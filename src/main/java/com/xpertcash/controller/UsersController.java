@@ -34,7 +34,7 @@ public class UsersController {
         }
     }
 
-
+    
     // Connexion
     @PostMapping("/login")
     public ResponseEntity<String> login(@RequestBody LoginRequest request) {
@@ -68,6 +68,8 @@ public class UsersController {
             return ResponseEntity.badRequest().body(e.getMessage());
         }
     }
+
+
 
     // Déverrouillage du compte via le lien de déverrouillage (GET avec paramètres)
     /*@GetMapping("/unlock")
