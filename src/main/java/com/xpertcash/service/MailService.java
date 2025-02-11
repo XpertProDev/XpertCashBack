@@ -62,4 +62,13 @@ public class MailService {
                 "Pour le déverrouiller, cliquez sur le lien suivant :\n" + unlockUrl);
         mailSender.send(message);
     }
+
+    // Envoie un email contenant le code de vérification à l'adresse spécifiée.
+    public void sendEmailVerificationCode(String toEmail, String verificationCode) {
+        SimpleMailMessage mailMessage = new SimpleMailMessage();
+        mailMessage.setTo(toEmail);
+        mailMessage.setSubject("Vérification de changement d'email");
+        mailMessage.setText("Votre code de vérification pour changer votre email est : " + verificationCode);
+        mailSender.send(mailMessage);
+    }
 }

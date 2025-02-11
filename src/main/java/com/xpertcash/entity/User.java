@@ -64,7 +64,7 @@ public class User {
     @Size(min = 8, message = "champs phone doit être 8 chiffres")
 
     // Not null de basse de donnée
-    @Column(nullable = false)
+    @Column(unique = true ,nullable = false)
     private String phone;
 
     //=========================== POUR PHOTO ===========================
