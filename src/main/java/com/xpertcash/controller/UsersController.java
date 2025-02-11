@@ -1,5 +1,6 @@
 package com.xpertcash.controller;
 
+import com.xpertcash.DTOs.UpdateUserRequest;
 import com.xpertcash.DTOs.LoginRequest;
 import com.xpertcash.DTOs.RegistrationRequest;
 import com.xpertcash.service.UsersService;
@@ -69,7 +70,16 @@ public class UsersController {
         }
     }
 
-
+    // Pour la mise en jour de user
+    @PutMapping("/updateUsers/{id}")
+    public ResponseEntity<String> updateUser(@PathVariable Long id, @RequestBody UpdateUserRequest request) {
+        try {
+            usersService.updateUser(id, request);
+            return ResponseEntity.ok("Utilisateur mis à jour avec succès");
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body("Erreur lors de la mise à jour : " + e.getMessage());
+        }
+    }
 
     // Déverrouillage du compte via le lien de déverrouillage (GET avec paramètres)
     /*@GetMapping("/unlock")

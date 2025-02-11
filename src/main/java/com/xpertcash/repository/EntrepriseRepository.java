@@ -1,6 +1,7 @@
 package com.xpertcash.repository;
 
 import com.xpertcash.entity.Entreprise;
+import com.xpertcash.entity.User;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
@@ -11,5 +12,7 @@ public interface EntrepriseRepository extends JpaRepository<Entreprise, Long> {
 
     Optional<Entreprise> findByNomEntreprise(String nom);
     boolean existsByIdentifiantEntreprise(String identifiantEntreprise);
-    boolean existsByNomEntreprise(String nom);
+
+
+    //boolean existsByNomEntreprise(String nom);
 }

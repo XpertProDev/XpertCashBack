@@ -1,5 +1,6 @@
 package com.xpertcash.service;
 
+import com.xpertcash.DTOs.UpdateUserRequest;
 import com.xpertcash.entity.Entreprise;
 import com.xpertcash.entity.User;
 import com.xpertcash.repository.EntrepriseRepository;
@@ -12,6 +13,7 @@ import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Random;
 
 @Service
@@ -31,6 +33,11 @@ public class UsersService {
         // Vérifier si l'email est déjà utilisé
         if (usersRepository.findByEmail(email).isPresent()) {
             throw new RuntimeException("Cet email est déjà utilisé.");
+        }
+
+        // Vérifier si le numéro de téléphone est déjà utilisé
+        if (usersRepository.findByPhone(phone).isPresent()) {
+            throw new RuntimeException("Ce numéro de téléphone est déjà utilisé. Veuillez en choisir un autre.");
         }
 
         // Vérifier si l'entreprise existe déjà
@@ -64,7 +71,7 @@ public class UsersService {
         users.setPassword(hashedPassword);
         users.setPhone(phone);
         users.setNomComplet(nomComplet);
-        users.setEntreprise(entreprise); // Associer l'entreprise à l'utilisateur
+        users.setEntreprise(entreprise);
         users.setActivationCode(activationCode);
         users.setCreatedAt(LocalDateTime.now());
         users.setActivatedLien(false);
@@ -152,7 +159,6 @@ public class UsersService {
         return status;
     }
 
-
     // Déverrouillage du compte en cas d'inactivité de 30 minutes, via le lien de déverrouillage
     public void unlockAccount(String email, String code) {
         User users = usersRepository.findByEmail(email)
@@ -166,6 +172,35 @@ public class UsersService {
             throw new RuntimeException("Code de déverrouillage invalide.");
         }
     }
+
+    // Pour la modification de utilisateur
+    public User updateUser(Long userId, UpdateUserRequest request) {
+        User user = usersRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
+
+        // Vérifier si le numéro de téléphone est déjà utilisé par un autre utilisateur
+        Optional<User> existingUserWithPhone = usersRepository.findByPhone(request.getPhone());
+        if (existingUserWithPhone.isPresent() && !existingUserWithPhone.get().getId().equals(userId)) {
+            throw new RuntimeException("Ce numéro de téléphone est déjà utilisé par un autre utilisateur.");
+        }
+
+        // Vérifier si le numéro est le même que l'ancien
+        if (user.getPhone().equals(request.getPhone())) {
+            throw new RuntimeException("Vous utilisez déjà ce numéro de téléphone.");
+        }
+
+        user.setNomComplet(request.getNomComplet());
+        user.setPhone(request.getPhone());
+        usersRepository.save(user);
+
+        return user;
+    }
+
+
+
+
+
+
 
     // Vérification (par exemple via un scheduler ou un intercepteur) de l'inactivité supérieure à 30 minutes
     // Si c'est le cas, le compte est verrouillé et un lien de déverrouillage est envoyé par email
