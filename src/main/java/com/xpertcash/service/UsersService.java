@@ -317,35 +317,25 @@ public class UsersService {
         User user = usersRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
 
-        boolean isUpdated = false; // Permet de vérifier s'il y a eu une modification
-
-        // Vérification et mise à jour du nom complet
-        if (request.getNomComplet() != null && !request.getNomComplet().equals(user.getNomComplet())) {
-            user.setNomComplet(request.getNomComplet());
-            isUpdated = true;
-        }
-
-        // Vérification et mise à jour du téléphone
+        // Si le numéro de téléphone a été modifié, faire la vérification
         if (request.getPhone() != null && !request.getPhone().equals(user.getPhone())) {
-            // Vérifier si le nouveau numéro est déjà utilisé par un autre utilisateur
-            usersRepository.findByPhone(request.getPhone())
-                    .filter(existingUser -> !existingUser.getId().equals(userId))
-                    .ifPresent(existingUser -> {
-                        throw new RuntimeException("Ce numéro est déjà utilisé par un autre utilisateur.");
-                    });
+            // Vérifier si le numéro de téléphone est déjà utilisé par un autre utilisateur
+            Optional<User> existingUserWithPhone = usersRepository.findByPhone(request.getPhone());
+            if (existingUserWithPhone.isPresent() && !existingUserWithPhone.get().getId().equals(userId)) {
+                throw new RuntimeException("Ce numéro de téléphone est déjà utilisé par un autre utilisateur.");
+            }
+        }
 
+        // Si le nom a changé, le mettre à jour
+        if (request.getNomComplet() != null) {
+            user.setNomComplet(request.getNomComplet());
+        }
+        if (request.getPhone() != null) {
             user.setPhone(request.getPhone());
-            isUpdated = true;
-        } else if (request.getPhone() != null && request.getPhone().equals(user.getPhone())) {
-            throw new RuntimeException("Vous utilisez déjà ce numéro de téléphone.");
         }
 
-        // Si aucune modification n'a été faite, on retourne l'utilisateur sans sauvegarder
-        if (!isUpdated) {
-            throw new RuntimeException("Aucune modification détectée.");
-        }
-
-        return usersRepository.save(user);
+        usersRepository.save(user);
+        return user;
     }
 
 
