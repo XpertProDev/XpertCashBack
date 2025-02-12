@@ -1,11 +1,16 @@
 package com.xpertcash.controller;
 
 import com.xpertcash.DTOs.UpdateUserRequest;
+import com.xpertcash.DTOs.USER.UserRequest;
+import com.xpertcash.entity.User;
 import com.xpertcash.DTOs.LoginRequest;
 import com.xpertcash.DTOs.RegistrationRequest;
 import com.xpertcash.service.UsersService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.validation.BindingResult;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.http.HttpStatus;
 
@@ -92,4 +97,19 @@ public class UsersController {
             return ResponseEntity.badRequest().body(e.getMessage());
         }
     }*/
+
+        
+         
+          // Endpoint pour ajouter un utilisateur à l'entreprise de l'Admin
+          
+    @PostMapping("/{adminId}/add")
+    public ResponseEntity<?> addUserToEntreprise(@PathVariable Long adminId, @RequestBody UserRequest userRequest) {
+        try {
+            User user = usersService.addUserToEntreprise(adminId, userRequest);
+            return new ResponseEntity<>(user, HttpStatus.CREATED);
+        } catch (RuntimeException e) {
+            return new ResponseEntity<>(e.getMessage(), HttpStatus.FORBIDDEN);
+        }
+    }
+    
 }

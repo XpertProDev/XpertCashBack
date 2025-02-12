@@ -100,6 +100,7 @@ public class User {
     private Entreprise entreprise;
 
     @ManyToOne
+    @JoinColumn(name = "role_id", nullable = false)
     private Role role;
 
 }
