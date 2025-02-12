@@ -2,9 +2,15 @@ package com.xpertcash.service;
 
 import com.xpertcash.DTOs.UpdateUserRequest;
 import com.xpertcash.entity.Entreprise;
+import com.xpertcash.entity.Role;
+import com.xpertcash.entity.RoleType;
 import com.xpertcash.entity.User;
 import com.xpertcash.repository.EntrepriseRepository;
+import com.xpertcash.repository.RoleRepository;
 import com.xpertcash.repository.UsersRepository;
+
+import jakarta.transaction.Transactional;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -13,7 +19,6 @@ import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Random;
 
 @Service
@@ -27,6 +32,9 @@ public class UsersService {
 
     @Autowired
     private MailService mailService;
+
+    @Autowired
+    private  RoleRepository roleRepository;
 
     // Inscription : génère le code PIN, enregistre l'utilisateur et envoie le lien d'activation
     public User registerUsers(String nomComplet, String email, String password, String phone, String nomEntreprise) {
@@ -65,6 +73,10 @@ public class UsersService {
         entreprise.setCreatedAt(LocalDateTime.now());
         entreprise = entrepriseRepository.save(entreprise);
 
+        // Attribution du rôle ADMIN
+                Role adminRole = roleRepository.findByName(RoleType.ADMIN)
+        .orElseThrow(() -> new RuntimeException("Rôle ADMIN non trouvé"));
+
         // Créer l'utilisateur
         User users = new User();
         users.setEmail(email);
@@ -72,6 +84,7 @@ public class UsersService {
         users.setPhone(phone);
         users.setNomComplet(nomComplet);
         users.setEntreprise(entreprise);
+        users.setRole(adminRole);
         users.setActivationCode(activationCode);
         users.setCreatedAt(LocalDateTime.now());
         users.setActivatedLien(false);
@@ -79,6 +92,9 @@ public class UsersService {
         users.setLastActivity(LocalDateTime.now());
         users.setLocked(false);
         usersRepository.save(users);
+
+        entreprise.setAdmin(users);
+        entrepriseRepository.save(entreprise);
 
         try {
             mailService.sendActivationLinkEmail(email, activationCode);
@@ -88,6 +104,23 @@ public class UsersService {
 
         return users;
     }
+
+    //Admin name
+
+    public String getNomCompletAdminDeEntreprise(Long entrepriseId) {
+        // Récupérer l'entreprise par ID
+        Entreprise entreprise = entrepriseRepository.findById(entrepriseId)
+                .orElseThrow(() -> new RuntimeException("Entreprise non trouvée"));
+    
+        // Vérifier si l'entreprise a un administrateur
+        User admin = entreprise.getAdmin();
+        if (admin != null) {
+            return admin.getNomComplet();  // Récupérer le nom complet de l'administrateur
+        } else {
+            throw new RuntimeException("Aucun administrateur assigné à cette entreprise.");
+        }
+    }
+    
 
     // Connexion : vérifie l'état du compte et met à jour la dernière activité
     public void login(String email, String password) {
@@ -174,26 +207,40 @@ public class UsersService {
     }
 
     // Pour la modification de utilisateur
+    @Transactional
     public User updateUser(Long userId, UpdateUserRequest request) {
         User user = usersRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
 
-        // Vérifier si le numéro de téléphone est déjà utilisé par un autre utilisateur
-        Optional<User> existingUserWithPhone = usersRepository.findByPhone(request.getPhone());
-        if (existingUserWithPhone.isPresent() && !existingUserWithPhone.get().getId().equals(userId)) {
-            throw new RuntimeException("Ce numéro de téléphone est déjà utilisé par un autre utilisateur.");
+        boolean isUpdated = false; // Permet de vérifier s'il y a eu une modification
+
+        // Vérification et mise à jour du nom complet
+        if (request.getNomComplet() != null && !request.getNomComplet().equals(user.getNomComplet())) {
+            user.setNomComplet(request.getNomComplet());
+            isUpdated = true;
         }
 
-        // Vérifier si le numéro est le même que l'ancien
-        if (user.getPhone().equals(request.getPhone())) {
+        // Vérification et mise à jour du téléphone
+        if (request.getPhone() != null && !request.getPhone().equals(user.getPhone())) {
+            // Vérifier si le nouveau numéro est déjà utilisé par un autre utilisateur
+            usersRepository.findByPhone(request.getPhone())
+                    .filter(existingUser -> !existingUser.getId().equals(userId))
+                    .ifPresent(existingUser -> {
+                        throw new RuntimeException("Ce numéro est déjà utilisé par un autre utilisateur.");
+                    });
+
+            user.setPhone(request.getPhone());
+            isUpdated = true;
+        } else if (request.getPhone() != null && request.getPhone().equals(user.getPhone())) {
             throw new RuntimeException("Vous utilisez déjà ce numéro de téléphone.");
         }
 
-        user.setNomComplet(request.getNomComplet());
-        user.setPhone(request.getPhone());
-        usersRepository.save(user);
+        // Si aucune modification n'a été faite, on retourne l'utilisateur sans sauvegarder
+        if (!isUpdated) {
+            throw new RuntimeException("Aucune modification détectée.");
+        }
 
-        return user;
+        return usersRepository.save(user);
     }
 
 

@@ -21,7 +21,8 @@ public class RoleService {
 
     @PostConstruct
     public void initRoles() {
-        if (roleRepository.count() == 0) {
+        // Ajouter les rôles uniquement si le rôle ADMIN n'existe pas déjà
+        if (!roleRepository.existsByName(RoleType.ADMIN)) {
             List<Role> roles = Arrays.asList(
                 new Role(null, RoleType.SUPER_ADMIN),
                 new Role(null, RoleType.ADMIN),
@@ -31,7 +32,7 @@ public class RoleService {
             );
             roleRepository.saveAll(roles);
             System.out.println("Rôles ajoutés dans la base de données.");
-        } 
+        }
     }
 
     public List<Role> getAllRoles() {

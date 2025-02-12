@@ -72,7 +72,7 @@ public class UsersController {
 
     // Pour la mise en jour de user
     @PutMapping("/updateUsers/{id}")
-    public ResponseEntity<String> updateUser(@PathVariable Long id, @RequestBody UpdateUserRequest request) {
+    public ResponseEntity<?> updateUser(@PathVariable Long id, @RequestBody UpdateUserRequest request) {
         try {
             usersService.updateUser(id, request);
             return ResponseEntity.ok("Utilisateur mis à jour avec succès");

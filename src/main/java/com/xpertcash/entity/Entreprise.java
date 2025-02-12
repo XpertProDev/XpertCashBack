@@ -28,9 +28,16 @@ public class Entreprise {
     @Column(nullable = false)
     private LocalDateTime createdAt;
 
+    @ManyToOne
+    @JoinColumn(name = "admin_id", nullable = true)  
+    private User admin;
+
     // Générer un identifiant unique
     public static String generateIdentifiantEntreprise() {
         return "Xpc" + String.format("%04d", new Random().nextInt(10000));
     }
+
+
+    
 
 }
