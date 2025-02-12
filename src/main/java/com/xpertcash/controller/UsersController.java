@@ -35,7 +35,6 @@ public class UsersController {
         }
     }
 
-
     // Connexion
     @PostMapping("/login")
     public ResponseEntity<String> login(@RequestBody LoginRequest request) {
@@ -71,7 +70,7 @@ public class UsersController {
     }
 
     // Pour la mise en jour de user
-    @PutMapping("/updateUsers/{id}")
+    @PatchMapping("/updateUsers/{id}")
     public ResponseEntity<String> updateUser(@PathVariable Long id, @RequestBody UpdateUserRequest request) {
         try {
             usersService.updateUser(id, request);

@@ -178,21 +178,24 @@ public class UsersService {
         User user = usersRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
 
-        // Vérifier si le numéro de téléphone est déjà utilisé par un autre utilisateur
-        Optional<User> existingUserWithPhone = usersRepository.findByPhone(request.getPhone());
-        if (existingUserWithPhone.isPresent() && !existingUserWithPhone.get().getId().equals(userId)) {
-            throw new RuntimeException("Ce numéro de téléphone est déjà utilisé par un autre utilisateur.");
+        // Si le numéro de téléphone a été modifié, faire la vérification
+        if (request.getPhone() != null && !request.getPhone().equals(user.getPhone())) {
+            // Vérifier si le numéro de téléphone est déjà utilisé par un autre utilisateur
+            Optional<User> existingUserWithPhone = usersRepository.findByPhone(request.getPhone());
+            if (existingUserWithPhone.isPresent() && !existingUserWithPhone.get().getId().equals(userId)) {
+                throw new RuntimeException("Ce numéro de téléphone est déjà utilisé par un autre utilisateur.");
+            }
         }
 
-        // Vérifier si le numéro est le même que l'ancien
-        if (user.getPhone().equals(request.getPhone())) {
-            throw new RuntimeException("Vous utilisez déjà ce numéro de téléphone.");
+        // Si le nom a changé, le mettre à jour
+        if (request.getNomComplet() != null) {
+            user.setNomComplet(request.getNomComplet());
+        }
+        if (request.getPhone() != null) {
+            user.setPhone(request.getPhone());
         }
 
-        user.setNomComplet(request.getNomComplet());
-        user.setPhone(request.getPhone());
         usersRepository.save(user);
-
         return user;
     }
 
