@@ -6,6 +6,9 @@ import com.xpertcash.entity.User;
 import com.xpertcash.DTOs.LoginRequest;
 import com.xpertcash.DTOs.RegistrationRequest;
 import com.xpertcash.service.UsersService;
+
+import jakarta.servlet.http.HttpServletRequest;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -41,12 +44,14 @@ public class UsersController {
     }
 
     
-    // Connexion
+          // Connexion
     @PostMapping("/login")
     public ResponseEntity<String> login(@RequestBody LoginRequest request) {
         try {
-            usersService.login(request.getEmail(), request.getPassword());
-            return ResponseEntity.ok("Connexion réussie.");
+            // Appeler la méthode login et récupérer le token JWT
+            String token = usersService.login(request.getEmail(), request.getPassword());
+            // Retourner le token dans la réponse
+            return ResponseEntity.ok("Connexion réussie. Token: " + token);
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(e.getMessage());
         }
@@ -102,14 +107,10 @@ public class UsersController {
          
           // Endpoint pour ajouter un utilisateur à l'entreprise de l'Admin
           
-    @PostMapping("/{adminId}/add")
-    public ResponseEntity<?> addUserToEntreprise(@PathVariable Long adminId, @RequestBody UserRequest userRequest) {
-        try {
-            User user = usersService.addUserToEntreprise(adminId, userRequest);
-            return new ResponseEntity<>(user, HttpStatus.CREATED);
-        } catch (RuntimeException e) {
-            return new ResponseEntity<>(e.getMessage(), HttpStatus.FORBIDDEN);
-        }
+    @PostMapping("/add")
+    public User addUserToEntreprise(HttpServletRequest request, @RequestBody UserRequest userRequest) {
+        // On appelle le service qui gère l'ajout de l'utilisateur
+        return usersService.addUserToEntreprise(request, userRequest);
     }
     
 }

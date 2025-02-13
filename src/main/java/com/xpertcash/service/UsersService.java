@@ -2,6 +2,8 @@ package com.xpertcash.service;
 
 import com.xpertcash.DTOs.UpdateUserRequest;
 import com.xpertcash.DTOs.USER.UserRequest;
+import com.xpertcash.configuration.JwtConfig;
+import com.xpertcash.configuration.JwtUtil;
 import com.xpertcash.configuration.PasswordGenerator;
 import com.xpertcash.entity.Entreprise;
 import com.xpertcash.entity.Role;
@@ -11,6 +13,9 @@ import com.xpertcash.repository.EntrepriseRepository;
 import com.xpertcash.repository.RoleRepository;
 import com.xpertcash.repository.UsersRepository;
 
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.SignatureAlgorithm;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.transaction.Transactional;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -22,6 +27,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -45,6 +51,22 @@ public class UsersService {
     @Autowired
     private BCryptPasswordEncoder passwordEncoder;
 
+    @Autowired
+    private JwtUtil jwtUtil;  // Utilisation de JwtUtil pour extraire l'ID de l'utilisateur
+
+    private final JwtConfig jwtConfig; 
+
+    @Autowired
+    public UsersService(UsersRepository usersRepository, JwtConfig jwtConfig, BCryptPasswordEncoder passwordEncoder) {
+        this.usersRepository = usersRepository;
+        this.jwtConfig = jwtConfig;
+        this.passwordEncoder = passwordEncoder;
+    }
+
+    
+
+   
+
 
     // Inscription : génère le code PIN, enregistre l'utilisateur et envoie le lien d'activation
     public User registerUsers(String nomComplet, String email, String password, String phone, String nomEntreprise) {
@@ -52,41 +74,41 @@ public class UsersService {
         if (usersRepository.findByEmail(email).isPresent()) {
             throw new RuntimeException("Cet email est déjà utilisé.");
         }
-
+    
         // Vérifier si le numéro de téléphone est déjà utilisé
         if (usersRepository.findByPhone(phone).isPresent()) {
             throw new RuntimeException("Ce numéro de téléphone est déjà utilisé. Veuillez en choisir un autre.");
         }
-
+    
         // Vérifier si l'entreprise existe déjà
         if (entrepriseRepository.findByNomEntreprise(nomEntreprise).isPresent()) {
             throw new RuntimeException("Le nom de l'entreprise est déjà utilisé. Veuillez choisir un autre nom.");
         }
-
+    
         // Générer un mot de passe haché
         BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
         String hashedPassword = passwordEncoder.encode(password);
-
+    
         // Générer un code PIN d'activation
         String activationCode = String.format("%04d", new Random().nextInt(10000));
-
+    
         // Générer un identifiant unique pour l'entreprise
         String identifiantUnique;
         do {
             identifiantUnique = Entreprise.generateIdentifiantEntreprise();
         } while (entrepriseRepository.existsByIdentifiantEntreprise(identifiantUnique));
-
+    
         // Créer l'entreprise
         Entreprise entreprise = new Entreprise();
         entreprise.setNomEntreprise(nomEntreprise);
         entreprise.setIdentifiantEntreprise(identifiantUnique);
         entreprise.setCreatedAt(LocalDateTime.now());
         entreprise = entrepriseRepository.save(entreprise);
-
+    
         // Attribution du rôle ADMIN
-                Role adminRole = roleRepository.findByName(RoleType.ADMIN)
-        .orElseThrow(() -> new RuntimeException("Rôle ADMIN non trouvé"));
-
+        Role adminRole = roleRepository.findByName(RoleType.ADMIN)
+            .orElseThrow(() -> new RuntimeException("Rôle ADMIN non trouvé"));
+    
         // Créer l'utilisateur
         User users = new User();
         users.setEmail(email);
@@ -97,23 +119,25 @@ public class UsersService {
         users.setRole(adminRole);
         users.setActivationCode(activationCode);
         users.setCreatedAt(LocalDateTime.now());
-        users.setActivatedLien(false);
-        users.setEnabledLien(true);
+        users.setActivatedLien(false);  // L'utilisateur n'a pas encore activé son compte
+        users.setEnabledLien(true);  // Lien d'activation activé
         users.setLastActivity(LocalDateTime.now());
         users.setLocked(false);
         usersRepository.save(users);
-
+    
         entreprise.setAdmin(users);
         entrepriseRepository.save(entreprise);
-
+    
         try {
             mailService.sendActivationLinkEmail(email, activationCode);
         } catch (Exception e) {
             System.err.println("Erreur lors de l'envoi de l'email d'activation : " + e.getMessage());
         }
-
+    
         return users;
     }
+    
+
 
     //Admin name
 
@@ -132,50 +156,67 @@ public class UsersService {
     }
     
 
+        // Connexion : vérifie l'état du compte et retourne un token JWT
+            // Connexion : vérifie l'état du compte et retourne un token JWT
+public String login(String email, String password) {
+    // Récupérer l'utilisateur par son email
+    User user = usersRepository.findByEmail(email)
+            .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+
+    // Vérification du mot de passe
+    if (!passwordEncoder.matches(password, user.getPassword())) {
+        throw new RuntimeException("Mot de passe incorrect.");
+    }
+
+    // Vérification si le compte est verrouillé
+    if (user.isLocked()) {
+        throw new RuntimeException("Votre compte est verrouillé pour inactivité.");
+    }
+
+    // Vérification de l'activation du compte
+    if (!user.isActivatedLien()) {
+        // Vérifier si l'activation a été faite dans les 24 heures
+        LocalDateTime expirationDate = user.getCreatedAt().plusHours(24); // Ajout de 24 heures à la date de création
+        if (LocalDateTime.now().isAfter(expirationDate)) {
+            user.setLocked(true); // Bloquer le compte après 24h si non activé
+            usersRepository.save(user);
+            throw new RuntimeException("Période d'activation expirée. Vous ne pouvez plus vous connecter.");
+        }
+
+        // Si le compte n'est pas activé mais qu'il est encore dans la période de 24h
+        // Générer le token même si le compte n'est pas activé
+        String token = generateToken(user);
+        return "Votre compte n'est pas encore activé. Veuillez activer votre compte dans les 24 heures. Token: " + token;
+    }
+
+    // Mise à jour de la dernière activité de l'utilisateur
+    user.setLastActivity(java.time.LocalDateTime.now());
+    usersRepository.save(user);
+
+    // Générer et retourner le JWT si le compte est activé
+    return generateToken(user);
+}
 
 
-    // Connexion : vérifie l'état du compte et met à jour la dernière activité
-                public void login(String email, String password) {
-                    User user = usersRepository.findByEmail(email)
-                            .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
 
-                    BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
+    // Génère un token JWT sécurisé
+    private String generateToken(User user) {
+        // Définir le temps d'expiration du token (24 heures)
+        long expirationTime = 1000 * 60 * 60 * 24; // 24 heures
+        Date now = new Date();
+        Date expirationDate = new Date(now.getTime() + expirationTime);
 
-                    // Vérification du mot de passe
-                    if (!passwordEncoder.matches(password, user.getPassword())) {
-                        throw new RuntimeException("Mot de passe incorrect.");
-                    }
+        // Générer le token JWT
+        return Jwts.builder()
+                .setSubject(String.valueOf(user.getId()))  // L'ID de l'utilisateur comme "subject"
+                .claim("role", user.getRole().getName())  // Ajouter le rôle de l'utilisateur dans le claim
+                .setIssuedAt(now)  // Date de création du token
+                .setExpiration(expirationDate)  // Date d'expiration du token
+                .signWith(SignatureAlgorithm.HS256, jwtConfig.getSecretKey())  // Utilisation de la clé secrète de JwtConfig pour signer
+                .compact();
+    }
 
-                    // Vérification si le compte est verrouillé
-                    if (user.isLocked()) {
-                        throw new RuntimeException("Votre compte est verrouillé pour inactivité. Veuillez le déverrouiller via le lien envoyé par email.");
-                    }
-
-                    // Vérification de l'activation du compte
-                    if (!user.isActivatedLien()) {
-                        LocalDateTime expiration = user.getCreatedAt().plusHours(24);
-                        if (LocalDateTime.now().isAfter(expiration)) {
-                            user.setEnabledLien(false);
-                            usersRepository.save(user);
-                            throw new RuntimeException("Votre période d'utilisation gratuite de 24h est terminée et votre compte a été désactivé.");
-                        }
-                    }
-
-                    // Mise à jour de la dernière activité
-                    user.setLastActivity(LocalDateTime.now());
-                    usersRepository.save(user);
-
-                    // Ajout d'une gestion selon le rôle (exemple)
-                    if (user.getRole().getName().equals("ADMIN")) {
-                        System.out.println("L'utilisateur est un ADMIN.");
-                    } else if (user.getRole().getName().equals("VENDEUR")) {
-                        System.out.println("L'utilisateur est un VENDEUR.");
-                    }
-                }
-
-
-
-
+  
 
     // Activation du compte via le lien d'activation (email + code PIN)
     public void activateAccount(String email, String code) {
@@ -233,8 +274,25 @@ public class UsersService {
     //Admin addUserToEntreprise
 
     @Transactional
-    public User addUserToEntreprise(Long adminId, UserRequest request) {
-        // Récupérer l'admin par l'ID fourni dans l'URL
+    public User addUserToEntreprise(HttpServletRequest request, UserRequest userRequest) {
+        // Vérifier la présence du token JWT dans l'entête de la requête
+        String token = request.getHeader("Authorization");
+        if (token == null || !token.startsWith("Bearer ")) {
+            throw new RuntimeException("Token JWT manquant ou mal formaté");
+        }
+    
+        // Extraire le token sans le "Bearer "
+        token = token.replace("Bearer ", "");
+    
+        Long adminId = null;
+        try {
+            // Décrypter le token pour obtenir l'ID de l'admin
+            adminId = jwtUtil.extractUserId(token);  // Méthode pour extraire l'ID de l'admin du token
+        } catch (Exception e) {
+            throw new RuntimeException("Erreur lors de l'extraction de l'ID de l'admin depuis le token", e);
+        }
+    
+        // Récupérer l'admin par l'ID extrait du token
         User admin = usersRepository.findById(adminId)
                 .orElseThrow(() -> new RuntimeException("Admin non trouvé"));
     
@@ -249,8 +307,8 @@ public class UsersService {
         }
     
         // Vérifier si un utilisateur avec le même email ou le même téléphone existe déjà dans l'entreprise
-        Optional<User> existingUserByEmail = usersRepository.findByEmailAndEntreprise(request.getEmail(), admin.getEntreprise());
-        Optional<User> existingUserByPhone = usersRepository.findByPhoneAndEntreprise(request.getPhone(), admin.getEntreprise());
+        Optional<User> existingUserByEmail = usersRepository.findByEmailAndEntreprise(userRequest.getEmail(), admin.getEntreprise());
+        Optional<User> existingUserByPhone = usersRepository.findByPhoneAndEntreprise(userRequest.getPhone(), admin.getEntreprise());
     
         if (existingUserByEmail.isPresent()) {
             throw new RuntimeException("Un utilisateur avec cet email existe déjà dans votre entreprise.");
@@ -261,21 +319,21 @@ public class UsersService {
         }
     
         // Vérifier que le rôle spécifié pour le nouvel utilisateur existe
-        Role role = roleRepository.findByName(request.getRoleType())
-                .orElseThrow(() -> new RuntimeException("Rôle invalide : " + request.getRoleType()));
+        Role role = roleRepository.findByName(userRequest.getRoleType())
+                .orElseThrow(() -> new RuntimeException("Rôle invalide : " + userRequest.getRoleType()));
     
         // Générer un mot de passe pour l'utilisateur
         String generatedPassword = PasswordGenerator.generatePassword();
-        
+    
         // Encoder le mot de passe avant de l'enregistrer
         String encodedPassword = passwordEncoder.encode(generatedPassword);
     
         // Créer un nouvel utilisateur avec le mot de passe encodé
         User newUser = new User();
-        newUser.setEmail(request.getEmail());
+        newUser.setEmail(userRequest.getEmail());
         newUser.setPassword(encodedPassword); // Utiliser le mot de passe encodé
-        newUser.setNomComplet(request.getNomComplet());
-        newUser.setPhone(request.getPhone());
+        newUser.setNomComplet(userRequest.getNomComplet());
+        newUser.setPhone(userRequest.getPhone());
         newUser.setEnabledLien(admin.isEnabledLien());
         newUser.setCreatedAt(LocalDateTime.now());
         newUser.setEntreprise(admin.getEntreprise());
@@ -284,25 +342,27 @@ public class UsersService {
         // Enregistrer l'utilisateur en base de données
         User savedUser = usersRepository.save(newUser);
     
-       // Envoi de l'email avec les informations
+        // Envoi de l'email avec les informations
         String message = String.format(
-            "Bonjour %s,\n\n" +
-            "Vous venez d'être ajouté à l'entreprise %s en tant que %s.\n\n" +
-            "Voici vos identifiants :\n" +
-            "Email : %s\n" +
-            "Mot de passe : %s\n\n" +
-            "Merci.",
-            savedUser.getNomComplet(),                       
-            savedUser.getEntreprise().getNomEntreprise(),             
-            savedUser.getRole().getName(),               
-            savedUser.getEmail(),                         
-            generatedPassword                            
+                "Bonjour %s,\n\n" +
+                        "Vous venez d'être ajouté à l'entreprise %s en tant que %s.\n\n" +
+                        "Voici vos identifiants :\n" +
+                        "Email : %s\n" +
+                        "Mot de passe : %s\n\n" +
+                        "Merci.",
+                savedUser.getNomComplet(),
+                savedUser.getEntreprise().getNomEntreprise(),
+                savedUser.getRole().getName(),
+                savedUser.getEmail(),
+                generatedPassword
         );
-
     
         try {
+            // Envoi de l'email
             mailService.sendEmail(savedUser.getEmail(), "Création de votre compte", message);
         } catch (MailException e) {
+            // Loguer l'erreur d'envoi d'email
+            System.err.println("Erreur lors de l'envoi de l'email : " + e.getMessage());
             throw new RuntimeException("Utilisateur créé mais une erreur est survenue lors de l'envoi de l'email.");
         }
     
