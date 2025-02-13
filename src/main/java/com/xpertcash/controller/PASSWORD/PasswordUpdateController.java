@@ -20,7 +20,7 @@ public class PasswordUpdateController {
      * L'utilisateur fournit son mot de passe actuel et le nouveau mot de passe.
      * Un code de vérification est envoyé à son email actuel.
      */
-    @PostMapping("/update-password/{userId}")
+    @PutMapping("/update-password/{userId}")
     public ResponseEntity<String> requestPasswordUpdate(@PathVariable Long userId, @Valid @RequestBody PasswordUpdateRequest request) {
         try {
             passwordUpdateService.requestPasswordUpdate(userId, request);

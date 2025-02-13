@@ -3,7 +3,13 @@ package com.xpertcash.controller;
 import com.xpertcash.DTOs.UpdateUserRequest;
 import com.xpertcash.DTOs.LoginRequest;
 import com.xpertcash.DTOs.RegistrationRequest;
+import com.xpertcash.entity.User;
 import com.xpertcash.service.UsersService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -18,7 +24,7 @@ public class UsersController {
     @Autowired
     private UsersService usersService;
 
-    // Inscription
+
     @PostMapping("/register")
     public ResponseEntity<String> register(@RequestBody RegistrationRequest request) {
         try {
