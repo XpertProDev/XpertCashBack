@@ -5,6 +5,7 @@ import com.xpertcash.composant.AuthorizationService;
 import com.xpertcash.entity.CategoryProduit;
 import com.xpertcash.entity.PermissionType;
 import com.xpertcash.entity.Produits;
+import com.xpertcash.entity.RoleType;
 import com.xpertcash.entity.User;
 import com.xpertcash.exceptions.CustomException;
 import com.xpertcash.exceptions.NotFoundException;
@@ -40,16 +41,21 @@ public class ProduitsService {
 
 
     // Méthode pour Ajouter un produit (Admin seulement)
-        // Ajouter un produit
+            // Ajouter un produit
     public Produits ajouterProduit(Long userId, Produits produit) {
-        // Vérifier si l'utilisateur existe
+        // Vérification de l'existence de l'utilisateur
         User user = usersRepository.findById(userId)
-                .orElseThrow(() -> new NotFoundException("Utilisateur non trouvé."));
+                .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
 
-        // Vérifier si l'utilisateur a les droits nécessaires (admin ou autre rôle autorisé)
+        // Vérification si l'utilisateur est un admin
+        if (user.getRole().getName() != RoleType.ADMIN) {
+            throw new RuntimeException("L'utilisateur n'a pas les droits nécessaires.");
+        }
+
+        // Vérification des permissions pour gérer les produits
         authorizationService.checkPermission(user, PermissionType.GERER_PRODUITS);
 
-        // Vérifier que tous les champs requis sont renseignés
+        // Validation des champs du produit
         if (produit.getNomProduit() == null || produit.getNomProduit().trim().isEmpty()) {
             throw new RuntimeException("Le nom du produit est obligatoire");
         }
@@ -68,24 +74,22 @@ public class ProduitsService {
         if (produit.getAlertSeuil() <= 0) {
             throw new RuntimeException("L'alerte de seuil doit être un nombre positif.");
         }
-        
 
-        // Vérifier que la catégorie du produit existe
+        // Vérifier la catégorie
         if (produit.getCategory() == null || produit.getCategory().getId() == null) {
             throw new RuntimeException("La catégorie du produit est obligatoire");
         }
 
-        // Récupérer la catégorie depuis la base de données
+        // Récupérer la catégorie du produit
         CategoryProduit category = categoryProduitRepository.findById(produit.getCategory().getId())
-                .orElseThrow(() -> new RuntimeException("La catégorie avec l'ID " + produit.getCategory().getId() + " n'existe pas."));
+                .orElseThrow(() -> new RuntimeException("La catégorie avec l'ID " + produit.getCategory().getId() + " n'existe pas"));
 
         // Associer la catégorie au produit
         produit.setCategory(category);
 
-        // Sauvegarde du produit en base de données
+        // Sauvegarder le produit en base de données
         return produitsRepository.save(produit);
     }
-    
 
     // Méthode pour Modifier un produit (Admin seulement)
     public Produits modifierProduit(Long userId, Long id, Produits produitModifie, MultipartFile imageFile) {

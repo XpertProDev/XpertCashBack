@@ -44,16 +44,13 @@ public class ProduitsController {
 
     
         // Méthode pour Ajouter un produit
-            // Méthode pour Ajouter un produit
+          // Méthode pour Ajouter un produit
 @PostMapping("/add/produit")
 public ResponseEntity<?> ajouterProduit(
         @RequestHeader("Authorization") String token,  // Récupération du token JWT
         @RequestBody Produits produit  // Récupération du produit directement dans le body
 ) {
     try {
-        // Log d'entrée pour le débogage
-        System.out.println("Tentative d'ajout du produit : " + produit.toString());
-
         // Extraire l'ID de l'utilisateur à partir du token JWT
         String jwtToken = token.substring(7);  // Enlever le "Bearer " du début du token
         Long userId = jwtUtil.extractUserId(jwtToken);  // Extraire l'ID de l'utilisateur
@@ -68,53 +65,42 @@ public ResponseEntity<?> ajouterProduit(
                     .body("L'utilisateur n'a pas les droits nécessaires.");
         }
 
-        // Vérifier les champs obligatoires du produit
+        // Vérifier si l'Admin a bien la permission de créer un produit
+        authorizationService.checkPermission(user, PermissionType.GERER_PRODUITS);
+
+        // Validation des champs du produit
         if (produit.getNomProduit() == null || produit.getNomProduit().trim().isEmpty()) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Collections.singletonMap("error", "Le nom du produit est obligatoire."));
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Le nom du produit est obligatoire.");
         }
         if (produit.getDescription() == null || produit.getDescription().trim().isEmpty()) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Collections.singletonMap("error", "La description du produit est obligatoire."));
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("La description du produit est obligatoire.");
         }
         if (produit.getPrix() == null || produit.getPrix() <= 0) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Collections.singletonMap("error", "Le prix du produit doit être supérieur à 0."));
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Le prix du produit doit être supérieur à 0.");
         }
         if (produit.getQuantite() <= 0) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Collections.singletonMap("error", "La quantité doit être supérieure à 0."));
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("La quantité doit être supérieure à 0.");
         }
         if (produit.getSeuil() <= 0) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Collections.singletonMap("error", "Le seuil doit être supérieur à 0."));
-        }
-        if (produit.getAlertSeuil() <= 0) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Collections.singletonMap("error", "L'alerte de seuil doit être un nombre positif."));
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Le seuil doit être supérieur à 0.");
         }
 
-        // Vérifier que la catégorie du produit existe
-        if (produit.getCategory() == null || produit.getCategory().getId() == null) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Collections.singletonMap("error", "La catégorie du produit est obligatoire."));
-        }
-
-        // Récupérer la catégorie depuis la base de données
-        CategoryProduit category = categoryProduitRepository.findById(produit.getCategory().getId())
-                .orElseThrow(() -> new RuntimeException("La catégorie avec l'ID " + produit.getCategory().getId() + " n'existe pas."));
-
-        // Associer la catégorie au produit
-        produit.setCategory(category);
-
-        // Sauvegarde du produit en base de données
+        // Appeler le service pour ajouter le produit
         Produits savedProduit = produitsService.ajouterProduit(userId, produit);
 
         return ResponseEntity.status(HttpStatus.CREATED).body(savedProduit);
 
-    } catch (NotFoundException e) {
-        // Log l'erreur NotFoundException
+    } catch (RuntimeException e) {
+        // En cas d'erreur (par exemple si l'utilisateur n'a pas les droits ou si les champs sont invalides)
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Collections.singletonMap("error", e.getMessage()));
     } catch (Exception e) {
-        // Log l'erreur générique
+        // Erreur générique
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Collections.singletonMap("error", "Erreur interne : " + e.getMessage()));
     }
 }
 
-        
+
+
         // Méthode pour Modifier un produit
             @PutMapping("/update/produit/{id}")
             public ResponseEntity<?> modifierProduit(
