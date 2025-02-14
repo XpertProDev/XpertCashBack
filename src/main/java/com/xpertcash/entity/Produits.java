@@ -29,11 +29,18 @@ public class Produits {
     private Double prix;
 
     @NotNull(message = "Champs vide")
-    private int quantite;
+    @Column(nullable = false)
+    private Double prixAchat;
 
     @NotNull(message = "Champs vide")
+    private int quantite;
+
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private int seuil;
+    private UniteMesure uniteMesure;
+
+
+    
 
     @NotNull(message = "Champs vide")
     @Column(nullable = false)
