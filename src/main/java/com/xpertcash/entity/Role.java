@@ -1,6 +1,7 @@
 package com.xpertcash.entity;
 
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 import jakarta.persistence.*;
@@ -21,12 +22,11 @@ public class Role {
     @Column(unique = true, nullable = false)
     private RoleType name;
 
-     // Relation many-to-many avec Permission
-    @ManyToMany
+    @ManyToMany(fetch = FetchType.EAGER)  // Relation ManyToMany avec Permission
     @JoinTable(
-        name = "role_permission", 
-        joinColumns = @JoinColumn(name = "role_id"), 
+        name = "role_permissions",
+        joinColumns = @JoinColumn(name = "role_id"),
         inverseJoinColumns = @JoinColumn(name = "permission_id")
     )
-    private Set<Permission> permissions = new HashSet<>();
+    private List<Permission> permissions;
 }

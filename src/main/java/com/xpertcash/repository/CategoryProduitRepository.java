@@ -1,7 +1,6 @@
 package com.xpertcash.repository;
 
 import com.xpertcash.entity.CategoryProduit;
-import com.xpertcash.entity.Produits;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 

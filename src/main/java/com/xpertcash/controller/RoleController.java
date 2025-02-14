@@ -21,29 +21,7 @@ public class RoleController {
 
     private final RoleService roleService;
 
-    // Ajouter une permission à un rôle
-    @PostMapping("/{roleId}/addPermission")
-    public ResponseEntity<?> addPermissionToRole(@PathVariable Long roleId, @RequestParam PermissionType permissionType) {
-        try {
-            Role updatedRole = roleService.addPermissionToRole(roleId, permissionType);
-            return ResponseEntity.ok(updatedRole);
-        } catch (RuntimeException e) {
-            return ResponseEntity.badRequest().body(e.getMessage());
-        }
-    }
-
-    // Récupérer les permissions d'un rôle
-    @GetMapping("/{roleId}/permissions")
-    public ResponseEntity<Set<Permission>> getPermissionsForRole(@PathVariable Long roleId) {
-        Set<Permission> permissions = roleService.getPermissionsForRole(roleId);
-        return ResponseEntity.ok(permissions);
-    }
 
 
-    @GetMapping("/all")
-    public ResponseEntity<List<Role>> getAllRoles() {
-        List<Role> roles = roleService.getAllRoles();
-        return ResponseEntity.ok(roles);
-    }
 
 }

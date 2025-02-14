@@ -5,6 +5,7 @@ import com.xpertcash.entity.User;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
 import java.util.Optional;
 
 @Repository
@@ -18,5 +19,6 @@ public interface UsersRepository extends JpaRepository<User, Long> {
     
     // Méthode pour trouver un utilisateur par téléphone et entreprise
     Optional<User> findByPhoneAndEntreprise(String phone, Entreprise entreprise);
+    List<User> findByEntreprise(Entreprise entreprise);
 }
 

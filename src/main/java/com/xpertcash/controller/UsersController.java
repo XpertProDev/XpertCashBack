@@ -17,6 +17,7 @@ import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.http.HttpStatus;
 
+import java.util.HashMap;
 import java.util.Map;
 
 @RestController
@@ -45,18 +46,27 @@ public class UsersController {
 
     
           // Connexion
-    @PostMapping("/login")
-    public ResponseEntity<String> login(@RequestBody LoginRequest request) {
-        try {
-            // Appeler la méthode login et récupérer le token JWT
-            String token = usersService.login(request.getEmail(), request.getPassword());
-            // Retourner le token dans la réponse
-            return ResponseEntity.ok("Connexion réussie. Token: " + token);
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(e.getMessage());
-        }
-    }
+            @PostMapping("/login")
+            public ResponseEntity<Map<String, String>> login(@RequestBody LoginRequest request) {
+                try {
+                    String token = usersService.login(request.getEmail(), request.getPassword());
 
+                    // Construire une réponse JSON avec le message et le token
+                    Map<String, String> response = new HashMap<>();
+                    response.put("message", "Connexion réussie");
+                    response.put("token", token);
+
+                    return ResponseEntity.ok(response);
+                } catch (Exception e) {
+                    // Construire une réponse JSON en cas d'erreur
+                    Map<String, String> errorResponse = new HashMap<>();
+                    errorResponse.put("error", e.getMessage());
+
+                    return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(errorResponse);
+                }
+            }
+
+          
     // Activation du compte via le lien d'activation (GET avec paramètres dans l'URL)
     @GetMapping("/activate")
     public ResponseEntity<String> activate(@RequestParam("email") String email,

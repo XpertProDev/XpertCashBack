@@ -1,8 +1,11 @@
 package com.xpertcash.service;
 
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
 
@@ -14,8 +17,8 @@ import com.xpertcash.repository.PermissionRepository;
 import com.xpertcash.repository.RoleRepository;
 
 import jakarta.annotation.PostConstruct;
-import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+
 
 
 @Service
@@ -27,55 +30,50 @@ public class RoleService {
 
     @PostConstruct
     public void initRoles() {
-        // Ajouter les rôles uniquement si le rôle ADMIN n'existe pas déjà
-        if (!roleRepository.existsByName(RoleType.ADMIN)) {
-            List<Role> roles = Arrays.asList(
-                new Role(null, RoleType.SUPER_ADMIN, null),
-                new Role(null, RoleType.ADMIN, null),
-                new Role(null, RoleType.VENDEUR, null),
-                new Role(null, RoleType.COMPTABLE, null),
-                new Role(null, RoleType.RH, null)
-            );
-            roleRepository.saveAll(roles);
-            System.out.println("Rôles ajoutés dans la base de données.");
+        if (roleRepository.count() == 0) {
+            System.out.println("nitialisation des rôles et permissions...");
+
+            // 1️⃣ Ajouter toutes les permissions en base si elles n'existent pas
+            for (PermissionType type : PermissionType.values()) {
+                if (!permissionRepository.existsByType(type)) {
+                    Permission permission = new Permission();
+                    permission.setType(type);
+                    permissionRepository.save(permission);
+                }
+            }
+
+            // Récupérer toutes les permissions depuis la base
+            List<Permission> allPermissions = permissionRepository.findAll();
+            Map<PermissionType, Permission> permissionMap = allPermissions.stream()
+                    .collect(Collectors.toMap(Permission::getType, p -> p));
+
+            // 3️Créer les rôles et leur attribuer les permissions
+            Role adminRole = new Role();
+            adminRole.setName(RoleType.ADMIN);
+            adminRole.setPermissions(Arrays.asList(
+                permissionMap.get(PermissionType.GERER_PRODUITS),
+                permissionMap.get(PermissionType.VENDRE_PRODUITS),
+                permissionMap.get(PermissionType.VOIR_FLUX_COMPTABLE),
+                permissionMap.get(PermissionType.APPROVISIONNER_STOCK)
+            ));
+
+            Role venteRole = new Role();
+            venteRole.setName(RoleType.VENDEUR);
+            venteRole.setPermissions(Collections.singletonList(
+                permissionMap.get(PermissionType.VENDRE_PRODUITS)
+            ));
+
+            Role comptableRole = new Role();
+            comptableRole.setName(RoleType.COMPTABLE);
+            comptableRole.setPermissions(Arrays.asList(
+                permissionMap.get(PermissionType.VOIR_FLUX_COMPTABLE),
+                permissionMap.get(PermissionType.APPROVISIONNER_STOCK)
+            ));
+
+            // 4️⃣ Sauvegarder les rôles avec les permissions associées
+            roleRepository.saveAll(Arrays.asList(adminRole, venteRole, comptableRole));
+
+            System.out.println("✅ Rôles et permissions initialisés avec succès !");
         }
     }
-
-    // Ajouter une permission à un rôle
-    // Ajouter une permission à un rôle
-    @Transactional
-    public Role addPermissionToRole(Long roleId, PermissionType permissionType) {
-        // Trouver le rôle
-        Role role = roleRepository.findById(roleId)
-            .orElseThrow(() -> new RuntimeException("Rôle non trouvé"));
-
-        // Vérifier si la permission existe
-        Permission permission = permissionRepository.findByType(permissionType)
-            .orElseGet(() -> {
-                // Si la permission n'existe pas, la créer et la sauvegarder
-                Permission newPermission = new Permission();
-                newPermission.setType(permissionType);
-                return permissionRepository.save(newPermission);
-            });
-
-        // Ajouter la permission au rôle si ce n'est pas déjà fait
-        if (!role.getPermissions().contains(permission)) {
-            role.getPermissions().add(permission);
-            roleRepository.save(role);  // Sauvegarder les changements
-        }
-
-        return role;
-    }
-
-    // Récupérer les permissions d'un rôle
-    public Set<Permission> getPermissionsForRole(Long roleId) {
-        Role role = roleRepository.findById(roleId)
-            .orElseThrow(() -> new RuntimeException("Rôle non trouvé"));
-        return role.getPermissions();
-    }
-
-    public List<Role> getAllRoles() {
-        return roleRepository.findAll();
-    }
-    
 }

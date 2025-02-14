@@ -8,6 +8,8 @@ import lombok.Data;
 
 import java.time.LocalDateTime;
 
+import com.fasterxml.jackson.annotation.JsonBackReference;
+
 @Entity
 @Data
 public class User {
@@ -96,7 +98,9 @@ public class User {
     // LES RELATIONS
 
     @ManyToOne
+    @JsonBackReference
     @JoinColumn(name = "entreprise_id", nullable = false)
+    
     private Entreprise entreprise;
 
     @ManyToOne
