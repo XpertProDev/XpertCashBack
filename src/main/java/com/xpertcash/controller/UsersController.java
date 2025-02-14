@@ -8,12 +8,8 @@ import com.xpertcash.DTOs.RegistrationRequest;
 import com.xpertcash.service.UsersService;
 
 import jakarta.servlet.http.HttpServletRequest;
-
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.validation.BindingResult;
-import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.http.HttpStatus;
 
@@ -36,6 +32,7 @@ public class UsersController {
                     request.getEmail(),
                     request.getPassword(),
                     request.getPhone(),
+                    request.getPays(),
                     request.getNomEntreprise()
             );
             return ResponseEntity.ok("Compte créé avec succès. Un lien d'activation vous a été envoyé par email.");
@@ -44,7 +41,7 @@ public class UsersController {
         }
     }
 
-    
+
           // Connexion
             @PostMapping("/login")
             public ResponseEntity<Map<String, String>> login(@RequestBody LoginRequest request) {
@@ -66,7 +63,7 @@ public class UsersController {
                 }
             }
 
-          
+
     // Activation du compte via le lien d'activation (GET avec paramètres dans l'URL)
     @GetMapping("/activate")
     public ResponseEntity<String> activate(@RequestParam("email") String email,
@@ -113,14 +110,14 @@ public class UsersController {
         }
     }*/
 
-        
-         
+
+
           // Endpoint pour ajouter un utilisateur à l'entreprise de l'Admin
-          
+
     @PostMapping("/add")
     public User addUserToEntreprise(HttpServletRequest request, @RequestBody UserRequest userRequest) {
         // On appelle le service qui gère l'ajout de l'utilisateur
         return usersService.addUserToEntreprise(request, userRequest);
     }
-    
+
 }

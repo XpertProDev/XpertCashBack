@@ -13,6 +13,9 @@ import com.xpertcash.repository.EntrepriseRepository;
 import com.xpertcash.repository.RoleRepository;
 import com.xpertcash.repository.UsersRepository;
 
+import jakarta.transaction.Transactional;
+
+
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import jakarta.servlet.http.HttpServletRequest;
@@ -56,7 +59,7 @@ public class UsersService {
     @Autowired
     private JwtUtil jwtUtil;  // Utilisation de JwtUtil pour extraire l'ID de l'utilisateur
 
-    private final JwtConfig jwtConfig; 
+    private final JwtConfig jwtConfig;
 
     @Autowired
     public UsersService(UsersRepository usersRepository, JwtConfig jwtConfig, BCryptPasswordEncoder passwordEncoder) {
@@ -65,57 +68,53 @@ public class UsersService {
         this.passwordEncoder = passwordEncoder;
     }
 
-    
-
-   
-
-
     // Inscription : génère le code PIN, enregistre l'utilisateur et envoie le lien d'activation
-    public User registerUsers(String nomComplet, String email, String password, String phone, String nomEntreprise) {
+    public User registerUsers(String nomComplet, String email, String password, String phone, String pays, String nomEntreprise) {
         // Vérifier si l'email est déjà utilisé
         if (usersRepository.findByEmail(email).isPresent()) {
             throw new RuntimeException("Cet email est déjà utilisé.");
         }
-    
+
         // Vérifier si le numéro de téléphone est déjà utilisé
         if (usersRepository.findByPhone(phone).isPresent()) {
             throw new RuntimeException("Ce numéro de téléphone est déjà utilisé. Veuillez en choisir un autre.");
         }
-    
+
         // Vérifier si l'entreprise existe déjà
         if (entrepriseRepository.findByNomEntreprise(nomEntreprise).isPresent()) {
             throw new RuntimeException("Le nom de l'entreprise est déjà utilisé. Veuillez choisir un autre nom.");
         }
-    
+
         // Générer un mot de passe haché
         BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
         String hashedPassword = passwordEncoder.encode(password);
-    
+
         // Générer un code PIN d'activation
         String activationCode = String.format("%04d", new Random().nextInt(10000));
-    
+
         // Générer un identifiant unique pour l'entreprise
         String identifiantUnique;
         do {
             identifiantUnique = Entreprise.generateIdentifiantEntreprise();
         } while (entrepriseRepository.existsByIdentifiantEntreprise(identifiantUnique));
-    
+
         // Créer l'entreprise
         Entreprise entreprise = new Entreprise();
         entreprise.setNomEntreprise(nomEntreprise);
         entreprise.setIdentifiantEntreprise(identifiantUnique);
         entreprise.setCreatedAt(LocalDateTime.now());
         entreprise = entrepriseRepository.save(entreprise);
-    
+
         // Attribution du rôle ADMIN
         Role adminRole = roleRepository.findByName(RoleType.ADMIN)
             .orElseThrow(() -> new RuntimeException("Rôle ADMIN non trouvé"));
-    
+
         // Créer l'utilisateur
         User users = new User();
         users.setEmail(email);
         users.setPassword(hashedPassword);
         users.setPhone(phone);
+        users.setPays(pays);
         users.setNomComplet(nomComplet);
         users.setEntreprise(entreprise);
         users.setRole(adminRole);
@@ -126,20 +125,18 @@ public class UsersService {
         users.setLastActivity(LocalDateTime.now());
         users.setLocked(false);
         usersRepository.save(users);
-    
+
         entreprise.setAdmin(users);
         entrepriseRepository.save(entreprise);
-    
+
         try {
             mailService.sendActivationLinkEmail(email, activationCode);
         } catch (Exception e) {
             System.err.println("Erreur lors de l'envoi de l'email d'activation : " + e.getMessage());
         }
-    
+
         return users;
     }
-    
-
 
     //Admin name
 
@@ -147,7 +144,7 @@ public class UsersService {
         // Récupérer l'entreprise par ID
         Entreprise entreprise = entrepriseRepository.findById(entrepriseId)
                 .orElseThrow(() -> new RuntimeException("Entreprise non trouvée"));
-    
+
         // Vérifier si l'entreprise a un administrateur
         User admin = entreprise.getAdmin();
         if (admin != null) {
@@ -156,36 +153,34 @@ public class UsersService {
             throw new RuntimeException("Aucun administrateur assigné à cette entreprise.");
         }
     }
-    
 
-     
-            // Connexion : vérifie l'état du compte et retourne un token JWT
-            public String login(String email, String password) {
+    // Connexion : vérifie l'état du compte et retourne un token JWT
+    public String login(String email, String password) {
                 // Récupérer l'utilisateur par son email
                 User user = usersRepository.findByEmail(email)
                         .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
-            
+
                 // Vérification du mot de passe
                 if (!passwordEncoder.matches(password, user.getPassword())) {
                     throw new RuntimeException("Mot de passe incorrect.");
                 }
-            
+
                 // Vérification si le compte est verrouillé
                 if (user.isLocked()) {
                     throw new RuntimeException("Votre compte est verrouillé pour inactivité.");
                 }
-            
+
                 // Récupérer l'admin associé à l'entreprise de l'utilisateur
                 User admin = user.getEntreprise().getAdmin();
-            
+
                 // Vérifier si l'utilisateur est ADMIN
                 boolean isAdmin = user.getRole().getName().equals(RoleType.ADMIN);
-            
+
                 // Vérifier si le compte a été créé il y a moins de 24h
                 //LocalDateTime expirationDate = user.getCreatedAt().plusHours(24);
                 LocalDateTime expirationDate = user.getCreatedAt().plusMinutes(5);
                 boolean within24Hours = LocalDateTime.now().isBefore(expirationDate);
-            
+
                 // **Cas 1 : ADMIN**
                 if (isAdmin) {
                     if (!user.isActivatedLien() && !within24Hours) {
@@ -199,16 +194,14 @@ public class UsersService {
                         }
                     }
                 }
-            
+
                 // Si tout est OK, mise à jour de la dernière activité
                 user.setLastActivity(LocalDateTime.now());
                 usersRepository.save(user);
-            
+
                 // Générer et retourner le JWT
                 return generateToken(user);
             }
-            
-
 
     // Génèration du token
     private String generateToken(User user) {
@@ -226,23 +219,22 @@ public class UsersService {
                 .compact();
     }
 
-  
 
     // Activation du compte via le lien d'activation (email + code PIN)
-            @Transactional
-            public void activateAccount(String email, String code) {
+    @Transactional
+    public void activateAccount(String email, String code) {
                 User user = usersRepository.findByEmail(email)
                         .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
-            
+
                 if (!user.getActivationCode().equals(code)) {
                     throw new RuntimeException("Code d'activation invalide.");
                 }
-            
+
                 // Activer le compte de l'utilisateur
                 user.setActivatedLien(true);
                 user.setEnabledLien(true);
                 usersRepository.save(user);
-            
+
                 // Si c'est un ADMIN, activer tous ses employés
                 if (user.getRole() != null && user.getRole().getName().equals(RoleType.ADMIN)) {
                     List<User> usersToActivate = usersRepository.findByEntreprise(user.getEntreprise());
@@ -250,8 +242,6 @@ public class UsersService {
                     usersRepository.saveAll(usersToActivate);
                 }
             }
-            
-
 
     // Pour récupérer le statut du compte d'un utilisateur
     public Map<String, Object> getAccountStatus(String email) {
@@ -291,10 +281,9 @@ public class UsersService {
         }
     }
 
-
-            //Admin addUserToEntreprise
-            @Transactional
-            public User addUserToEntreprise(HttpServletRequest request, UserRequest userRequest) {
+    //Admin addUserToEntreprise
+    @Transactional
+    public User addUserToEntreprise(HttpServletRequest request, UserRequest userRequest) {
                 // Vérifier la présence du token JWT dans l'entête de la requête
                 String token = request.getHeader("Authorization");
                 if (token == null || !token.startsWith("Bearer ")) {
@@ -381,7 +370,6 @@ public class UsersService {
 
                 return savedUser;
             }
-
 
     // Pour la modification de utilisateur
     @Transactional

@@ -63,11 +63,17 @@ public class User {
     // Not nul de Spring boot
     @NotNull(message = "Champs vide")
 
-    @Size(min = 8, message = "champs phone doit être 8 chiffres")
+    @Size(max = 15 ,min = 8, message = "champs phone doit être 15 chiffres")
 
     // Not null de basse de donnée
     @Column(unique = true ,nullable = false)
     private String phone;
+
+    //=========================== POUR PAYS ===========================
+    //@NotNull(message = "Champs vide")
+    // Not null de basse de donnée
+    @Column(nullable = false)
+    private String pays;
 
     //=========================== POUR PHOTO ===========================
     @Column(nullable = true)

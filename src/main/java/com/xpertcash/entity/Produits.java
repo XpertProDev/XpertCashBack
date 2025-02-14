@@ -16,6 +16,8 @@ public class Produits {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    private String codeProduit;
+
     @NotNull(message = "Champs vide")
     @Column(nullable = false)
     private String nomProduit;

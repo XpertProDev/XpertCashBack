@@ -13,4 +13,5 @@ public class UserRequest {
     private RoleType roleType;
     @Pattern(regexp = "^\\+?[0-9]{8,15}$", message = "Le téléphone doit être au format valide")
     private String phone;
+    private String pays;
 }
