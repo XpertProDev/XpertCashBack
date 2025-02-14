@@ -1,5 +1,9 @@
 package com.xpertcash.entity;
 
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -17,4 +21,12 @@ public class Role {
     @Enumerated(EnumType.STRING)
     @Column(unique = true, nullable = false)
     private RoleType name;
+
+    @ManyToMany(fetch = FetchType.EAGER)  // Relation ManyToMany avec Permission
+    @JoinTable(
+        name = "role_permissions",
+        joinColumns = @JoinColumn(name = "role_id"),
+        inverseJoinColumns = @JoinColumn(name = "permission_id")
+    )
+    private List<Permission> permissions;
 }

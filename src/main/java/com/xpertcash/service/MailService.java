@@ -1,11 +1,15 @@
 package com.xpertcash.service;
 
 import jakarta.annotation.PostConstruct;
+import jakarta.mail.MessagingException;
+import jakarta.mail.internet.MimeMessage;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.MailException;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -69,6 +73,14 @@ public class MailService {
         mailMessage.setTo(toEmail);
         mailMessage.setSubject("Vérification de changement d'email");
         mailMessage.setText("Votre code de vérification pour changer votre email est : " + verificationCode);
+        mailSender.send(mailMessage);
+    }
+
+    public void sendEmail(String toEmail, String subject, String message) {
+        SimpleMailMessage mailMessage = new SimpleMailMessage();
+        mailMessage.setTo(toEmail);
+        mailMessage.setSubject(subject);
+        mailMessage.setText(message);
         mailSender.send(mailMessage);
     }
 }

@@ -1,7 +1,11 @@
 package com.xpertcash.service;
 
 
+import com.xpertcash.composant.AuthorizationService;
+import com.xpertcash.entity.CategoryProduit;
+import com.xpertcash.entity.PermissionType;
 import com.xpertcash.entity.Produits;
+import com.xpertcash.entity.User;
 import com.xpertcash.exceptions.CustomException;
 import com.xpertcash.exceptions.NotFoundException;
 import com.xpertcash.repository.CategoryProduitRepository;
@@ -10,6 +14,7 @@ import com.xpertcash.service.IMAGES.ImageStorageService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
+import com.xpertcash.repository.UsersRepository;
 
 import java.util.List;
 
@@ -20,39 +25,76 @@ public class ProduitsService {
     private ProduitsRepository produitsRepository;
 
     @Autowired
-    private  CategoryProduitRepository categoryProduitRepository;
+    private CategoryProduitRepository categoryProduitRepository;
 
     @Autowired
-    private  ImageStorageService imageStorageService;
+    private UsersRepository usersRepository;
 
-    // Méthode pour Ajouter un new produit
-    public Produits ajouterProduit(Produits produit, MultipartFile imageFile) {
-        if (produit.getNomProduit() == null || produit.getNomProduit().isBlank()) {
-            throw new NotFoundException("Le nom du produit est obligatoire.");
+    @Autowired
+    private AuthorizationService authorizationService;
+
+  
+
+    @Autowired
+    private DepenseService depenseService; // Service pour gérer les dépenses
+
+
+    // Méthode pour Ajouter un produit (Admin seulement)
+        // Ajouter un produit
+    public Produits ajouterProduit(Long userId, Produits produit) {
+        // Vérifier si l'utilisateur existe
+        User user = usersRepository.findById(userId)
+                .orElseThrow(() -> new NotFoundException("Utilisateur non trouvé."));
+
+        // Vérifier si l'utilisateur a les droits nécessaires (admin ou autre rôle autorisé)
+        authorizationService.checkPermission(user, PermissionType.GERER_PRODUITS);
+
+        // Vérifier que tous les champs requis sont renseignés
+        if (produit.getNomProduit() == null || produit.getNomProduit().trim().isEmpty()) {
+            throw new RuntimeException("Le nom du produit est obligatoire");
+        }
+        if (produit.getDescription() == null || produit.getDescription().trim().isEmpty()) {
+            throw new RuntimeException("La description du produit est obligatoire");
         }
         if (produit.getPrix() == null || produit.getPrix() <= 0) {
-            throw new NotFoundException("Le prix du produit doit être supérieur à 0.");
+            throw new RuntimeException("Le prix du produit doit être supérieur à 0");
         }
+        if (produit.getQuantite() <= 0) {
+            throw new RuntimeException("La quantité doit être supérieure à 0");
+        }
+        if (produit.getSeuil() <= 0) {
+            throw new RuntimeException("Le seuil doit être supérieur à 0");
+        }
+        if (produit.getAlertSeuil() <= 0) {
+            throw new RuntimeException("L'alerte de seuil doit être un nombre positif.");
+        }
+        
 
-        // Vérifier si la catégorie existe
+        // Vérifier que la catégorie du produit existe
         if (produit.getCategory() == null || produit.getCategory().getId() == null) {
-            throw new NotFoundException("La catégorie du produit est obligatoire.");
+            throw new RuntimeException("La catégorie du produit est obligatoire");
         }
 
-        categoryProduitRepository.findById(produit.getCategory().getId())
-                .orElseThrow(() -> new NotFoundException("La catégorie avec l'ID " + produit.getCategory().getId() + " n'existe pas."));
+        // Récupérer la catégorie depuis la base de données
+        CategoryProduit category = categoryProduitRepository.findById(produit.getCategory().getId())
+                .orElseThrow(() -> new RuntimeException("La catégorie avec l'ID " + produit.getCategory().getId() + " n'existe pas."));
 
-        // Sauvegarde de l'image si fournie
-        if (imageFile != null) {
-            String imageUrl = imageStorageService.saveImage(imageFile);
-            produit.setPhoto(imageUrl);
-        }
+        // Associer la catégorie au produit
+        produit.setCategory(category);
 
+        // Sauvegarde du produit en base de données
         return produitsRepository.save(produit);
     }
+    
 
-    // Méthode pour Modifier un produit
-    public Produits modifierProduit(Long id, Produits produitModifie, MultipartFile imageFile) {
+    // Méthode pour Modifier un produit (Admin seulement)
+    public Produits modifierProduit(Long userId, Long id, Produits produitModifie, MultipartFile imageFile) {
+        User user = usersRepository.findById(userId)
+                .orElseThrow(() -> new NotFoundException("Utilisateur non trouvé."));
+
+        // Vérifier si l'utilisateur est un Admin
+        authorizationService.checkPermission(user, PermissionType.GERER_PRODUITS);
+
         Produits produitExistant = produitsRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Produit non trouvé pour l'ID : " + id));
 
@@ -71,28 +113,29 @@ public class ProduitsService {
             produitExistant.setCategory(produitModifie.getCategory());
         }
 
-        // Mise à jour de l'image si fournie
-        if (imageFile != null) {
-            String imageUrl = imageStorageService.saveImage(imageFile);
-            produitExistant.setPhoto(imageUrl);
-        }
 
         return produitsRepository.save(produitExistant);
     }
 
     // Méthode pour récupérer tous les produits
     public List<Produits> getAllProduits() {
-        return produitsRepository.findAll();
+        return produitsRepository.findAll(); // Récupère tous les produits depuis la base de données
     }
-
+    
     // Méthode pour récupérer un produit par son ID
     public Produits getProduitById(Long id) {
         return produitsRepository.findById(id)
-                .orElseThrow(() -> new NotFoundException("Produit non trouvé pour l'ID : " + id));
+                    .orElseThrow(() -> new NotFoundException("Produit non trouvé pour l'ID : " + id)); // Récupère un produit par son ID
     }
 
-    // Méthode pour supprimer un produit
-    public String deleteProduit(Long id) {
+    // Méthode pour supprimer un produit (Admin seulement)
+    public String deleteProduit(Long userId, Long id) {
+        User user = usersRepository.findById(userId)
+                .orElseThrow(() -> new NotFoundException("Utilisateur non trouvé."));
+
+        // Vérifier si l'utilisateur est un Admin
+        authorizationService.checkPermission(user, PermissionType.GERER_PRODUITS);
+
         if (produitsRepository.findById(id).isPresent()) {
             produitsRepository.deleteById(id);
             return "Succès : produit supprimé.";
@@ -101,4 +144,27 @@ public class ProduitsService {
         }
     }
 
+    // Méthode pour approvisionner le stock (Comptable seulement)
+    public String approvisionnerStock(Long userId, Long produitId, int quantite) {
+        User user = usersRepository.findById(userId)
+                .orElseThrow(() -> new NotFoundException("Utilisateur non trouvé."));
+
+        // Vérifier si l'utilisateur est un Comptable
+        authorizationService.checkPermission(user, PermissionType.APPROVISIONNER_STOCK);
+
+        Produits produit = produitsRepository.findById(produitId)
+                .orElseThrow(() -> new NotFoundException("Produit non trouvé pour l'ID : " + produitId));
+
+        // Approvisionner le stock
+        int ancienneQuantite = produit.getQuantite();
+        produit.setQuantite(ancienneQuantite + quantite);
+
+        // Enregistrer la dépense
+        double montantDepense = quantite * produit.getPrix();  // Montant basé sur la quantité et le prix unitaire
+        depenseService.enregistrerDepense(montantDepense, "Approvisionnement de stock pour le produit " + produit.getNomProduit(), user);
+
+        produitsRepository.save(produit);
+
+        return "Approvisionnement effectué avec succès.";
+    }
 }

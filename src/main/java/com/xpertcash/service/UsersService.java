@@ -1,6 +1,10 @@
 package com.xpertcash.service;
 
 import com.xpertcash.DTOs.UpdateUserRequest;
+import com.xpertcash.DTOs.USER.UserRequest;
+import com.xpertcash.configuration.JwtConfig;
+import com.xpertcash.configuration.JwtUtil;
+import com.xpertcash.configuration.PasswordGenerator;
 import com.xpertcash.entity.Entreprise;
 import com.xpertcash.entity.Role;
 import com.xpertcash.entity.RoleType;
@@ -11,16 +15,28 @@ import com.xpertcash.repository.UsersRepository;
 
 import jakarta.transaction.Transactional;
 
+
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.SignatureAlgorithm;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.transaction.Transactional;
+
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.mail.MailException;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
+import java.util.Date;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Random;
+import java.util.stream.Collectors;
 
 @Service
 public class UsersService {
@@ -36,6 +52,26 @@ public class UsersService {
 
     @Autowired
     private  RoleRepository roleRepository;
+
+    @Autowired
+    private BCryptPasswordEncoder passwordEncoder;
+
+    @Autowired
+    private JwtUtil jwtUtil;  // Utilisation de JwtUtil pour extraire l'ID de l'utilisateur
+
+    private final JwtConfig jwtConfig;
+
+    @Autowired
+    public UsersService(UsersRepository usersRepository, JwtConfig jwtConfig, BCryptPasswordEncoder passwordEncoder) {
+        this.usersRepository = usersRepository;
+        this.jwtConfig = jwtConfig;
+        this.passwordEncoder = passwordEncoder;
+    }
+
+
+
+
+
 
     // Inscription : génère le code PIN, enregistre l'utilisateur et envoie le lien d'activation
     public User registerUsers(String nomComplet, String email, String password, String phone, String nomEntreprise) {
@@ -75,8 +111,8 @@ public class UsersService {
         entreprise = entrepriseRepository.save(entreprise);
 
         // Attribution du rôle ADMIN
-                Role adminRole = roleRepository.findByName(RoleType.ADMIN)
-        .orElseThrow(() -> new RuntimeException("Rôle ADMIN non trouvé"));
+        Role adminRole = roleRepository.findByName(RoleType.ADMIN)
+            .orElseThrow(() -> new RuntimeException("Rôle ADMIN non trouvé"));
 
         // Créer l'utilisateur
         User users = new User();
@@ -88,8 +124,8 @@ public class UsersService {
         users.setRole(adminRole);
         users.setActivationCode(activationCode);
         users.setCreatedAt(LocalDateTime.now());
-        users.setActivatedLien(false);
-        users.setEnabledLien(true);
+        users.setActivatedLien(false);  // L'utilisateur n'a pas encore activé son compte
+        users.setEnabledLien(true);  // Lien d'activation activé
         users.setLastActivity(LocalDateTime.now());
         users.setLocked(false);
         usersRepository.save(users);
@@ -105,6 +141,9 @@ public class UsersService {
 
         return users;
     }
+
+
+
     //Admin name
 
     public String getNomCompletAdminDeEntreprise(Long entrepriseId) {
@@ -121,51 +160,101 @@ public class UsersService {
         }
     }
 
-    // Connexion : vérifie l'état du compte et met à jour la dernière activité
-    public void login(String email, String password) {
-        User users = usersRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
 
-        BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
-        // Vérification du mot de passe haché
-        if (!passwordEncoder.matches(password, users.getPassword())) {
-            throw new RuntimeException("Mot de passe incorrect.");
-        }
+            // Connexion : vérifie l'état du compte et retourne un token JWT
+            public String login(String email, String password) {
+                // Récupérer l'utilisateur par son email
+                User user = usersRepository.findByEmail(email)
+                        .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
 
-        // Vérification si le compte est verrouillé
-        if (users.isLocked()) {
-            throw new RuntimeException("Votre compte est verrouillé pour inactivité. Veuillez le déverrouiller via le lien envoyé par email.");
-        }
+                // Vérification du mot de passe
+                if (!passwordEncoder.matches(password, user.getPassword())) {
+                    throw new RuntimeException("Mot de passe incorrect.");
+                }
 
-        // Vérification de l'activation du compte
-        if (!users.isActivatedLien()) {
-            LocalDateTime expiration = users.getCreatedAt().plusHours(24);
-            if (LocalDateTime.now().isAfter(expiration)) {
-                users.setEnabledLien(false);
-                usersRepository.save(users);
-                throw new RuntimeException("Votre période d'utilisation gratuite de 24h est terminée et votre compte a été désactivé. Veuillez activer votre compte via le lien envoyé par email.");
+                // Vérification si le compte est verrouillé
+                if (user.isLocked()) {
+                    throw new RuntimeException("Votre compte est verrouillé pour inactivité.");
+                }
+
+                // Récupérer l'admin associé à l'entreprise de l'utilisateur
+                User admin = user.getEntreprise().getAdmin();
+
+                // Vérifier si l'utilisateur est ADMIN
+                boolean isAdmin = user.getRole().getName().equals(RoleType.ADMIN);
+
+                // Vérifier si le compte a été créé il y a moins de 24h
+                //LocalDateTime expirationDate = user.getCreatedAt().plusHours(24);
+                LocalDateTime expirationDate = user.getCreatedAt().plusMinutes(5);
+                boolean within24Hours = LocalDateTime.now().isBefore(expirationDate);
+
+                // **Cas 1 : ADMIN**
+                if (isAdmin) {
+                    if (!user.isActivatedLien() && !within24Hours) {
+                        throw new RuntimeException("Votre compte administrateur n'est pas activé et la période de connexion temporaire est expirée.");
+                    }
+                } else {
+                    // **Cas 2 : EMPLOYÉ**
+                    if (!admin.isActivatedLien()) {
+                        if (!within24Hours) {
+                            throw new RuntimeException("Votre compte est désactivé car votre administrateur n'a pas activé son compte.");
+                        }
+                    }
+                }
+
+                // Si tout est OK, mise à jour de la dernière activité
+                user.setLastActivity(LocalDateTime.now());
+                usersRepository.save(user);
+
+                // Générer et retourner le JWT
+                return generateToken(user);
             }
-        }
 
-        // Mise à jour de la dernière activité
-        users.setLastActivity(LocalDateTime.now());
-        usersRepository.save(users);
+
+
+    // Génèration du token
+    private String generateToken(User user) {
+        long expirationTime = 1000 * 60 * 60 * 24; // 24 heures
+        Date now = new Date();
+        Date expirationDate = new Date(now.getTime() + expirationTime);
+
+        // Générer le token JWT
+        return Jwts.builder()
+                .setSubject(String.valueOf(user.getId()))  // L'ID de l'utilisateur comme "subject"
+                .claim("role", user.getRole().getName())  // Ajouter le rôle de l'utilisateur dans le claim
+                .setIssuedAt(now)  // Date de création du token
+                .setExpiration(expirationDate)  // Date d'expiration du token
+                .signWith(SignatureAlgorithm.HS256, jwtConfig.getSecretKey())  // Utilisation de la clé secrète de JwtConfig pour signer
+                .compact();
     }
+
+
 
     // Activation du compte via le lien d'activation (email + code PIN)
-    public void activateAccount(String email, String code) {
-        User user = usersRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+            @Transactional
+            public void activateAccount(String email, String code) {
+                User user = usersRepository.findByEmail(email)
+                        .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
 
-        if (user.getActivationCode().equals(code)) {
-            user.setActivatedLien(true);
-            user.setEnabledLien(true); // Réactive le compte si celui-ci avait été désactivé
-            usersRepository.save(user);
-        } else {
-            throw new RuntimeException("Code d'activation invalide.");
-        }
-    }
+                if (!user.getActivationCode().equals(code)) {
+                    throw new RuntimeException("Code d'activation invalide.");
+                }
+
+                // Activer le compte de l'utilisateur
+                user.setActivatedLien(true);
+                user.setEnabledLien(true);
+                usersRepository.save(user);
+
+                // Si c'est un ADMIN, activer tous ses employés
+                if (user.getRole() != null && user.getRole().getName().equals(RoleType.ADMIN)) {
+                    List<User> usersToActivate = usersRepository.findByEntreprise(user.getEntreprise());
+                    usersToActivate.forEach(u -> u.setEnabledLien(true));
+                    usersRepository.saveAll(usersToActivate);
+                }
+            }
+
+
 
     // Pour récupérer le statut du compte d'un utilisateur
     public Map<String, Object> getAccountStatus(String email) {
@@ -204,6 +293,98 @@ public class UsersService {
             throw new RuntimeException("Code de déverrouillage invalide.");
         }
     }
+
+
+            //Admin addUserToEntreprise
+            @Transactional
+            public User addUserToEntreprise(HttpServletRequest request, UserRequest userRequest) {
+                // Vérifier la présence du token JWT dans l'entête de la requête
+                String token = request.getHeader("Authorization");
+                if (token == null || !token.startsWith("Bearer ")) {
+                    throw new RuntimeException("Token JWT manquant ou mal formaté");
+                }
+
+                // Extraire le token sans le "Bearer "
+                token = token.replace("Bearer ", "");
+
+                Long adminId = null;
+                try {
+                    // Décrypter le token pour obtenir l'ID de l'admin
+                    adminId = jwtUtil.extractUserId(token);
+                } catch (Exception e) {
+                    throw new RuntimeException("Erreur lors de l'extraction de l'ID de l'admin depuis le token", e);
+                }
+
+                // Récupérer l'admin par l'ID extrait du token
+                User admin = usersRepository.findById(adminId)
+                        .orElseThrow(() -> new RuntimeException("Admin non trouvé"));
+
+                // Vérifier que l'Admin est bien un ADMIN
+                if (admin.getRole() == null || !admin.getRole().getName().equals(RoleType.ADMIN)) {
+                    throw new RuntimeException("Seul un ADMIN peut ajouter des utilisateurs !");
+                }
+
+                // Vérifier que l'Admin possède une entreprise
+                if (admin.getEntreprise() == null) {
+                    throw new RuntimeException("L'Admin n'a pas d'entreprise associée.");
+                }
+
+                // Vérifier si un utilisateur avec le même email ou téléphone existe déjà
+                if (usersRepository.findByEmailAndEntreprise(userRequest.getEmail(), admin.getEntreprise()).isPresent()) {
+                    throw new RuntimeException("Un utilisateur avec cet email existe déjà dans votre entreprise.");
+                }
+
+                if (usersRepository.findByPhoneAndEntreprise(userRequest.getPhone(), admin.getEntreprise()).isPresent()) {
+                    throw new RuntimeException("Un utilisateur avec ce numéro de téléphone existe déjà dans votre entreprise.");
+                }
+
+                // Vérifier que le rôle spécifié pour le nouvel utilisateur existe
+                Role role = roleRepository.findByName(userRequest.getRoleType())
+                        .orElseThrow(() -> new RuntimeException("Rôle invalide : " + userRequest.getRoleType()));
+
+                // Générer un mot de passe et l'encoder
+                String generatedPassword = PasswordGenerator.generatePassword();
+                String encodedPassword = passwordEncoder.encode(generatedPassword);
+
+                // Créer un nouvel utilisateur avec l'activation dépendante de l'admin
+                User newUser = new User();
+                newUser.setEmail(userRequest.getEmail());
+                newUser.setPassword(encodedPassword);
+                newUser.setNomComplet(userRequest.getNomComplet());
+                newUser.setPhone(userRequest.getPhone());
+                newUser.setEnabledLien(admin.isActivatedLien()); // L'employé est activé SEULEMENT si l'admin est activé
+                newUser.setCreatedAt(LocalDateTime.now());
+                newUser.setEntreprise(admin.getEntreprise());
+                newUser.setRole(role);
+
+                // Enregistrer l'utilisateur
+                User savedUser = usersRepository.save(newUser);
+
+                // Envoi de l'email avec les identifiants
+                String message = String.format(
+                        "Bonjour %s,\n\n" +
+                                "Vous venez d'être ajouté à l'entreprise %s en tant que %s.\n\n" +
+                                "Voici vos identifiants :\n" +
+                                "Email : %s\n" +
+                                "Mot de passe : %s\n\n" +
+                                "Merci.",
+                        savedUser.getNomComplet(),
+                        savedUser.getEntreprise().getNomEntreprise(),
+                        savedUser.getRole().getName(),
+                        savedUser.getEmail(),
+                        generatedPassword
+                );
+
+                try {
+                    mailService.sendEmail(savedUser.getEmail(), "Création de votre compte", message);
+                } catch (MailException e) {
+                    System.err.println("Erreur lors de l'envoi de l'email : " + e.getMessage());
+                    throw new RuntimeException("Utilisateur créé mais une erreur est survenue lors de l'envoi de l'email.");
+                }
+
+                return savedUser;
+            }
+
 
     // Pour la modification de utilisateur
     @Transactional

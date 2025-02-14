@@ -1,14 +1,12 @@
 package com.xpertcash.entity;
 
 import com.fasterxml.jackson.annotation.JsonBackReference;
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
 import java.time.LocalDateTime;
-import java.util.List;
 
 @Entity
 @Data
@@ -30,24 +28,21 @@ public class Produits {
     @Column(nullable = false)
     private Double prix;
 
-    @Column(nullable = true)
-    private String photo;
-
     @NotNull(message = "Champs vide")
-    private String quantite;
+    private int quantite;
 
     @NotNull(message = "Champs vide")
     @Column(nullable = false)
-    private Integer seuil;
+    private int seuil;
 
     @NotNull(message = "Champs vide")
     @Column(nullable = false)
-    private String alertSeuil;
+    private int alertSeuil;
 
     @Column(nullable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
 
-    //@JsonIgnore
+    // Utilisation de @JsonBackReference pour éviter des boucles infinies de sérialisation
     @JsonBackReference
     @ManyToOne
     @JoinColumn(name = "category_id", nullable = false)
