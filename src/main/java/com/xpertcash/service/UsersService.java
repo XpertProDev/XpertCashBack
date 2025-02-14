@@ -105,7 +105,6 @@ public class UsersService {
 
         return users;
     }
-
     //Admin name
 
     public String getNomCompletAdminDeEntreprise(Long entrepriseId) {
@@ -121,7 +120,6 @@ public class UsersService {
             throw new RuntimeException("Aucun administrateur assigné à cette entreprise.");
         }
     }
-
 
     // Connexion : vérifie l'état du compte et met à jour la dernière activité
     public void login(String email, String password) {

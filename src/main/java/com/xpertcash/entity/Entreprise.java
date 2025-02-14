@@ -28,6 +28,9 @@ public class Entreprise {
     @Column(nullable = false)
     private LocalDateTime createdAt;
 
+    @Column(nullable = true)
+    private String logo;
+
     @ManyToOne
     @JoinColumn(name = "admin_id", nullable = true)  
     private User admin;
@@ -36,8 +39,5 @@ public class Entreprise {
     public static String generateIdentifiantEntreprise() {
         return "Xpc" + String.format("%04d", new Random().nextInt(10000));
     }
-
-
-    
 
 }
