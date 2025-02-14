@@ -5,6 +5,7 @@ import com.xpertcash.composant.AuthorizationService;
 import com.xpertcash.entity.CategoryProduit;
 import com.xpertcash.entity.PermissionType;
 import com.xpertcash.entity.Produits;
+import com.xpertcash.entity.RoleType;
 import com.xpertcash.entity.User;
 import com.xpertcash.exceptions.CustomException;
 import com.xpertcash.exceptions.NotFoundException;
@@ -17,6 +18,7 @@ import org.springframework.web.multipart.MultipartFile;
 import com.xpertcash.repository.UsersRepository;
 
 import java.util.List;
+import java.util.Optional;
 
 @Service
 public class ProduitsService {
@@ -40,15 +42,14 @@ public class ProduitsService {
 
 
     // Méthode pour Ajouter un produit (Admin seulement)
-        // Ajouter un produit
     public Produits ajouterProduit(Long userId, Produits produit) {
         // Vérifier si l'utilisateur existe
         User user = usersRepository.findById(userId)
                 .orElseThrow(() -> new NotFoundException("Utilisateur non trouvé."));
-
+    
         // Vérifier si l'utilisateur a les droits nécessaires (admin ou autre rôle autorisé)
         authorizationService.checkPermission(user, PermissionType.GERER_PRODUITS);
-
+    
         // Vérifier que tous les champs requis sont renseignés
         if (produit.getNomProduit() == null || produit.getNomProduit().trim().isEmpty()) {
             throw new RuntimeException("Le nom du produit est obligatoire");
@@ -68,22 +69,31 @@ public class ProduitsService {
         if (produit.getAlertSeuil() <= 0) {
             throw new RuntimeException("L'alerte de seuil doit être un nombre positif.");
         }
-        
-
+    
         // Vérifier que la catégorie du produit existe
         if (produit.getCategory() == null || produit.getCategory().getId() == null) {
             throw new RuntimeException("La catégorie du produit est obligatoire");
         }
-
+    
         // Récupérer la catégorie depuis la base de données
         CategoryProduit category = categoryProduitRepository.findById(produit.getCategory().getId())
                 .orElseThrow(() -> new RuntimeException("La catégorie avec l'ID " + produit.getCategory().getId() + " n'existe pas."));
-
-        // Associer la catégorie au produit
-        produit.setCategory(category);
-
-        // Sauvegarde du produit en base de données
-        return produitsRepository.save(produit);
+    
+        // Vérifier si le produit existe déjà dans cette catégorie
+        Optional<Produits> existingProductOpt = produitsRepository.findByNomProduitAndCategory(produit.getNomProduit(), category);
+    
+        if (existingProductOpt.isPresent()) {
+            // Si le produit existe déjà, mettre à jour la quantité
+            Produits existingProduct = existingProductOpt.get();
+            existingProduct.setQuantite(existingProduct.getQuantite() + produit.getQuantite());
+            
+            // Sauvegarder le produit mis à jour
+            return produitsRepository.save(existingProduct);
+        } else {
+            // Si le produit n'existe pas, l'ajouter normalement
+            produit.setCategory(category);
+            return produitsRepository.save(produit);
+        }
     }
     
 

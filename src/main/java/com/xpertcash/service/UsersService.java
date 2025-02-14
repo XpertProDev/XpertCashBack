@@ -68,11 +68,6 @@ public class UsersService {
         this.passwordEncoder = passwordEncoder;
     }
 
-
-
-
-
-
     // Inscription : génère le code PIN, enregistre l'utilisateur et envoie le lien d'activation
     public User registerUsers(String nomComplet, String email, String password, String phone, String nomEntreprise) {
         // Vérifier si l'email est déjà utilisé
@@ -142,8 +137,6 @@ public class UsersService {
         return users;
     }
 
-
-
     //Admin name
 
     public String getNomCompletAdminDeEntreprise(Long entrepriseId) {
@@ -160,10 +153,8 @@ public class UsersService {
         }
     }
 
-
-
-            // Connexion : vérifie l'état du compte et retourne un token JWT
-            public String login(String email, String password) {
+    // Connexion : vérifie l'état du compte et retourne un token JWT
+    public String login(String email, String password) {
                 // Récupérer l'utilisateur par son email
                 User user = usersRepository.findByEmail(email)
                         .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
@@ -211,8 +202,6 @@ public class UsersService {
                 return generateToken(user);
             }
 
-
-
     // Génèration du token
     private String generateToken(User user) {
         long expirationTime = 1000 * 60 * 60 * 24; // 24 heures
@@ -230,10 +219,9 @@ public class UsersService {
     }
 
 
-
     // Activation du compte via le lien d'activation (email + code PIN)
-            @Transactional
-            public void activateAccount(String email, String code) {
+    @Transactional
+    public void activateAccount(String email, String code) {
                 User user = usersRepository.findByEmail(email)
                         .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
 
@@ -253,8 +241,6 @@ public class UsersService {
                     usersRepository.saveAll(usersToActivate);
                 }
             }
-
-
 
     // Pour récupérer le statut du compte d'un utilisateur
     public Map<String, Object> getAccountStatus(String email) {
@@ -294,10 +280,9 @@ public class UsersService {
         }
     }
 
-
-            //Admin addUserToEntreprise
-            @Transactional
-            public User addUserToEntreprise(HttpServletRequest request, UserRequest userRequest) {
+    //Admin addUserToEntreprise
+    @Transactional
+    public User addUserToEntreprise(HttpServletRequest request, UserRequest userRequest) {
                 // Vérifier la présence du token JWT dans l'entête de la requête
                 String token = request.getHeader("Authorization");
                 if (token == null || !token.startsWith("Bearer ")) {
@@ -384,7 +369,6 @@ public class UsersService {
 
                 return savedUser;
             }
-
 
     // Pour la modification de utilisateur
     @Transactional
