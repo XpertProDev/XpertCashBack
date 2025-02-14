@@ -69,7 +69,7 @@ public class UsersService {
     }
 
     // Inscription : génère le code PIN, enregistre l'utilisateur et envoie le lien d'activation
-    public User registerUsers(String nomComplet, String email, String password, String phone, String nomEntreprise) {
+    public User registerUsers(String nomComplet, String email, String password, String phone, String pays, String nomEntreprise) {
         // Vérifier si l'email est déjà utilisé
         if (usersRepository.findByEmail(email).isPresent()) {
             throw new RuntimeException("Cet email est déjà utilisé.");
@@ -114,6 +114,7 @@ public class UsersService {
         users.setEmail(email);
         users.setPassword(hashedPassword);
         users.setPhone(phone);
+        users.setPays(pays);
         users.setNomComplet(nomComplet);
         users.setEntreprise(entreprise);
         users.setRole(adminRole);

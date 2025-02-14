@@ -42,6 +42,7 @@ public class UsersController {
                     request.getEmail(),
                     request.getPassword(),
                     request.getPhone(),
+                    request.getPays(),
                     request.getNomEntreprise()
             );
             return ResponseEntity.ok("Compte créé avec succès. Un lien d'activation vous a été envoyé par email.");
