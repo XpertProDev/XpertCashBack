@@ -21,11 +21,12 @@ public interface ProduitsRepository extends JpaRepository<Produits, Long> {
 
     List<Produits> findByCategoryIn(List<CategoryProduit> categories);
     
+
     Optional<Produits> findByNomProduitAndCategoryAndUniteMesure(String nomProduit, CategoryProduit category, UniteMesure uniteMesure);
 
-
-
-    // Autres méthodes, par exemple pour trouver un produit par son nom et catégorie
-    //Optional<Produits> findByNomProduitAndCategory(String nomProduit, CategoryProduit category);
-
 }
+
+
+
+
+

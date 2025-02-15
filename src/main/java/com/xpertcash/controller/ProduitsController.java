@@ -36,53 +36,45 @@ public class ProduitsController {
         // Méthode pour Ajouter un produit
         @PostMapping("/add/produit")
         public ResponseEntity<?> ajouterProduit(
-                @RequestHeader("Authorization") String token, 
-                @RequestBody Produits produit ) {
+                @RequestHeader("Authorization") String token,
+                @RequestBody Produits produit) {
             try {
-                // Extraire id de l'utilisateur à partir du token
-                String jwtToken = token.substring(7);  
-                Long userId = jwtUtil.extractUserId(jwtToken); 
-
+                // Extraire l'ID de l'utilisateur à partir du token
+                String jwtToken = token.substring(7);
+                Long userId = jwtUtil.extractUserId(jwtToken);
+    
+                // Vérifier si l'utilisateur existe
                 User user = usersRepository.findById(userId)
                         .orElseThrow(() -> new NotFoundException("Utilisateur non trouvé"));
-
-                // Vérifier si l'utilisateur a les droits nécessaires (si c'est un admin)
-                if (user.getRole().getName() != RoleType.ADMIN) {
+    
+                // Vérifier si l'utilisateur est admin
+                if (!user.getRole().getName().equals(RoleType.ADMIN)) {
                     return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                            .body("Vous n'avez pas les droits nécessaires.");
+                            .body(Collections.singletonMap("error", "Vous n'avez pas les droits nécessaires."));
                 }
+    
+                // Vérification des permissions
                 authorizationService.checkPermission(user, PermissionType.GERER_PRODUITS);
-
-                // Validation des champs du produit
-                if (produit.getNomProduit() == null || produit.getNomProduit().trim().isEmpty()) {
-                    return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Le nom du produit est obligatoire.");
-                }
-                if (produit.getDescription() == null || produit.getDescription().trim().isEmpty()) {
-                    return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("La description du produit est obligatoire.");
-                }
-                if (produit.getPrix() == null || produit.getPrix() <= 0) {
-                    return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Le prix du produit doit être supérieur à 0.");
-                }
-                if (produit.getPrixAchat() == null || produit.getPrixAchat() <= 0) {
+    
+                // Ajouter le produit via le service
+                Produits savedProduit = produitsService.ajouterProduit(userId, produit);
+    
+                return ResponseEntity.status(HttpStatus.CREATED).body(savedProduit);
+    
+            } catch (NotFoundException e) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body(Collections.singletonMap("error", e.getMessage()));
+    
+            } catch (RuntimeException e) {
                     return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                            .body(Collections.singletonMap("error", "Le prix d'achat du produit est obligatoire et doit être supérieur à 0."));
-                }
-                if (produit.getQuantite() <= 0) {
-                    return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("La quantité doit être supérieure à 0.");
-                }
+            .body(Collections.singletonMap("error", e.getMessage()));
 
-                    Produits savedProduit = produitsService.ajouterProduit(userId, produit);
-
-                    return ResponseEntity.status(HttpStatus.CREATED).body(savedProduit);
-
-                } catch (RuntimeException e) {
-                    return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Collections.singletonMap("error", e.getMessage()));
-                } catch (Exception e) {
-                    return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                            .body(Collections.singletonMap("error", "Erreur interne : " + e.getMessage()));
-                }
+    
+            } catch (Exception e) {
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                        .body(Collections.singletonMap("error", "Erreur interne : " + e.getMessage()));
+            }
         }
-
 
           // Endpoint pour récupérer les produits de l'entreprise de l'utilisateur
           @GetMapping("/entreprise/produits")

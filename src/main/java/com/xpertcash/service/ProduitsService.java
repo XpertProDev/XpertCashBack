@@ -6,25 +6,18 @@ import com.xpertcash.entity.CategoryProduit;
 import com.xpertcash.entity.Entreprise;
 import com.xpertcash.entity.PermissionType;
 import com.xpertcash.entity.Produits;
-import com.xpertcash.entity.Role;
 import com.xpertcash.entity.RoleType;
 import com.xpertcash.entity.UniteMesure;
 import com.xpertcash.entity.User;
-import com.xpertcash.exceptions.CustomException;
 import com.xpertcash.exceptions.NotFoundException;
 import com.xpertcash.repository.CategoryProduitRepository;
 import com.xpertcash.repository.ProduitsRepository;
-import com.xpertcash.repository.RoleRepository;
-import com.xpertcash.service.IMAGES.ImageStorageService;
+import com.xpertcash.repository.UniteMesureRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import org.springframework.web.multipart.MultipartFile;
 import com.xpertcash.repository.UsersRepository;
 
-import java.text.SimpleDateFormat;
 import java.time.LocalDateTime;
-import java.util.Collections;
-import java.util.Date;
 import java.util.List;
 import java.util.Optional;
 
@@ -32,7 +25,11 @@ import java.util.Optional;
 public class ProduitsService {
 
     @Autowired
+
     private ProduitsRepository produitsRepository;
+
+    @Autowired
+    private UniteMesureRepository uniteMesureRepository;
 
     @Autowired
     private CategoryProduitRepository categoryProduitRepository;
@@ -43,33 +40,22 @@ public class ProduitsService {
     @Autowired
     private AuthorizationService authorizationService;
 
-   
-  
-
-    @Autowired
-    private DepenseService depenseService; 
 
 
         // Méthode pour Ajouter un produit (Admin seulement)
-
         public Produits ajouterProduit(Long userId, Produits produit) {
-            // Vérifier si l'utilisateur existe
+            // Vérification de l'utilisateur
             User user = usersRepository.findById(userId)
                     .orElseThrow(() -> new NotFoundException("Utilisateur non trouvé."));
         
-            // Vérifier si l'utilisateur appartient à une entreprise
             if (user.getEntreprise() == null) {
                 throw new RuntimeException("L'utilisateur ne fait partie d'aucune entreprise.");
             }
         
-            // Récupérer l'admin de l'entreprise
             User admin = user.getEntreprise().getAdmin();
-        
-            // Vérification si le compte a été créé récemment (dans les 24h ou 5 minutes pour le test)
             LocalDateTime expirationDate = user.getCreatedAt().plusMinutes(5);
             boolean withinTimeLimit = LocalDateTime.now().isBefore(expirationDate);
         
-            // Vérification selon si l'utilisateur est un admin ou un employé
             boolean isAdmin = user.getRole() != null && user.getRole().getName().equals(RoleType.ADMIN);
         
             if (isAdmin) {
@@ -82,10 +68,10 @@ public class ProduitsService {
                 }
             }
         
-            // Vérification des permissions de l'utilisateur
+            // Vérification des permissions
             authorizationService.checkPermission(user, PermissionType.GERER_PRODUITS);
         
-            // Vérification des champs obligatoires
+            // Vérifications des champs obligatoires
             if (produit.getNomProduit() == null || produit.getNomProduit().trim().isEmpty()) {
                 throw new RuntimeException("Le nom du produit est obligatoire.");
             }
@@ -104,8 +90,8 @@ public class ProduitsService {
             if (produit.getAlertSeuil() <= 0) {
                 throw new RuntimeException("L'alerte de seuil doit être un nombre positif.");
             }
-            if (produit.getUniteMesure() == null) {
-                throw new RuntimeException("L'unité de mesure est obligatoire (UNITE, KG, M, L, CARTON, etc.).");
+            if (produit.getUniteMesure() == null || produit.getUniteMesure().getNomUnite().trim().isEmpty()) {
+                throw new RuntimeException("L'unité de mesure est obligatoire.");
             }
             if (produit.getCategory() == null || produit.getCategory().getId() == null) {
                 throw new RuntimeException("La catégorie du produit est obligatoire.");
@@ -115,9 +101,18 @@ public class ProduitsService {
             CategoryProduit category = categoryProduitRepository.findById(produit.getCategory().getId())
                     .orElseThrow(() -> new RuntimeException("La catégorie avec l'ID " + produit.getCategory().getId() + " n'existe pas."));
         
-            // Vérifier si un produit similaire existe déjà dans cette catégorie (même nom de produit et même unité de mesure)
+            // Récupérer ou créer l'unité de mesure
+            String nomUnite = produit.getUniteMesure().getNomUnite(); // On s'assure d'avoir une String
+            UniteMesure uniteMesure = uniteMesureRepository.findByNomUnite(nomUnite)
+                    .orElseGet(() -> {
+                        UniteMesure newUniteMesure = new UniteMesure();
+                        newUniteMesure.setNomUnite(nomUnite);
+                        return uniteMesureRepository.save(newUniteMesure);
+                    });
+        
+            // Vérifier si un produit similaire existe déjà dans cette catégorie avec la même unité de mesure
             Optional<Produits> existingProductOpt = produitsRepository.findByNomProduitAndCategoryAndUniteMesure(
-                    produit.getNomProduit(), category, produit.getUniteMesure());
+                    produit.getNomProduit(), category, uniteMesure);
         
             if (existingProductOpt.isPresent()) {
                 throw new RuntimeException("Impossible d'ajouter ce produit. Un produit du même nom avec cette unité de mesure existe déjà dans la catégorie.");
@@ -127,11 +122,15 @@ public class ProduitsService {
             String codeProduit = generateProductCode();
             produit.setCodeProduit(codeProduit);
         
-            // Ajouter le nouveau produit normalement
+            // Associer l'unité de mesure au produit
+            produit.setUniteMesure(uniteMesure);
+        
+            // Ajouter le produit normalement
             produit.setCategory(category);
             return produitsRepository.save(produit);
         }
         
+            
 
         // Méthode pour générer un code unique pour chaque produit
         private String generateProductCode() {

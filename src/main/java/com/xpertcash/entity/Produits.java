@@ -37,8 +37,8 @@ public class Produits {
     @NotNull(message = "Champs vide")
     private int quantite;
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
+    @ManyToOne
+    @JoinColumn(name = "unite_mesure_id", nullable = false)
     private UniteMesure uniteMesure;
 
 
