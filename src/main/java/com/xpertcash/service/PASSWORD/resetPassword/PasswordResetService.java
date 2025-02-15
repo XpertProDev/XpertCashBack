@@ -5,6 +5,9 @@ import com.xpertcash.DTOs.PASSWORD.resetPassword.PasswordResetRequest;
 import com.xpertcash.entity.User;
 import com.xpertcash.repository.UsersRepository;
 import com.xpertcash.service.MailService;
+
+import jakarta.mail.MessagingException;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.mail.MailException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -45,12 +48,13 @@ public class PasswordResetService {
         PendingPasswordReset pendingReset = new PendingPasswordReset(verificationCode, LocalDateTime.now());
         pendingPasswordResets.put(email.toLowerCase(), pendingReset);
 
-        // Envoyer le code de vérification à l'email
-        try {
+            try {
+            // Envoyer le code de vérification à l'email
             mailService.sendEmailVerificationCode(email, verificationCode);
-        } catch (MailException e) {
+        } catch (MessagingException e) {  // Utiliser MessagingException au lieu de MailException
             throw new RuntimeException("Erreur lors de l'envoi de l'email de vérification : " + e.getMessage());
         }
+
     }
 
     /**

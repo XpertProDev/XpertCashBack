@@ -18,6 +18,7 @@ import jakarta.transaction.Transactional;
 
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
+import jakarta.mail.MessagingException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.transaction.Transactional;
 
@@ -72,43 +73,42 @@ public class UsersService {
     public User registerUsers(String nomComplet, String email, String password, String phone, String pays, String nomEntreprise) {
         // Vérifier si l'email est déjà utilisé
         if (usersRepository.findByEmail(email).isPresent()) {
-            throw new RuntimeException("Cet email est déjà utilisé.");
+            throw new RuntimeException("Cet email est déjà utilisé. L'utilisateur existe déjà.");
         }
-
+    
         // Vérifier si le numéro de téléphone est déjà utilisé
         if (usersRepository.findByPhone(phone).isPresent()) {
-            throw new RuntimeException("Ce numéro de téléphone est déjà utilisé. Veuillez en choisir un autre.");
+            throw new RuntimeException("Ce numéro de téléphone est déjà utilisé. L'utilisateur existe déjà.");
         }
-
+    
         // Vérifier si l'entreprise existe déjà
         if (entrepriseRepository.findByNomEntreprise(nomEntreprise).isPresent()) {
-            throw new RuntimeException("Le nom de l'entreprise est déjà utilisé. Veuillez choisir un autre nom.");
+            throw new RuntimeException("Le nom de l'entreprise est déjà utilisé. L'entreprise existe déjà.");
         }
-
+    
         // Générer un mot de passe haché
         BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
         String hashedPassword = passwordEncoder.encode(password);
-
+    
         // Générer un code PIN d'activation
         String activationCode = String.format("%04d", new Random().nextInt(10000));
-
-        // Générer un identifiant unique pour l'entreprise
+    
+        // Créer l'entreprise
         String identifiantUnique;
         do {
             identifiantUnique = Entreprise.generateIdentifiantEntreprise();
         } while (entrepriseRepository.existsByIdentifiantEntreprise(identifiantUnique));
-
-        // Créer l'entreprise
+    
         Entreprise entreprise = new Entreprise();
         entreprise.setNomEntreprise(nomEntreprise);
         entreprise.setIdentifiantEntreprise(identifiantUnique);
         entreprise.setCreatedAt(LocalDateTime.now());
         entreprise = entrepriseRepository.save(entreprise);
-
+    
         // Attribution du rôle ADMIN
         Role adminRole = roleRepository.findByName(RoleType.ADMIN)
             .orElseThrow(() -> new RuntimeException("Rôle ADMIN non trouvé"));
-
+    
         // Créer l'utilisateur
         User users = new User();
         users.setEmail(email);
@@ -125,19 +125,20 @@ public class UsersService {
         users.setLastActivity(LocalDateTime.now());
         users.setLocked(false);
         usersRepository.save(users);
-
+    
         entreprise.setAdmin(users);
         entrepriseRepository.save(entreprise);
-
+    
         try {
             mailService.sendActivationLinkEmail(email, activationCode);
-        } catch (Exception e) {
+        } catch (MessagingException e) {
             System.err.println("Erreur lors de l'envoi de l'email d'activation : " + e.getMessage());
+            throw new RuntimeException("Une erreur est survenue lors de l'envoi de l'email d'activation.", e);
         }
-
+    
         return users;
     }
-
+    
     //Admin name
 
     public String getNomCompletAdminDeEntreprise(Long entrepriseId) {
@@ -355,26 +356,23 @@ public class UsersService {
                 User savedUser = usersRepository.save(newUser);
 
                 // Envoi de l'email avec les identifiants
-                String message = String.format(
-                        "Bonjour %s,\n\n" +
-                                "Vous venez d'être ajouté à l'entreprise %s en tant que %s.\n\n" +
-                                "Voici vos identifiants :\n" +
-                                "Email : %s\n" +
-                                "Mot de passe : %s\n\n" +
-                                "Merci.",
+                try {
+                    mailService.sendEmployeEmail(
+                        savedUser.getEmail(),
                         savedUser.getNomComplet(),
                         savedUser.getEntreprise().getNomEntreprise(),
-                        savedUser.getRole().getName(),
+                        savedUser.getRole().getName().toString(),
                         savedUser.getEmail(),
                         generatedPassword
-                );
-
-                try {
-                    mailService.sendEmail(savedUser.getEmail(), "Création de votre compte", message);
-                } catch (MailException e) {
-                    System.err.println("Erreur lors de l'envoi de l'email : " + e.getMessage());
-                    throw new RuntimeException("Utilisateur créé mais une erreur est survenue lors de l'envoi de l'email.");
+                    );
+                } catch (MessagingException e) {
+                    System.err.println("Erreur lors de l'envoi de l'email à " + savedUser.getEmail() + " : " + e.getMessage());
+                    e.printStackTrace();
+                    throw new RuntimeException("Utilisateur créé mais une erreur est survenue lors de l'envoi de l'email.", e);
                 }
+                
+                
+
 
                 return savedUser;
             }

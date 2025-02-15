@@ -5,6 +5,9 @@ import com.xpertcash.DTOs.PASSWORD.PasswordUpdateRequest;
 import com.xpertcash.entity.User;
 import com.xpertcash.repository.UsersRepository;
 import com.xpertcash.service.MailService;
+
+import jakarta.mail.MessagingException;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -55,8 +58,14 @@ public class PasswordUpdateService {
         PendingPasswordUpdate pendingUpdate = new PendingPasswordUpdate(request.getNewPassword(), verificationCode, LocalDateTime.now());
         pendingPasswordUpdates.put(userId, pendingUpdate);
 
-        // Envoyer le code de vérification à l'email actuel de l'utilisateur
-        mailService.sendEmailVerificationCode(user.getEmail(), verificationCode);
+                try {
+            // Envoyer le code de vérification à l'email actuel de l'utilisateur
+            mailService.sendEmailVerificationCode(user.getEmail(), verificationCode);
+        } catch (MessagingException e) {  // Capturer MessagingException ici
+            System.err.println("Erreur lors de l'envoi du code de vérification à l'email : " + e.getMessage());
+            throw new RuntimeException("Erreur lors de l'envoi du code de vérification. L'email n'a pas pu être envoyé.");
+        }
+
     }
 
     /**
