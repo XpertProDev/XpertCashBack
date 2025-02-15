@@ -4,5 +4,6 @@ public enum UniteMesure {
         UNITE,
         KG, 
         L,
-        M
+        M,
+        CARTON
 }

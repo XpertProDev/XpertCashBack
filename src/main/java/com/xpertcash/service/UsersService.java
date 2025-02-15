@@ -322,7 +322,14 @@ public class UsersService {
 
                 if (usersRepository.findByPhoneAndEntreprise(userRequest.getPhone(), admin.getEntreprise()).isPresent()) {
                     throw new RuntimeException("Un utilisateur avec ce numéro de téléphone existe déjà dans votre entreprise.");
+                } 
+
+                if (usersRepository.findByPhoneAndEntrepriseAndPays(userRequest.getPhone(), admin.getEntreprise(), userRequest.getPays()).isPresent()) {
+                    throw new RuntimeException("Un utilisateur avec ce numéro de téléphone existe déjà dans votre entreprise.");
                 }
+                
+
+                
 
                 // Vérifier que le rôle spécifié pour le nouvel utilisateur existe
                 Role role = roleRepository.findByName(userRequest.getRoleType())
@@ -337,6 +344,7 @@ public class UsersService {
                 newUser.setEmail(userRequest.getEmail());
                 newUser.setPassword(encodedPassword);
                 newUser.setNomComplet(userRequest.getNomComplet());
+                newUser.setPays(userRequest.getPays());
                 newUser.setPhone(userRequest.getPhone());
                 newUser.setEnabledLien(admin.isActivatedLien()); // L'employé est activé SEULEMENT si l'admin est activé
                 newUser.setCreatedAt(LocalDateTime.now());

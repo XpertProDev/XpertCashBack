@@ -19,6 +19,7 @@ public interface UsersRepository extends JpaRepository<User, Long> {
     
     // Méthode pour trouver un utilisateur par téléphone et entreprise
     Optional<User> findByPhoneAndEntreprise(String phone, Entreprise entreprise);
+    Optional<User> findByPhoneAndEntrepriseAndPays(String phone, Entreprise entreprise, String pays);
     List<User> findByEntreprise(Entreprise entreprise);
 }
 
