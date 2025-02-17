@@ -20,12 +20,8 @@ import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import jakarta.mail.MessagingException;
 import jakarta.servlet.http.HttpServletRequest;
-import jakarta.transaction.Transactional;
 
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.mail.MailException;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -37,7 +33,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Random;
-import java.util.stream.Collectors;
 
 @Service
 public class UsersService {
@@ -120,8 +115,8 @@ public class UsersService {
         users.setRole(adminRole);
         users.setActivationCode(activationCode);
         users.setCreatedAt(LocalDateTime.now());
-        users.setActivatedLien(false);  // L'utilisateur n'a pas encore activé son compte
-        users.setEnabledLien(true);  // Lien d'activation activé
+        users.setActivatedLien(false);
+        users.setEnabledLien(true);
         users.setLastActivity(LocalDateTime.now());
         users.setLocked(false);
         usersRepository.save(users);
