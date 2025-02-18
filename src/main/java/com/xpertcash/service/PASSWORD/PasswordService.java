@@ -73,7 +73,7 @@ public class PasswordService {
                 } catch (MessagingException e) {
                     throw new RuntimeException("Erreur lors de l'envoi de l'email de réinitialisation", e);
                 }
-}       
+        }       
 
 
 
