@@ -103,7 +103,6 @@ public class User {
     @ManyToOne
     @JsonBackReference
     @JoinColumn(name = "entreprise_id", nullable = false)
-    
     private Entreprise entreprise;
 
     @ManyToOne

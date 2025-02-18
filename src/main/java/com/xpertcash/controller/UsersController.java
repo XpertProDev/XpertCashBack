@@ -5,11 +5,9 @@ import com.xpertcash.DTOs.USER.UserRequest;
 import com.xpertcash.entity.User;
 import com.xpertcash.DTOs.LoginRequest;
 import com.xpertcash.DTOs.RegistrationRequest;
-import com.xpertcash.entity.User;
 import com.xpertcash.service.UsersService;
 
 import jakarta.servlet.http.HttpServletRequest;
-
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -28,7 +26,6 @@ public class UsersController {
     // Inscription
     @PostMapping("/register")
     public ResponseEntity<Map<String, String>> register(@RequestBody RegistrationRequest request) {
-        Map<String, String> response = new HashMap<>();
         try {
             usersService.registerUsers(
                     request.getNomComplet(),
@@ -38,41 +35,21 @@ public class UsersController {
                     request.getPays(),
                     request.getNomEntreprise()
             );
-
+            Map<String, String> response = new HashMap<>();
             response.put("message", "Compte créé avec succès. Un lien d'activation vous a été envoyé par email.");
             return ResponseEntity.ok(response);
-
-        } catch (RuntimeException e) {
-            //response.put("error", e.getMessage());
-            response.put("error", "Erreur lors de l'inscription : " + e.getMessage());
-            return ResponseEntity.badRequest().body(response);
         } catch (Exception e) {
-            response.put("error", "Erreur interne du serveur.");
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+            Map<String, String> errorResponse = new HashMap<>();
+            errorResponse.put("error", "Erreur lors de l'inscription : " + e.getMessage());
+            return ResponseEntity.badRequest().body(errorResponse);
         }
     }
-   /* @PostMapping("/register")
-    public ResponseEntity<String> register(@RequestBody RegistrationRequest request) {
-        try {
-            usersService.registerUsers(
-                    request.getNomComplet(),
-                    request.getEmail(),
-                    request.getPassword(),
-                    request.getPhone(),
-                    request.getPays(),
-                    request.getNomEntreprise()
-            );
-            return ResponseEntity.ok("Compte créé avec succès. Un lien d'activation vous a été envoyé par email.");
-        } catch (RuntimeException e) {
-            return ResponseEntity.badRequest().body("Erreur lors de l'inscription : " + e.getMessage());
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Erreur interne du serveur.");
-        }
-    }*/
 
-  // Connexion
-    @PostMapping("/login")
-    public ResponseEntity<Map<String, String>> login(@RequestBody LoginRequest request) {
+
+
+    // Connexion
+            @PostMapping("/login")
+            public ResponseEntity<Map<String, String>> login(@RequestBody LoginRequest request) {
                 try {
                     String token = usersService.login(request.getEmail(), request.getPassword());
 

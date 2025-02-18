@@ -4,6 +4,9 @@ import com.xpertcash.DTOs.EmailUpdateConfirmationRequest;
 import com.xpertcash.DTOs.EmailUpdateRequest;
 import com.xpertcash.entity.User;
 import com.xpertcash.repository.UsersRepository;
+
+import jakarta.mail.MessagingException;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -50,8 +53,14 @@ public class EmailUpdateService {
         PendingEmailUpdate pendingUpdate = new PendingEmailUpdate(request.getNewEmail(), verificationCode, LocalDateTime.now());
         pendingEmailUpdates.put(userId, pendingUpdate);
 
-        // Envoyer le code de vérification à l'email actuel de l'utilisateur
-        mailService.sendEmailVerificationCode(user.getEmail(), verificationCode);
+                try {
+            // Envoyer le code de vérification à l'email actuel de l'utilisateur
+            mailService.sendEmailVerificationCode(user.getEmail(), verificationCode);
+        } catch (MessagingException e) {  // Capturer MessagingException ici
+            System.err.println("Erreur lors de l'envoi du code de vérification à l'email : " + e.getMessage());
+            throw new RuntimeException("Erreur lors de l'envoi du code de vérification. L'email n'a pas pu être envoyé.");
+        }
+
     }
 
     /**

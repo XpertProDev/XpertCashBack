@@ -16,6 +16,8 @@ public class Produits {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    private String codeProduit;
+
     @NotNull(message = "Champs vide")
     @Column(nullable = false)
     private String nomProduit;
@@ -29,11 +31,18 @@ public class Produits {
     private Double prix;
 
     @NotNull(message = "Champs vide")
-    private int quantite;
+    @Column(nullable = false)
+    private Double prixAchat;
 
     @NotNull(message = "Champs vide")
-    @Column(nullable = false)
-    private int seuil;
+    private int quantite;
+
+    @ManyToOne
+    @JoinColumn(name = "unite_mesure_id", nullable = false)
+    private UniteMesure uniteMesure;
+
+
+    
 
     @NotNull(message = "Champs vide")
     @Column(nullable = false)
