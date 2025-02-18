@@ -33,25 +33,7 @@ public class AuthControllerPassword {
     }
 
 
-        // Étape 2 : Vérifier le code OTP
-        @PostMapping("/verify-reset-token")
-        public ResponseEntity<?> verifyToken(@RequestBody Map<String, String> request) {
-            try {
-                String email = request.get("email");
-                String token = request.get("token");
-    
-                if (passwordService.verifyResetToken(email, token)) {
-                    return ResponseEntity.ok(Collections.singletonMap("message", "Code valide, vous pouvez maintenant changer votre mot de passe."));
-                } else {
-                    return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Collections.singletonMap("error", "Code invalide ou expiré."));
-                }
-            } catch (RuntimeException e) {
-                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Collections.singletonMap("error", e.getMessage()));
-            }
-        }
-
-
-            // Étape 3 : Modifier le mot de passe
+            // Étape 2 : Modifier le mot de passe
     @PostMapping("/reset-password")
     public ResponseEntity<?> resetPassword(@RequestBody Map<String, String> request) {
         try {

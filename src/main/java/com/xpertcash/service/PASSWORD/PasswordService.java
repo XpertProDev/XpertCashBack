@@ -76,35 +76,31 @@ public class PasswordService {
 }       
 
 
-    // Étape 2 : Vérifier le code OTP
-    public boolean verifyResetToken(String email, String token) {
+
+
+    // Étape : Réinitialiser le mot de passe
+    @Transactional
+    public void resetPassword(String email, String token, String newPassword) {
+        // Récupérer le token pour vérifier si il est valide
         PasswordResetToken resetToken = passwordResetTokenRepository.findByEmailAndToken(email, token)
                 .orElseThrow(() -> new RuntimeException("Code invalide ou expiré."));
-
+    
+        // Vérifier si le token a expiré
         if (resetToken.getExpirationDate().isBefore(LocalDateTime.now())) {
             throw new RuntimeException("Le code de vérification a expiré.");
         }
-
-        return true;
-    }
-
-
-
-    // Étape 3 : Réinitialiser le mot de passe
-    @Transactional
-    public void resetPassword(String email, String token, String newPassword) {
-        if (!verifyResetToken(email, token)) {
-            throw new RuntimeException("Code invalide.");
-        }
-
+    
+        // Récupérer l'utilisateur
         User user = usersRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé."));
-
+    
+        // Changer le mot de passe de l'utilisateur
         user.setPassword(passwordEncoder.encode(newPassword));
         usersRepository.save(user);
-
-        // Supprimer le token après utilisation
+    
+        // Supprimer le token après utilisation pour empêcher son usage multiple
         passwordResetTokenRepository.deleteByEmail(email);
     }
+    
 
 }
