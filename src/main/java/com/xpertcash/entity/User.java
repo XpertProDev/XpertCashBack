@@ -42,7 +42,7 @@ public class User {
     // Not nul de Spring boot
     @NotNull(message = "Champs vide")
 
-    @Email(message = "email incorrect veille saisir correctement ex : example@gmail.com")
+    //@Email(message = "email incorrect veille saisir correctement ex : example@gmail.com")
     // Not Null de base de donnée
     @Column(unique = true, nullable = false)
     private String email;
@@ -53,7 +53,7 @@ public class User {
 
     // size : lenght de notre Mot de passe
     // message : message afficher si le champs de notre Mot de passe est vide
-    @Size(min = 7, message = "Saisissez un Mot de pass correct")
+    //@Size(min = 7, message = "Saisissez un Mot de pass correct")
 
     // Not Null de base de donnée
     @Column(nullable = false)
@@ -62,11 +62,8 @@ public class User {
     //=========================== POUR PHONE ===========================
     // Not nul de Spring boot
     @NotNull(message = "Champs vide")
-
-    @Size(max = 15 ,min = 8, message = "champs phone doit être 15 chiffres")
-
-    // Not null de basse de donnée
     @Column(unique = true ,nullable = false)
+    //@Size(min = 8, message = "Le numéro de téléphone doit contenir au moins 8 caractères.")
     private String phone;
 
     //=========================== POUR PAYS ===========================
