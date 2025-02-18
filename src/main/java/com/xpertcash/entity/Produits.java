@@ -32,6 +32,10 @@ public class Produits {
 
     @NotNull(message = "Champs vide")
     @Column(nullable = false)
+    private String photo;
+
+    @NotNull(message = "Champs vide")
+    @Column(nullable = false)
     private Double prixAchat;
 
     @NotNull(message = "Champs vide")
