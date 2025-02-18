@@ -138,7 +138,7 @@ public class ProduitsService {
             String randomCode = String.format("%05d", (int)(Math.random() * 100000));
             
             // Retourner le code produit au format "PROD-xxxxx"
-            return "PROD-" + randomCode;
+            return "P-" + randomCode;
         }
         
 
