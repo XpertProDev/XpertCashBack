@@ -127,7 +127,7 @@ public class StockController {
 
 
         // Endpoint pour récupérer tout le stock
-         @GetMapping("/alltout")
+         @GetMapping("/allstock")
          public ResponseEntity<?> recupererToutLeStock(
             @RequestHeader("Authorization") String token) {
         try {
@@ -150,6 +150,11 @@ public class StockController {
 
             // Récupérer tout le stock
             List<Stock> stocks = stockService.recupererToutLeStock();
+
+            if (stocks.isEmpty()) {
+                return ResponseEntity.status(HttpStatus.OK) 
+                        .body(Collections.singletonMap("message", "Aucun stock disponible."));
+            }
             return ResponseEntity.ok(stocks);
 
         } catch (NotFoundException e) {
