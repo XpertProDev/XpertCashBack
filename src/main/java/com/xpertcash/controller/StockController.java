@@ -127,7 +127,7 @@ public class StockController {
 
 
         // Endpoint pour récupérer tout le stock
-         @GetMapping("/tout")
+         @GetMapping("/alltout")
          public ResponseEntity<?> recupererToutLeStock(
             @RequestHeader("Authorization") String token) {
         try {
