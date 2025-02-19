@@ -74,6 +74,14 @@ public class MailService {
         mailSender.send(message);
     }
 
+
+    public void sendPasswordResetEmail(String to, String otp) throws MessagingException {
+        String subject = "Réinitialisation de votre mot de passe";
+        String htmlContent = generatePasswordResetEmail(otp);
+    
+        sendEmail(to, subject, htmlContent);
+    }
+
     
     private String generateActivationEmail(String activationUrl) {
         return """
@@ -155,4 +163,28 @@ public class MailService {
         </html>
         """.formatted(verificationCode);
     }
+
+
+    private String generatePasswordResetEmail(String otp) {
+        return """
+            <html>
+                <body style="font-family: Arial, sans-serif; background-color: #f4f4f4; padding: 20px;">
+                    <div style="max-width: 600px; margin: auto; background: white; padding: 17px; border-radius: 10px; text-align: center;">
+                        <img src="cid:logo" alt="Logo" style="width: 100px; margin-bottom: -26px;">
+                        <p><strong>Bonjour</strong>,</p>
+                        <p>Votre code de vérification est :</p>
+                        <h3 style="background: #f8d7da; padding: 10px; border-radius: 5px; display: inline-block;">
+                            %s
+                        </h3>
+                        <p>Ce code est valable pendant <strong>10 minutes</strong>.</p>
+                        <p style="font-size: 12px; color: #555; margin-top: 30px;">Si vous n'avez pas effectué cette demande, veuillez ignorer cet e-mail.</p>
+                       <p style="font-size: 10px; color: #777;">L'équipe XperCash</p>
+                    </div>
+                </body>
+            </html>
+        """.formatted(otp);
+    }
+
+
+
 }

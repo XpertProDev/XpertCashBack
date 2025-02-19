@@ -24,6 +24,7 @@ public class CategoryProduit {
     private String nomCategory;
 
     @ManyToOne
+    @JsonBackReference
     @JoinColumn(name = "entreprise_id", nullable = false)  
     private Entreprise entreprise;
 
