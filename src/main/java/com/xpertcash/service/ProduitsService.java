@@ -7,16 +7,19 @@ import com.xpertcash.entity.Entreprise;
 import com.xpertcash.entity.PermissionType;
 import com.xpertcash.entity.Produits;
 import com.xpertcash.entity.RoleType;
+import com.xpertcash.entity.Stock;
 import com.xpertcash.entity.UniteMesure;
 import com.xpertcash.entity.User;
 import com.xpertcash.exceptions.NotFoundException;
 import com.xpertcash.repository.CategoryProduitRepository;
 import com.xpertcash.repository.ProduitsRepository;
+import com.xpertcash.repository.StockRepository;
 import com.xpertcash.repository.UniteMesureRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import com.xpertcash.repository.UsersRepository;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -39,6 +42,9 @@ public class ProduitsService {
 
     @Autowired
     private AuthorizationService authorizationService;
+
+    @Autowired
+    private StockRepository stockRepository;
 
 
 
@@ -127,7 +133,38 @@ public class ProduitsService {
         
             // Ajouter le produit normalement
             produit.setCategory(category);
+
+            // Sauvegarder le produit
+        Produits savedProduit = produitsRepository.save(produit);
+
+            // Ajouter le produit au stock
+            ajouterStock(savedProduit, produit.getQuantite());
             return produitsRepository.save(produit);
+        }
+
+
+         // Méthode pour ajouter un produit au stock
+         private void ajouterStock(Produits produit, Integer quantite) {
+            // Vérifie si le produit existe déjà dans le stock
+            Stock stock = stockRepository.findByProduitId(produit.getId())
+                    .orElse(new Stock());
+        
+            // Associe le produit au stock
+            stock.setProduit(produit);
+        
+            // Si une quantité est donnée, on l'utilise, sinon on met 0
+            stock.setQuantite(quantite != null ? quantite : 0);
+        
+            // Associe la catégorie du produit au stock (en supposant que la catégorie existe)
+            if (produit.getCategory() != null) {
+                stock.setCategory(produit.getCategory());
+            }
+        
+            // Date actuelle d'ajout au stock
+            stock.setDateAjout(LocalDateTime.now());
+        
+            // Sauvegarde du stock dans la base de données
+            stockRepository.save(stock);
         }
         
             
