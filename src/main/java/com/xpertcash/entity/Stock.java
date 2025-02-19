@@ -3,6 +3,8 @@ package com.xpertcash.entity;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
+import com.fasterxml.jackson.annotation.JsonBackReference;
+
 import jakarta.persistence.*;
 import lombok.Data;
 
@@ -15,6 +17,7 @@ public class Stock {
 
     @OneToOne
     @JoinColumn(name = "produit_id", nullable = false)
+    @JsonBackReference
     private Produits produit;
 
     @ManyToOne

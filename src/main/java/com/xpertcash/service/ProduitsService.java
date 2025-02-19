@@ -149,10 +149,8 @@ public class ProduitsService {
             Stock stock = stockRepository.findByProduitId(produit.getId())
                     .orElse(new Stock());
         
-            // Associe le produit au stock
             stock.setProduit(produit);
         
-            // Si une quantité est donnée, on l'utilise, sinon on met 0
             stock.setQuantite(quantite != null ? quantite : 0);
         
             // Associe la catégorie du produit au stock (en supposant que la catégorie existe)
@@ -163,7 +161,6 @@ public class ProduitsService {
             // Date actuelle d'ajout au stock
             stock.setDateAjout(LocalDateTime.now());
         
-            // Sauvegarde du stock dans la base de données
             stockRepository.save(stock);
         }
         
@@ -171,42 +168,33 @@ public class ProduitsService {
 
         // Méthode pour générer un code unique pour chaque produit
         private String generateProductCode() {
-            // Générer un nombre aléatoire entre 10000 et 99999 (5 chiffres)
             String randomCode = String.format("%05d", (int)(Math.random() * 100000));
             
-            // Retourner le code produit au format "PROD-xxxxx"
             return "P-" + randomCode;
         }
         
 
 
        //Listing Entreprise Product
-
        public List<Produits> listerProduitsEntreprise(Long userId) {
-        // Vérifier si l'utilisateur existe
         User user = usersRepository.findById(userId)
                 .orElseThrow(() -> new NotFoundException("Utilisateur non trouvé."));
     
-        // Vérifier si l'utilisateur appartient à une entreprise
         if (user.getEntreprise() == null) {
             throw new RuntimeException("L'utilisateur ne fait partie d'aucune entreprise.");
         }
     
-        // Vérifier si l'utilisateur est un admin
         boolean isAdmin = user.getRole() != null && user.getRole().getName().equals(RoleType.ADMIN);
     
         // Vérifier la condition de l'activation du compte
         LocalDateTime expirationDate = user.getCreatedAt().plusMinutes(5);  // Utilisation de l'exemple de délai de 5 minutes
         boolean withinTimeLimit = LocalDateTime.now().isBefore(expirationDate);
     
-        // Vérification selon si l'utilisateur est un admin ou non
         if (isAdmin) {
-            // Si l'admin n'est pas activé, afficher un message d'erreur
             if (!user.isActivatedLien() && !withinTimeLimit) {
                 throw new RuntimeException("Votre compte administrateur n'est pas activé et la période de connexion temporaire est expirée.");
             }
         } else {
-            // Si l'utilisateur n'est pas un admin (employé), vérifier si le compte de l'admin est activé
             if (!user.getEntreprise().getAdmin().isActivatedLien()) {
                 if (!withinTimeLimit) {
                     throw new RuntimeException("Votre compte est désactivé car votre administrateur n'a pas activé son compte.");

@@ -42,7 +42,7 @@ public class StockService {
 
         // Méthode pour récupérer tout le stock
         public List<Stock> recupererToutLeStock() {
-            return stockRepository.findAll();  // Récupère tout le stock avec les relations (produit et catégorie)
+            return stockRepository.findAll();
         }
 
 
