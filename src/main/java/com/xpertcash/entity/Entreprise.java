@@ -31,6 +31,9 @@ public class Entreprise {
     @Column(nullable = true)
     private String logo;
 
+    @Column(nullable = true)
+    private String adresse;
+
     @ManyToOne
     @JoinColumn(name = "admin_id", nullable = true)  
     private User admin;
