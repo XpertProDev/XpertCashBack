@@ -46,10 +46,8 @@ public class ProduitsService {
     @Autowired
     private StockRepository stockRepository;
 
-
-
-        // Méthode pour Ajouter un produit (Admin seulement)
-        public Produits ajouterProduit(Long userId, Produits produit) {
+    // Méthode pour Ajouter un produit (Admin seulement)
+    public Produits ajouterProduit(Long userId, Produits produit) {
             // Vérification de l'utilisateur
             User user = usersRepository.findById(userId)
                     .orElseThrow(() -> new NotFoundException("Utilisateur non trouvé."));
@@ -59,7 +57,7 @@ public class ProduitsService {
             }
         
             User admin = user.getEntreprise().getAdmin();
-            LocalDateTime expirationDate = user.getCreatedAt().plusMinutes(5);
+            LocalDateTime expirationDate = user.getCreatedAt().plusHours(24);
             boolean withinTimeLimit = LocalDateTime.now().isBefore(expirationDate);
         
             boolean isAdmin = user.getRole() != null && user.getRole().getName().equals(RoleType.ADMIN);
@@ -135,16 +133,15 @@ public class ProduitsService {
             produit.setCategory(category);
 
             // Sauvegarder le produit
-        Produits savedProduit = produitsRepository.save(produit);
+            Produits savedProduit = produitsRepository.save(produit);
 
             // Ajouter le produit au stock
             ajouterStock(savedProduit, produit.getQuantite());
             return produitsRepository.save(produit);
         }
 
-
-         // Méthode pour ajouter un produit au stock
-         private void ajouterStock(Produits produit, Integer quantite) {
+    // Méthode pour ajouter un produit au stock
+    private void ajouterStock(Produits produit, Integer quantite) {
             // Vérifie si le produit existe déjà dans le stock
             Stock stock = stockRepository.findByProduitId(produit.getId())
                     .orElse(new Stock());
@@ -163,20 +160,16 @@ public class ProduitsService {
         
             stockRepository.save(stock);
         }
-        
-            
 
-        // Méthode pour générer un code unique pour chaque produit
-        private String generateProductCode() {
-            String randomCode = String.format("%05d", (int)(Math.random() * 100000));
-            
-            return "P-" + randomCode;
-        }
-        
+    // Méthode pour générer un code unique pour chaque produit
+    private String generateProductCode() {
+        String randomCode = String.format("%05d", (int)(Math.random() * 100000));
 
+        return "P-" + randomCode;
+    }
 
-       //Listing Entreprise Product
-       public List<Produits> listerProduitsEntreprise(Long userId) {
+   //Listing Entreprise Product
+   public List<Produits> listerProduitsEntreprise(Long userId) {
         User user = usersRepository.findById(userId)
                 .orElseThrow(() -> new NotFoundException("Utilisateur non trouvé."));
     
@@ -187,7 +180,7 @@ public class ProduitsService {
         boolean isAdmin = user.getRole() != null && user.getRole().getName().equals(RoleType.ADMIN);
     
         // Vérifier la condition de l'activation du compte
-        LocalDateTime expirationDate = user.getCreatedAt().plusMinutes(5);  // Utilisation de l'exemple de délai de 5 minutes
+        LocalDateTime expirationDate = user.getCreatedAt().plusHours(24);  // Utilisation de l'exemple de délai de 5 minutes
         boolean withinTimeLimit = LocalDateTime.now().isBefore(expirationDate);
     
         if (isAdmin) {
@@ -207,7 +200,7 @@ public class ProduitsService {
     
         // Récupérer toutes les catégories de produits associées à l'entreprise
         List<CategoryProduit> categories = categoryProduitRepository.findByEntreprise(entreprise);
-        
+
         if (categories.isEmpty()) {
             throw new RuntimeException("Aucune catégorie trouvée pour cette entreprise.");
         }

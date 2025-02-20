@@ -3,11 +3,17 @@ package com.xpertcash.controller;
 import com.xpertcash.configuration.JwtUtil;
 import com.xpertcash.entity.CategoryProduit;
 import com.xpertcash.entity.Entreprise;
+import com.xpertcash.entity.Produits;
 import com.xpertcash.entity.RoleType;
 import com.xpertcash.entity.User;
 import com.xpertcash.exceptions.NotFoundException;
 import com.xpertcash.repository.UsersRepository;
 import com.xpertcash.service.CategoryProduitService;
+
+import java.util.Collections;
+import java.util.List;
+import java.util.Optional;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -25,10 +31,9 @@ public class CategoryProduitController {
      @Autowired
     private JwtUtil jwtUtil;
 
-
-        // Créer une catégorie.
-        @PostMapping("/add/categoryProduit")
-        public ResponseEntity<?> createCategory(@RequestBody CategoryProduit category, @RequestHeader("Authorization") String token) {
+    // Créer une catégorie.
+    @PostMapping("/add/categoryProduit")
+    public ResponseEntity<?> createCategory(@RequestBody CategoryProduit category, @RequestHeader("Authorization") String token) {
             try {
                 // Extraire id de user à partir de son token
                 String jwtToken = token.substring(7);
@@ -60,4 +65,21 @@ public class CategoryProduitController {
             }
         }
 
+    @GetMapping("/allCategory")
+          public ResponseEntity<Object> listerPCategorye(@RequestHeader("Authorization") String token) {
+              String jwtToken = token.substring(7);
+              Long userId = jwtUtil.extractUserId(jwtToken);
+
+              try {
+                  List<CategoryProduit> categoryProduits = categoryProduitService.getAllCategories();
+                  return ResponseEntity.ok(categoryProduits);
+
+              } catch (RuntimeException e) {
+                  return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                          .body(Collections.singletonMap("error", e.getMessage()));
+              } catch (Exception e) {
+                  return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                          .body(Collections.singletonMap("error", "Erreur interne : " + e.getMessage()));
+              }
+          }
 }

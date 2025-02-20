@@ -28,6 +28,13 @@ public class CategoryProduitService {
         return categoryProduitRepository.save(category);
     }
 
+    // Listes des catégories existante.
+    public List<CategoryProduit> getAllCategories() {
+        System.out.println("🔹 Récupération des catégories en base de données...");
+        return categoryProduitRepository.findAll();
+    }
+
+
     // Met à jour une catégorie existante.
     public CategoryProduit updateCategory(Long id, CategoryProduit updatedCategory) {
         CategoryProduit category = getCategoryById(id);
@@ -50,10 +57,6 @@ public class CategoryProduitService {
         categoryProduitRepository.delete(category);
     }
 
-    // Listes des catégories existante.
-    public List<CategoryProduit> getAllCategories() {
-        return categoryProduitRepository.findAll();
-    }
 
     // Listes des catégories existante par ID avect les produit qui est lier
     @Transactional

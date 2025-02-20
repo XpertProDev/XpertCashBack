@@ -1,6 +1,7 @@
 package com.xpertcash.entity;
 
 import com.fasterxml.jackson.annotation.JsonBackReference;
+import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
@@ -45,20 +46,18 @@ public class Produits {
     @JoinColumn(name = "unite_mesure_id", nullable = false)
     private UniteMesure uniteMesure;
 
-
-    
-
     @NotNull(message = "Champs vide")
     @Column(nullable = false)
     private int alertSeuil;
 
     @Column(nullable = false)
+    @JsonFormat(pattern = "yyyy-MM-dd 'à' HH:mm")
     private LocalDateTime createdAt = LocalDateTime.now();
 
     // Utilisation de @JsonBackReference pour éviter des boucles infinies de sérialisation
-    @JsonBackReference
+    //@JsonBackReference
     @ManyToOne
     @JoinColumn(name = "category_id", nullable = false)
-    @JsonProperty("categoryProduit")
+//    @JsonProperty("categoryProduit")
     private CategoryProduit category;
 }

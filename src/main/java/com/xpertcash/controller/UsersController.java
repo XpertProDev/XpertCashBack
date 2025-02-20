@@ -45,11 +45,9 @@ public class UsersController {
         }
     }
 
-
-
     // Connexion
-            @PostMapping("/login")
-            public ResponseEntity<Map<String, String>> login(@RequestBody LoginRequest request) {
+    @PostMapping("/login")
+    public ResponseEntity<Map<String, String>> login(@RequestBody LoginRequest request) {
                 try {
                     String token = usersService.login(request.getEmail(), request.getPassword());
 
@@ -117,7 +115,7 @@ public class UsersController {
 
 
 
-          // Endpoint pour ajouter un utilisateur à l'entreprise de l'Admin
+   // Endpoint pour ajouter un utilisateur à l'entreprise de l'Admin
 
     @PostMapping("/add")
     public User addUserToEntreprise(HttpServletRequest request, @RequestBody UserRequest userRequest) {
