@@ -12,6 +12,7 @@ import com.xpertcash.service.CategoryProduitService;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -30,10 +31,9 @@ public class CategoryProduitController {
      @Autowired
     private JwtUtil jwtUtil;
 
-
-        // Créer une catégorie.
-        @PostMapping("/add/categoryProduit")
-        public ResponseEntity<?> createCategory(@RequestBody CategoryProduit category, @RequestHeader("Authorization") String token) {
+    // Créer une catégorie.
+    @PostMapping("/add/categoryProduit")
+    public ResponseEntity<?> createCategory(@RequestBody CategoryProduit category, @RequestHeader("Authorization") String token) {
             try {
                 // Extraire id de user à partir de son token
                 String jwtToken = token.substring(7);
@@ -65,38 +65,21 @@ public class CategoryProduitController {
             }
         }
 
+    @GetMapping("/allCategory")
+          public ResponseEntity<Object> listerPCategorye(@RequestHeader("Authorization") String token) {
+              String jwtToken = token.substring(7);
+              Long userId = jwtUtil.extractUserId(jwtToken);
 
-        // Endpoint pour récupérer les category
-        @GetMapping("/allCategory")
-        public ResponseEntity<Object> listerCategories(@RequestHeader("Authorization") String token) {
-            try {
-                String jwtToken = token.substring(7);
-                Long userId = jwtUtil.extractUserId(jwtToken);
-        
-                User user = usersRepository.findById(userId)
-                        .orElseThrow(() -> new NotFoundException("Utilisateur non trouvé"));
-        
-                if (!user.getRole().getName().equals(RoleType.ADMIN)) {
-                    return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                            .body(Collections.singletonMap("error", "Vous n'avez pas les droits nécessaires."));
-                }
-        
-                List<CategoryProduit> categoryProduits = categoryProduitService.getAllCategories();
-        
-                if (categoryProduits.isEmpty()) {
-                    return ResponseEntity.status(HttpStatus.OK)
-                            .body(Collections.singletonMap("message", "Aucune catégorie disponible."));
-                }
-        
-                return ResponseEntity.ok(categoryProduits);
-        
-            } catch (NotFoundException e) {
-                return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                        .body(Collections.singletonMap("error", e.getMessage()));
-            } catch (Exception e) {
-                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                        .body(Collections.singletonMap("error", "Erreur interne : " + e.getMessage()));
-            }
-        }
-        
+              try {
+                  List<CategoryProduit> categoryProduits = categoryProduitService.getAllCategories();
+                  return ResponseEntity.ok(categoryProduits);
+
+              } catch (RuntimeException e) {
+                  return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                          .body(Collections.singletonMap("error", e.getMessage()));
+              } catch (Exception e) {
+                  return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                          .body(Collections.singletonMap("error", "Erreur interne : " + e.getMessage()));
+              }
+          }
 }

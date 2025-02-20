@@ -20,10 +20,9 @@ import org.springframework.web.multipart.MultipartFile;
 import java.util.Collections;
 import java.util.List;
 
+@CrossOrigin(origins = "*")
 @RestController
 @RequestMapping("/api/auth")
-
-
 public class ProduitsController {
 
     @Autowired
@@ -39,12 +38,12 @@ public class ProduitsController {
     private JwtUtil jwtUtil;
 
     
-        // Méthode pour Ajouter un produit
-        @PostMapping(value = "/add/produit", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-        public ResponseEntity<?> ajouterProduit(
-                @RequestHeader("Authorization") String token,
-                @RequestPart("produit") String produitJson,
-                @RequestPart("photo") MultipartFile photo) {
+    // Méthode pour Ajouter un produit
+    @PostMapping(value = "/add/produit", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<?> ajouterProduit(
+            @RequestHeader("Authorization") String token,
+            @RequestPart("produit") String produitJson,
+            @RequestPart("photo") MultipartFile photo) {
             try {
                 // Convertir le JSON en objet Produits
                 ObjectMapper mapper = new ObjectMapper();
@@ -62,6 +61,10 @@ public class ProduitsController {
                 if (!user.getRole().getName().equals(RoleType.ADMIN)) {
                     return ResponseEntity.status(HttpStatus.FORBIDDEN)
                             .body(Collections.singletonMap("error", "Vous n'avez pas les droits nécessaires."));
+                }
+
+                if (produit.getCategory() == null || produit.getCategory().getId() == null) {
+                    throw new RuntimeException("La catégorie du produit est obligatoire.");
                 }
 
                 // Vérification des permissions
@@ -90,8 +93,8 @@ public class ProduitsController {
         }
 
     // Endpoint pour récupérer les produits de l'entreprise de l'utilisateur
-          @GetMapping("/entreprise/produits")
-          public ResponseEntity<Object> listerProduitsEntreprise(@RequestHeader("Authorization") String token) {
+      @GetMapping("/entreprise/produits")
+      public ResponseEntity<Object> listerProduitsEntreprise(@RequestHeader("Authorization") String token) {
               String jwtToken = token.substring(7); 
               Long userId = jwtUtil.extractUserId(jwtToken);
 
