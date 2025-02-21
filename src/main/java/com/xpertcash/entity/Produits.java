@@ -2,6 +2,7 @@ package com.xpertcash.entity;
 
 import com.fasterxml.jackson.annotation.JsonBackReference;
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
@@ -11,6 +12,7 @@ import java.time.LocalDateTime;
 
 @Entity
 @Data
+@JsonIgnoreProperties("stock")
 public class Produits {
 
     @Id
@@ -60,4 +62,8 @@ public class Produits {
     @JoinColumn(name = "category_id", nullable = false)
 //    @JsonProperty("categoryProduit")
     private CategoryProduit category;
+
+    @OneToOne(mappedBy = "produit")
+    @JsonBackReference // Empêche une boucle infinie
+    private Stock stock;
 }
