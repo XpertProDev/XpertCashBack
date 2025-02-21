@@ -74,7 +74,15 @@ public class ProduitsService {
         
             // Vérification des permissions
             authorizationService.checkPermission(user, PermissionType.GERER_PRODUITS);
-        
+
+            // Vérification du codebar seulement s'il est renseigné
+            if (produit.getCodebar() != null && !produit.getCodebar().trim().isEmpty()) {
+                Optional<Produits> existingProductByCodebar = produitsRepository.findByCodebar(produit.getCodebar());
+                if(existingProductByCodebar.isPresent()){
+                    throw new RuntimeException("Un produit avec ce code barre existe déjà.");
+                }
+            }
+
             // Vérifications des champs obligatoires
             if (produit.getNomProduit() == null || produit.getNomProduit().trim().isEmpty()) {
                 throw new RuntimeException("Le nom du produit est obligatoire.");

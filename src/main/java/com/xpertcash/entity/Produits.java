@@ -60,4 +60,8 @@ public class Produits {
     @JoinColumn(name = "category_id", nullable = false)
 //    @JsonProperty("categoryProduit")
     private CategoryProduit category;
+
+
+    @Column(unique = true, nullable = true)
+    private String codebar;
 }
