@@ -399,6 +399,24 @@ public class UsersService {
         return user;
     }
 
+    public UserRequest getInfo(Long userId) {
+        User user = usersRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+
+        return new UserRequest(
+                user.getNomComplet(),
+                user.getEntreprise().getNomEntreprise(),
+                user.getEmail(),
+                user.getRole().getName(),
+                user.getPhone(),
+                user.getPays(),
+                user.getEntreprise().getAdresse(),
+                user.getEntreprise().getLogo()
+
+        );
+    }
+
+
 
 
 

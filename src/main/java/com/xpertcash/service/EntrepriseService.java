@@ -29,7 +29,9 @@ public class EntrepriseService {
                 .map(entreprise -> new EntrepriseDTO(
                         entreprise.getNomEntreprise(),
                         entreprise.getAdmin() != null ? entreprise.getAdmin().getNomComplet() : "Aucun Admin", 
-                        entreprise.getCreatedAt()
+                        entreprise.getCreatedAt(),
+                        entreprise.getAdresse(),
+                        entreprise.getLogo()
                 ))
                 .collect(Collectors.toList());
 

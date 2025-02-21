@@ -15,7 +15,7 @@ import java.util.UUID;
 @Service
 public class ImageStorageService {
 
-    private final String imageLocation = "C:\\xampp\\htdocs\\xpertCashFile\\images"; // Chemin à rendre configurable
+    private final String imageLocation = "src/main/resources/static/uploads";
 
     public String saveImage(MultipartFile imageFile) {
         if (imageFile == null || imageFile.isEmpty()) {
@@ -23,7 +23,10 @@ public class ImageStorageService {
         }
 
         try {
-            Path imageRootLocation = Paths.get(imageLocation);
+            // Emplacement de l'image dans le dossier static/uploads
+            Path imageRootLocation = Paths.get("src/main/resources/static/uploads");
+
+            // Vérifie si le dossier existe, sinon le crée
             if (!Files.exists(imageRootLocation)) {
                 Files.createDirectories(imageRootLocation);
             }
@@ -32,11 +35,13 @@ public class ImageStorageService {
             Path imagePath = imageRootLocation.resolve(imageName);
             Files.copy(imageFile.getInputStream(), imagePath, StandardCopyOption.REPLACE_EXISTING);
 
-            return "http://localhost/xpertCashFile/images/" + imageName;
+            // Retourner l'URL de l'image
+            return "/uploads/" + imageName;
 
         } catch (IOException e) {
             throw new NotFoundException("Erreur lors de l'enregistrement de l'image : " + e.getMessage());
         }
     }
+
 }
 
