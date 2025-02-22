@@ -250,6 +250,7 @@ public class ProduitsService {
                     break;
                 case "prix":
                     produit.setPrix(Double.valueOf(value.toString()));
+                    System.out.println("Prix mis à jour: " + produit.getPrix());  // Ajout du log
                     break;
                 case "photo":
                     produit.setPhoto((String) value);
@@ -267,6 +268,7 @@ public class ProduitsService {
                     // Mettre à jour le stock avec la nouvelle quantité
                     mettreAJourStock(produit, newQuantity);
                     break;
+
                 case "alertSeuil":
                     produit.setAlertSeuil(Integer.valueOf(value.toString()));
                     break;
@@ -282,7 +284,17 @@ public class ProduitsService {
                                 });
                         produit.setUniteMesure(uniteMesure);
                     }
+
                     break;
+
+                case "category":
+                    if (value instanceof Map) {
+                        Map<String, Long> categoryMap = (Map<String, Long>) value;
+                        Long categoryId = categoryMap.get("id");
+                        CategoryProduit category = categoryProduitRepository.findById(categoryId)
+                                .orElseThrow(() -> new NotFoundException("Catégorie non trouvée"));
+                        produit.setCategory(category);
+                    }
             }
         });
 
