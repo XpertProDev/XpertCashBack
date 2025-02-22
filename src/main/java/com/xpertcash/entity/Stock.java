@@ -5,6 +5,7 @@ import java.time.LocalDateTime;
 
 import com.fasterxml.jackson.annotation.JsonBackReference;
 
+import com.fasterxml.jackson.annotation.JsonManagedReference;
 import jakarta.persistence.*;
 import lombok.Data;
 
@@ -17,7 +18,7 @@ public class Stock {
 
     @OneToOne
     @JoinColumn(name = "produit_id", nullable = false)
-    @JsonBackReference
+    @JsonManagedReference
     private Produits produit;
 
     @ManyToOne
