@@ -225,11 +225,12 @@ public class ProduitsService {
         // Vérifier si le produit existe
         Produits produit = produitsRepository.findById(produitId)
                 .orElseThrow(() -> new NotFoundException("Produit non trouvé"));
-    
+
+        // Vérifier les permissions de l'utilisateur
         User user = usersRepository.findById(userId)
                 .orElseThrow(() -> new NotFoundException("Utilisateur non trouvé"));
         authorizationService.checkPermission(user, PermissionType.GERER_PRODUITS);
-    
+
         // Vérifier si le codeProduit ou la catégorie sont dans les mises à jour
         if (updates.containsKey("codeProduit")) {
             throw new RuntimeException("Le code du produit ne peut pas être modifié.");
@@ -237,8 +238,8 @@ public class ProduitsService {
         if (updates.containsKey("category")) {
             throw new RuntimeException("La catégorie du produit ne peut pas être modifiée.");
         }
-    
-        // ce qui peuvent etre modifier
+
+        // Appliquer les modifications
         updates.forEach((key, value) -> {
             switch (key) {
                 case "nomProduit":
@@ -250,11 +251,21 @@ public class ProduitsService {
                 case "prix":
                     produit.setPrix(Double.valueOf(value.toString()));
                     break;
+                case "photo":
+                    produit.setPhoto((String) value);
+                    break;
+                case "codebar":
+                    produit.setCodebar((String) value);
+                    break;
                 case "prixAchat":
                     produit.setPrixAchat(Double.valueOf(value.toString()));
                     break;
                 case "quantite":
-                    produit.setQuantite(Integer.valueOf(value.toString()));
+                    int newQuantity = Integer.valueOf(value.toString());
+                    produit.setQuantite(newQuantity);
+
+                    // Mettre à jour le stock avec la nouvelle quantité
+                    mettreAJourStock(produit, newQuantity);
                     break;
                 case "alertSeuil":
                     produit.setAlertSeuil(Integer.valueOf(value.toString()));
@@ -274,10 +285,29 @@ public class ProduitsService {
                     break;
             }
         });
+
         produit.setCreatedAt(LocalDateTime.now());
-        return produitsRepository.save(produit);
+
+        Produits produitModifie = produitsRepository.save(produit);
+
+        return produitModifie;
     }
-    
-     
-    
+
+    private void mettreAJourStock(Produits produit, int nouvelleQuantite) {
+
+        Stock stock = produit.getStock();
+        if (stock != null) {
+            stock.setQuantite(nouvelleQuantite);
+            stockRepository.save(stock);
+        } else {
+            // Si le produit n'a pas encore de stock, tu pourrais en créer un
+            Stock newStock = new Stock();
+            newStock.setProduit(produit);
+            newStock.setQuantite(nouvelleQuantite);
+            stockRepository.save(newStock);
+        }
+    }
+
+
+
 }
