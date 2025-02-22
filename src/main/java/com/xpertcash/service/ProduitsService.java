@@ -274,7 +274,7 @@ public class ProduitsService {
                     break;
             }
         });
-    
+        produit.setCreatedAt(LocalDateTime.now());
         return produitsRepository.save(produit);
     }
     
