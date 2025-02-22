@@ -66,4 +66,8 @@ public class Produits {
     @OneToOne(mappedBy = "produit")
     @JsonBackReference // Empêche une boucle infinie
     private Stock stock;
+
+
+    @Column(unique = true, nullable = true)
+    private String codebar;
 }

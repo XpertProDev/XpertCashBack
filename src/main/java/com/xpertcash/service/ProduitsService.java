@@ -22,6 +22,7 @@ import com.xpertcash.repository.UsersRepository;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 @Service
@@ -74,7 +75,15 @@ public class ProduitsService {
         
             // Vérification des permissions
             authorizationService.checkPermission(user, PermissionType.GERER_PRODUITS);
-        
+
+            // Vérification du codebar seulement s'il est renseigné
+            if (produit.getCodebar() != null && !produit.getCodebar().trim().isEmpty()) {
+                Optional<Produits> existingProductByCodebar = produitsRepository.findByCodebar(produit.getCodebar());
+                if(existingProductByCodebar.isPresent()){
+                    throw new RuntimeException("Un produit avec ce code barre existe déjà.");
+                }
+            }
+
             // Vérifications des champs obligatoires
             if (produit.getNomProduit() == null || produit.getNomProduit().trim().isEmpty()) {
                 throw new RuntimeException("Le nom du produit est obligatoire.");
@@ -168,7 +177,7 @@ public class ProduitsService {
         return "P-" + randomCode;
     }
 
-   //Listing Entreprise Product
+   //Methode Listing Entreprise Product
    public List<Produits> listerProduitsEntreprise(Long userId) {
         User user = usersRepository.findById(userId)
                 .orElseThrow(() -> new NotFoundException("Utilisateur non trouvé."));
@@ -209,6 +218,64 @@ public class ProduitsService {
         List<Produits> produits = produitsRepository.findByCategoryIn(categories);
     
         return produits;
+    }
+    
+    //Methode Update Produit
+    public Produits modifierProduit(Long userId, Long produitId, Map<String, Object> updates) {
+        // Vérifier si le produit existe
+        Produits produit = produitsRepository.findById(produitId)
+                .orElseThrow(() -> new NotFoundException("Produit non trouvé"));
+    
+        User user = usersRepository.findById(userId)
+                .orElseThrow(() -> new NotFoundException("Utilisateur non trouvé"));
+        authorizationService.checkPermission(user, PermissionType.GERER_PRODUITS);
+    
+        // Vérifier si le codeProduit ou la catégorie sont dans les mises à jour
+        if (updates.containsKey("codeProduit")) {
+            throw new RuntimeException("Le code du produit ne peut pas être modifié.");
+        }
+        if (updates.containsKey("category")) {
+            throw new RuntimeException("La catégorie du produit ne peut pas être modifiée.");
+        }
+    
+        // ce qui peuvent etre modifier
+        updates.forEach((key, value) -> {
+            switch (key) {
+                case "nomProduit":
+                    produit.setNomProduit((String) value);
+                    break;
+                case "description":
+                    produit.setDescription((String) value);
+                    break;
+                case "prix":
+                    produit.setPrix(Double.valueOf(value.toString()));
+                    break;
+                case "prixAchat":
+                    produit.setPrixAchat(Double.valueOf(value.toString()));
+                    break;
+                case "quantite":
+                    produit.setQuantite(Integer.valueOf(value.toString()));
+                    break;
+                case "alertSeuil":
+                    produit.setAlertSeuil(Integer.valueOf(value.toString()));
+                    break;
+                case "uniteMesure":
+                    if (value instanceof Map) {
+                        Map<String, String> uniteMesureMap = (Map<String, String>) value;
+                        String nomUnite = uniteMesureMap.get("nomUnite");
+                        UniteMesure uniteMesure = uniteMesureRepository.findByNomUnite(nomUnite)
+                                .orElseGet(() -> {
+                                    UniteMesure newUnite = new UniteMesure();
+                                    newUnite.setNomUnite(nomUnite);
+                                    return uniteMesureRepository.save(newUnite);
+                                });
+                        produit.setUniteMesure(uniteMesure);
+                    }
+                    break;
+            }
+        });
+    
+        return produitsRepository.save(produit);
     }
     
      

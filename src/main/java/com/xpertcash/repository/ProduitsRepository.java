@@ -20,10 +20,11 @@ public interface ProduitsRepository extends JpaRepository<Produits, Long> {
     List<Produits> findByCategory(CategoryProduit category);
 
     List<Produits> findByCategoryIn(List<CategoryProduit> categories);
-    
 
     Optional<Produits> findByNomProduitAndCategoryAndUniteMesure(String nomProduit, CategoryProduit category, UniteMesure uniteMesure);
 
+    // Méthode pour rechercher un produit par codebar
+    Optional<Produits> findByCodebar(String codebar);
 }
 
 

@@ -19,6 +19,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 
 @CrossOrigin(origins = "*")
 @RestController
@@ -111,4 +112,29 @@ public class ProduitsController {
               }
           }
           
+    //Endpoint pour Update produit
+    @PatchMapping("/update/produit/{produitId}")
+    public ResponseEntity<?> modifierProduit(
+            @RequestHeader("Authorization") String token,
+            @PathVariable Long produitId,
+            @RequestBody Map<String, Object> updates) {
+        try {
+            String jwtToken = token.substring(7);
+            Long userId = jwtUtil.extractUserId(jwtToken);
+    
+            Produits updatedProduit = produitsService.modifierProduit(userId, produitId, updates);
+    
+            return ResponseEntity.ok(updatedProduit);
+        } catch (NotFoundException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(Collections.singletonMap("error", e.getMessage()));
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Collections.singletonMap("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Collections.singletonMap("error", "Erreur interne : " + e.getMessage()));
+        }
+    }
+    
 }
