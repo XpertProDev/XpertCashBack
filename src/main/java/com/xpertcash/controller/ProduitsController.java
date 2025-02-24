@@ -113,18 +113,41 @@ public class ProduitsController {
           }
           
     //Endpoint pour Update produit
-    @PatchMapping("/update/produit/{produitId}")
+    // Controller
+    @PatchMapping(value = "/update/produit/{id}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<?> modifierProduit(
             @RequestHeader("Authorization") String token,
-            @PathVariable Long produitId,
-            @RequestBody Map<String, Object> updates) {
+            @PathVariable("id") Long produitId,
+            @RequestPart("produit") String produitJson,
+            @RequestPart(value = "photo", required = false) MultipartFile photo) {
         try {
+            // Conversion du JSON en objet Produits
+            ObjectMapper mapper = new ObjectMapper();
+            Produits produit = mapper.readValue(produitJson, Produits.class);
+
+            // Extraction de l'ID de l'utilisateur depuis le token
             String jwtToken = token.substring(7);
             Long userId = jwtUtil.extractUserId(jwtToken);
-    
-            Produits updatedProduit = produitsService.modifierProduit(userId, produitId, updates);
-    
+
+            // Vérification de l'utilisateur
+            User user = usersRepository.findById(userId)
+                    .orElseThrow(() -> new NotFoundException("Utilisateur non trouvé"));
+
+            // Vérification des permissions
+            authorizationService.checkPermission(user, PermissionType.GERER_PRODUITS);
+
+            // Si une nouvelle photo est fournie, sauvegarder l'image et récupérer son URL
+            if (photo != null && !photo.isEmpty()) {
+                System.out.println("Photo reçue : " + photo.getOriginalFilename());
+                String imageUrl = imageStorageService.saveImage(photo);
+                System.out.println("Image sauvegardée avec URL : " + imageUrl);
+                produit.setPhoto(imageUrl);
+            }
+
+            // Appel du service pour modifier le produit
+            Produits updatedProduit = produitsService.modifierProduit(userId, produitId, produit);
             return ResponseEntity.ok(updatedProduit);
+
         } catch (NotFoundException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
                     .body(Collections.singletonMap("error", e.getMessage()));

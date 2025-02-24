@@ -219,78 +219,80 @@ public class ProduitsService {
     
         return produits;
     }
-    
-    //Methode Update Produit
-    public Produits modifierProduit(Long userId, Long produitId, Map<String, Object> updates) {
-        // Vérifier si le produit existe
-        Produits produit = produitsRepository.findById(produitId)
-                .orElseThrow(() -> new NotFoundException("Produit non trouvé"));
 
-        // Vérifier les permissions de l'utilisateur
+    // Service Produits
+    public Produits modifierProduit(Long userId, Long produitId, Produits produitModif) {
+        // Vérification de l'utilisateur
         User user = usersRepository.findById(userId)
-                .orElseThrow(() -> new NotFoundException("Utilisateur non trouvé"));
+                .orElseThrow(() -> new NotFoundException("Utilisateur non trouvé."));
+        // Vérification des permissions
         authorizationService.checkPermission(user, PermissionType.GERER_PRODUITS);
 
-        // Vérifier si le codeProduit ou la catégorie sont dans les mises à jour
-        if (updates.containsKey("codeProduit")) {
-            throw new RuntimeException("Le code du produit ne peut pas être modifié.");
+        // Récupération du produit existant
+        Produits existingProduit = produitsRepository.findById(produitId)
+                .orElseThrow(() -> new NotFoundException("Produit non trouvé."));
+
+        // Mise à jour du nom du produit s'il est fourni
+        if (produitModif.getNomProduit() != null && !produitModif.getNomProduit().trim().isEmpty()) {
+            existingProduit.setNomProduit(produitModif.getNomProduit());
         }
-        if (updates.containsKey("category")) {
-            throw new RuntimeException("La catégorie du produit ne peut pas être modifiée.");
+
+        // Mise à jour de la description
+        if (produitModif.getDescription() != null && !produitModif.getDescription().trim().isEmpty()) {
+            existingProduit.setDescription(produitModif.getDescription());
         }
 
-        // Appliquer les modifications
-        updates.forEach((key, value) -> {
-            switch (key) {
-                case "nomProduit":
-                    produit.setNomProduit((String) value);
-                    break;
-                case "description":
-                    produit.setDescription((String) value);
-                    break;
-                case "prix":
-                    produit.setPrix(Double.valueOf(value.toString()));
-                    break;
-                case "photo":
-                    produit.setPhoto((String) value);
-                    break;
-                case "codebar":
-                    produit.setCodebar((String) value);
-                    break;
-                case "prixAchat":
-                    produit.setPrixAchat(Double.valueOf(value.toString()));
-                    break;
-                case "quantite":
-                    int newQuantity = Integer.valueOf(value.toString());
-                    produit.setQuantite(newQuantity);
+        // Mise à jour du prix
+        if (produitModif.getPrix() != null && produitModif.getPrix() > 0) {
+            existingProduit.setPrix(produitModif.getPrix());
+        }
 
-                    // Mettre à jour le stock avec la nouvelle quantité
-                    mettreAJourStock(produit, newQuantity);
-                    break;
-                case "alertSeuil":
-                    produit.setAlertSeuil(Integer.valueOf(value.toString()));
-                    break;
-                case "uniteMesure":
-                    if (value instanceof Map) {
-                        Map<String, String> uniteMesureMap = (Map<String, String>) value;
-                        String nomUnite = uniteMesureMap.get("nomUnite");
-                        UniteMesure uniteMesure = uniteMesureRepository.findByNomUnite(nomUnite)
-                                .orElseGet(() -> {
-                                    UniteMesure newUnite = new UniteMesure();
-                                    newUnite.setNomUnite(nomUnite);
-                                    return uniteMesureRepository.save(newUnite);
-                                });
-                        produit.setUniteMesure(uniteMesure);
-                    }
-                    break;
-            }
-        });
+        // Mise à jour du prix d'achat
+        if (produitModif.getPrixAchat() != null && produitModif.getPrixAchat() > 0) {
+            existingProduit.setPrixAchat(produitModif.getPrixAchat());
+        }
 
-        produit.setCreatedAt(LocalDateTime.now());
+        // Mise à jour de la quantité
+        if (produitModif.getQuantite() > 0) {
+            existingProduit.setQuantite(produitModif.getQuantite());
+        } else if (produitModif.getQuantite() != 0) {
+            throw new RuntimeException("La quantité doit être supérieure à 0.");
+        }
 
-        Produits produitModifie = produitsRepository.save(produit);
+        // Mise à jour de l'alerte de seuil
+        if (produitModif.getAlertSeuil() > 0) {
+            existingProduit.setAlertSeuil(produitModif.getAlertSeuil());
+        } else if (produitModif.getAlertSeuil() != 0) {
+            throw new RuntimeException("L'alerte de seuil doit être un nombre positif.");
+        }
 
-        return produitModifie;
+        // Mise à jour de l'unité de mesure si fournie
+        if (produitModif.getUniteMesure() != null &&
+                produitModif.getUniteMesure().getNomUnite() != null &&
+                !produitModif.getUniteMesure().getNomUnite().trim().isEmpty()) {
+
+            String nomUnite = produitModif.getUniteMesure().getNomUnite();
+            UniteMesure uniteMesure = uniteMesureRepository.findByNomUnite(nomUnite)
+                    .orElseGet(() -> {
+                        UniteMesure newUniteMesure = new UniteMesure();
+                        newUniteMesure.setNomUnite(nomUnite);
+                        return uniteMesureRepository.save(newUniteMesure);
+                    });
+            existingProduit.setUniteMesure(uniteMesure);
+        }
+
+        // Mise à jour de la photo si une nouvelle URL est fournie
+        if (produitModif.getPhoto() != null && !produitModif.getPhoto().trim().isEmpty()) {
+            System.out.println("Mise à jour de la photo avec URL : " + produitModif.getPhoto());
+            existingProduit.setPhoto(produitModif.getPhoto());
+        }
+
+        existingProduit.setCreatedAt(LocalDateTime.now());
+
+        // Sauvegarde et retour du produit modifié
+        Produits savedProduit = produitsRepository.save(existingProduit);
+        //System.out.println("Produit sauvegardé avec photo : " + savedProduit.getPhoto());
+        return savedProduit;
     }
 
     private void mettreAJourStock(Produits produit, int nouvelleQuantite) {
