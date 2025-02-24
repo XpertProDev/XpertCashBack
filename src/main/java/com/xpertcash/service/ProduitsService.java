@@ -255,9 +255,12 @@ public class ProduitsService {
         // Mise à jour de la quantité
         if (produitModif.getQuantite() > 0) {
             existingProduit.setQuantite(produitModif.getQuantite());
+            // Mise à jour du stock
+            mettreAJourStock(existingProduit, produitModif.getQuantite());
         } else if (produitModif.getQuantite() != 0) {
             throw new RuntimeException("La quantité doit être supérieure à 0.");
         }
+
 
         // Mise à jour de l'alerte de seuil
         if (produitModif.getAlertSeuil() > 0) {
@@ -305,6 +308,7 @@ public class ProduitsService {
             // Si le produit n'a pas encore de stock, tu pourrais en créer un
             Stock newStock = new Stock();
             newStock.setProduit(produit);
+            newStock.setDateAjout(LocalDateTime.now());
             newStock.setQuantite(nouvelleQuantite);
             stockRepository.save(newStock);
         }
