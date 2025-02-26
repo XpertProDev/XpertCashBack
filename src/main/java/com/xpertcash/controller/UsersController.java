@@ -40,7 +40,8 @@ public class UsersController {
                     request.getPassword(),
                     request.getPhone(),
                     request.getPays(),
-                    request.getNomEntreprise()
+                    request.getNomEntreprise(),
+                    request.getNomBoutique()
             );
             Map<String, String> response = new HashMap<>();
             response.put("message", "Compte créé avec succès. Un lien d'activation vous a été envoyé par email.");

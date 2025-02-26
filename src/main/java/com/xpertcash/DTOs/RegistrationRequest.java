@@ -10,4 +10,5 @@ public class RegistrationRequest {
     private String phone;
     private String pays;
     private String nomEntreprise;
+    private String nomBoutique;
 }

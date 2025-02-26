@@ -25,6 +25,9 @@ public class Stock {
     @JoinColumn(name = "category_id", nullable = false) 
     private CategoryProduit category;
 
+    @ManyToOne
+    private Magasin magasin;
+
      private int quantite;
      private LocalDate dateExpiration;
      private LocalDateTime dateAjout = LocalDateTime.now();  

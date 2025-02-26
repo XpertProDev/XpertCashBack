@@ -1,9 +1,6 @@
 package com.xpertcash.entity;
 
-import com.fasterxml.jackson.annotation.JsonBackReference;
-import com.fasterxml.jackson.annotation.JsonFormat;
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.*;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
@@ -64,10 +61,15 @@ public class Produits {
     private CategoryProduit category;
 
     @OneToOne(mappedBy = "produit")
-    @JsonBackReference // Empêche une boucle infinie
+    @JsonManagedReference // Empêche une boucle infinie
     private Stock stock;
 
 
     @Column(unique = true, nullable = true)
     private String codebar;
+
+    @ManyToOne
+    @JoinColumn(name = "magasin_id", nullable = false)
+    @JsonBackReference
+    private Magasin magasin;
 }

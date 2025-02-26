@@ -2,11 +2,9 @@ package com.xpertcash.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.xpertcash.composant.AuthorizationService;
 import com.xpertcash.configuration.JwtUtil;
-import com.xpertcash.entity.PermissionType;
-import com.xpertcash.entity.Produits;
-import com.xpertcash.entity.RoleType;
-import com.xpertcash.entity.User;
+import com.xpertcash.entity.*;
 import com.xpertcash.exceptions.NotFoundException;
+import com.xpertcash.repository.MagasinRepository;
 import com.xpertcash.repository.UsersRepository;
 import com.xpertcash.service.IMAGES.ImageStorageService;
 import com.xpertcash.service.ProduitsService;
@@ -37,61 +35,69 @@ public class ProduitsController {
     private ImageStorageService imageStorageService;
     @Autowired
     private JwtUtil jwtUtil;
+    @Autowired
+    private MagasinRepository magasinRepository;
 
-    
-    // Méthode pour Ajouter un produit
+
+
     @PostMapping(value = "/add/produit", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<?> ajouterProduit(
-            @RequestHeader("Authorization") String token,
-            @RequestPart("produit") String produitJson,
-            @RequestPart("photo") MultipartFile photo) {
-            try {
-                // Convertir le JSON en objet Produits
-                ObjectMapper mapper = new ObjectMapper();
-                Produits produit = mapper.readValue(produitJson, Produits.class);
+            @RequestHeader("Authorization") String token,         // Auth token
+            @RequestPart("produit") String produitJson,           // JSON du produit
+            @RequestPart("photo") MultipartFile photo,           // Photo du produit
+            @RequestParam("magasinId") Long magasinId) {         // ID du magasin en paramètre de la requête
 
-                // Extraire l'ID de l'utilisateur à partir du token
-                String jwtToken = token.substring(7);
-                Long userId = jwtUtil.extractUserId(jwtToken);
+        try {
+            // Convertir le JSON du produit en objet Produits
+            ObjectMapper mapper = new ObjectMapper();
+            Produits produit = mapper.readValue(produitJson, Produits.class);
 
-                // Vérifier si l'utilisateur existe
-                User user = usersRepository.findById(userId)
-                        .orElseThrow(() -> new NotFoundException("Utilisateur non trouvé"));
+            // Extraire l'ID de l'utilisateur à partir du token
+            String jwtToken = token.substring(7); // Supposons que le token commence par "Bearer "
+            Long userId = jwtUtil.extractUserId(jwtToken);  // Extraire l'ID de l'utilisateur
 
-                // Vérifier si l'utilisateur est admin
-                if (!user.getRole().getName().equals(RoleType.ADMIN)) {
-                    return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                            .body(Collections.singletonMap("error", "Vous n'avez pas les droits nécessaires."));
-                }
+            // Vérifier si l'utilisateur existe
+            User user = usersRepository.findById(userId)
+                    .orElseThrow(() -> new NotFoundException("Utilisateur non trouvé"));
 
-                if (produit.getCategory() == null || produit.getCategory().getId() == null) {
-                    throw new RuntimeException("La catégorie du produit est obligatoire.");
-                }
-
-                // Vérification des permissions
-                authorizationService.checkPermission(user, PermissionType.GERER_PRODUITS);
-
-                // Sauvegarder l'image via le service et récupérer son URL
-                String imageUrl = imageStorageService.saveImage(photo);
-                // Associer l'URL de l'image au produit
-                produit.setPhoto(imageUrl);
-
-                // Ajouter le produit via le service
-                Produits savedProduit = produitsService.ajouterProduit(userId, produit);
-
-                return ResponseEntity.status(HttpStatus.CREATED).body(savedProduit);
-
-            } catch (NotFoundException e) {
-                return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                        .body(Collections.singletonMap("error", e.getMessage()));
-            } catch (RuntimeException e) {
-                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                        .body(Collections.singletonMap("error", e.getMessage()));
-            } catch (Exception e) {
-                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                        .body(Collections.singletonMap("error", "Erreur interne : " + e.getMessage()));
+            // Vérifier si l'utilisateur a les droits nécessaires (administrateur)
+            if (!user.getRole().getName().equals(RoleType.ADMIN)) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                        .body(Collections.singletonMap("error", "Vous n'avez pas les droits nécessaires."));
             }
+
+            // Vérification que la catégorie du produit est renseignée
+            if (produit.getCategory() == null || produit.getCategory().getId() == null) {
+                throw new RuntimeException("La catégorie du produit est obligatoire.");
+            }
+
+            // Vérification des permissions spécifiques sur les produits
+            authorizationService.checkPermission(user, PermissionType.GERER_PRODUITS);
+
+            // Sauvegarder l'image du produit
+            String imageUrl = imageStorageService.saveImage(photo); // Enregistrer l'image et récupérer l'URL
+            produit.setPhoto(imageUrl); // Associer l'URL de l'image au produit
+
+            // Appel du service pour ajouter le produit avec magasinId en plus
+            Produits savedProduit = produitsService.ajouterProduit(userId, magasinId, produit);
+
+            // Retourner une réponse avec le produit ajouté
+            return ResponseEntity.status(HttpStatus.CREATED).body(savedProduit);
+
+        } catch (NotFoundException e) {
+            // Si l'utilisateur n'a pas été trouvé
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(Collections.singletonMap("error", e.getMessage()));
+        } catch (RuntimeException e) {
+            // Si une exception liée à la logique métier se produit
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Collections.singletonMap("error", e.getMessage()));
+        } catch (Exception e) {
+            // Pour toute autre exception
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Collections.singletonMap("error", "Erreur interne : " + e.getMessage()));
         }
+    }
 
     // Endpoint pour récupérer les produits de l'entreprise de l'utilisateur
       @GetMapping("/entreprise/produits")
@@ -113,7 +119,6 @@ public class ProduitsController {
           }
           
     //Endpoint pour Update produit
-    // Controller
     @PatchMapping(value = "/update/produit/{id}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<?> modifierProduit(
             @RequestHeader("Authorization") String token,
@@ -159,5 +164,13 @@ public class ProduitsController {
                     .body(Collections.singletonMap("error", "Erreur interne : " + e.getMessage()));
         }
     }
-    
+
+
+    //Endpoint pour Etat des magqsin Produit
+    @GetMapping("/magasins/stats")
+    public ResponseEntity<List<Map<String, Object>>> getCountAndTotalQuantitiesByMagasin() {
+        return ResponseEntity.ok(produitsService.getCountAndTotalQuantitiesByMagasin());
+    }
+
+
 }

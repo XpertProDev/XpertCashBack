@@ -5,10 +5,8 @@ import com.xpertcash.DTOs.USER.UserRequest;
 import com.xpertcash.configuration.JwtConfig;
 import com.xpertcash.configuration.JwtUtil;
 import com.xpertcash.configuration.PasswordGenerator;
-import com.xpertcash.entity.Entreprise;
-import com.xpertcash.entity.Role;
-import com.xpertcash.entity.RoleType;
-import com.xpertcash.entity.User;
+import com.xpertcash.entity.*;
+import com.xpertcash.repository.BoutiqueRepository;
 import com.xpertcash.repository.EntrepriseRepository;
 import com.xpertcash.repository.RoleRepository;
 import com.xpertcash.repository.UsersRepository;
@@ -56,6 +54,10 @@ public class UsersService {
     private JwtUtil jwtUtil;  // Utilisation de JwtUtil pour extraire l'ID de l'utilisateur
 
     private final JwtConfig jwtConfig;
+    @Autowired
+    private BoutiqueService boutiqueService;
+    @Autowired
+    BoutiqueRepository boutiqueRepository;
 
     @Autowired
     public UsersService(UsersRepository usersRepository, JwtConfig jwtConfig, BCryptPasswordEncoder passwordEncoder) {
@@ -65,45 +67,45 @@ public class UsersService {
     }
 
     // Inscription : génère le code PIN, enregistre l'utilisateur et envoie le lien d'activation
-    public User registerUsers(String nomComplet, String email, String password, String phone, String pays, String nomEntreprise) {
+    public User registerUsers(String nomComplet, String email, String password, String phone, String pays, String nomEntreprise, String nomBoutique) {
         // Vérifier si l'email est déjà utilisé
         if (usersRepository.findByEmail(email).isPresent()) {
             throw new RuntimeException("Cet email est déjà utilisé. L'utilisateur existe déjà.");
         }
-    
+
         // Vérifier si le numéro de téléphone est déjà utilisé
         if (usersRepository.findByPhone(phone).isPresent()) {
             throw new RuntimeException("Ce numéro de téléphone est déjà utilisé. L'utilisateur existe déjà.");
         }
-    
+
         // Vérifier si l'entreprise existe déjà
         if (entrepriseRepository.findByNomEntreprise(nomEntreprise).isPresent()) {
             throw new RuntimeException("Le nom de l'entreprise est déjà utilisé. L'entreprise existe déjà.");
         }
-    
+
         // Générer un mot de passe haché
         BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
         String hashedPassword = passwordEncoder.encode(password);
-    
+
         // Générer un code PIN d'activation
         String activationCode = String.format("%04d", new Random().nextInt(10000));
-    
+
         // Créer l'entreprise
         String identifiantUnique;
         do {
             identifiantUnique = Entreprise.generateIdentifiantEntreprise();
         } while (entrepriseRepository.existsByIdentifiantEntreprise(identifiantUnique));
-    
+
         Entreprise entreprise = new Entreprise();
         entreprise.setNomEntreprise(nomEntreprise);
         entreprise.setIdentifiantEntreprise(identifiantUnique);
         entreprise.setCreatedAt(LocalDateTime.now());
         entreprise = entrepriseRepository.save(entreprise);
-    
+
         // Attribution du rôle ADMIN
         Role adminRole = roleRepository.findByName(RoleType.ADMIN)
-            .orElseThrow(() -> new RuntimeException("Rôle ADMIN non trouvé"));
-    
+                .orElseThrow(() -> new RuntimeException("Rôle ADMIN non trouvé"));
+
         // Créer l'utilisateur
         User users = new User();
         users.setEmail(email);
@@ -120,20 +122,29 @@ public class UsersService {
         users.setLastActivity(LocalDateTime.now());
         users.setLocked(false);
         usersRepository.save(users);
-    
+
         entreprise.setAdmin(users);
         entrepriseRepository.save(entreprise);
-    
+
+        // Créer automatiquement une première boutique avec un nom par défaut
+        String defaultBoutiqueName = "Boutique principale";  // Nom par défaut pour la première boutique
+        if (nomBoutique == null || nomBoutique.isEmpty()) {
+            nomBoutique = defaultBoutiqueName;  // Si aucun nom n'est fourni, utiliser le nom par défaut
+        }
+
+        // Créer la boutique automatiquement
+        Boutique boutique = boutiqueService.createBoutiqueForUser(users, nomBoutique);
+
         try {
             mailService.sendActivationLinkEmail(email, activationCode);
         } catch (MessagingException e) {
             System.err.println("Erreur lors de l'envoi de l'email d'activation : " + e.getMessage());
             throw new RuntimeException("Une erreur est survenue lors de l'envoi de l'email d'activation.", e);
         }
-    
+
         return users;
     }
-    
+
     //Admin name
 
     public String getNomCompletAdminDeEntreprise(Long entrepriseId) {

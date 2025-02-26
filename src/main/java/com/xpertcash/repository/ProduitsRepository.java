@@ -5,6 +5,7 @@ import com.xpertcash.entity.Produits;
 import com.xpertcash.entity.UniteMesure;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -25,6 +26,13 @@ public interface ProduitsRepository extends JpaRepository<Produits, Long> {
 
     // Méthode pour rechercher un produit par codebar
     Optional<Produits> findByCodebar(String codebar);
+
+    @Query("SELECT p.magasin.id, COUNT(p), SUM(p.quantite) FROM Produits p GROUP BY p.magasin.id")
+    List<Object[]> countAndSumQuantitiesByMagasin();
+
+
+
+
 }
 
 

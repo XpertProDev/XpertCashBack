@@ -54,7 +54,8 @@ public class RoleService {
                 permissionMap.get(PermissionType.GERER_PRODUITS),
                 permissionMap.get(PermissionType.VENDRE_PRODUITS),
                 permissionMap.get(PermissionType.VOIR_FLUX_COMPTABLE),
-                permissionMap.get(PermissionType.APPROVISIONNER_STOCK)
+                permissionMap.get(PermissionType.APPROVISIONNER_STOCK),
+                    permissionMap.get(PermissionType.GERER_MAGASINS)
             ));
 
             Role venteRole = new Role();

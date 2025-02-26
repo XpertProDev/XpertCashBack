@@ -2,28 +2,14 @@ package com.xpertcash.service;
 
 
 import com.xpertcash.composant.AuthorizationService;
-import com.xpertcash.entity.CategoryProduit;
-import com.xpertcash.entity.Entreprise;
-import com.xpertcash.entity.PermissionType;
-import com.xpertcash.entity.Produits;
-import com.xpertcash.entity.RoleType;
-import com.xpertcash.entity.Stock;
-import com.xpertcash.entity.UniteMesure;
-import com.xpertcash.entity.User;
+import com.xpertcash.entity.*;
 import com.xpertcash.exceptions.NotFoundException;
-import com.xpertcash.repository.CategoryProduitRepository;
-import com.xpertcash.repository.ProduitsRepository;
-import com.xpertcash.repository.StockRepository;
-import com.xpertcash.repository.UniteMesureRepository;
+import com.xpertcash.repository.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import com.xpertcash.repository.UsersRepository;
 
-import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 
 @Service
 public class ProduitsService {
@@ -47,107 +33,120 @@ public class ProduitsService {
     @Autowired
     private StockRepository stockRepository;
 
+    @Autowired
+    private MagasinRepository magasinRepository;
+
     // Méthode pour Ajouter un produit (Admin seulement)
-    public Produits ajouterProduit(Long userId, Produits produit) {
-            // Vérification de l'utilisateur
-            User user = usersRepository.findById(userId)
-                    .orElseThrow(() -> new NotFoundException("Utilisateur non trouvé."));
-        
-            if (user.getEntreprise() == null) {
-                throw new RuntimeException("L'utilisateur ne fait partie d'aucune entreprise.");
-            }
-        
-            User admin = user.getEntreprise().getAdmin();
-            LocalDateTime expirationDate = user.getCreatedAt().plusHours(24);
-            boolean withinTimeLimit = LocalDateTime.now().isBefore(expirationDate);
-        
-            boolean isAdmin = user.getRole() != null && user.getRole().getName().equals(RoleType.ADMIN);
-        
-            if (isAdmin) {
-                if (!user.isActivatedLien() && !withinTimeLimit) {
-                    throw new RuntimeException("Votre compte administrateur n'est pas activé et la période de connexion temporaire est expirée.");
-                }
-            } else {
-                if (!admin.isActivatedLien() && !withinTimeLimit) {
-                    throw new RuntimeException("Votre compte est désactivé car votre administrateur n'a pas activé son compte.");
-                }
-            }
-        
-            // Vérification des permissions
-            authorizationService.checkPermission(user, PermissionType.GERER_PRODUITS);
+    public Produits ajouterProduit(Long userId, Long magasinId, Produits produit) {
+        // Vérification de l'utilisateur
+        User user = usersRepository.findById(userId)
+                .orElseThrow(() -> new NotFoundException("Utilisateur non trouvé."));
 
-            // Vérification du codebar seulement s'il est renseigné
-            if (produit.getCodebar() != null && !produit.getCodebar().trim().isEmpty()) {
-                Optional<Produits> existingProductByCodebar = produitsRepository.findByCodebar(produit.getCodebar());
-                if(existingProductByCodebar.isPresent()){
-                    throw new RuntimeException("Un produit avec ce code barre existe déjà.");
-                }
-            }
-
-            // Vérifications des champs obligatoires
-            if (produit.getNomProduit() == null || produit.getNomProduit().trim().isEmpty()) {
-                throw new RuntimeException("Le nom du produit est obligatoire.");
-            }
-            if (produit.getDescription() == null || produit.getDescription().trim().isEmpty()) {
-                throw new RuntimeException("La description du produit est obligatoire.");
-            }
-            if (produit.getPrix() == null || produit.getPrix() <= 0) {
-                throw new RuntimeException("Le prix du produit doit être supérieur à 0.");
-            }
-            if (produit.getPrixAchat() == null || produit.getPrixAchat() <= 0) {
-                throw new RuntimeException("Le prix d'achat doit être supérieur à 0.");
-            }
-            if (produit.getQuantite() <= 0) {
-                throw new RuntimeException("La quantité doit être supérieure à 0.");
-            }
-            if (produit.getAlertSeuil() <= 0) {
-                throw new RuntimeException("L'alerte de seuil doit être un nombre positif.");
-            }
-            if (produit.getUniteMesure() == null || produit.getUniteMesure().getNomUnite().trim().isEmpty()) {
-                throw new RuntimeException("L'unité de mesure est obligatoire.");
-            }
-            if (produit.getCategory() == null || produit.getCategory().getId() == null) {
-                throw new RuntimeException("La catégorie du produit est obligatoire.");
-            }
-        
-            // Récupérer la catégorie depuis la base de données
-            CategoryProduit category = categoryProduitRepository.findById(produit.getCategory().getId())
-                    .orElseThrow(() -> new RuntimeException("La catégorie avec l'ID " + produit.getCategory().getId() + " n'existe pas."));
-        
-            // Récupérer ou créer l'unité de mesure
-            String nomUnite = produit.getUniteMesure().getNomUnite(); // On s'assure d'avoir une String
-            UniteMesure uniteMesure = uniteMesureRepository.findByNomUnite(nomUnite)
-                    .orElseGet(() -> {
-                        UniteMesure newUniteMesure = new UniteMesure();
-                        newUniteMesure.setNomUnite(nomUnite);
-                        return uniteMesureRepository.save(newUniteMesure);
-                    });
-        
-            // Vérifier si un produit similaire existe déjà dans cette catégorie avec la même unité de mesure
-            Optional<Produits> existingProductOpt = produitsRepository.findByNomProduitAndCategoryAndUniteMesure(
-                    produit.getNomProduit(), category, uniteMesure);
-        
-            if (existingProductOpt.isPresent()) {
-                throw new RuntimeException("Impossible d'ajouter ce produit. Un produit du même nom avec cette unité de mesure existe déjà dans la catégorie.");
-            }
-        
-            // Générer un code unique pour le produit
-            String codeProduit = generateProductCode();
-            produit.setCodeProduit(codeProduit);
-        
-            // Associer l'unité de mesure au produit
-            produit.setUniteMesure(uniteMesure);
-        
-            // Ajouter le produit normalement
-            produit.setCategory(category);
-
-            // Sauvegarder le produit
-            Produits savedProduit = produitsRepository.save(produit);
-
-            // Ajouter le produit au stock
-            ajouterStock(savedProduit, produit.getQuantite());
-            return produitsRepository.save(produit);
+        if (user.getEntreprise() == null) {
+            throw new RuntimeException("L'utilisateur ne fait partie d'aucune entreprise.");
         }
+
+        User admin = user.getEntreprise().getAdmin();
+        LocalDateTime expirationDate = user.getCreatedAt().plusHours(24);
+        boolean withinTimeLimit = LocalDateTime.now().isBefore(expirationDate);
+
+        boolean isAdmin = user.getRole() != null && user.getRole().getName().equals(RoleType.ADMIN);
+
+        if (isAdmin) {
+            if (!user.isActivatedLien() && !withinTimeLimit) {
+                throw new RuntimeException("Votre compte administrateur n'est pas activé et la période de connexion temporaire est expirée.");
+            }
+        } else {
+            if (!admin.isActivatedLien() && !withinTimeLimit) {
+                throw new RuntimeException("Votre compte est désactivé car votre administrateur n'a pas activé son compte.");
+            }
+        }
+
+        // Vérification des permissions
+        authorizationService.checkPermission(user, PermissionType.GERER_PRODUITS);
+
+        // Vérification du codebar seulement s'il est renseigné
+        if (produit.getCodebar() != null && !produit.getCodebar().trim().isEmpty()) {
+            Optional<Produits> existingProductByCodebar = produitsRepository.findByCodebar(produit.getCodebar());
+            if (existingProductByCodebar.isPresent()) {
+                throw new RuntimeException("Un produit avec ce code barre existe déjà.");
+            }
+        }
+
+        // Vérifications des champs obligatoires
+        if (produit.getNomProduit() == null || produit.getNomProduit().trim().isEmpty()) {
+            throw new RuntimeException("Le nom du produit est obligatoire.");
+        }
+        if (produit.getDescription() == null || produit.getDescription().trim().isEmpty()) {
+            throw new RuntimeException("La description du produit est obligatoire.");
+        }
+        if (produit.getPrix() == null || produit.getPrix() <= 0) {
+            throw new RuntimeException("Le prix du produit doit être supérieur à 0.");
+        }
+        if (produit.getPrixAchat() == null || produit.getPrixAchat() <= 0) {
+            throw new RuntimeException("Le prix d'achat doit être supérieur à 0.");
+        }
+        if (produit.getQuantite() <= 0) {
+            throw new RuntimeException("La quantité doit être supérieure à 0.");
+        }
+        if (produit.getAlertSeuil() <= 0) {
+            throw new RuntimeException("L'alerte de seuil doit être un nombre positif.");
+        }
+        if (produit.getUniteMesure() == null || produit.getUniteMesure().getNomUnite().trim().isEmpty()) {
+            throw new RuntimeException("L'unité de mesure est obligatoire.");
+        }
+        if (produit.getCategory() == null || produit.getCategory().getId() == null) {
+            throw new RuntimeException("La catégorie du produit est obligatoire.");
+        }
+
+        // Récupérer la catégorie depuis la base de données
+        CategoryProduit category = categoryProduitRepository.findById(produit.getCategory().getId())
+                .orElseThrow(() -> new RuntimeException("La catégorie avec l'ID " + produit.getCategory().getId() + " n'existe pas."));
+
+        // Récupérer ou créer l'unité de mesure
+        String nomUnite = produit.getUniteMesure().getNomUnite(); // On s'assure d'avoir une String
+        UniteMesure uniteMesure = uniteMesureRepository.findByNomUnite(nomUnite)
+                .orElseGet(() -> {
+                    UniteMesure newUniteMesure = new UniteMesure();
+                    newUniteMesure.setNomUnite(nomUnite);
+                    return uniteMesureRepository.save(newUniteMesure);
+                });
+
+        // Vérifier si un produit similaire existe déjà dans cette catégorie avec la même unité de mesure
+        Optional<Produits> existingProductOpt = produitsRepository.findByNomProduitAndCategoryAndUniteMesure(
+                produit.getNomProduit(), category, uniteMesure);
+
+        if (existingProductOpt.isPresent()) {
+            throw new RuntimeException("Impossible d'ajouter ce produit. Un produit du même nom avec cette unité de mesure existe déjà dans la catégorie.");
+        }
+
+        // Vérifier que le magasin existe et qu'il appartient à l'entreprise de l'utilisateur
+        Magasin magasin = magasinRepository.findById(magasinId)
+                .orElseThrow(() -> new RuntimeException("Le magasin avec l'ID " + magasinId + " n'existe pas."));
+
+        if (!magasin.getEntreprise().equals(user.getEntreprise())) {
+            throw new RuntimeException("Le magasin ne fait pas partie de votre entreprise.");
+        }
+
+        // Générer un code unique pour le produit
+        String codeProduit = generateProductCode();
+        produit.setCodeProduit(codeProduit);
+
+        // Associer l'unité de mesure et la catégorie au produit
+        produit.setUniteMesure(uniteMesure);
+        produit.setCategory(category);
+
+        // Associer le produit au magasin sélectionné
+        produit.setMagasin(magasin);
+
+        // Sauvegarder le produit
+        Produits savedProduit = produitsRepository.save(produit);
+
+        // Ajouter le produit au stock du magasin
+        ajouterStock(savedProduit, produit.getQuantite());
+        return produitsRepository.save(produit);
+    }
+
 
     // Méthode pour ajouter un produit au stock
     private void ajouterStock(Produits produit, Integer quantite) {
@@ -216,7 +215,11 @@ public class ProduitsService {
     
         // Récupérer tous les produits associés aux catégories de l'entreprise
         List<Produits> produits = produitsRepository.findByCategoryIn(categories);
-    
+
+       if (produits.isEmpty()) {
+           throw new RuntimeException("Aucun produit avec un magasin trouvé pour cette entreprise.");
+       }
+
         return produits;
     }
 
@@ -312,6 +315,23 @@ public class ProduitsService {
             newStock.setQuantite(nouvelleQuantite);
             stockRepository.save(newStock);
         }
+    }
+
+
+    //Methode  types de produits dans chaque magasin La quantité totale.
+    public List<Map<String, Object>> getCountAndTotalQuantitiesByMagasin() {
+        List<Object[]> results = produitsRepository.countAndSumQuantitiesByMagasin();
+        List<Map<String, Object>> magasinStats = new ArrayList<>();
+
+        for (Object[] result : results) {
+            Map<String, Object> data = new HashMap<>();
+            data.put("magasinId", result[0]);
+            data.put("nombreProduits", result[1]);
+            data.put("quantiteTotale", result[2]);
+            magasinStats.add(data);
+        }
+
+        return magasinStats;
     }
 
 
