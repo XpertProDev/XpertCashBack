@@ -217,44 +217,49 @@ public class ProduitService {
             Stock stock = stockRepository.findByProduit(produit);
             
             if (stock == null) {
-                // Si le stock n'existe pas, créer un nouveau stock
+                // Si le stock n'existe pas, créer un nouveau stock avec le seuilAlert
                 Stock newStock = new Stock();
                 newStock.setProduit(produit);
                 newStock.setQuantite(produit.getQuantite());
                 newStock.setBoutique(produit.getBoutique());
                 newStock.setCreatedAt(LocalDateTime.now());
                 newStock.setLastUpdated(LocalDateTime.now());
-                
-                // Ajouter le seuil d'alerte dans le stock si défini
+        
+                // Vérifier si le seuil d'alerte est spécifié
                 if (produitRequest.getSeuilAlert() != null) {
                     newStock.setSeuilAlert(produitRequest.getSeuilAlert());
+                } else {
+                    // S'il n'est pas spécifié, essayer de garder l'ancien seuil (si existant)
+                    newStock.setSeuilAlert(produit.getSeuilAlert());
                 }
-    
+        
                 stockRepository.save(newStock);
             } else {
-                // Si le stock existe déjà, mettre à jour la quantité et le seuil d'alerte
-                stock.setQuantite(produit.getQuantite()); // Met à jour la quantité du stock
+                // Si le stock existe déjà, mise à jour
+                stock.setQuantite(produit.getQuantite());
                 stock.setLastUpdated(LocalDateTime.now());
-    
-                // Met à jour le seuil d'alerte dans le stock
+        
+                // Mettre à jour seuilAlert seulement si fourni
                 if (produitRequest.getSeuilAlert() != null) {
                     stock.setSeuilAlert(produitRequest.getSeuilAlert());
                 }
-    
+        
                 stockRepository.save(stock);
             }
-    
-            produit.setEnStock(true); // Le produit est en stock
+        
+            produit.setEnStock(true);
         } else {
-            // Si addToStock est false, supprimer le produit du stock
+            // Ne supprime pas, mais met à zéro la quantité en gardant seuilAlert
             Stock stock = stockRepository.findByProduit(produit);
             if (stock != null) {
-                stockRepository.delete(stock); // Suppression du stock lié au produit
+                stock.setQuantite(0);  // Le produit est temporairement hors stock
+                stock.setLastUpdated(LocalDateTime.now());
+                stockRepository.save(stock);
             }
-    
-            produit.setEnStock(false); // Le produit n'est plus en stock
+        
+            produit.setEnStock(false);
         }
-    
+        
         // Mapper Produit vers ProduitDTO pour la réponse
         ProduitDTO produitDTO = new ProduitDTO();
         produitDTO.setId(produit.getId());

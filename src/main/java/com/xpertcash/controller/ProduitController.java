@@ -57,10 +57,13 @@ public class ProduitController {
            @RequestHeader("Authorization") String token,
            HttpServletRequest request) {
        try {
+           // Appeler le service pour créer le produit
            Produit produit = produitService.createProduit(request, boutiqueId, produitRequest, addToStock);
 
+           // Retourner la réponse avec le produit créé
            return ResponseEntity.status(HttpStatus.CREATED).body(produit);
        } catch (DuplicateProductException e) {
+        // Gestion des erreurs détaillées dans la réponse
         String errorMessage = "erreur  : " + e.getMessage();
          Map<String, String> errorResponse = new HashMap<>();
          errorResponse.put("error", e.getMessage());
@@ -75,19 +78,22 @@ public class ProduitController {
  @PatchMapping("/updateProduit/{produitId}")
 public ResponseEntity<ProduitDTO> updateProduit(
         @PathVariable Long produitId,
-        @RequestBody ProduitRequest produitRequest,
-        @RequestParam boolean addToStock,
+        @RequestBody ProduitRequest produitRequest,  // On récupère toutes les infos dans le body
         @RequestHeader("Authorization") String token,
         HttpServletRequest request) {
 
     try {
+        // Vérifie si addToStock est null, pour éviter une erreur
+        boolean addToStock = produitRequest.getEnStock() != null && produitRequest.getEnStock();
+
+        // Appel au service pour modifier le produit
         ProduitDTO updatedProduit = produitService.updateProduct(produitId, produitRequest, addToStock, request);
+
         return ResponseEntity.status(HttpStatus.OK).body(updatedProduit);
     } catch (RuntimeException e) {
         String errorMessage = "Une erreur est survenue lors de la mise à jour du produit : " + e.getMessage();
         System.err.println(errorMessage);
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                             .body(null); 
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
     }
 }
 
