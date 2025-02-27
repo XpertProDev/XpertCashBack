@@ -60,22 +60,19 @@ public ResponseEntity<Object> createUnite(@RequestBody Map<String, String> paylo
     }
 }
 
-//Update Unite
-@PutMapping("/updateUnite/{uniteId}")
-public ResponseEntity<Object> updateUnite(@PathVariable Long uniteId, @RequestBody Unite uniteDetails, HttpServletRequest request) {
-    try {
-        // Appel du service pour mettre à jour l'unité
-        Unite updatedUnite = uniteService.updateUnite(request, uniteId, uniteDetails);
-        return ResponseEntity.ok(updatedUnite);  // Retourner l'unité mise à jour en cas de succès
-    } catch (RuntimeException e) {
-        // Capture de l'exception avec un message détaillé
-        Map<String, String> errorResponse = new HashMap<>();
-        errorResponse.put("error", e.getMessage());
-        
-        // Retourner une erreur avec message détaillé
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse); 
+    //Update Unite
+    @PutMapping("/updateUnite/{uniteId}")
+    public ResponseEntity<Unite> updateUnite(@PathVariable Long uniteId, @RequestBody Unite uniteDetails, HttpServletRequest request) {
+        try {
+            
+            // Appeler le service pour mettre à jour l'unité
+            Unite updatedUnite = uniteService.updateUnite(request, uniteId, uniteDetails);
+            return ResponseEntity.ok(updatedUnite);  // Retourner l'unité mise à jour
+        } catch (RuntimeException e) {
+            // Retour d'une erreur en cas de problème
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(null);
+        }
     }
-}
 
 
     

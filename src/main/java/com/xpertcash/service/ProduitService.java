@@ -6,6 +6,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.xpertcash.DTOs.ProduitDTO;
 import com.xpertcash.DTOs.ProduitRequest;
 import com.xpertcash.configuration.JwtUtil;
 import com.xpertcash.entity.Boutique;
@@ -78,6 +79,12 @@ public class ProduitService {
             Boutique boutique = boutiqueRepository.findById(boutiqueId)
                     .orElseThrow(() -> new RuntimeException("Boutique avec l'ID " + boutiqueId + " non trouvée"));
             
+            // Vérification de l'existence du produit par nom, prix et boutiqueId
+            Produit existingProduit = produitRepository.findByNomAndPrixVenteAndBoutiqueId(produitRequest.getNom(), produitRequest.getPrixVente(), boutiqueId);
+            if (existingProduit != null) {
+                throw new RuntimeException("Un produit avec le même nom et prix existe déjà dans cette boutique.");
+            }
+
            
             // Vérifier si la catégorie existe dans la base de données
             Categorie categorie = null;
@@ -125,12 +132,15 @@ public class ProduitService {
                 stock.setCreatedAt(LocalDateTime.now());
                 stock.setLastUpdated(LocalDateTime.now());
                 stockRepository.save(stock);
+
+                savedProduit.setEnStock(true);
+                produitRepository.save(savedProduit);
             }
-    
+            
             return savedProduit;
         } catch (RuntimeException e) {
             System.err.println("Erreur lors de la création du produit : " + e.getMessage());
-            throw new RuntimeException("Une erreur est survenue lors de la création du produit : " + e.getMessage(), e);
+            throw new RuntimeException(e.getMessage(), e);
         }
     }
 
@@ -146,78 +156,114 @@ public class ProduitService {
     
     
     // Update Produit
-
-    @Transactional
-    public Produit updateProduct(Long produitId, Produit produitRequest, boolean addToStock, HttpServletRequest request) {
-    // Vérifier si l'admin est connecté et possède les droits nécessaires
-    String token = request.getHeader("Authorization");
-    if (token == null || !token.startsWith("Bearer ")) {
-        throw new RuntimeException("Token JWT manquant ou mal formaté");
-    }
-
-    // Extraire le token sans le "Bearer "
-    token = token.replace("Bearer ", "");
-
-    Long adminId = null;
-    try {
-        // Décrypter le token pour obtenir l'ID de l'admin
-        adminId = jwtUtil.extractUserId(token);
-    } catch (Exception e) {
-        throw new RuntimeException("Erreur lors de l'extraction de l'ID de l'admin depuis le token", e);
-    }
-
-    // Récupérer l'admin par l'ID extrait du token
-    User admin = usersRepository.findById(adminId)
-            .orElseThrow(() -> new RuntimeException("Admin non trouvé"));
-
-    // Vérifier que l'Admin est bien un ADMIN
-    if (admin.getRole() == null || !admin.getRole().getName().equals(RoleType.ADMIN)) {
-        throw new RuntimeException("Seul un ADMIN peut modifier les produits !");
-    }
-
-    // Récupérer le produit à modifier
-    Produit produit = produitRepository.findById(produitId)
-            .orElseThrow(() -> new RuntimeException("Produit non trouvé"));
-
-    // Modifier les propriétés du produit
-    produit.setNom(produitRequest.getNom());
-    produit.setPrixVente(produitRequest.getPrixVente());
-    produit.setPrixAchat(produitRequest.getPrixAchat());
-    produit.setQuantite(produitRequest.getQuantite());
-    produit.setSeuilAlert(produitRequest.getSeuilAlert());
-    produit.setCategorie(produitRequest.getCategorie());
-    produit.setUniteDeMesure(produitRequest.getUniteDeMesure());
-    produit.setCodeGenerique(produitRequest.getCodeGenerique());
-    produit.setCodeBare(produitRequest.getCodeBare());
-    produit.setPhoto(produitRequest.getPhoto());
-    produit.setEnStock(addToStock);  // Si le produit doit aller en stock ou pas
-
-    produit.setCreatedAt(produit.getCreatedAt()); // Garder la date de création intacte
-    produitRepository.save(produit);
-
-    // Si l'admin a choisi d'ajouter ce produit au stock, alors ajouter le produit au stock de la boutique
-    if (addToStock) {
-        // Vérifier si le produit est déjà dans le stock
-        Stock stock = stockRepository.findByProduit(produit);
-        if (stock == null) {
-            // Si le produit n'est pas dans le stock, l'ajouter
-            Stock newStock = new Stock();
-            newStock.setProduit(produit);
-            newStock.setQuantite(produitRequest.getQuantite());
-            newStock.setBoutique(produit.getBoutique());
-            newStock.setCreatedAt(LocalDateTime.now());
-            newStock.setLastUpdated(LocalDateTime.now());
-            stockRepository.save(newStock);
-        } else {
-            // Si le produit est déjà dans le stock, mettre à jour la quantité
-            stock.setQuantite(produitRequest.getQuantite());
-            stock.setLastUpdated(LocalDateTime.now());
-            stockRepository.save(stock);
+    public ProduitDTO updateProduct(Long produitId, ProduitRequest produitRequest, boolean addToStock, HttpServletRequest request) {
+        // Vérification de l'autorisation de l'admin
+        String token = request.getHeader("Authorization");
+        if (token == null || !token.startsWith("Bearer ")) {
+            throw new RuntimeException("Token JWT manquant ou mal formaté");
         }
+    
+        token = token.replace("Bearer ", "");
+        Long adminId = null;
+        try {
+            adminId = jwtUtil.extractUserId(token);
+        } catch (Exception e) {
+            throw new RuntimeException("Erreur lors de l'extraction de l'ID de l'admin depuis le token", e);
+        }
+    
+        User admin = usersRepository.findById(adminId)
+                .orElseThrow(() -> new RuntimeException("Admin non trouvé"));
+    
+        if (admin.getRole() == null || !admin.getRole().getName().equals(RoleType.ADMIN)) {
+            throw new RuntimeException("Seul un ADMIN peut modifier les produits !");
+        }
+    
+        Produit produit = produitRepository.findById(produitId)
+                .orElseThrow(() -> new RuntimeException("Produit non trouvé"));
+    
+        // Mise à jour des informations du produit
+        if (produitRequest.getNom() != null) produit.setNom(produitRequest.getNom());
+        if (produitRequest.getPrixVente() != null) produit.setPrixVente(produitRequest.getPrixVente());
+        if (produitRequest.getPrixAchat() != null) produit.setPrixAchat(produitRequest.getPrixAchat());
+        if (produitRequest.getQuantite() != null) produit.setQuantite(produitRequest.getQuantite());
+        if (produitRequest.getSeuilAlert() != null) produit.setSeuilAlert(produitRequest.getSeuilAlert());
+        if (produitRequest.getCodeBare() != null) produit.setCodeBare(produitRequest.getCodeBare());
+        if (produitRequest.getPhoto() != null) produit.setPhoto(produitRequest.getPhoto());
+        
+        // Mise à jour de 'enStock' en fonction du paramètre 'addToStock'
+        if (produitRequest.getEnStock() != null) {
+            produit.setEnStock(produitRequest.getEnStock());
+        } else {
+            produit.setEnStock(addToStock); // Si enStock n'est pas fourni, mettre à jour enStock avec 'addToStock'
+        }
+    
+        // Mise à jour de la catégorie si nécessaire
+        if (produitRequest.getCategorieId() != null) {
+            Categorie categorie = categorieRepository.findById(produitRequest.getCategorieId())
+                    .orElseThrow(() -> new RuntimeException("Catégorie non trouvée"));
+            produit.setCategorie(categorie);
+        }
+    
+        // Mise à jour de l'unité si nécessaire
+        if (produitRequest.getUniteId() != null) {
+            Unite unite = uniteRepository.findById(produitRequest.getUniteId())
+                    .orElseThrow(() -> new RuntimeException("Unité de mesure non trouvée"));
+            produit.setUniteDeMesure(unite);
+        }
+    
+        produitRepository.save(produit);
+    
+        // Si addToStock est vrai, il faut transférer les produits dans le stock
+        if (addToStock) {
+            Stock stock = stockRepository.findByProduit(produit);
+            
+            if (stock == null) {
+                // Si le produit n'a pas encore de stock, on crée un nouveau stock avec la quantité du produit
+                Stock newStock = new Stock();
+                newStock.setProduit(produit);
+                newStock.setQuantite(produitRequest.getQuantite() != null ? produitRequest.getQuantite() : 0); // Ajouter une valeur par défaut si quantite est null
+                newStock.setBoutique(produit.getBoutique());
+                newStock.setCreatedAt(LocalDateTime.now());
+                newStock.setLastUpdated(LocalDateTime.now());
+                stockRepository.save(newStock);
+            } else {
+                // Si le produit existe déjà dans le stock et qu'il n'était pas encore en stock, on met à jour la quantité
+                if (!produit.getEnStock()) {
+                    stock.setQuantite(produitRequest.getQuantite() != null ? produitRequest.getQuantite() : 0); // On transfert la quantité du produit dans le stock
+                    stock.setLastUpdated(LocalDateTime.now());
+                    stockRepository.save(stock);
+                }
+            }
+            
+            produit.setEnStock(true); // On s'assure que le produit est en stock
+        } else {
+            // Si addToStock est false, on retire le produit du stock
+            Stock stock = stockRepository.findByProduit(produit);
+            if (stock != null) {
+                stock.setQuantite(0);  // Mettre la quantité du stock à 0
+                stock.setLastUpdated(LocalDateTime.now());
+                stockRepository.save(stock);
+            }
+            
+            produit.setEnStock(false); // Le produit n'est plus en stock
+        }
+    
+        // Mapper Produit vers ProduitDTO
+        ProduitDTO produitDTO = new ProduitDTO();
+        produitDTO.setId(produit.getId());
+        produitDTO.setNom(produit.getNom());
+        produitDTO.setPrixVente(produit.getPrixVente());
+        produitDTO.setPrixAchat(produit.getPrixAchat());
+        produitDTO.setQuantite(produit.getQuantite());
+        produitDTO.setSeuilAlert(produit.getSeuilAlert());
+        produitDTO.setCategorieId(produit.getCategorie().getId());
+        produitDTO.setUniteId(produit.getUniteDeMesure().getId());
+        produitDTO.setCodeBare(produit.getCodeBare());
+        produitDTO.setPhoto(produit.getPhoto());
+        produitDTO.setEnStock(produit.getEnStock());
+    
+        return produitDTO;
     }
-
-    return produit;
-}
-
-   
+    
+ 
 }

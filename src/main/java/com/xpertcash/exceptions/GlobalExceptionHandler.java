@@ -64,4 +64,12 @@ public class GlobalExceptionHandler {
         errorResponse.put("exception", e.getClass().getSimpleName());  // Détails sur l'exception
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(errorResponse);
     }
+
+     // Gérer les doublons de produits
+     @ExceptionHandler(DuplicateProductException.class)
+     public ResponseEntity<Map<String, String>> handleDuplicateProductException(DuplicateProductException e) {
+         Map<String, String> errorResponse = new HashMap<>();
+         errorResponse.put("error", e.getMessage());  
+         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse); 
+     }
 }

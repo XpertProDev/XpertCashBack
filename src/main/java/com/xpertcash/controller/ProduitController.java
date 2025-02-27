@@ -1,8 +1,12 @@
 package com.xpertcash.controller;
 
+import java.util.HashMap;
+import java.util.Map;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -12,12 +16,14 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.xpertcash.DTOs.ProduitDTO;
 import com.xpertcash.DTOs.ProduitRequest;
 import com.xpertcash.composant.AuthorizationService;
 import com.xpertcash.configuration.JwtUtil;
 import com.xpertcash.entity.Produit;
 import com.xpertcash.entity.RoleType;
 import com.xpertcash.entity.User;
+import com.xpertcash.exceptions.DuplicateProductException;
 import com.xpertcash.repository.UsersRepository;
 import com.xpertcash.service.ProduitService;
 import com.xpertcash.service.UsersService;
@@ -51,18 +57,39 @@ public class ProduitController {
            @RequestHeader("Authorization") String token,
            HttpServletRequest request) {
        try {
-           // Appeler le service pour créer le produit
            Produit produit = produitService.createProduit(request, boutiqueId, produitRequest, addToStock);
 
-           // Retourner la réponse avec le produit créé
            return ResponseEntity.status(HttpStatus.CREATED).body(produit);
-       } catch (RuntimeException e) {
-        // Gestion des erreurs détaillées dans la réponse
-        String errorMessage = "Une erreur est survenue lors de la création du produit : " + e.getMessage();
+       } catch (DuplicateProductException e) {
+        String errorMessage = "erreur  : " + e.getMessage();
+         Map<String, String> errorResponse = new HashMap<>();
+         errorResponse.put("error", e.getMessage());
         System.err.println(errorMessage);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                             .body(null);  // Cette réponse d'erreur générique peut être détaillée davantage selon les types d'erreurs
+                             .body(null);  
     }
    }
+
+
+   //Update Produit
+ @PatchMapping("/updateProduit/{produitId}")
+public ResponseEntity<ProduitDTO> updateProduit(
+        @PathVariable Long produitId,
+        @RequestBody ProduitRequest produitRequest,
+        @RequestParam boolean addToStock,
+        @RequestHeader("Authorization") String token,
+        HttpServletRequest request) {
+
+    try {
+        ProduitDTO updatedProduit = produitService.updateProduct(produitId, produitRequest, addToStock, request);
+        return ResponseEntity.status(HttpStatus.OK).body(updatedProduit);
+    } catch (RuntimeException e) {
+        String errorMessage = "Une erreur est survenue lors de la mise à jour du produit : " + e.getMessage();
+        System.err.println(errorMessage);
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                             .body(null); 
+    }
+}
+
 
 }
