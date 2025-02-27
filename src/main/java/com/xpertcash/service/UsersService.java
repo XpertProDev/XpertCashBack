@@ -8,7 +8,9 @@ import com.xpertcash.configuration.PasswordGenerator;
 import com.xpertcash.entity.*;
 import com.xpertcash.repository.BoutiqueRepository;
 import com.xpertcash.repository.EntrepriseRepository;
+import com.xpertcash.repository.ProduitRepository;
 import com.xpertcash.repository.RoleRepository;
+import com.xpertcash.repository.StockRepository;
 import com.xpertcash.repository.UsersRepository;
 
 import jakarta.transaction.Transactional;
@@ -55,9 +57,12 @@ public class UsersService {
 
     private final JwtConfig jwtConfig;
     @Autowired
-    private BoutiqueService boutiqueService;
+    private BoutiqueRepository boutiqueRepository;
     @Autowired
-    BoutiqueRepository boutiqueRepository;
+    private StockRepository stockRepository;
+    @Autowired
+    private ProduitRepository produitRepository;
+
 
     @Autowired
     public UsersService(UsersRepository usersRepository, JwtConfig jwtConfig, BCryptPasswordEncoder passwordEncoder) {
@@ -68,83 +73,88 @@ public class UsersService {
 
     // Inscription : génère le code PIN, enregistre l'utilisateur et envoie le lien d'activation
     public User registerUsers(String nomComplet, String email, String password, String phone, String pays, String nomEntreprise, String nomBoutique) {
-        // Vérifier si l'email est déjà utilisé
+        // Vérification des données déjà existantes
         if (usersRepository.findByEmail(email).isPresent()) {
             throw new RuntimeException("Cet email est déjà utilisé. L'utilisateur existe déjà.");
         }
-
-        // Vérifier si le numéro de téléphone est déjà utilisé
         if (usersRepository.findByPhone(phone).isPresent()) {
             throw new RuntimeException("Ce numéro de téléphone est déjà utilisé. L'utilisateur existe déjà.");
         }
-
-        // Vérifier si l'entreprise existe déjà
         if (entrepriseRepository.findByNomEntreprise(nomEntreprise).isPresent()) {
             throw new RuntimeException("Le nom de l'entreprise est déjà utilisé. L'entreprise existe déjà.");
         }
-
-        // Générer un mot de passe haché
+    
+        // Génération du mot de passe haché
         BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
         String hashedPassword = passwordEncoder.encode(password);
-
-        // Générer un code PIN d'activation
+    
+        // Générer le code PIN d'activation
         String activationCode = String.format("%04d", new Random().nextInt(10000));
-
+    
         // Créer l'entreprise
         String identifiantUnique;
         do {
             identifiantUnique = Entreprise.generateIdentifiantEntreprise();
         } while (entrepriseRepository.existsByIdentifiantEntreprise(identifiantUnique));
-
+    
         Entreprise entreprise = new Entreprise();
         entreprise.setNomEntreprise(nomEntreprise);
         entreprise.setIdentifiantEntreprise(identifiantUnique);
         entreprise.setCreatedAt(LocalDateTime.now());
         entreprise = entrepriseRepository.save(entreprise);
-
-        // Attribution du rôle ADMIN
+    
+        // Créer la boutique (magasin) associée à l'entreprise
+        Boutique boutique = new Boutique();
+        boutique.setNomBoutique(nomBoutique);
+        boutique.setEntreprise(entreprise);
+        boutique.setCreatedAt(LocalDateTime.now());
+        boutiqueRepository.save(boutique);
+    
+        // Créer un stock vide initial, sans produit
+        Stock stock = new Stock();
+        stock.setQuantite(0);  // Stock vide
+        stock.setBoutique(boutique);
+        stock.setCreatedAt(LocalDateTime.now());
+        stock.setLastUpdated(LocalDateTime.now());
+        stockRepository.save(stock);  // Aucune association de produit au stock ici
+    
+        // Attribution du rôle ADMIN à l'utilisateur
         Role adminRole = roleRepository.findByName(RoleType.ADMIN)
                 .orElseThrow(() -> new RuntimeException("Rôle ADMIN non trouvé"));
-
+    
         // Créer l'utilisateur
-        User users = new User();
-        users.setEmail(email);
-        users.setPassword(hashedPassword);
-        users.setPhone(phone);
-        users.setPays(pays);
-        users.setNomComplet(nomComplet);
-        users.setEntreprise(entreprise);
-        users.setRole(adminRole);
-        users.setActivationCode(activationCode);
-        users.setCreatedAt(LocalDateTime.now());
-        users.setActivatedLien(false);
-        users.setEnabledLien(true);
-        users.setLastActivity(LocalDateTime.now());
-        users.setLocked(false);
-        usersRepository.save(users);
-
-        entreprise.setAdmin(users);
+        User user = new User();
+        user.setEmail(email);
+        user.setPassword(hashedPassword);
+        user.setPhone(phone);
+        user.setPays(pays);
+        user.setNomComplet(nomComplet);
+        user.setEntreprise(entreprise);
+        user.setRole(adminRole);
+        user.setActivationCode(activationCode);
+        user.setCreatedAt(LocalDateTime.now());
+        user.setActivatedLien(false);
+        user.setEnabledLien(true);
+        user.setLastActivity(LocalDateTime.now());
+        user.setLocked(false);
+        usersRepository.save(user);
+    
+        // Assigner l'utilisateur admin à l'entreprise
+        entreprise.setAdmin(user);
         entrepriseRepository.save(entreprise);
-
-        // Créer automatiquement une première boutique avec un nom par défaut
-        String defaultBoutiqueName = "Boutique principale";  // Nom par défaut pour la première boutique
-        if (nomBoutique == null || nomBoutique.isEmpty()) {
-            nomBoutique = defaultBoutiqueName;  // Si aucun nom n'est fourni, utiliser le nom par défaut
-        }
-
-        // Créer la boutique automatiquement
-        Boutique boutique = boutiqueService.createBoutiqueForUser(users, nomBoutique);
-
+    
+        // Envoi de l'email d'activation avec le code PIN
         try {
             mailService.sendActivationLinkEmail(email, activationCode);
         } catch (MessagingException e) {
             System.err.println("Erreur lors de l'envoi de l'email d'activation : " + e.getMessage());
             throw new RuntimeException("Une erreur est survenue lors de l'envoi de l'email d'activation.", e);
         }
-
-        return users;
+    
+        // Retourner l'utilisateur créé
+        return user;
     }
-
+    
     //Admin name
 
     public String getNomCompletAdminDeEntreprise(Long entrepriseId) {
@@ -427,21 +437,4 @@ public class UsersService {
         );
     }
 
-
-
-
-
-
-
-
-    // Vérification (par exemple via un scheduler ou un intercepteur) de l'inactivité supérieure à 30 minutes
-    // Si c'est le cas, le compte est verrouillé et un lien de déverrouillage est envoyé par email
-    /*public void checkAndLockIfInactive(Users users) {
-        if (!users.isLocked() && users.getLastActivity() != null &&
-                users.getLastActivity().plusMinutes(30).isBefore(LocalDateTime.now())) {
-            users.setLocked(true);
-            usersRepository.save(users);
-            mailService.sendUnlockLinkEmail(users.getEmail(), users.getActivationCode());
-        }
-    }*/
 }

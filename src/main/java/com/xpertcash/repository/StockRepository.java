@@ -1,20 +1,20 @@
 package com.xpertcash.repository;
 
-import java.util.Optional;
+import java.util.List;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+import com.xpertcash.entity.Boutique;
+import com.xpertcash.entity.Produit;
 import com.xpertcash.entity.Stock;
 
 @Repository
 public interface StockRepository extends JpaRepository<Stock, Long> {
+    List<Stock> findByBoutiqueId(Long boutiqueId);
 
-    // Trouver le stock d'un produit spécifique
-    Optional<Stock> findByProduitId(Long produitId);
+    Stock findByProduit(Produit produit);
 
-    // Supprimer le stock d'un produit (si besoin)
-    void deleteByProduitId(Long produitId);
-
-
+    Stock findByBoutiqueAndProduit(Boutique boutique, Produit produit);
 }
+

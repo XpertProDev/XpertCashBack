@@ -1,12 +1,11 @@
 package com.xpertcash.entity;
 
-import com.fasterxml.jackson.annotation.JsonBackReference;
-import jakarta.persistence.*;
-import lombok.Data;
-
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+
+import jakarta.persistence.*;
+import lombok.Data;
 
 @Entity
 @Data
@@ -16,25 +15,21 @@ public class Boutique {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false)
     private String nomBoutique;
+    private String adresse;
+    private LocalDateTime createdAt;
+    private LocalDateTime lastUpdated;
 
     @ManyToOne
     @JoinColumn(name = "entreprise_id", nullable = false)
-    @JsonBackReference
     private Entreprise entreprise;
 
-    @ManyToOne
-    @JoinColumn(name = "user_id", nullable = false)
-    @JsonBackReference
-    private User user; // L'utilisateur qui possède la boutique
-
-    @Column(nullable = false)
-    private LocalDateTime createdAt;
-
     @OneToMany(mappedBy = "boutique", cascade = CascadeType.ALL)
-    @JsonBackReference
-    private List<ProduitBoutique> produitsBoutique = new ArrayList<>();
+    private List<Stock> stocks = new ArrayList<>();
 
+    @PrePersist
+    public void prePersist() {
+        this.createdAt = LocalDateTime.now();
+    }
 
 }
