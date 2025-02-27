@@ -16,8 +16,10 @@ public class Stock {
 
     private Integer quantite;
 
+    private Integer seuilAlert;
+
     @ManyToOne
-    @JoinColumn(name = "produit_id")
+    @JoinColumn(name = "produit_id") 
     private Produit produit; // Association au produit
 
     @ManyToOne
