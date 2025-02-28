@@ -35,10 +35,14 @@ public class ImageStorageService {
             Path imagePath = imageRootLocation.resolve(imageName);
             Files.copy(imageFile.getInputStream(), imagePath, StandardCopyOption.REPLACE_EXISTING);
 
+            String imageUrl = "/uploads/" + imageName;
+            System.out.println("✅ Image sauvegardée : " + imageUrl);
             // Retourner l'URL de l'image
             return "/uploads/" + imageName;
 
+
         } catch (IOException e) {
+            System.out.println("❌ ERREUR lors de l'enregistrement de l'image : " + e.getMessage());
             throw new NotFoundException("Erreur lors de l'enregistrement de l'image : " + e.getMessage());
         }
     }
