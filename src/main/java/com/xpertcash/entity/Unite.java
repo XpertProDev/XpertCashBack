@@ -19,5 +19,4 @@ public class Unite {
     private Long id;
     private String nom;
 
-
 }
