@@ -115,7 +115,10 @@ public class BoutiqueService {
             throw new RuntimeException("Token JWT manquant ou mal formaté");
         }
     
-        Long adminId = jwtUtil.extractUserId(token);  // Décoder l'ID de l'admin depuis le token
+        // 🔍 Extraction de l'ID de l'admin depuis le token
+        Long adminId = jwtUtil.extractUserId(token.substring(7)); // Enlever "Bearer "
+        System.out.println("ID ADMIN EXTRAIT : " + adminId); // 🔥 DEBUG ICI
+    
         User admin = usersRepository.findById(adminId)
                 .orElseThrow(() -> new RuntimeException("Admin non trouvé"));
     

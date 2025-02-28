@@ -13,7 +13,6 @@ import com.xpertcash.repository.RoleRepository;
 import com.xpertcash.repository.StockRepository;
 import com.xpertcash.repository.UsersRepository;
 
-import jakarta.transaction.Transactional;
 
 
 import io.jsonwebtoken.Jwts;
@@ -33,6 +32,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Random;
+import org.springframework.transaction.annotation.Transactional;
+
 
 @Service
 public class UsersService {
@@ -72,6 +73,7 @@ public class UsersService {
     }
 
     // Inscription : génère le code PIN, enregistre l'utilisateur et envoie le lien d'activation
+    @Transactional
     public User registerUsers(String nomComplet, String email, String password, String phone, String pays, String nomEntreprise, String nomBoutique) {
         // Vérification des données déjà existantes
         if (usersRepository.findByEmail(email).isPresent()) {
@@ -91,7 +93,17 @@ public class UsersService {
         // Générer le code PIN d'activation
         String activationCode = String.format("%04d", new Random().nextInt(10000));
     
-        // Créer l'entreprise
+        // Envoi de l'email d'activation avec le code PIN AVANT l'enregistrement
+        try {
+            mailService.sendActivationLinkEmail(email, activationCode);
+        } catch (MessagingException e) {
+            System.err.println("Erreur lors de l'envoi de l'email d'activation : " + e.getMessage());
+            throw new RuntimeException("L'inscription a échoué. Veuillez vérifier votre connexion Internet ou réessayer plus tard.");
+        }
+    
+        // Si l'email est bien envoyé, on continue l'enregistrement
+    
+        // Créer l’entreprise
         String identifiantUnique;
         do {
             identifiantUnique = Entreprise.generateIdentifiantEntreprise();
@@ -102,23 +114,28 @@ public class UsersService {
         entreprise.setIdentifiantEntreprise(identifiantUnique);
         entreprise.setCreatedAt(LocalDateTime.now());
         entreprise = entrepriseRepository.save(entreprise);
+
+        // Vérifier et attribuer un nom par défaut à la boutique
+        if (nomBoutique == null || nomBoutique.trim().isEmpty()) {
+            nomBoutique = "Ma Boutique";
+        }
     
-        // Créer la boutique (magasin) associée à l'entreprise
+        // Créer la boutique associée à l'entreprise
         Boutique boutique = new Boutique();
         boutique.setNomBoutique(nomBoutique);
         boutique.setEntreprise(entreprise);
         boutique.setCreatedAt(LocalDateTime.now());
         boutiqueRepository.save(boutique);
     
-        // Créer un stock vide initial, sans produit
+        // Créer un stock vide initial
         Stock stock = new Stock();
         stock.setQuantite(0);  // Stock vide
         stock.setBoutique(boutique);
         stock.setCreatedAt(LocalDateTime.now());
         stock.setLastUpdated(LocalDateTime.now());
-        stockRepository.save(stock);  // Aucune association de produit au stock ici
+        stockRepository.save(stock);
     
-        // Attribution du rôle ADMIN à l'utilisateur
+        // Attribution du rôle ADMIN à l’utilisateur
         Role adminRole = roleRepository.findByName(RoleType.ADMIN)
                 .orElseThrow(() -> new RuntimeException("Rôle ADMIN non trouvé"));
     
@@ -143,18 +160,9 @@ public class UsersService {
         entreprise.setAdmin(user);
         entrepriseRepository.save(entreprise);
     
-        // Envoi de l'email d'activation avec le code PIN
-        try {
-            mailService.sendActivationLinkEmail(email, activationCode);
-        } catch (MessagingException e) {
-            System.err.println("Erreur lors de l'envoi de l'email d'activation : " + e.getMessage());
-            throw new RuntimeException("Une erreur est survenue lors de l'envoi de l'email d'activation.", e);
-        }
-    
         // Retourner l'utilisateur créé
         return user;
     }
-    
     //Admin name
 
     public String getNomCompletAdminDeEntreprise(Long entrepriseId) {

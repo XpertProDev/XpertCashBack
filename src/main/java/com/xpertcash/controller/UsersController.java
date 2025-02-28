@@ -33,6 +33,8 @@ public class UsersController {
     // Inscription
     @PostMapping("/register")
     public ResponseEntity<Map<String, String>> register(@RequestBody RegistrationRequest request) {
+        Map<String, String> response = new HashMap<>();
+        
         try {
             usersService.registerUsers(
                     request.getNomComplet(),
@@ -43,15 +45,18 @@ public class UsersController {
                     request.getNomEntreprise(),
                     request.getNomBoutique()
             );
-            Map<String, String> response = new HashMap<>();
+            
             response.put("message", "Compte créé avec succès. Un lien d'activation vous a été envoyé par email.");
             return ResponseEntity.ok(response);
-        } catch (Exception e) {
-            Map<String, String> errorResponse = new HashMap<>();
-            errorResponse.put("error", "Erreur lors de l'inscription : " + e.getMessage());
-            return ResponseEntity.badRequest().body(errorResponse);
+            
+        } catch (RuntimeException e) {
+            System.err.println("Erreur lors de l'inscription : " + e.getMessage());
+    
+            response.put("error", "L'inscription a échoué. Veuillez vérifier votre connexion Internet ou réessayer plus tard.");
+            return ResponseEntity.badRequest().body(response);
         }
     }
+    
 
     // Connexion
     @PostMapping("/login")
