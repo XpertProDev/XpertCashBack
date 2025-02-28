@@ -29,6 +29,9 @@ public class Boutique {
     @OneToMany(mappedBy = "boutique", cascade = CascadeType.ALL)
     private List<Stock> stocks = new ArrayList<>();
 
+    @OneToMany(mappedBy = "boutique", fetch = FetchType.EAGER)
+    private List<Produit> produits;
+
     @PrePersist
     public void prePersist() {
         this.createdAt = LocalDateTime.now();

@@ -33,7 +33,7 @@ public class Produit {
     private LocalDateTime lastUpdated;
 
 
-    @ManyToOne
+    @ManyToOne 
     @JoinColumn(name = "boutique_id")
     @JsonBackReference
     private Boutique boutique; 

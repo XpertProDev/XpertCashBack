@@ -128,12 +128,7 @@ public class UsersService {
         boutiqueRepository.save(boutique);
     
         // Créer un stock vide initial
-        Stock stock = new Stock();
-        stock.setQuantite(0);  // Stock vide
-        stock.setBoutique(boutique);
-        stock.setCreatedAt(LocalDateTime.now());
-        stock.setLastUpdated(LocalDateTime.now());
-        stockRepository.save(stock);
+       
     
         // Attribution du rôle ADMIN à l’utilisateur
         Role adminRole = roleRepository.findByName(RoleType.ADMIN)
