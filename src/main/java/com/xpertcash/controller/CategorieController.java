@@ -33,42 +33,42 @@ public class CategorieController {
     @Autowired
     private CategorieRepository categorieRepository;
 
-        // Ajouter une catégorie (seul ADMIN)
-        @PostMapping("/createCategory")
-        public ResponseEntity<Object> createCategorie(@RequestBody Map<String, String> payload) {
-    try {
-        String nom = payload.get("nom");
+    // Ajouter une catégorie (seul ADMIN)
+    @PostMapping("/createCategory")
+    public ResponseEntity<Object> createCategorie(@RequestBody Map<String, String> payload) {
+        try {
+            String nom = payload.get("nom");
 
-        if (nom == null || nom.isEmpty()) {
-            // Si le nom de la catégorie est vide
-            throw new RuntimeException("Le nom de la catégorie ne peut pas être vide !");
-        }
+            if (nom == null || nom.isEmpty()) {
+                // Si le nom de la catégorie est vide
+                throw new RuntimeException("Le nom de la catégorie ne peut pas être vide !");
+            }
 
-        // Vérifier si la catégorie existe déjà
-        if (categorieRepository.existsByNom(nom)) {
-            // Si la catégorie existe déjà, on renvoie une réponse 409 Conflict avec un message
+            // Vérifier si la catégorie existe déjà
+            if (categorieRepository.existsByNom(nom)) {
+                // Si la catégorie existe déjà, on renvoie une réponse 409 Conflict avec un message
+                Map<String, String> errorResponse = new HashMap<>();
+                errorResponse.put("error", "Cette catégorie existe déjà !");
+                return ResponseEntity.status(HttpStatus.CONFLICT).body(errorResponse);
+            }
+
+            // Créer la catégorie
+            Categorie categorie = new Categorie();
+            categorie.setNom(nom);
+            categorie.setCreatedAt(LocalDateTime.now());
+
+            // Sauvegarder la catégorie dans la base de données
+            Categorie savedCategorie = categorieRepository.save(categorie);
+
+            // Retourner la réponse avec la catégorie créée
+            return ResponseEntity.status(HttpStatus.CREATED).body(savedCategorie);
+        } catch (RuntimeException e) {
+            // Gestion des erreurs
             Map<String, String> errorResponse = new HashMap<>();
-            errorResponse.put("error", "Cette catégorie existe déjà !");
-            return ResponseEntity.status(HttpStatus.CONFLICT).body(errorResponse);
+            errorResponse.put("error", e.getMessage());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse); // Retour d'une erreur générique en cas de problème
         }
-
-        // Créer la catégorie
-        Categorie categorie = new Categorie();
-        categorie.setNom(nom);
-        categorie.setCreatedAt(LocalDateTime.now());
-
-        // Sauvegarder la catégorie dans la base de données
-        Categorie savedCategorie = categorieRepository.save(categorie);
-
-        // Retourner la réponse avec la catégorie créée
-        return ResponseEntity.status(HttpStatus.CREATED).body(savedCategorie);
-    } catch (RuntimeException e) {
-        // Gestion des erreurs
-        Map<String, String> errorResponse = new HashMap<>();
-        errorResponse.put("error", e.getMessage());
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse); // Retour d'une erreur générique en cas de problème
     }
-}
 
 
 

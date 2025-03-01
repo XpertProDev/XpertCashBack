@@ -32,8 +32,9 @@ public class UniteController {
     private UniteRepository uniteRepository;
 
      // Créer une unité de mesure
-   @PostMapping("/createUnite")
-public ResponseEntity<Object> createUnite(@RequestBody Map<String, String> payload) {
+
+    @PostMapping("/createUnite")
+    public ResponseEntity<Object> createUnite(@RequestBody Map<String, String> payload) {
     try {
         String nom = payload.get("nom");
 
@@ -74,10 +75,6 @@ public ResponseEntity<Object> createUnite(@RequestBody Map<String, String> paylo
         }
     }
 
-
-    
-
-    
      // Récupérer toutes les unités 
      @GetMapping("/allUnite")
      public ResponseEntity<List<Unite>> getAllUnites() {
