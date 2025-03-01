@@ -1,5 +1,6 @@
 package com.xpertcash.service;
 
+import com.xpertcash.DTOs.BoutiqueResponse;
 import com.xpertcash.DTOs.UpdateUserRequest;
 import com.xpertcash.DTOs.USER.UserRequest;
 import com.xpertcash.configuration.JwtConfig;
@@ -32,6 +33,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Random;
+import java.util.stream.Collectors;
+
 import org.springframework.transaction.annotation.Transactional;
 
 
@@ -423,21 +426,27 @@ public class UsersService {
         return user;
     }
 
-    public UserRequest getInfo(Long userId) {
-        User user = usersRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+ public UserRequest getInfo(Long userId) {
+    User user = usersRepository.findById(userId)
+            .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
 
-        return new UserRequest(
-                user.getNomComplet(),
-                user.getEntreprise().getNomEntreprise(),
-                user.getEmail(),
-                user.getRole().getName(),
-                user.getPhone(),
-                user.getPays(),
-                user.getEntreprise().getAdresse(),
-                user.getEntreprise().getLogo()
+    List<BoutiqueResponse> boutiqueResponses = user.getEntreprise()
+            .getBoutiques()
+            .stream()
+            .map(b -> new BoutiqueResponse(b.getId(), b.getNomBoutique(), b.getAdresse(), b.getCreatedAt()))
+            .collect(Collectors.toList());
 
-        );
-    }
+    return new UserRequest(
+            user.getNomComplet(),
+            user.getEntreprise().getNomEntreprise(),
+            user.getEmail(),
+            user.getRole().getName(),
+            user.getPhone(),
+            user.getPays(),
+            user.getEntreprise().getAdresse(),
+            user.getEntreprise().getLogo(),
+            boutiqueResponses
+    );
+}
 
 }

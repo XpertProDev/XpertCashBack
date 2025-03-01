@@ -25,6 +25,9 @@ public class Entreprise {
     @OneToMany(mappedBy = "entreprise", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<User> utilisateurs = new ArrayList<>();
 
+    @OneToMany(mappedBy = "entreprise", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    private List<Boutique> boutiques = new ArrayList<>();
+
     @Column(nullable = false)
     private LocalDateTime createdAt;
 
@@ -37,6 +40,7 @@ public class Entreprise {
     @ManyToOne
     @JoinColumn(name = "admin_id", nullable = true)  
     private User admin;
+
 
     // Générer un identifiant unique
     public static String generateIdentifiantEntreprise() {

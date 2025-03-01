@@ -4,13 +4,15 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
-import com.fasterxml.jackson.annotation.JsonManagedReference;
-
 import jakarta.persistence.*;
+import lombok.AllArgsConstructor;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 @Entity
 @Data
+@AllArgsConstructor
+@NoArgsConstructor
 public class Boutique {
 
     @Id
@@ -28,9 +30,6 @@ public class Boutique {
 
     @OneToMany(mappedBy = "boutique", cascade = CascadeType.ALL)
     private List<Stock> stocks = new ArrayList<>();
-
-    @OneToMany(mappedBy = "boutique", fetch = FetchType.EAGER)
-    private List<Produit> produits;
 
     @PrePersist
     public void prePersist() {
