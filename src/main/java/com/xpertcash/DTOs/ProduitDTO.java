@@ -1,14 +1,29 @@
 package com.xpertcash.DTOs;
 
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import lombok.Data;
 
 @Data
 public class ProduitDTO {
     private Long id;
+
+    @NotNull(message = "Le nom est obligatoire")
+    @Size(min = 2, max = 50, message = "Le nom doit contenir entre 2 et 50 caractères")
     private String nom;
+
+    @NotNull(message = "Le prix de vente est obligatoire")
+    //@Positive(message = "Le prix de vente doit être positif")
     private Double prixVente;
+
+    @NotNull(message = "Le prix d'achat est obligatoire")
+    //@Positive(message = "Le prix d'achat doit être positif")
     private Double prixAchat;
+
+    @NotNull(message = "La quantité est obligatoire")
+    //@Positive(message = "La quantité doit être positive")
     private Integer quantite;
+
     private Integer seuilAlert;
     private Long categorieId;
     private Long uniteId;
