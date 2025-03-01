@@ -16,6 +16,10 @@ public interface ProduitRepository extends JpaRepository<Produit, Long> {
     boolean existsByCodeGenerique(String codeGenerique);
     @Query("SELECT p FROM Produit p WHERE p.nom = :nom AND p.prixVente = :prixVente AND p.boutique.id = :boutiqueId")
     Produit findByNomAndPrixVenteAndBoutiqueId(String nom, Double prixVente, Long boutiqueId);
+
+    @Query("SELECT p FROM Produit p WHERE p.nom = :nom  AND p.boutique.id = :boutiqueId")
+    Produit findByNomAndBoutiqueId(String nom, Long boutiqueId);
+
     List<Produit> findByBoutique(Boutique boutique);
 
      // Récupérer les produits enStock = false d'une boutique donnée

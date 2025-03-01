@@ -84,12 +84,12 @@ public class ProduitService {
                     .orElseThrow(() -> new RuntimeException("Boutique avec l'ID " + boutiqueId + " non trouvée"));
     
             // Vérification de l'existence du produit par nom, prix et boutiqueId
-            Produit existingProduit = produitRepository.findByNomAndPrixVenteAndBoutiqueId(produitRequest.getNom(), produitRequest.getPrixVente(), boutiqueId);
+            Produit existingProduit = produitRepository.findByNomAndBoutiqueId(produitRequest.getNom(), boutiqueId);
             if (existingProduit != null) {
-                throw new RuntimeException("Un produit avec le même nom et prix existe déjà dans cette boutique.");
+                throw new RuntimeException("Un produit avec le même nom existe déjà dans cette boutique.");
             }
     
-            // Vérifier si la catégorie existe dans la base de données
+            // Vérifier si la catégorie existe dans la base de données 
             Categorie categorie = null;
             if (produitRequest.getCategorieId() != null) {
                 categorie = categorieRepository.findById(produitRequest.getCategorieId())
