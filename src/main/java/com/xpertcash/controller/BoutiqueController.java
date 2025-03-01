@@ -1,5 +1,6 @@
 package com.xpertcash.controller;
 
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -15,9 +16,11 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.xpertcash.DTOs.ProduitDTO;
 import com.xpertcash.composant.AuthorizationService;
 import com.xpertcash.configuration.JwtUtil;
 import com.xpertcash.entity.Boutique;
+import com.xpertcash.entity.Produit;
 import com.xpertcash.service.BoutiqueService;
 import com.xpertcash.service.UsersService;
 
@@ -86,6 +89,7 @@ public class BoutiqueController {
     }
 
 
+    //Endpoint Update Boutique
     @PutMapping("/updatedBoutique/{id}")
     public ResponseEntity<Map<String, String>> updateBoutique(
         @PathVariable Long id,
@@ -122,4 +126,5 @@ public class BoutiqueController {
     }
 }
 
+    //Endpoint listing Produit boutique
 }

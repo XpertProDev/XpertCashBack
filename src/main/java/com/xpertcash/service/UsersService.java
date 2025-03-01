@@ -1,5 +1,6 @@
 package com.xpertcash.service;
 
+import com.xpertcash.DTOs.BoutiqueResponse;
 import com.xpertcash.DTOs.UpdateUserRequest;
 import com.xpertcash.DTOs.USER.UserRequest;
 import com.xpertcash.configuration.JwtConfig;
@@ -32,6 +33,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Random;
+import java.util.stream.Collectors;
+
 import org.springframework.transaction.annotation.Transactional;
 
 
@@ -128,12 +131,7 @@ public class UsersService {
         boutiqueRepository.save(boutique);
     
         // Créer un stock vide initial
-        Stock stock = new Stock();
-        stock.setQuantite(0);  // Stock vide
-        stock.setBoutique(boutique);
-        stock.setCreatedAt(LocalDateTime.now());
-        stock.setLastUpdated(LocalDateTime.now());
-        stockRepository.save(stock);
+       
     
         // Attribution du rôle ADMIN à l’utilisateur
         Role adminRole = roleRepository.findByName(RoleType.ADMIN)
@@ -433,6 +431,12 @@ public class UsersService {
         User user = usersRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
 
+        List<BoutiqueResponse> boutiqueResponses = user.getEntreprise()
+                .getBoutiques()
+                .stream()
+                .map(b -> new BoutiqueResponse(b.getId(), b.getNomBoutique(), b.getAdresse(), b.getCreatedAt()))
+                .collect(Collectors.toList());
+
         return new UserRequest(
                 user.getNomComplet(),
                 user.getEntreprise().getNomEntreprise(),
@@ -441,9 +445,8 @@ public class UsersService {
                 user.getPhone(),
                 user.getPays(),
                 user.getEntreprise().getAdresse(),
-                user.getEntreprise().getLogo()
-
+                user.getEntreprise().getLogo(),
+                boutiqueResponses
         );
     }
-
 }

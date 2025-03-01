@@ -1,6 +1,6 @@
 package com.xpertcash.controller;
 
-import com.xpertcash.DTOs.RegistrationResponse;
+//import com.xpertcash.DTOs.RegistrationResponse;
 import com.xpertcash.DTOs.UpdateUserRequest;
 import com.xpertcash.DTOs.USER.UserRequest;
 import com.xpertcash.composant.AuthorizationService;
@@ -33,9 +33,11 @@ public class UsersController {
 
     // Inscription
     @PostMapping("/register")
-    public ResponseEntity<RegistrationResponse> register(@RequestBody RegistrationRequest request) {
+    public ResponseEntity<Map<String, String>> register(@RequestBody RegistrationRequest request) {
+        Map<String, String> response = new HashMap<>();
+
         try {
-            User user = usersService.registerUsers(
+            usersService.registerUsers(
                     request.getNomComplet(),
                     request.getEmail(),
                     request.getPassword(),
@@ -45,29 +47,16 @@ public class UsersController {
                     request.getNomBoutique()
             );
 
-            // Récupérer le nom de la boutique créée.
-            // Ici, on suppose que la boutique est créée avec le nom par défaut "Ma Boutique"
-            // ou avec celui fourni dans le RegistrationRequest.
-            String boutiqueName = (request.getNomBoutique() == null || request.getNomBoutique().trim().isEmpty())
-                    ? "Ma Boutique"
-                    : request.getNomBoutique();
-
-            RegistrationResponse response = new RegistrationResponse(
-                    "Compte créé avec succès. Un lien d'activation vous a été envoyé par email.",
-                    boutiqueName
-            );
-
+            response.put("message", "Compte créé avec succès. Un lien d'activation vous a été envoyé par email.");
             return ResponseEntity.ok(response);
+
         } catch (RuntimeException e) {
             System.err.println("Erreur lors de l'inscription : " + e.getMessage());
-            RegistrationResponse response = new RegistrationResponse(
-                    "L'inscription a échoué. Veuillez vérifier votre connexion Internet ou réessayer plus tard.",
-                    null
-            );
+
+            response.put("error", "L'inscription a échoué. Veuillez vérifier votre connexion Internet ou réessayer plus tard.");
             return ResponseEntity.badRequest().body(response);
         }
     }
-
 
     // Connexion
     @PostMapping("/login")

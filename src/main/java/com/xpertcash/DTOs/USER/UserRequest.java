@@ -1,5 +1,9 @@
 package com.xpertcash.DTOs.USER;
 
+import java.util.List;
+
+import com.xpertcash.DTOs.BoutiqueResponse;
+import com.xpertcash.entity.Boutique;
 import com.xpertcash.entity.RoleType;
 
 import jakarta.validation.constraints.NotNull;
@@ -26,4 +30,5 @@ public class UserRequest {
     private String pays;
     private String adresseEntreprise;
     private String logoEntreprise;
+    private List<BoutiqueResponse> boutiques;
 }
