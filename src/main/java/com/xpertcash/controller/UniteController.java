@@ -39,7 +39,7 @@ public class UniteController {
         String nom = payload.get("nom");
 
         if (nom == null || nom.isEmpty()) {
-            throw new RuntimeException("Le nom de l'unité ne peut pas être vide !");
+            throw new RuntimeException("L'unité ne peut pas être vide !");
         }
 
         if (uniteRepository.existsByNom(nom)) {

@@ -41,7 +41,7 @@ public class CategorieController {
 
             if (nom == null || nom.isEmpty()) {
                 // Si le nom de la catégorie est vide
-                throw new RuntimeException("Le nom de la catégorie ne peut pas être vide !");
+                throw new RuntimeException("Catégorie ne peut pas être vide !");
             }
 
             // Vérifier si la catégorie existe déjà
