@@ -10,7 +10,7 @@ import lombok.Data;
 @Data
 public class ProduitRequest {
     private String nom;
-    private String Description;
+    private String description;
     private Double prixVente;
     private Double prixAchat;
     private Integer quantite;

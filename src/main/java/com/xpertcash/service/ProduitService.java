@@ -383,6 +383,8 @@ public ProduitDTO updateProduct(Long produitId, ProduitRequest produitRequest, b
         produitDTO.setId(produit.getId());
         produitDTO.setNom(produit.getNom());
         produitDTO.setPrixVente(produit.getPrixVente());
+        produitDTO.setDescription(produit.getDescription());
+        produitDTO.setCodeGenerique(produit.getCodeGenerique());
         produitDTO.setPrixAchat(produit.getPrixAchat());
         produitDTO.setQuantite(produit.getQuantite());
         produitDTO.setSeuilAlert(produit.getSeuilAlert());
@@ -391,8 +393,14 @@ public ProduitDTO updateProduct(Long produitId, ProduitRequest produitRequest, b
         produitDTO.setCodeBare(produit.getCodeBare());
         produitDTO.setPhoto(produit.getPhoto());
         produitDTO.setEnStock(produit.getEnStock());
+
+        // Récupérer et affecter le nom de la catégorie et de l'unité
+        produitDTO.setNomCategorie(produit.getCategorie() != null ? produit.getCategorie().getNom() : null);
+        produitDTO.setNomUnite(produit.getUniteDeMesure() != null ? produit.getUniteDeMesure().getNom() : null);
+
         return produitDTO;
     }
+
 
 
     //Methode Total des Produit:

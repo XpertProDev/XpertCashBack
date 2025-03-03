@@ -22,7 +22,7 @@ public class Produit {
     private Double prixAchat;
     private Integer quantite;
     private Integer seuilAlert;
-    private String Description;
+    private String description;
     @Column(unique = true, nullable = false)
     private String codeGenerique;
     private String codeBare;

@@ -1,18 +1,13 @@
 package com.xpertcash.DTOs.USER;
 
-import java.util.List;
-
 import com.xpertcash.DTOs.BoutiqueResponse;
-import com.xpertcash.entity.Boutique;
 import com.xpertcash.entity.RoleType;
-
-import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
-import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
-
 import lombok.Data;
 import lombok.NoArgsConstructor;
+
+import java.util.List;
 
 @Data
 @AllArgsConstructor

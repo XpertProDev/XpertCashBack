@@ -28,6 +28,11 @@ public class ProduitDTO {
     private Long categorieId;
     private Long uniteId;
     private String codeBare;
+    private String codeGenerique;
+    private String description;
     private String photo;
     private Boolean enStock;
+    // Nouveaux attributs pour afficher les noms
+    private String nomCategorie;
+    private String nomUnite;
 }

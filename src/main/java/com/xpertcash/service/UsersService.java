@@ -68,6 +68,7 @@ public class UsersService {
     private ProduitRepository produitRepository;
 
 
+
     @Autowired
     public UsersService(UsersRepository usersRepository, JwtConfig jwtConfig, BCryptPasswordEncoder passwordEncoder) {
         this.usersRepository = usersRepository;
