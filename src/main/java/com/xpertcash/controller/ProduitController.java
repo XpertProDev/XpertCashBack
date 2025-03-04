@@ -117,28 +117,50 @@ public class ProduitController {
     }
 
     //Endpoint Update Produit
-        @PatchMapping("/updateProduit/{produitId}")
-        public ResponseEntity<ProduitDTO> updateProduit(
-                @PathVariable Long produitId,
-                @RequestBody ProduitRequest produitRequest,  // On récupère toutes les infos dans le body
-                @RequestHeader("Authorization") String token,
-                HttpServletRequest request) {
-
-            try {
-                // Vérifie si addToStock est null, pour éviter une erreur
-                boolean addToStock = produitRequest.getEnStock() != null && produitRequest.getEnStock();
-
-                // Appel au service pour modifier le produit
-                ProduitDTO updatedProduit = produitService.updateProduct(produitId, produitRequest, addToStock, request);
-
-                return ResponseEntity.status(HttpStatus.OK).body(updatedProduit);
-            } catch (RuntimeException e) {
-                String errorMessage = "Une erreur est survenue lors de la mise à jour du produit : " + e.getMessage();
-                System.err.println(errorMessage);
-                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
+    @PatchMapping(value = "/updateProduit/{produitId}", consumes = { MediaType.MULTIPART_FORM_DATA_VALUE })
+    public ResponseEntity<?> updateProduit(
+            @PathVariable Long produitId,
+            @RequestPart("produit") String produitJson,  // Produit JSON en tant que part
+            @RequestPart(value = "image", required = false) MultipartFile imageFile,  // Image en tant que part (optionnelle)
+            @RequestParam boolean addToStock,  // Ajout au stock
+            @RequestHeader("Authorization") String token,
+            HttpServletRequest request) {
+        try {
+            // Vérification de l'image reçue
+            if (imageFile != null) {
+                System.out.println("📷 Image reçue avec succès : " + imageFile.getOriginalFilename());
+            } else {
+                System.out.println("❌ Aucune image reçue !");
             }
+    
+            // Convertir le JSON en objet ProduitRequest
+            ObjectMapper objectMapper = new ObjectMapper();
+            ProduitRequest produitRequest = objectMapper.readValue(produitJson, ProduitRequest.class);
+    
+            // Sauvegarde de l'image si elle est présente
+            String photo = null;
+            if (imageFile != null && !imageFile.isEmpty()) {
+                photo = imageStorageService.saveImage(imageFile);  // Utilisation du service pour stocker l'image
+                System.out.println("URL enregistrée dans photo : " + photo);
+            }
+    
+            produitRequest.setPhoto(photo);  // Assigner l'URL de l'image au produit
+    
+            // Mise à jour du produit via le service
+            ProduitDTO updatedProduitDTO = produitService.updateProduct(produitId, produitRequest, addToStock, request);
+    
+            // Retourner le produit mis à jour avec son DTO
+            return ResponseEntity.status(HttpStatus.OK).body(updatedProduitDTO);
+    
+        } catch (Exception e) {
+            // Gestion des erreurs
+            e.printStackTrace();
+            Map<String, String> errorResponse = new HashMap<>();
+            errorResponse.put("error", "Une erreur est survenue lors de la mise à jour du produit : " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
         }
-
+    }
+    
         //Endpoint pour Supprime le produit s’il n'est pas en stock
             @DeleteMapping("/deleteProduit/{produitId}")
         public ResponseEntity<String> deleteProduit(@PathVariable Long produitId) {
