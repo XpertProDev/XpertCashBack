@@ -9,9 +9,7 @@ import com.xpertcash.configuration.PasswordGenerator;
 import com.xpertcash.entity.*;
 import com.xpertcash.repository.BoutiqueRepository;
 import com.xpertcash.repository.EntrepriseRepository;
-import com.xpertcash.repository.ProduitRepository;
 import com.xpertcash.repository.RoleRepository;
-import com.xpertcash.repository.StockRepository;
 import com.xpertcash.repository.UsersRepository;
 
 
@@ -57,15 +55,11 @@ public class UsersService {
     private BCryptPasswordEncoder passwordEncoder;
 
     @Autowired
-    private JwtUtil jwtUtil;  // Utilisation de JwtUtil pour extraire l'ID de l'utilisateur
-
+    private JwtUtil jwtUtil; 
     private final JwtConfig jwtConfig;
     @Autowired
     private BoutiqueRepository boutiqueRepository;
-    @Autowired
-    private StockRepository stockRepository;
-    @Autowired
-    private ProduitRepository produitRepository;
+
 
 
 

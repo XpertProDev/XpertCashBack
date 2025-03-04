@@ -8,7 +8,6 @@ import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import com.xpertcash.DTOs.ProduitDTO;
 import com.xpertcash.DTOs.ProduitRequest;
@@ -22,7 +21,6 @@ import com.xpertcash.entity.Unite;
 import com.xpertcash.entity.User;
 import com.xpertcash.repository.BoutiqueRepository;
 import com.xpertcash.repository.CategorieRepository;
-import com.xpertcash.repository.EntrepriseRepository;
 import com.xpertcash.repository.ProduitRepository;
 import com.xpertcash.repository.StockRepository;
 import com.xpertcash.repository.UniteRepository;
@@ -36,9 +34,6 @@ public class ProduitService {
 
     @Autowired
     private BoutiqueRepository boutiqueRepository;
-
-    @Autowired
-    private EntrepriseRepository entrepriseRepository;
 
     @Autowired
     private JwtUtil jwtUtil; 
@@ -168,6 +163,8 @@ public class ProduitService {
         produitDTO.setCodeBare(produit.getCodeBare());
         produitDTO.setPhoto(produit.getPhoto());
         produitDTO.setEnStock(produit.getEnStock());
+        produitDTO.setCreatedAt(produit.getCreatedAt());
+        produitDTO.setLastUpdated(produit.getLastUpdated());
     
         // Assigner les IDs des entités liées (pas directement les objets)
         if (produit.getCategorie() != null) {
@@ -303,11 +300,19 @@ public ProduitDTO updateProduct(Long produitId, ProduitRequest produitRequest, b
     produitDTO.setPrixAchat(produit.getPrixAchat());
     produitDTO.setQuantite(produit.getQuantite());
     produitDTO.setSeuilAlert(produit.getSeuilAlert());
-    produitDTO.setCategorieId(produit.getCategorie().getId());
-    produitDTO.setUniteId(produit.getUniteDeMesure().getId());
-    produitDTO.setCodeBare(produit.getCodeBare());
+    produitDTO.setCategorieId(produit.getCategorie() != null ? produit.getCategorie().getId() : null);
+    produitDTO.setUniteId(produit.getUniteDeMesure() != null ? produit.getUniteDeMesure().getId() : null);
     produitDTO.setPhoto(produit.getPhoto());
+    produitDTO.setDescription(produit.getDescription());
+    produitDTO.setCodeBare(produit.getCodeBare());
     produitDTO.setEnStock(produit.getEnStock());
+    produitDTO.setCreatedAt(produit.getCreatedAt());
+    produitDTO.setLastUpdated(produit.getLastUpdated());
+    produitDTO.setNomCategorie(produit.getCategorie() != null ? produit.getCategorie().getNom() : null);
+    produitDTO.setNomUnite(produit.getUniteDeMesure() != null ? produit.getUniteDeMesure().getNom() : null);
+
+
+    
 
     return produitDTO;
 }
