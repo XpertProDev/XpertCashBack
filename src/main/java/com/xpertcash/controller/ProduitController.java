@@ -88,7 +88,7 @@ public class ProduitController {
             String photo = null;
             if (imageFile != null && !imageFile.isEmpty()) {
                 photo = imageStorageService.saveImage(imageFile);
-                System.out.println("✅ URL enregistrée dans photo : " + photo);
+                System.out.println("URL enregistrée dans photo : " + photo);
             }
 
             produitRequest.setPhoto(photo);
@@ -170,14 +170,11 @@ public class ProduitController {
                 // Récupérer les produits en stock
                 List<ProduitDTO> produitsDTO = produitService.getProduitsParStock(boutiqueId);
 
-                // Retourner les produits en stock sous forme de réponse OK
                 return ResponseEntity.ok(produitsDTO);
             } catch (Exception e) {
-                // En cas d'erreur, on renvoie un message d'erreur sous forme de Map<String, String>
                 Map<String, String> errorResponse = new HashMap<>();
                 errorResponse.put("error", "Une erreur est survenue lors de la récupération des produits.");
 
-                // Retourner une réponse d'erreur avec un code HTTP 500
                 return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
             }
         }
@@ -189,24 +186,21 @@ public class ProduitController {
             try {
                 // Récupérer les totaux des quantités en stock et non en stock
                 Map<String, Integer> totals = produitService.getTotalQuantitesParStock(boutiqueId);
-
-                // Retourner la réponse avec le statut OK
                 return ResponseEntity.ok(totals);
             } catch (Exception e) {
-                // En cas d'erreur, retourner un Map avec des valeurs par défaut (0)
                 Map<String, Integer> errorResponse = new HashMap<>();
-                errorResponse.put("totalEnStock", 0);  // Valeur par défaut en cas d'erreur
-                errorResponse.put("totalNonEnStock", 0);  // Valeur par défaut en cas d'erreur
+                errorResponse.put("totalEnStock", 0);
+                errorResponse.put("totalNonEnStock", 0);
                 return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
             }
         }
 
         //Get Produit by id
         @GetMapping("/produits/{produitId}")
-    public ResponseEntity<ProduitDTO> getProduitById(@PathVariable("produitId") Long produitId) {
-        ProduitDTO produitDTO = produitService.getProduitById(produitId);
-        return ResponseEntity.ok(produitDTO);
-    }
+        public ResponseEntity<ProduitDTO> getProduitById(@PathVariable("produitId") Long produitId) {
+            ProduitDTO produitDTO = produitService.getProduitById(produitId);
+            return ResponseEntity.ok(produitDTO);
+        }
         
 
 }

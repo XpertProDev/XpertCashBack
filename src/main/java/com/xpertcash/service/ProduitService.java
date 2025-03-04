@@ -449,8 +449,6 @@ public ProduitDTO updateProduct(Long produitId, ProduitRequest produitRequest, b
         dto.setEnStock(produit.getEnStock());
         dto.setCreatedAt(produit.getCreatedAt());
         dto.setLastUpdated(produit.getLastUpdated());
-
-        // Ajouter les noms des catégories et unités
         dto.setNomCategorie(produit.getCategorie() != null ? produit.getCategorie().getNom() : null);
         dto.setNomUnite(produit.getUniteDeMesure() != null ? produit.getUniteDeMesure().getNom() : null);
 
