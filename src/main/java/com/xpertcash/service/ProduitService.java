@@ -104,8 +104,10 @@ public class ProduitService {
             }
     
             String codeGenerique = generateProductCode();
-    
-            // Mapper ProduitRequest à Produit
+
+            // Mapper ProduitRequest à
+            // Produit
+
             Produit produit = new Produit();
             produit.setNom(produitRequest.getNom());
             produit.setDescription(produitRequest.getDescription());
