@@ -1,9 +1,6 @@
 package com.xpertcash.entity;
 
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
-
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;

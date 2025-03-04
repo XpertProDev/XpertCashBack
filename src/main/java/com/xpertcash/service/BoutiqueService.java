@@ -2,22 +2,16 @@ package com.xpertcash.service;
 
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.stream.Collectors;
 
-import org.hibernate.Hibernate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.xpertcash.DTOs.ProduitDTO;
 import com.xpertcash.configuration.JwtUtil;
 import com.xpertcash.entity.Boutique;
-import com.xpertcash.entity.Produit;
 import com.xpertcash.entity.RoleType;
 import com.xpertcash.entity.User;
 import com.xpertcash.repository.BoutiqueRepository;
-import com.xpertcash.repository.EntrepriseRepository;
-import com.xpertcash.repository.ProduitRepository;
 import com.xpertcash.repository.UsersRepository;
 
 import jakarta.servlet.http.HttpServletRequest;
@@ -29,15 +23,11 @@ public class BoutiqueService {
     private BoutiqueRepository boutiqueRepository;
 
     @Autowired
-    private EntrepriseRepository entrepriseRepository;
-
-    @Autowired
     private JwtUtil jwtUtil; 
 
     @Autowired
     private UsersRepository usersRepository;
-    @Autowired
-    private ProduitRepository produitRepository;
+
 
     // Ajouter une nouvelle boutique pour l'admin
     @Transactional
