@@ -423,5 +423,39 @@ public ProduitDTO updateProduct(Long produitId, ProduitRequest produitRequest, b
     
         return totals;
     }
+
+    //Methode pour reuperer un produit par son id
+    public ProduitDTO getProduitById(Long id) {
+        Produit produit = produitRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Produit avec ID " + id + " non trouvé"));
+
+        return mapToProduitDTO(produit);
+    }
+
+    private ProduitDTO mapToProduitDTO(Produit produit) {
+        ProduitDTO dto = new ProduitDTO();
+        dto.setId(produit.getId());
+        dto.setNom(produit.getNom());
+        dto.setPrixVente(produit.getPrixVente());
+        dto.setPrixAchat(produit.getPrixAchat());
+        dto.setQuantite(produit.getQuantite());
+        dto.setSeuilAlert(produit.getSeuilAlert());
+        dto.setCategorieId(produit.getCategorie() != null ? produit.getCategorie().getId() : null);
+        dto.setUniteId(produit.getUniteDeMesure() != null ? produit.getUniteDeMesure().getId() : null);
+        dto.setCodeBare(produit.getCodeBare());
+        dto.setCodeGenerique(produit.getCodeGenerique());
+        dto.setDescription(produit.getDescription());
+        dto.setPhoto(produit.getPhoto());
+        dto.setEnStock(produit.getEnStock());
+        dto.setCreatedAt(produit.getCreatedAt());
+        dto.setLastUpdated(produit.getLastUpdated());
+
+        // Ajouter les noms des catégories et unités
+        dto.setNomCategorie(produit.getCategorie() != null ? produit.getCategorie().getNom() : null);
+        dto.setNomUnite(produit.getUniteDeMesure() != null ? produit.getUniteDeMesure().getNom() : null);
+
+        return dto;
+    }
+    
     
 }

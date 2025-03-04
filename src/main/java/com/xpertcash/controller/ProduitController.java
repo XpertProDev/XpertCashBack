@@ -201,6 +201,12 @@ public class ProduitController {
             }
         }
 
-
+        //Get Produit by id
+        @GetMapping("/produits/{produitId}")
+    public ResponseEntity<ProduitDTO> getProduitById(@PathVariable("produitId") Long produitId) {
+        ProduitDTO produitDTO = produitService.getProduitById(produitId);
+        return ResponseEntity.ok(produitDTO);
+    }
+        
 
 }

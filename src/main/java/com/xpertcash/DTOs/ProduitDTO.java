@@ -1,10 +1,16 @@
 package com.xpertcash.DTOs;
 
+import java.time.LocalDateTime;
+
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
+import lombok.AllArgsConstructor;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 @Data
+@AllArgsConstructor
+@NoArgsConstructor
 public class ProduitDTO {
     private Long id;
 
@@ -35,4 +41,7 @@ public class ProduitDTO {
     // Nouveaux attributs pour afficher les noms
     private String nomCategorie;
     private String nomUnite;
+
+    private LocalDateTime createdAt;
+    private LocalDateTime lastUpdated;
 }
