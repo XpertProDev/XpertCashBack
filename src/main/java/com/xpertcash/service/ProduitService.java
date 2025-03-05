@@ -401,6 +401,10 @@ public class ProduitService {
         produitDTO.setPhoto(produit.getPhoto());
         produitDTO.setEnStock(produit.getEnStock());
 
+        produitDTO.setCreatedAt(produit.getCreatedAt());
+        produitDTO.setLastUpdated(produit.getLastUpdated());
+
+
         // Récupérer et affecter le nom de la catégorie et de l'unité
         produitDTO.setNomCategorie(produit.getCategorie() != null ? produit.getCategorie().getNom() : null);
         produitDTO.setNomUnite(produit.getUniteDeMesure() != null ? produit.getUniteDeMesure().getNom() : null);
