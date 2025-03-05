@@ -9,7 +9,6 @@ import com.xpertcash.entity.Unite;
 import lombok.Data;
 
 @Data
-
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class ProduitRequest {
     private String nom;
@@ -19,7 +18,7 @@ public class ProduitRequest {
     private Integer quantite;
     private Integer seuilAlert;
     private Long categorieId;      
-     private Long uniteId;       
+    private Long uniteId;
     private String codeBare;
     private String photo;
     private Boolean enStock;
