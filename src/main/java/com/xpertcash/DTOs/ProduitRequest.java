@@ -2,12 +2,15 @@ package com.xpertcash.DTOs;
 
 
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.xpertcash.entity.Categorie;
 import com.xpertcash.entity.Unite;
 
 import lombok.Data;
 
 @Data
+
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class ProduitRequest {
     private String nom;
     private String description;

@@ -189,7 +189,7 @@ public class ProduitService {
     
     
    // Update Produit
-public ProduitDTO updateProduct(Long produitId, ProduitRequest produitRequest, boolean addToStock, HttpServletRequest request) {
+    public ProduitDTO updateProduct(Long produitId, ProduitRequest produitRequest, boolean addToStock, HttpServletRequest request) {
     // Vérification de l'autorisation de l'admin
     String token = request.getHeader("Authorization");
     if (token == null || !token.startsWith("Bearer ")) {
