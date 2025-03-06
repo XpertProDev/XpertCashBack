@@ -256,7 +256,8 @@ public class ProduitService {
         return stock;
     }
     
-   
+    
+    
 
     
    // Update Produit
