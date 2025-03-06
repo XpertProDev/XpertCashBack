@@ -157,36 +157,37 @@ public class ProduitController {
                 stock.setBoutique(produit.getBoutique());
                 stock.setCreatedAt(LocalDateTime.now());
             }
-
     
             // Mise à jour du stock
             stock.setStockActuel(produit.getQuantite());
     
             stock.setQuantiteAjoute(0);
             stock.setQuantiteRetirer(0);
+            //com
     
             // Calculer stockApres
             stock.setStockApres(stock.getStockActuel() + stock.getQuantiteAjoute());
     
             // Mettre à jour la date de mise à jour du stock
             stock.setLastUpdated(LocalDateTime.now());
+    
             stockRepository.save(stock);
     
             return ResponseEntity.status(HttpStatus.OK).body(produit);
     
-=======
-
-            stock.setStockActuel(produit.getQuantite());
-
-            // Recalculer stockApres (stock actuel + quantiteAjoute)
-            stock.setStockApres(stock.getStockActuel() + stock.getQuantiteAjoute());
-
-            // Mettre à jour la date de mise à jour du stock
-            stock.setLastUpdated(LocalDateTime.now());
-
-            // Sauvegarder le stock mis à jour
-            stockRepository.save(stock);
-
+        } catch (Exception e) {
+            e.printStackTrace();
+            Map<String, String> errorResponse = new HashMap<>();
+            errorResponse.put("error", "Une erreur est survenue lors de la mise à jour du produit : " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
+        }
+    }
+    
+        //Endpoint pour Supprime le produit s’il n'est pas en stock
+            @DeleteMapping("/deleteProduit/{produitId}")
+        public ResponseEntity<String> deleteProduit(@PathVariable Long produitId) {
+            try {
+                produitService.deleteProduit(produitId);
                 return ResponseEntity.ok("Produit supprimé avec succès !");
             } catch (RuntimeException e) {
                 return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
