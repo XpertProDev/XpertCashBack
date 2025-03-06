@@ -130,25 +130,26 @@ public class ProduitController {
             } else {
                 System.out.println("❌ Aucune image reçue !");
             }
-
+    
             ObjectMapper objectMapper = new ObjectMapper();
             ProduitRequest produitRequest = objectMapper.readValue(produitJson, ProduitRequest.class);
-
+    
             String photo = null;
             if (imageFile != null && !imageFile.isEmpty()) {
                 photo = imageStorageService.saveImage(imageFile);
                 System.out.println("URL enregistrée dans photo : " + photo);
             }
-
+    
             produitRequest.setPhoto(photo);
-
+    
+            // Mise à jour du produit
             Produit produit = produitRepository.findById(produitId)
                     .orElseThrow(() -> new RuntimeException("Produit non trouvé"));
-
             produit.setNom(produitRequest.getNom());
             produit.setQuantite(produitRequest.getQuantite());
             produitRepository.save(produit);
-
+    
+            // Mise à jour du stock associé
             Stock stock = stockRepository.findByProduit(produit);
             if (stock == null) {
                 stock = new Stock();
@@ -156,29 +157,31 @@ public class ProduitController {
                 stock.setBoutique(produit.getBoutique());
                 stock.setCreatedAt(LocalDateTime.now());
             }
-
+    
+            // Mise à jour du stock
             stock.setStockActuel(produit.getQuantite());
-
-            // Recalculer stockApres (stock actuel + quantiteAjoute)
+    
+            stock.setQuantiteAjoute(0);
+            stock.setQuantiteRetirer(0);
+    
+            // Calculer stockApres
             stock.setStockApres(stock.getStockActuel() + stock.getQuantiteAjoute());
-
+    
             // Mettre à jour la date de mise à jour du stock
             stock.setLastUpdated(LocalDateTime.now());
-
-            // Sauvegarder le stock mis à jour
+    
             stockRepository.save(stock);
-
+    
             return ResponseEntity.status(HttpStatus.OK).body(produit);
-
+    
         } catch (Exception e) {
-            // Gestion des erreurs
             e.printStackTrace();
             Map<String, String> errorResponse = new HashMap<>();
             errorResponse.put("error", "Une erreur est survenue lors de la mise à jour du produit : " + e.getMessage());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
         }
     }
-
+    
         //Endpoint pour Supprime le produit s’il n'est pas en stock
             @DeleteMapping("/deleteProduit/{produitId}")
         public ResponseEntity<String> deleteProduit(@PathVariable Long produitId) {
