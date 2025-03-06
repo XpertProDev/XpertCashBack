@@ -7,6 +7,7 @@ import com.xpertcash.configuration.JwtConfig;
 import com.xpertcash.configuration.JwtUtil;
 import com.xpertcash.configuration.PasswordGenerator;
 import com.xpertcash.entity.*;
+import com.xpertcash.exceptions.BusinessException;
 import com.xpertcash.repository.BoutiqueRepository;
 import com.xpertcash.repository.EntrepriseRepository;
 import com.xpertcash.repository.RoleRepository;
@@ -331,24 +332,21 @@ public class UsersService {
 
                 // Vérifier que l'Admin possède une entreprise
                 if (admin.getEntreprise() == null) {
-                    throw new RuntimeException("L'Admin n'a pas d'entreprise associée.");
+                    throw new BusinessException("L'Admin n'a pas d'entreprise associée.");
                 }
 
                 // Vérifier si un utilisateur avec le même email ou téléphone existe déjà
                 if (usersRepository.findByEmailAndEntreprise(userRequest.getEmail(), admin.getEntreprise()).isPresent()) {
-                    throw new RuntimeException("Un utilisateur avec cet email existe déjà dans votre entreprise.");
+                    throw new BusinessException("Un utilisateur avec cet email existe déjà dans votre entreprise.");
                 }
 
                 if (usersRepository.findByPhoneAndEntreprise(userRequest.getPhone(), admin.getEntreprise()).isPresent()) {
-                    throw new RuntimeException("Un utilisateur avec ce numéro de téléphone existe déjà dans votre entreprise.");
+                    throw new BusinessException("Un utilisateur avec ce numéro de téléphone existe déjà dans votre entreprise.");
                 } 
 
                 if (usersRepository.findByPhoneAndEntrepriseAndPays(userRequest.getPhone(), admin.getEntreprise(), userRequest.getPays()).isPresent()) {
-                    throw new RuntimeException("Un utilisateur avec ce numéro de téléphone existe déjà dans votre entreprise.");
+                    throw new BusinessException("Un utilisateur avec ce numéro de téléphone existe déjà dans votre entreprise.");
                 }
-                
-
-                
 
                 // Vérifier que le rôle spécifié pour le nouvel utilisateur existe
                 Role role = roleRepository.findByName(userRequest.getRoleType())
@@ -388,10 +386,6 @@ public class UsersService {
                     e.printStackTrace();
                     throw new RuntimeException("Utilisateur créé mais une erreur est survenue lors de l'envoi de l'email.", e);
                 }
-                
-                
-
-
                 return savedUser;
             }
 

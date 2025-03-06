@@ -56,6 +56,16 @@ public class GlobalExceptionHandler {
        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
    }
 
+    // Gestion personnalisée pour BusinessException
+    @ExceptionHandler(BusinessException.class)
+    public ResponseEntity<Map<String, String>> handleBusinessException(BusinessException e) {
+        Map<String, String> errorResponse = new HashMap<>();
+        errorResponse.put("error", e.getMessage());  // Pas de préfixe ajouté ici
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
+    }
+
+    // Gestion générale des RuntimeExceptions (pour les autres cas)
+
    // Gestion des erreurs NoResourceFoundException (ressource non trouvée)
     @ExceptionHandler(NoResourceFoundException.class)
     public ResponseEntity<Map<String, String>> handleNoResourceFoundException(NoResourceFoundException e) {
