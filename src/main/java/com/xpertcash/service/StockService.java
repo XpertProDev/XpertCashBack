@@ -42,7 +42,7 @@ public class StockService {
     private  RoleRepository roleRepository;
 
     // Ajouter du stock à une boutique (seul l'admin peut le faire)
-    @Transactional
+    /*@Transactional
     public Stock ajouterStock(HttpServletRequest request, Long boutiqueId, Long produitId, int quantite) {
         // Vérifier la présence du token JWT dans l'entête de la requête
         String token = request.getHeader("Authorization");
@@ -83,7 +83,7 @@ public class StockService {
 
         // Sauvegarder le stock en base de données
         return stockRepository.save(stock);
-    }
+    }*/
 
     // Récupérer les stocks associés à une boutique
     public List<Stock> getStocksByBoutique(Long boutiqueId) {

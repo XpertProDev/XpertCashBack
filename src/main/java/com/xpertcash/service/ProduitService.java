@@ -125,21 +125,32 @@ public class ProduitService {
             // Si addToStock est vrai, ajouter le produit au stock
             if (addToStock) {
                 Stock stock = new Stock();
-                stock.setQuantite(produitRequest.getQuantite());
+            
+                // Définir stockActuel comme la quantité du produit (ou 0 si non renseigné)
+                stock.setStockActuel(produitRequest.getQuantite() != null ? produitRequest.getQuantite() : 0);
+            
+                // Initialiser stockApres avec la même valeur que stockActuel
+                stock.setStockApres(stock.getStockActuel());
+            
+                // Initialiser quantiteAjoute à 0 (car pas encore de mise à jour de stock)
+                stock.setQuantiteAjoute(0);
+            
                 stock.setBoutique(boutique);
                 stock.setProduit(savedProduit);  // Associer le produit au stock
                 stock.setCreatedAt(LocalDateTime.now());
                 stock.setLastUpdated(LocalDateTime.now());
+            
                 // Si un seuil d'alerte est spécifié, on le copie dans le stock
                 if (produitRequest.getSeuilAlert() != null) {
                     stock.setSeuilAlert(produitRequest.getSeuilAlert());
                 }
-    
+            
                 stockRepository.save(stock);
-    
+            
                 savedProduit.setEnStock(true);
                 produitRepository.save(savedProduit);
             }
+            
     
             // Mapper l'entité Produit en DTO
             ProduitDTO produitDTO = mapToDTO(savedProduit);
@@ -187,6 +198,33 @@ public class ProduitService {
         return code;
     }
     
+    
+
+    //Methode pour ajuster la quantiter du produit en stock
+    public Stock ajouterStock(Long produitId, Integer quantiteAjoute) {
+        Produit produit = produitRepository.findById(produitId)
+                .orElseThrow(() -> new RuntimeException("Produit non trouvé"));
+    
+        Stock stock = stockRepository.findByProduit(produit);
+        if (stock == null) {
+            stock = new Stock();
+            stock.setProduit(produit);
+            stock.setBoutique(produit.getBoutique());
+            stock.setCreatedAt(LocalDateTime.now());
+            stock.setLastUpdated(LocalDateTime.now());
+        }
+        stock.setStockActuel(produit.getQuantite());
+        stock.setQuantiteAjoute(quantiteAjoute);
+        stock.setStockApres(stock.getStockActuel() + quantiteAjoute);
+        stock.setLastUpdated(LocalDateTime.now());
+        stockRepository.save(stock);
+    
+        return stock;
+    }
+    
+    
+    
+
     
    // Update Produit
     public ProduitDTO updateProduct(Long produitId, ProduitRequest produitRequest, boolean addToStock, HttpServletRequest request) {
@@ -250,7 +288,7 @@ public class ProduitService {
             // Si le stock n'existe pas, création d'un nouveau stock
             Stock newStock = new Stock();
             newStock.setProduit(produit);  // Associer le produit au stock
-            newStock.setQuantite(produit.getQuantite());  // Quantité du produit dans le stock
+            newStock.setStockActuel(produit.getQuantite() != null ? produit.getQuantite() : 0);
             newStock.setBoutique(produit.getBoutique());  // Associer la boutique au stock
             newStock.setCreatedAt(LocalDateTime.now());  // Date de création du stock
             newStock.setLastUpdated(LocalDateTime.now());  // Date de dernière mise à jour
@@ -265,7 +303,8 @@ public class ProduitService {
             stockRepository.save(newStock);  // Sauvegarde du nouveau stock
         } else {
             // Si le stock existe déjà, mise à jour des informations du stock
-            stock.setQuantite(produit.getQuantite());  // Mettre à jour la quantité
+            stock.setStockActuel(produit.getQuantite() != null ? produit.getQuantite() : 0);
+
             stock.setLastUpdated(LocalDateTime.now());  // Mettre à jour la date de dernière mise à jour
 
             // Mettre à jour le seuil d'alerte dans le stock si spécifié dans la requête

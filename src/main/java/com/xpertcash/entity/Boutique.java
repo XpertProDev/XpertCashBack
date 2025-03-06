@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import com.fasterxml.jackson.annotation.JsonBackReference;
+import com.fasterxml.jackson.annotation.JsonManagedReference;
 
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
@@ -28,11 +29,11 @@ public class Boutique {
 
     @ManyToOne
     @JoinColumn(name = "entreprise_id", nullable = false)
-    @JsonBackReference
+    @JsonBackReference("boutique-entreprise")
     private Entreprise entreprise;
 
     @OneToMany(mappedBy = "boutique", cascade = CascadeType.ALL)
-    @JsonBackReference
+    @JsonManagedReference("boutique-stock")
     private List<Stock> stocks = new ArrayList<>();
 
     @PrePersist

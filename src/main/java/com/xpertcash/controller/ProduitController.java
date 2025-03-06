@@ -18,6 +18,7 @@ import com.xpertcash.composant.AuthorizationService;
 import com.xpertcash.configuration.JwtUtil;
 import com.xpertcash.entity.Produit;
 import com.xpertcash.entity.RoleType;
+import com.xpertcash.entity.Stock;
 import com.xpertcash.entity.User;
 import com.xpertcash.exceptions.DuplicateProductException;
 import com.xpertcash.repository.UsersRepository;
@@ -214,5 +215,34 @@ public class ProduitController {
             return ResponseEntity.ok(produitDTO);
         }
         
+
+        //Endpoint pour ajuster la quantiter du produit en stock
+        @PatchMapping(value = "/ajouterStock/{produitId}", consumes = { MediaType.MULTIPART_FORM_DATA_VALUE })
+        public ResponseEntity<?> ajouterStock(
+                @PathVariable Long produitId,
+                @RequestPart(value = "stock") String stockJson, 
+                @RequestHeader("Authorization") String token) {
+            try {
+                // Vérifier si stockJson est fourni
+                if (stockJson == null || stockJson.isEmpty()) {
+                    return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                            .body("Erreur : Le champ 'stock' est obligatoire.");
+                }
+        
+                ObjectMapper objectMapper = new ObjectMapper();
+                Stock stockRequest = objectMapper.readValue(stockJson, Stock.class);
+        
+                Stock updatedStock = produitService.ajouterStock(produitId, stockRequest.getQuantiteAjoute());
+        
+                return ResponseEntity.status(HttpStatus.OK).body(updatedStock);
+        
+            } catch (Exception e) {
+                e.printStackTrace();
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                        .body("Une erreur est survenue lors de l'ajout du stock : " + e.getMessage());
+            }
+        }
+        
+
 
 }
