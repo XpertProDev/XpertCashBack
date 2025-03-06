@@ -222,7 +222,28 @@ public class ProduitService {
         return stock;
     }
     
+    //Methode pour reduire la quantiter du produit en stock
+
+    public Stock retirerStock(Long produitId, Integer quantiteRetirer) {
+        Produit produit = produitRepository.findById(produitId)
+                .orElseThrow(() -> new RuntimeException("Produit non trouvé"));
     
+        Stock stock = stockRepository.findByProduit(produit);
+        if (stock == null) {
+            stock = new Stock();
+            stock.setProduit(produit);
+            stock.setBoutique(produit.getBoutique());
+            stock.setCreatedAt(LocalDateTime.now());
+            stock.setLastUpdated(LocalDateTime.now());
+        }
+        stock.setStockActuel(produit.getQuantite());
+        stock.setQuantiteRetirer(quantiteRetirer);
+        stock.setStockApres(stock.getStockActuel() - quantiteRetirer);
+        stock.setLastUpdated(LocalDateTime.now());
+        stockRepository.save(stock);
+    
+        return stock;
+    }
     
 
     

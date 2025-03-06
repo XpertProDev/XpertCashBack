@@ -46,4 +46,5 @@ public class ProduitDTO {
 
     private LocalDateTime createdAt;
     private LocalDateTime lastUpdated;
+    
 }

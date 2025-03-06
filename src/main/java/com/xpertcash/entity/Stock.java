@@ -19,6 +19,7 @@ public class Stock {
 
     private Integer stockActuel = 0;
     private Integer quantiteAjoute = 0;
+    private Integer quantiteRetirer = 0;
     private Integer stockApres = 0;
 
     private Integer seuilAlert;
