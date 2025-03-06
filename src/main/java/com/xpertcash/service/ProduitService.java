@@ -108,7 +108,7 @@ public class ProduitService {
             produit.setDescription(produitRequest.getDescription());
             produit.setPrixVente(produitRequest.getPrixVente());
             produit.setPrixAchat(produitRequest.getPrixAchat());
-            produit.setQuantite(produitRequest.getQuantite());
+            produit.setQuantite(produitRequest.getQuantite() != null ? produitRequest.getQuantite() : 0);
             produit.setSeuilAlert(produitRequest.getSeuilAlert());
             produit.setCategorie(categorie);
             produit.setUniteDeMesure(unite);
@@ -125,21 +125,32 @@ public class ProduitService {
             // Si addToStock est vrai, ajouter le produit au stock
             if (addToStock) {
                 Stock stock = new Stock();
-                stock.setQuantite(produitRequest.getQuantite());
+            
+                // Définir stockActuel comme la quantité du produit (ou 0 si non renseigné)
+                stock.setStockActuel(produitRequest.getQuantite() != null ? produitRequest.getQuantite() : 0);
+            
+                // Initialiser stockApres avec la même valeur que stockActuel
+                stock.setStockApres(stock.getStockActuel());
+            
+                // Initialiser quantiteAjoute à 0 (car pas encore de mise à jour de stock)
+                stock.setQuantiteAjoute(0);
+            
                 stock.setBoutique(boutique);
                 stock.setProduit(savedProduit);  // Associer le produit au stock
                 stock.setCreatedAt(LocalDateTime.now());
                 stock.setLastUpdated(LocalDateTime.now());
+            
                 // Si un seuil d'alerte est spécifié, on le copie dans le stock
                 if (produitRequest.getSeuilAlert() != null) {
                     stock.setSeuilAlert(produitRequest.getSeuilAlert());
                 }
-    
+            
                 stockRepository.save(stock);
-    
+            
                 savedProduit.setEnStock(true);
                 produitRepository.save(savedProduit);
             }
+            
     
             // Mapper l'entité Produit en DTO
             ProduitDTO produitDTO = mapToDTO(savedProduit);
@@ -187,6 +198,67 @@ public class ProduitService {
         return code;
     }
     
+    
+
+    //Methode pour ajuster la quantiter du produit en stock
+    public Stock ajouterStock(Long produitId, Integer quantiteAjoute) {
+        Produit produit = produitRepository.findById(produitId)
+                .orElseThrow(() -> new RuntimeException("Produit non trouvé"));
+    
+        Stock stock = stockRepository.findByProduit(produit);
+        if (stock == null) {
+            throw new RuntimeException("Stock introuvable pour ce produit");
+        }
+    
+        // Mettre à jour la quantité du produit
+        int nouvelleQuantiteProduit = produit.getQuantite() + quantiteAjoute;
+        produit.setQuantite(nouvelleQuantiteProduit);
+        produitRepository.save(produit);
+    
+        // Mise à jour du stock
+        stock.setStockActuel(nouvelleQuantiteProduit);
+        stock.setQuantiteAjoute(quantiteAjoute);
+        stock.setStockApres(stock.getStockActuel());
+        stock.setLastUpdated(LocalDateTime.now());
+    
+        stockRepository.save(stock);
+    
+        return stock;
+    }
+    
+    //Methode pour reduire la quantiter du produit en stock
+    public Stock retirerStock(Long produitId, Integer quantiteRetirer) {
+        Produit produit = produitRepository.findById(produitId)
+                .orElseThrow(() -> new RuntimeException("Produit non trouvé"));
+    
+        Stock stock = stockRepository.findByProduit(produit);
+        if (stock == null) {
+            throw new RuntimeException("Stock introuvable pour ce produit");
+        }
+    
+        // Vérifier que la quantité à retirer ne dépasse pas la quantité disponible
+        if (quantiteRetirer > produit.getQuantite()) {
+            throw new RuntimeException("Impossible de retirer plus que la quantité disponible !");
+        }
+    
+        int nouvelleQuantiteProduit = produit.getQuantite() - quantiteRetirer;
+        produit.setQuantite(nouvelleQuantiteProduit);
+        produitRepository.save(produit);
+    
+        // Mise à jour du stock
+        stock.setStockActuel(nouvelleQuantiteProduit);
+        stock.setQuantiteRetirer(quantiteRetirer);
+        stock.setStockApres(stock.getStockActuel());
+        stock.setLastUpdated(LocalDateTime.now());
+    
+        stockRepository.save(stock);
+    
+        return stock;
+    }
+    
+    
+    
+
     
    // Update Produit
     public ProduitDTO updateProduct(Long produitId, ProduitRequest produitRequest, boolean addToStock, HttpServletRequest request) {
@@ -245,51 +317,52 @@ public class ProduitService {
     if (addToStock) {
         // Recherche du stock existant pour ce produit
         Stock stock = stockRepository.findByProduit(produit);
-
+    
         if (stock == null) {
             // Si le stock n'existe pas, création d'un nouveau stock
             Stock newStock = new Stock();
             newStock.setProduit(produit);  // Associer le produit au stock
-            newStock.setQuantite(produit.getQuantite());  // Quantité du produit dans le stock
-            newStock.setBoutique(produit.getBoutique());  // Associer la boutique au stock
-            newStock.setCreatedAt(LocalDateTime.now());  // Date de création du stock
-            newStock.setLastUpdated(LocalDateTime.now());  // Date de dernière mise à jour
-
+            newStock.setStockActuel(produit.getQuantite() != null ? produit.getQuantite() : 0);
+            newStock.setBoutique(produit.getBoutique());
+            newStock.setCreatedAt(LocalDateTime.now());
+            newStock.setLastUpdated(LocalDateTime.now());
+    
             // Ajouter le seuil d'alerte dans le stock
             if (produitRequest.getSeuilAlert() != null) {
                 newStock.setSeuilAlert(produitRequest.getSeuilAlert());
             } else {
                 newStock.setSeuilAlert(produit.getSeuilAlert());
             }
-
-            stockRepository.save(newStock);  // Sauvegarde du nouveau stock
+    
+            stockRepository.save(newStock);
         } else {
             // Si le stock existe déjà, mise à jour des informations du stock
-            stock.setQuantite(produit.getQuantite());  // Mettre à jour la quantité
-            stock.setLastUpdated(LocalDateTime.now());  // Mettre à jour la date de dernière mise à jour
-
-            // Mettre à jour le seuil d'alerte dans le stock si spécifié dans la requête
+            stock.setStockActuel(produit.getQuantite() != null ? produit.getQuantite() : 0);
+    
+            stock.setQuantiteAjoute(0);
+            stock.setQuantiteRetirer(0);
+    
+            // Mettre à jour le seuil d'alerte si nécessaire
             if (produitRequest.getSeuilAlert() != null) {
                 stock.setSeuilAlert(produitRequest.getSeuilAlert());
             }
-
-            stockRepository.save(stock);  // Sauvegarde du stock mis à jour
+    
+            stock.setLastUpdated(LocalDateTime.now());
+            stockRepository.save(stock);
         }
-
-        produit.setEnStock(true);  // Le produit est en stock
+    
+        produit.setEnStock(true);
     } else {
-        // Si addToStock est false, on met à jour le produit et on supprime le stock si nécessaire
+        // Si le produit ne doit plus être en stock, suppression du stock
         Stock stock = stockRepository.findByProduit(produit);
-
+    
         if (stock != null) {
-            // Si le stock existe, on le supprime
             stockRepository.delete(stock);
         }
-
-        produit.setEnStock(false);  // Le produit n'est plus en stock
+    
+        produit.setEnStock(false);
     }
-
-    // Mettre à jour le produit pour refléter l'état hors stock ou en stock
+    
     produitRepository.save(produit);
 
     // Mapper Produit vers ProduitDTO pour la réponse
@@ -400,6 +473,10 @@ public class ProduitService {
         produitDTO.setCodeBare(produit.getCodeBare());
         produitDTO.setPhoto(produit.getPhoto());
         produitDTO.setEnStock(produit.getEnStock());
+
+        produitDTO.setCreatedAt(produit.getCreatedAt());
+        produitDTO.setLastUpdated(produit.getLastUpdated());
+
 
         // Récupérer et affecter le nom de la catégorie et de l'unité
         produitDTO.setNomCategorie(produit.getCategorie() != null ? produit.getCategorie().getNom() : null);

@@ -24,7 +24,7 @@ public class StockController {
     private StockService stockService;
 
     // Ajouter un stock à une boutique (seul l'admin peut le faire)
-    @PostMapping("/ajouterStock")
+    /*@PostMapping("/ajouterStock")
     public ResponseEntity<Stock> ajouterStock(
             HttpServletRequest request,
             @RequestParam Long boutiqueId,
@@ -48,6 +48,8 @@ public class StockController {
 
         // Retourner la liste des stocks
         return ResponseEntity.ok(stocks);
-    }
+    }*/
+
+    
 
 }

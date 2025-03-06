@@ -1,5 +1,6 @@
 package com.xpertcash.controller;
 
+import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -18,8 +19,11 @@ import com.xpertcash.composant.AuthorizationService;
 import com.xpertcash.configuration.JwtUtil;
 import com.xpertcash.entity.Produit;
 import com.xpertcash.entity.RoleType;
+import com.xpertcash.entity.Stock;
 import com.xpertcash.entity.User;
 import com.xpertcash.exceptions.DuplicateProductException;
+import com.xpertcash.repository.ProduitRepository;
+import com.xpertcash.repository.StockRepository;
 import com.xpertcash.repository.UsersRepository;
 import com.xpertcash.service.ProduitService;
 import com.xpertcash.service.UsersService;
@@ -45,6 +49,10 @@ public class ProduitController {
     private UsersRepository usersRepository;
     @Autowired
     private ImageStorageService imageStorageService;
+    @Autowired
+    private ProduitRepository produitRepository;
+    @Autowired
+    private StockRepository stockRepository;
 
 
    /* @Autowired
@@ -106,12 +114,12 @@ public class ProduitController {
         }
     }
 
-    //Endpoint Update Produit
+    // Endpoint Update Produit
     @PatchMapping(value = "/updateProduit/{produitId}", consumes = { MediaType.MULTIPART_FORM_DATA_VALUE })
     public ResponseEntity<?> updateProduit(
             @PathVariable Long produitId,
-            @RequestPart("produit") String produitJson,  // Produit JSON en tant que part
-            @RequestPart(value = "image", required = false) MultipartFile imageFile,  // Image en tant que part (optionnelle)
+            @RequestPart("produit") String produitJson,
+            @RequestPart(value = "image", required = false) MultipartFile imageFile,
             @RequestParam boolean addToStock,  // Ajout au stock
             @RequestHeader("Authorization") String token,
             HttpServletRequest request) {
@@ -123,27 +131,51 @@ public class ProduitController {
                 System.out.println("❌ Aucune image reçue !");
             }
     
-            // Convertir le JSON en objet ProduitRequest
             ObjectMapper objectMapper = new ObjectMapper();
             ProduitRequest produitRequest = objectMapper.readValue(produitJson, ProduitRequest.class);
     
-            // Sauvegarde de l'image si elle est présente
             String photo = null;
             if (imageFile != null && !imageFile.isEmpty()) {
-                photo = imageStorageService.saveImage(imageFile);  // Utilisation du service pour stocker l'image
+                photo = imageStorageService.saveImage(imageFile);
                 System.out.println("URL enregistrée dans photo : " + photo);
             }
     
-            produitRequest.setPhoto(photo);  // Assigner l'URL de l'image au produit
+            produitRequest.setPhoto(photo);
     
-            // Mise à jour du produit via le service
-            ProduitDTO updatedProduitDTO = produitService.updateProduct(produitId, produitRequest, addToStock, request);
+            // Mise à jour du produit
+            Produit produit = produitRepository.findById(produitId)
+                    .orElseThrow(() -> new RuntimeException("Produit non trouvé"));
+            produit.setNom(produitRequest.getNom());
+            produit.setQuantite(produitRequest.getQuantite());
+            produitRepository.save(produit);
     
-            // Retourner le produit mis à jour avec son DTO
-            return ResponseEntity.status(HttpStatus.OK).body(updatedProduitDTO);
+            // Mise à jour du stock associé
+            Stock stock = stockRepository.findByProduit(produit);
+            if (stock == null) {
+                stock = new Stock();
+                stock.setProduit(produit);
+                stock.setBoutique(produit.getBoutique());
+                stock.setCreatedAt(LocalDateTime.now());
+            }
+    
+            // Mise à jour du stock
+            stock.setStockActuel(produit.getQuantite());
+    
+            stock.setQuantiteAjoute(0);
+            stock.setQuantiteRetirer(0);
+            //com
+    
+            // Calculer stockApres
+            stock.setStockApres(stock.getStockActuel() + stock.getQuantiteAjoute());
+    
+            // Mettre à jour la date de mise à jour du stock
+            stock.setLastUpdated(LocalDateTime.now());
+    
+            stockRepository.save(stock);
+    
+            return ResponseEntity.status(HttpStatus.OK).body(produit);
     
         } catch (Exception e) {
-            // Gestion des erreurs
             e.printStackTrace();
             Map<String, String> errorResponse = new HashMap<>();
             errorResponse.put("error", "Une erreur est survenue lors de la mise à jour du produit : " + e.getMessage());
@@ -152,7 +184,7 @@ public class ProduitController {
     }
     
         //Endpoint pour Supprime le produit s’il n'est pas en stock
-            @DeleteMapping("/deleteProduit/{produitId}")
+        @DeleteMapping("/deleteProduit/{produitId}")
         public ResponseEntity<String> deleteProduit(@PathVariable Long produitId) {
             try {
                 produitService.deleteProduit(produitId);
@@ -161,7 +193,6 @@ public class ProduitController {
                 return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
             }
         }
-
 
         //Endpoint pour Supprimer uniquement le stock
         @DeleteMapping("/deleteStock/{produitId}")
@@ -175,7 +206,6 @@ public class ProduitController {
         }
 
         //Lister les produit
-
         @GetMapping("/produits/{boutiqueId}/stock")
         public ResponseEntity<?> getProduitsParStock(@PathVariable Long boutiqueId) {
             try {
@@ -215,4 +245,58 @@ public class ProduitController {
         }
         
 
+        //Endpoint pour ajuster la quantiter du produit en stock
+        @PatchMapping(value = "/ajouterStock/{produitId}", consumes = { MediaType.MULTIPART_FORM_DATA_VALUE })
+        public ResponseEntity<?> ajouterStock(
+                @PathVariable Long produitId,
+                @RequestPart(value = "stock") String stockJson, 
+                @RequestHeader("Authorization") String token) {
+            try {
+                if (stockJson == null || stockJson.isEmpty()) {
+                    return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                            .body("Erreur : Le champ 'stock' est obligatoire.");
+                }
+        
+                ObjectMapper objectMapper = new ObjectMapper();
+                Stock stockRequest = objectMapper.readValue(stockJson, Stock.class);
+        
+                Stock updatedStock = produitService.ajouterStock(produitId, stockRequest.getQuantiteAjoute());
+        
+                return ResponseEntity.status(HttpStatus.OK).body(updatedStock);
+        
+            } catch (Exception e) {
+                e.printStackTrace();
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                        .body("Une erreur est survenue lors de l'ajout du stock : " + e.getMessage());
+            }
+        }
+        
+
+
+        //Endpoint pour retirer la quantiter du produit en stock
+        @PatchMapping(value = "/retirerStock/{produitId}", consumes = { MediaType.MULTIPART_FORM_DATA_VALUE })
+        public ResponseEntity<?> retirerStock(
+                @PathVariable Long produitId,
+                @RequestPart(value = "stock") String stockJson, 
+                @RequestHeader("Authorization") String token) {
+            try {
+                if (stockJson == null || stockJson.isEmpty()) {
+                    return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                            .body("Erreur : Le champ 'stock' est obligatoire.");
+                }
+        
+                ObjectMapper objectMapper = new ObjectMapper();
+                Stock stockRequest = objectMapper.readValue(stockJson, Stock.class);
+        
+                Stock updatedStock = produitService.retirerStock(produitId, stockRequest.getQuantiteRetirer());
+        
+                return ResponseEntity.status(HttpStatus.OK).body(updatedStock);
+        
+            } catch (Exception e) {
+                e.printStackTrace();
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                        .body("Une erreur est survenue lors de reduction du stock : " + e.getMessage());
+            }
+        }
+        
 }

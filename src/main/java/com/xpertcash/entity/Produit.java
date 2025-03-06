@@ -1,8 +1,9 @@
 package com.xpertcash.entity;
 import java.time.LocalDateTime;
-
+import java.util.List;
 
 import com.fasterxml.jackson.annotation.JsonBackReference;
+import com.fasterxml.jackson.annotation.JsonManagedReference;
 
 import jakarta.persistence.*;
 import lombok.Data;
@@ -33,7 +34,7 @@ public class Produit {
 
     @ManyToOne 
     @JoinColumn(name = "boutique_id")
-    @JsonBackReference
+    @JsonBackReference("produit-boutique")
     private Boutique boutique; 
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -43,6 +44,10 @@ public class Produit {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "unite_id", nullable = true)
     private Unite uniteDeMesure;
+
+    @OneToMany(mappedBy = "produit")
+    @JsonManagedReference("produit-stock")
+    private List<Stock> stocks;
 
  
 

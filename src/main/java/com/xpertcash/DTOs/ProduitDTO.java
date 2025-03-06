@@ -10,6 +10,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 @Data
+@JsonIgnoreProperties(ignoreUnknown = true)
 @AllArgsConstructor
 @NoArgsConstructor
 public class ProduitDTO {
@@ -45,4 +46,5 @@ public class ProduitDTO {
 
     private LocalDateTime createdAt;
     private LocalDateTime lastUpdated;
+    
 }
