@@ -201,7 +201,7 @@ public class ProduitService {
     
 
     //Methode pour ajuster la quantiter du produit en stock
-    public Stock ajouterStock(Long produitId, Integer quantiteAjoute) {
+    public Stock ajouterStock(Long produitId, Integer quantiteAjoute, String descriptionAjout) {
         Produit produit = produitRepository.findById(produitId)
                 .orElseThrow(() -> new RuntimeException("Produit non trouvé"));
     
@@ -220,6 +220,11 @@ public class ProduitService {
         stock.setQuantiteAjoute(quantiteAjoute);
         stock.setStockApres(stock.getStockActuel());
         stock.setLastUpdated(LocalDateTime.now());
+
+        // Si une description est fournie, on l'ajoute
+        if (descriptionAjout != null && !descriptionAjout.isEmpty()) {
+            stock.setDescriptionAjout(descriptionAjout);
+        }
     
         stockRepository.save(stock);
     
@@ -227,7 +232,7 @@ public class ProduitService {
     }
     
     //Methode pour reduire la quantiter du produit en stock
-    public Stock retirerStock(Long produitId, Integer quantiteRetirer) {
+    public Stock retirerStock(Long produitId, Integer quantiteRetirer, String descriptionRetire) {
         Produit produit = produitRepository.findById(produitId)
                 .orElseThrow(() -> new RuntimeException("Produit non trouvé"));
     
@@ -250,6 +255,11 @@ public class ProduitService {
         stock.setQuantiteRetirer(quantiteRetirer);
         stock.setStockApres(stock.getStockActuel());
         stock.setLastUpdated(LocalDateTime.now());
+
+        // Si une description est fournie, on l'ajoute
+        if (descriptionRetire != null && !descriptionRetire.isEmpty()) {
+            stock.setDescriptionRetire(descriptionRetire);
+        }
     
         stockRepository.save(stock);
     

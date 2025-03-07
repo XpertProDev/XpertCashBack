@@ -305,8 +305,9 @@ public class ProduitController {
         
                 ObjectMapper objectMapper = new ObjectMapper();
                 Stock stockRequest = objectMapper.readValue(stockJson, Stock.class);
+                String description = stockRequest.getDescriptionAjout() != null ? stockRequest.getDescriptionAjout() : null;
         
-                Stock updatedStock = produitService.ajouterStock(produitId, stockRequest.getQuantiteAjoute());
+                Stock updatedStock = produitService.ajouterStock(produitId, stockRequest.getQuantiteAjoute(), description);
         
                 return ResponseEntity.status(HttpStatus.OK).body(updatedStock);
         
@@ -333,8 +334,10 @@ public class ProduitController {
         
                 ObjectMapper objectMapper = new ObjectMapper();
                 Stock stockRequest = objectMapper.readValue(stockJson, Stock.class);
+
+                String descriptionRetire = stockRequest.getDescriptionRetire() != null ? stockRequest.getDescriptionRetire() : null;
         
-                Stock updatedStock = produitService.retirerStock(produitId, stockRequest.getQuantiteRetirer());
+                Stock updatedStock = produitService.retirerStock(produitId, stockRequest.getQuantiteRetirer(), descriptionRetire);
         
                 return ResponseEntity.status(HttpStatus.OK).body(updatedStock);
         
