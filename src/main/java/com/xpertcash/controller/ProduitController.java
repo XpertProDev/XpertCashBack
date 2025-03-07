@@ -164,19 +164,18 @@ public class ProduitController {
             if (produitRequest.getPhoto() != null) produit.setPhoto(produitRequest.getPhoto());
             if (produitRequest.getCodeBare() != null) produit.setCodeBare(produitRequest.getCodeBare());
 
-               // Mise à jour de la catégorie si nécessaire
-        if (produitRequest.getCategorieId() != null) {
-            Categorie categorie = categorieRepository.findById(produitRequest.getCategorieId())
-                    .orElseThrow(() -> new RuntimeException("Catégorie non trouvée"));
-            produit.setCategorie(categorie);
-        }
 
-        // Mise à jour de l'unité si nécessaire
-        if (produitRequest.getUniteId() != null) {
-            Unite unite = uniteRepository.findById(produitRequest.getUniteId())
-                    .orElseThrow(() -> new RuntimeException("Unité de mesure non trouvée"));
-            produit.setUniteDeMesure(unite);
-        }
+            if (produitRequest.getCategorieId() != null) {
+                Categorie categorie = categorieRepository.findById(produitRequest.getCategorieId())
+                        .orElseThrow(() -> new RuntimeException("Catégorie non trouvée"));
+                produit.setCategorie(categorie);
+            }
+
+            if (produitRequest.getUniteId() != null) {
+                Unite unite = uniteRepository.findById(produitRequest.getUniteId())
+                        .orElseThrow(() -> new RuntimeException("Unité de mesure non trouvée"));
+                produit.setUniteDeMesure(unite);
+            }
     
             produitRepository.saveAndFlush(produit);
             System.out.println("✅ Produit mis à jour avec succès !");

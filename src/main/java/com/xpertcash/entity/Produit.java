@@ -3,6 +3,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 import com.fasterxml.jackson.annotation.JsonBackReference;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonManagedReference;
 
 import jakarta.persistence.*;
@@ -39,10 +40,12 @@ public class Produit {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "categorie_id", nullable = true)
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
     private Categorie categorie;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "unite_id", nullable = true)
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
     private Unite uniteDeMesure;
 
     @OneToMany(mappedBy = "produit")

@@ -293,6 +293,7 @@ public class ProduitService {
     if (produitRequest.getPrixVente() != null) produit.setPrixVente(produitRequest.getPrixVente());
     if (produitRequest.getPrixAchat() != null) produit.setPrixAchat(produitRequest.getPrixAchat());
     if (produitRequest.getQuantite() != null) produit.setQuantite(produitRequest.getQuantite());
+    if (produitRequest.getCodeBare() != null) produit.setCodeBare(produitRequest.getCodeBare());
     if (produitRequest.getSeuilAlert() != null) {
         produit.setSeuilAlert(produitRequest.getSeuilAlert());
         System.out.println("Seuil d'alerte mis à jour : " + produit.getSeuilAlert());
