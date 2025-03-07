@@ -28,7 +28,7 @@ public class ProduitDTO {
     //@Positive(message = "Le prix d'achat doit être positif")
     private Double prixAchat;
 
-    @NotNull(message = "La quantité est obligatoire")
+//    @NotNull(message = "La quantité est obligatoire")
     //@Positive(message = "La quantité doit être positive")
     private Integer quantite;
 
