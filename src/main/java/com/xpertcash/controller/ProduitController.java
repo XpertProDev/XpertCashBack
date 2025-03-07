@@ -17,13 +17,17 @@ import com.xpertcash.DTOs.ProduitDTO;
 import com.xpertcash.DTOs.ProduitRequest;
 import com.xpertcash.composant.AuthorizationService;
 import com.xpertcash.configuration.JwtUtil;
+import com.xpertcash.entity.Categorie;
 import com.xpertcash.entity.Produit;
 import com.xpertcash.entity.RoleType;
 import com.xpertcash.entity.Stock;
+import com.xpertcash.entity.Unite;
 import com.xpertcash.entity.User;
 import com.xpertcash.exceptions.DuplicateProductException;
+import com.xpertcash.repository.CategorieRepository;
 import com.xpertcash.repository.ProduitRepository;
 import com.xpertcash.repository.StockRepository;
+import com.xpertcash.repository.UniteRepository;
 import com.xpertcash.repository.UsersRepository;
 import com.xpertcash.service.ProduitService;
 import com.xpertcash.service.UsersService;
@@ -53,6 +57,10 @@ public class ProduitController {
     private ProduitRepository produitRepository;
     @Autowired
     private StockRepository stockRepository;
+    @Autowired
+    private CategorieRepository categorieRepository;
+    @Autowired
+    private UniteRepository uniteRepository;
 
 
    /* @Autowired
@@ -154,6 +162,20 @@ public class ProduitController {
             if (produitRequest.getDescription() != null) produit.setDescription(produitRequest.getDescription());
             if (produitRequest.getSeuilAlert() != null) produit.setSeuilAlert(produitRequest.getSeuilAlert());
             if (produitRequest.getPhoto() != null) produit.setPhoto(produitRequest.getPhoto());
+
+               // Mise à jour de la catégorie si nécessaire
+        if (produitRequest.getCategorieId() != null) {
+            Categorie categorie = categorieRepository.findById(produitRequest.getCategorieId())
+                    .orElseThrow(() -> new RuntimeException("Catégorie non trouvée"));
+            produit.setCategorie(categorie);
+        }
+
+        // Mise à jour de l'unité si nécessaire
+        if (produitRequest.getUniteId() != null) {
+            Unite unite = uniteRepository.findById(produitRequest.getUniteId())
+                    .orElseThrow(() -> new RuntimeException("Unité de mesure non trouvée"));
+            produit.setUniteDeMesure(unite);
+        }
     
             produitRepository.saveAndFlush(produit);
             System.out.println("✅ Produit mis à jour avec succès !");

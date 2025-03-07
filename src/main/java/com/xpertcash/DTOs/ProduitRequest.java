@@ -22,5 +22,9 @@ public class ProduitRequest {
     private String codeBare;
     private String photo;
     private Boolean enStock;
+
+    // Nouveaux attributs pour afficher les noms
+    private String nomCategorie;
+    private String nomUnite;
 }
 
