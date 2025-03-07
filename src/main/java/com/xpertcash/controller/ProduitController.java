@@ -120,63 +120,86 @@ public class ProduitController {
             @PathVariable Long produitId,
             @RequestPart("produit") String produitJson,
             @RequestPart(value = "image", required = false) MultipartFile imageFile,
-            @RequestParam boolean addToStock,  // Ajout au stock
+            @RequestParam boolean addToStock,
             @RequestHeader("Authorization") String token,
             HttpServletRequest request) {
         try {
+            System.out.println("🔄 Début de la mise à jour du produit ID: " + produitId);
+    
             // Vérification de l'image reçue
             if (imageFile != null) {
-                System.out.println("📷 Image reçue avec succès : " + imageFile.getOriginalFilename());
+                System.out.println("📷 Image reçue : " + imageFile.getOriginalFilename());
             } else {
                 System.out.println("❌ Aucune image reçue !");
             }
     
+            // Désérialisation de l'objet JSON en ProduitRequest
             ObjectMapper objectMapper = new ObjectMapper();
             ProduitRequest produitRequest = objectMapper.readValue(produitJson, ProduitRequest.class);
     
-            String photo = null;
-            if (imageFile != null && !imageFile.isEmpty()) {
-                photo = imageStorageService.saveImage(imageFile);
-                System.out.println("URL enregistrée dans photo : " + photo);
-            }
-    
-            produitRequest.setPhoto(photo);
-    
-            // Mise à jour du produit
+            // Vérification si le produit existe
             Produit produit = produitRepository.findById(produitId)
-                    .orElseThrow(() -> new RuntimeException("Produit non trouvé"));
-            produit.setNom(produitRequest.getNom());
-            produit.setQuantite(produitRequest.getQuantite());
-            produitRepository.save(produit);
+                    .orElseThrow(() -> new RuntimeException("❌ Produit non trouvé !"));
     
-            // Mise à jour du stock associé
-            Stock stock = stockRepository.findByProduit(produit);
-            if (stock == null) {
-                stock = new Stock();
-                stock.setProduit(produit);
-                stock.setBoutique(produit.getBoutique());
-                stock.setCreatedAt(LocalDateTime.now());
+            // Gestion de l'image
+            if (imageFile != null && !imageFile.isEmpty()) {
+                String photo = imageStorageService.saveImage(imageFile);
+                produitRequest.setPhoto(photo);
+                System.out.println("📸 URL de l'image enregistrée : " + photo);
             }
     
-            // Mise à jour du stock
-            stock.setStockActuel(produit.getQuantite());
+            // Mise à jour des champs du produit
+            if (produitRequest.getNom() != null) produit.setNom(produitRequest.getNom());
+            if (produitRequest.getQuantite() != null) produit.setQuantite(produitRequest.getQuantite());
+            if (produitRequest.getDescription() != null) produit.setDescription(produitRequest.getDescription());
+            if (produitRequest.getSeuilAlert() != null) produit.setSeuilAlert(produitRequest.getSeuilAlert());
+            if (produitRequest.getPhoto() != null) produit.setPhoto(produitRequest.getPhoto());
     
-            stock.setQuantiteAjoute(0);
-            stock.setQuantiteRetirer(0);
-            //com
+            produitRepository.saveAndFlush(produit);
+            System.out.println("✅ Produit mis à jour avec succès !");
     
-            // Calculer stockApres
-            stock.setStockApres(stock.getStockActuel() + stock.getQuantiteAjoute());
+            // Gestion du stock
+            Stock stock = stockRepository.findByProduit(produit);
+            if (addToStock) {
+                if (stock == null) {
+                    stock = new Stock();
+                    stock.setProduit(produit);
+                    stock.setBoutique(produit.getBoutique());
+                    stock.setCreatedAt(LocalDateTime.now());
+                }
     
-            // Mettre à jour la date de mise à jour du stock
-            stock.setLastUpdated(LocalDateTime.now());
+                 // Si la quantité est modifiée, réinitialiser les valeurs du stock
+                if (produitRequest.getQuantite() != null) {
+                    stock.setStockActuel(produitRequest.getQuantite());
+                    stock.setQuantiteAjoute(0);
+                    stock.setQuantiteRetirer(0);
+                    stock.setStockApres(stock.getStockActuel());
+                }
+                if (produitRequest.getSeuilAlert() != null) {
+                    stock.setSeuilAlert(produitRequest.getSeuilAlert());
+                    System.out.println("🔔 Seuil d'alerte mis à jour : " + stock.getSeuilAlert());
+                }
     
-            stockRepository.save(stock);
+                stock.setLastUpdated(LocalDateTime.now());
+                stockRepository.save(stock);
+                produit.setEnStock(true);
+            } else {
+                // Suppression du stock si `addToStock` est `false`
+                if (stock != null) {
+                    stockRepository.delete(stock);
+                    System.out.println("🗑️ Stock supprimé !");
+                }
+                produit.setEnStock(false);
+            }
+    
+            produitRepository.saveAndFlush(produit);
+            System.out.println("✅ Stock mis à jour avec succès !");
     
             return ResponseEntity.status(HttpStatus.OK).body(produit);
-    
         } catch (Exception e) {
             e.printStackTrace();
+            System.err.println("❌ Erreur lors de la mise à jour du produit : " + e.getMessage());
+    
             Map<String, String> errorResponse = new HashMap<>();
             errorResponse.put("error", "Une erreur est survenue lors de la mise à jour du produit : " + e.getMessage());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
