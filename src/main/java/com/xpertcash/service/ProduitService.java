@@ -436,6 +436,9 @@ public class ProduitService {
         }
     }
     
+    public List<Stock> getAllStocks() {
+        return stockRepository.findAll();
+    }
 
     //Lister Produit par boutique
     public List<ProduitDTO> getProduitsParStock(Long boutiqueId) {

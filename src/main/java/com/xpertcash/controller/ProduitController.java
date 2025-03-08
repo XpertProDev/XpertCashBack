@@ -1,6 +1,7 @@
 package com.xpertcash.controller;
 
 import java.time.LocalDateTime;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -350,5 +351,20 @@ public class ProduitController {
                         .body("Une erreur est survenue lors de reduction du stock : " + e.getMessage());
             }
         }
-        
+  
+        //Endpoint List des Stock
+
+        @GetMapping("/getAllStock")
+        public ResponseEntity<List<Stock>> getAllStocks() {
+            try {
+                List<Stock> stocks = produitService.getAllStocks();
+                if (stocks.isEmpty()) {
+                    return ResponseEntity.status(HttpStatus.NO_CONTENT).body(stocks);
+                }
+                return ResponseEntity.status(HttpStatus.OK).body(stocks);
+            } catch (Exception e) {
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                        .body(Collections.emptyList());
+            }
+        }
 }
