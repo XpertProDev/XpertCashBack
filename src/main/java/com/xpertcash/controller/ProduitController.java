@@ -16,12 +16,14 @@ import org.springframework.web.multipart.MultipartFile;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.xpertcash.DTOs.ProduitDTO;
 import com.xpertcash.DTOs.ProduitRequest;
+import com.xpertcash.DTOs.StockHistoryDTO;
 import com.xpertcash.composant.AuthorizationService;
 import com.xpertcash.configuration.JwtUtil;
 import com.xpertcash.entity.Categorie;
 import com.xpertcash.entity.Produit;
 import com.xpertcash.entity.RoleType;
 import com.xpertcash.entity.Stock;
+import com.xpertcash.entity.StockHistory;
 import com.xpertcash.entity.Unite;
 import com.xpertcash.entity.User;
 import com.xpertcash.exceptions.DuplicateProductException;
@@ -300,7 +302,7 @@ public class ProduitController {
         public ResponseEntity<?> ajouterStock(
                 @PathVariable Long produitId,
                 @RequestPart(value = "stock") String stockJson, 
-                @RequestHeader("Authorization") String token) {
+                @RequestHeader("Authorization") String token, HttpServletRequest request) {
             try {
                 if (stockJson == null || stockJson.isEmpty()) {
                     return ResponseEntity.status(HttpStatus.BAD_REQUEST)
@@ -311,7 +313,7 @@ public class ProduitController {
                 Stock stockRequest = objectMapper.readValue(stockJson, Stock.class);
                 String description = stockRequest.getDescriptionAjout() != null ? stockRequest.getDescriptionAjout() : null;
         
-                Stock updatedStock = produitService.ajouterStock(produitId, stockRequest.getQuantiteAjoute(), description);
+                Stock updatedStock = produitService.ajouterStock(produitId, stockRequest.getQuantiteAjoute(), description, request);
         
                 return ResponseEntity.status(HttpStatus.OK).body(updatedStock);
         
@@ -321,7 +323,18 @@ public class ProduitController {
                         .body("Une erreur est survenue lors de l'ajout du stock : " + e.getMessage());
             }
         }
-        
+
+            // Endpoint Stock Historique
+            @GetMapping("/stockhistorique/{produitId}")
+            public ResponseEntity<List<StockHistoryDTO>> getStockHistory(@PathVariable Long produitId) {
+                try {
+                    List<StockHistoryDTO> stockHistoryDTOs = produitService.getStockHistory(produitId);
+                    return ResponseEntity.ok(stockHistoryDTOs);
+                } catch (Exception e) {
+                    return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
+                }
+            }
+
 
 
         //Endpoint pour retirer la quantiter du produit en stock

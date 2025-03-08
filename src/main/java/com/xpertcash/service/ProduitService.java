@@ -5,23 +5,28 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import com.xpertcash.DTOs.ProduitDTO;
 import com.xpertcash.DTOs.ProduitRequest;
+import com.xpertcash.DTOs.StockHistoryDTO;
+import com.xpertcash.DTOs.USER.UserRequest;
 import com.xpertcash.configuration.JwtUtil;
 import com.xpertcash.entity.Boutique;
 import com.xpertcash.entity.Categorie;
 import com.xpertcash.entity.Produit;
 import com.xpertcash.entity.RoleType;
 import com.xpertcash.entity.Stock;
+import com.xpertcash.entity.StockHistory;
 import com.xpertcash.entity.Unite;
 import com.xpertcash.entity.User;
 import com.xpertcash.repository.BoutiqueRepository;
 import com.xpertcash.repository.CategorieRepository;
 import com.xpertcash.repository.ProduitRepository;
+import com.xpertcash.repository.StockHistoryRepository;
 import com.xpertcash.repository.StockRepository;
 import com.xpertcash.repository.UniteRepository;
 import com.xpertcash.repository.UsersRepository;
@@ -46,10 +51,15 @@ public class ProduitService {
 
     @Autowired
     private StockRepository stockRepository;
+
     @Autowired
     private CategorieRepository categorieRepository;
+
     @Autowired
     private UniteRepository uniteRepository;
+  
+    @Autowired
+    private StockHistoryRepository stockHistoryRepository;
 
 
     // Ajouter un produit à la liste sans le stock
@@ -201,7 +211,19 @@ public class ProduitService {
     
 
     //Methode pour ajuster la quantiter du produit en stock
-    public Stock ajouterStock(Long produitId, Integer quantiteAjoute, String descriptionAjout) {
+    public Stock ajouterStock(Long produitId, Integer quantiteAjoute, String descriptionAjout, HttpServletRequest request) {
+        // Récupérer le token JWT depuis le header "Authorization"
+        String token = request.getHeader("Authorization");
+        if (token == null || !token.startsWith("Bearer ")) {
+            throw new RuntimeException("Token JWT manquant ou mal formaté");
+        }
+
+        String jwtToken = token.substring(7);
+        Long userId = jwtUtil.extractUserId(jwtToken);
+
+        User user = usersRepository.findById(userId)
+        .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+
         Produit produit = produitRepository.findById(produitId)
                 .orElseThrow(() -> new RuntimeException("Produit non trouvé"));
     
@@ -209,6 +231,8 @@ public class ProduitService {
         if (stock == null) {
             throw new RuntimeException("Stock introuvable pour ce produit");
         }
+
+        int stockAvant = stock.getStockActuel();
     
         // Mettre à jour la quantité du produit
         int nouvelleQuantiteProduit = produit.getQuantite() + quantiteAjoute;
@@ -227,6 +251,21 @@ public class ProduitService {
         }
     
         stockRepository.save(stock);
+
+         // Enregistrer l’historique du mouvement (ajout)
+         StockHistory stockHistory = new StockHistory();
+        stockHistory.setAction("Ajout sur quantité");
+        stockHistory.setQuantite(quantiteAjoute);
+        stockHistory.setStockAvant(stockAvant);
+        stockHistory.setStockApres(stock.getStockActuel());
+        stockHistory.setDescription(descriptionAjout);
+        stockHistory.setCreatedAt(LocalDateTime.now());
+        stockHistory.setStock(stock);
+        stockHistory.setUser(user);
+
+        // Sauvegarder l'historique
+        stockHistoryRepository.save(stockHistory);
+      
     
         return stock;
     }
@@ -265,6 +304,49 @@ public class ProduitService {
     
         return stock;
     }
+    
+
+    //Methode liste Historique sur Stock
+    public List<StockHistoryDTO> getStockHistory(Long produitId) {
+        // Récupérer le produit depuis la base de données
+        Produit produit = produitRepository.findById(produitId)
+                .orElseThrow(() -> new RuntimeException("Produit non trouvé"));
+    
+        // Récupérer le stock lié au produit
+        Stock stock = stockRepository.findByProduit(produit);
+        if (stock == null) {
+            throw new RuntimeException("Stock introuvable pour ce produit");
+        }
+    
+        // Récupérer l'historique des mouvements de stock pour ce produit
+        List<StockHistory> stockHistories = stockHistoryRepository.findByStock(stock);
+    
+        // Mapper les StockHistory en StockHistoryDTO
+        List<StockHistoryDTO> stockHistoryDTOs = stockHistories.stream()
+                .map(stockHistory -> {
+                    StockHistoryDTO dto = new StockHistoryDTO();
+                    dto.setId(stockHistory.getId());
+                    dto.setAction(stockHistory.getAction());
+                    dto.setQuantite(stockHistory.getQuantite());
+                    dto.setStockAvant(stockHistory.getStockAvant());
+                    dto.setStockApres(stockHistory.getStockApres());
+                    dto.setDescription(stockHistory.getDescription());
+                    dto.setCreatedAt(stockHistory.getCreatedAt());
+    
+                    // Mapper seulement nomComplet et phone de l'utilisateur dans le DTO
+                    User user = stockHistory.getUser();
+                    if (user != null) {
+                        dto.setNomComplet(user.getNomComplet());
+                        dto.setPhone(user.getPhone());
+                    }
+                    
+                    return dto;
+                })
+                .collect(Collectors.toList());
+    
+        return stockHistoryDTOs;
+    }
+    
     
     
     
