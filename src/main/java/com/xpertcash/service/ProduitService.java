@@ -197,11 +197,9 @@ public class ProduitService {
     
         return code;
     }
-    
-    
 
     //Methode pour ajuster la quantiter du produit en stock
-    public Stock ajouterStock(Long produitId, Integer quantiteAjoute) {
+    public Stock ajouterStock(Long produitId, Integer quantiteAjoute, String descriptionAjout) {
         Produit produit = produitRepository.findById(produitId)
                 .orElseThrow(() -> new RuntimeException("Produit non trouvé"));
     
@@ -220,6 +218,11 @@ public class ProduitService {
         stock.setQuantiteAjoute(quantiteAjoute);
         stock.setStockApres(stock.getStockActuel());
         stock.setLastUpdated(LocalDateTime.now());
+
+        // Si une description est fournie, on l'ajoute
+        if (descriptionAjout != null && !descriptionAjout.isEmpty()) {
+            stock.setDescriptionAjout(descriptionAjout);
+        }
     
         stockRepository.save(stock);
     
@@ -227,7 +230,7 @@ public class ProduitService {
     }
     
     //Methode pour reduire la quantiter du produit en stock
-    public Stock retirerStock(Long produitId, Integer quantiteRetirer) {
+    public Stock retirerStock(Long produitId, Integer quantiteRetirer, String descriptionRetire) {
         Produit produit = produitRepository.findById(produitId)
                 .orElseThrow(() -> new RuntimeException("Produit non trouvé"));
     
@@ -250,18 +253,19 @@ public class ProduitService {
         stock.setQuantiteRetirer(quantiteRetirer);
         stock.setStockApres(stock.getStockActuel());
         stock.setLastUpdated(LocalDateTime.now());
+
+        // Si une description est fournie, on l'ajoute
+        if (descriptionRetire != null && !descriptionRetire.isEmpty()) {
+            stock.setDescriptionRetire(descriptionRetire);
+        }
     
         stockRepository.save(stock);
     
         return stock;
     }
-    
-    
-    
 
-    
-   // Update Produit
-   public ProduitDTO updateProduct(Long produitId, ProduitRequest produitRequest, boolean addToStock, HttpServletRequest request) {
+    // Update Produit
+    public ProduitDTO updateProduct(Long produitId, ProduitRequest produitRequest, boolean addToStock, HttpServletRequest request) {
     // Vérification de l'autorisation de l'admin
     String token = request.getHeader("Authorization");
     if (token == null || !token.startsWith("Bearer ")) {
@@ -384,7 +388,6 @@ public class ProduitService {
     return produitDTO;
 }
 
-
     //Methoce Supprime le produit s’il n'est pas en stock
     public void deleteProduit(Long produitId) {
         Produit produit = produitRepository.findById(produitId)
@@ -403,10 +406,8 @@ public class ProduitService {
         produitRepository.delete(produit);
         System.out.println("✅ Produit supprimé avec succès !");
     }
-    
 
     //Methoce Supprimer uniquement le stock
-
     public void deleteStock(Long produitId) {
         Produit produit = produitRepository.findById(produitId)
                 .orElseThrow(() -> new RuntimeException("Produit non trouvé"));
@@ -425,7 +426,6 @@ public class ProduitService {
             throw new RuntimeException("Aucun stock trouvé pour ce produit !");
         }
     }
-    
 
     //Lister Produit par boutique
     public List<ProduitDTO> getProduitsParStock(Long boutiqueId) {
@@ -478,8 +478,6 @@ public class ProduitService {
 
         return produitDTO;
     }
-
-
 
     //Methode Total des Produit:
     public Map<String, Integer> getTotalQuantitesParStock(Long boutiqueId) {

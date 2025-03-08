@@ -17,6 +17,9 @@ public class Stock {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    private String descriptionAjout;
+    private String descriptionRetire;
+
     private Integer stockActuel = 0;
     private Integer quantiteAjoute = 0;
     private Integer quantiteRetirer = 0;
