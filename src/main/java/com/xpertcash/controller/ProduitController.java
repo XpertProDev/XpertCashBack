@@ -334,7 +334,7 @@ public class ProduitController {
                     return ResponseEntity.status(HttpStatus.NOT_FOUND)
                             .body(Collections.singletonMap("message", "Produit non trouvé avec l'ID : " + produitId));
                 } catch (RuntimeException e) {
-                    return ResponseEntity.status(HttpStatus.OK) // Utilisation de 200 OK car ce n'est pas une erreur serveur
+                    return ResponseEntity.status(HttpStatus.OK)
                             .body(Collections.singletonMap("message", e.getMessage()));
                 }
             }
