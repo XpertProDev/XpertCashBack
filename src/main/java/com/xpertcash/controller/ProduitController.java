@@ -5,6 +5,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.NoSuchElementException;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -235,7 +236,7 @@ public class ProduitController {
     }
     
         //Endpoint pour Supprime le produit s’il n'est pas en stock
-            @DeleteMapping("/deleteProduit/{produitId}")
+        @DeleteMapping("/deleteProduit/{produitId}")
         public ResponseEntity<String> deleteProduit(@PathVariable Long produitId) {
             try {
                 produitService.deleteProduit(produitId);
@@ -244,7 +245,6 @@ public class ProduitController {
                 return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
             }
         }
-
 
         //Endpoint pour Supprimer uniquement le stock
         @DeleteMapping("/deleteStock/{produitId}")
@@ -326,14 +326,19 @@ public class ProduitController {
 
             // Endpoint Stock Historique
             @GetMapping("/stockhistorique/{produitId}")
-            public ResponseEntity<List<StockHistoryDTO>> getStockHistory(@PathVariable Long produitId) {
+            public ResponseEntity<?> getStockHistory(@PathVariable Long produitId) {
                 try {
                     List<StockHistoryDTO> stockHistoryDTOs = produitService.getStockHistory(produitId);
                     return ResponseEntity.ok(stockHistoryDTOs);
-                } catch (Exception e) {
-                    return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
+                } catch (NoSuchElementException e) {
+                    return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                            .body(Collections.singletonMap("message", "Produit non trouvé avec l'ID : " + produitId));
+                } catch (RuntimeException e) {
+                    return ResponseEntity.status(HttpStatus.OK) // Utilisation de 200 OK car ce n'est pas une erreur serveur
+                            .body(Collections.singletonMap("message", e.getMessage()));
                 }
             }
+            
 
 
 
@@ -342,7 +347,8 @@ public class ProduitController {
         public ResponseEntity<?> retirerStock(
                 @PathVariable Long produitId,
                 @RequestPart(value = "stock") String stockJson, 
-                @RequestHeader("Authorization") String token) {
+                @RequestHeader("Authorization") String token,
+                HttpServletRequest request) {
             try {
                 if (stockJson == null || stockJson.isEmpty()) {
                     return ResponseEntity.status(HttpStatus.BAD_REQUEST)
@@ -354,7 +360,7 @@ public class ProduitController {
 
                 String descriptionRetire = stockRequest.getDescriptionRetire() != null ? stockRequest.getDescriptionRetire() : null;
         
-                Stock updatedStock = produitService.retirerStock(produitId, stockRequest.getQuantiteRetirer(), descriptionRetire);
+                Stock updatedStock = produitService.retirerStock(produitId, stockRequest.getQuantiteRetirer(), descriptionRetire, request);
         
                 return ResponseEntity.status(HttpStatus.OK).body(updatedStock);
         
@@ -366,7 +372,6 @@ public class ProduitController {
         }
   
         //Endpoint List des Stock
-
         @GetMapping("/getAllStock")
         public ResponseEntity<List<Stock>> getAllStocks() {
             try {
@@ -380,4 +385,7 @@ public class ProduitController {
                         .body(Collections.emptyList());
             }
         }
+      
+
+       
 }

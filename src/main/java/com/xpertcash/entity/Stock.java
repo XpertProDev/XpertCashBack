@@ -5,6 +5,7 @@ import java.time.LocalDateTime;
 import com.fasterxml.jackson.annotation.JsonBackReference;
 import com.fasterxml.jackson.annotation.JsonManagedReference;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
 import lombok.Data;
 
@@ -39,5 +40,11 @@ public class Stock {
 
     private LocalDateTime createdAt;
     private LocalDateTime lastUpdated;
+
+    // Ajout d'un getter pour exposer l'id du produit dans le JSON
+    @JsonProperty("produitId")
+    public Long getProduitId() {
+        return (produit != null) ? produit.getId() : null;
+    }
 
 }

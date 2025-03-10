@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.NoSuchElementException;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -92,6 +93,12 @@ public class ProduitService {
             Produit existingProduit = produitRepository.findByNomAndBoutiqueId(produitRequest.getNom(), boutiqueId);
             if (existingProduit != null) {
                 throw new RuntimeException("Un produit avec le même nom existe déjà dans cette boutique.");
+            }
+
+            // Vérification de l'existence du produit par codeBare et boutiqueId
+            Produit existingProduitCode = produitRepository.findByCodeBareAndBoutiqueId(produitRequest.getCodeBare(), boutiqueId);
+            if (existingProduitCode != null) {
+                throw new RuntimeException("Un produit avec le même codeBare existe déjà dans cette boutique.");
             }
     
             // Vérifier si la catégorie existe dans la base de données 
@@ -244,11 +251,6 @@ public class ProduitService {
         stock.setQuantiteAjoute(quantiteAjoute);
         stock.setStockApres(stock.getStockActuel());
         stock.setLastUpdated(LocalDateTime.now());
-
-        // Si une description est fournie, on l'ajoute
-        if (descriptionAjout != null && !descriptionAjout.isEmpty()) {
-            stock.setDescriptionAjout(descriptionAjout);
-        }
     
         stockRepository.save(stock);
 
@@ -271,7 +273,20 @@ public class ProduitService {
     }
     
     //Methode pour reduire la quantiter du produit en stock
-    public Stock retirerStock(Long produitId, Integer quantiteRetirer, String descriptionRetire) {
+    public Stock retirerStock(Long produitId, Integer quantiteRetirer, String descriptionRetire, HttpServletRequest request) {
+
+                // Récupérer le token JWT depuis le header "Authorization"
+                String token = request.getHeader("Authorization");
+                if (token == null || !token.startsWith("Bearer ")) {
+                    throw new RuntimeException("Token JWT manquant ou mal formaté");
+                }
+        
+                String jwtToken = token.substring(7);
+                Long userId = jwtUtil.extractUserId(jwtToken);
+        
+                User user = usersRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+
         Produit produit = produitRepository.findById(produitId)
                 .orElseThrow(() -> new RuntimeException("Produit non trouvé"));
     
@@ -284,6 +299,8 @@ public class ProduitService {
         if (quantiteRetirer > produit.getQuantite()) {
             throw new RuntimeException("Impossible de retirer plus que la quantité disponible !");
         }
+
+        int stockAvant = stock.getStockActuel();
     
         int nouvelleQuantiteProduit = produit.getQuantite() - quantiteRetirer;
         produit.setQuantite(nouvelleQuantiteProduit);
@@ -294,35 +311,47 @@ public class ProduitService {
         stock.setQuantiteRetirer(quantiteRetirer);
         stock.setStockApres(stock.getStockActuel());
         stock.setLastUpdated(LocalDateTime.now());
-
-        // Si une description est fournie, on l'ajoute
-        if (descriptionRetire != null && !descriptionRetire.isEmpty()) {
-            stock.setDescriptionRetire(descriptionRetire);
-        }
     
         stockRepository.save(stock);
+
+          // Enregistrer l’historique du mouvement (Retire)
+          StockHistory stockHistory = new StockHistory();
+          stockHistory.setAction("Reduction sur quantité");
+          stockHistory.setQuantite(quantiteRetirer);
+          stockHistory.setStockAvant(stockAvant);
+          stockHistory.setStockApres(stock.getStockActuel());
+          stockHistory.setDescription(descriptionRetire);
+          stockHistory.setCreatedAt(LocalDateTime.now());
+          stockHistory.setStock(stock);
+          stockHistory.setUser(user);
+          stockHistoryRepository.save(stockHistory);
     
         return stock;
     }
     
 
     //Methode liste Historique sur Stock
-    public List<StockHistoryDTO> getStockHistory(Long produitId) {
-        // Récupérer le produit depuis la base de données
+        public List<StockHistoryDTO> getStockHistory(Long produitId) {
+        // Vérifier si le produit existe
         Produit produit = produitRepository.findById(produitId)
-                .orElseThrow(() -> new RuntimeException("Produit non trouvé"));
-    
-        // Récupérer le stock lié au produit
+                .orElseThrow(() -> new NoSuchElementException("Produit non trouvé avec l'ID : " + produitId));
+
+        // Vérifier si un stock est associé au produit
         Stock stock = stockRepository.findByProduit(produit);
         if (stock == null) {
             throw new RuntimeException("Stock introuvable pour ce produit");
         }
-    
-        // Récupérer l'historique des mouvements de stock pour ce produit
+
+        // Récupérer l'historique des stocks
         List<StockHistory> stockHistories = stockHistoryRepository.findByStock(stock);
-    
-        // Mapper les StockHistory en StockHistoryDTO
-        List<StockHistoryDTO> stockHistoryDTOs = stockHistories.stream()
+
+        // Vérifier si l'historique est vide
+        if (stockHistories.isEmpty()) {
+            throw new RuntimeException("Aucun historique de stock trouvé pour ce produit");
+        }
+
+        // Mapper en DTO
+        return stockHistories.stream()
                 .map(stockHistory -> {
                     StockHistoryDTO dto = new StockHistoryDTO();
                     dto.setId(stockHistory.getId());
@@ -332,8 +361,7 @@ public class ProduitService {
                     dto.setStockApres(stockHistory.getStockApres());
                     dto.setDescription(stockHistory.getDescription());
                     dto.setCreatedAt(stockHistory.getCreatedAt());
-    
-                    // Mapper seulement nomComplet et phone de l'utilisateur dans le DTO
+
                     User user = stockHistory.getUser();
                     if (user != null) {
                         dto.setNomComplet(user.getNomComplet());
@@ -343,17 +371,18 @@ public class ProduitService {
                     return dto;
                 })
                 .collect(Collectors.toList());
-    
-        return stockHistoryDTOs;
     }
+
     
-    
-    
-    
+   //Lister Stock
+   public List<Stock> getAllStocks() {
+    return stockRepository.findAll();
+}
+
 
     
    // Update Produit
-   public ProduitDTO updateProduct(Long produitId, ProduitRequest produitRequest, boolean addToStock, HttpServletRequest request) {
+    public ProduitDTO updateProduct(Long produitId, ProduitRequest produitRequest, boolean addToStock, HttpServletRequest request) {
     // Vérification de l'autorisation de l'admin
     String token = request.getHeader("Authorization");
     if (token == null || !token.startsWith("Bearer ")) {
@@ -361,12 +390,17 @@ public class ProduitService {
     }
 
     token = token.replace("Bearer ", "");
-    Long adminId = jwtUtil.extractUserId(token);
+    Long adminId = null;
+    try {
+        adminId = jwtUtil.extractUserId(token);
+    } catch (Exception e) {
+        throw new RuntimeException("Erreur lors de l'extraction de l'ID de l'admin depuis le token", e);
+    }
 
     User admin = usersRepository.findById(adminId)
             .orElseThrow(() -> new RuntimeException("Admin non trouvé"));
 
-    if (!RoleType.ADMIN.equals(admin.getRole().getName())) {
+    if (admin.getRole() == null || !admin.getRole().getName().equals(RoleType.ADMIN)) {
         throw new RuntimeException("Seul un ADMIN peut modifier les produits !");
     }
 
@@ -374,22 +408,12 @@ public class ProduitService {
             .orElseThrow(() -> new RuntimeException("Produit non trouvé"));
 
     // Mise à jour des informations du produit
-    if (produitRequest.getNom() != null) {
-        produit.setNom(produitRequest.getNom());
-        System.out.println("Nom mis à jour : " + produit.getNom());
-    }
-    if (produitRequest.getDescription() != null) {
-        produit.setDescription(produitRequest.getDescription());
-        System.out.println("Description mise à jour : " + produit.getDescription());
-    }
+    if (produitRequest.getNom() != null) produit.setNom(produitRequest.getNom());
+    if (produitRequest.getDescription() != null) produit.setDescription(produitRequest.getDescription());
     if (produitRequest.getPrixVente() != null) produit.setPrixVente(produitRequest.getPrixVente());
     if (produitRequest.getPrixAchat() != null) produit.setPrixAchat(produitRequest.getPrixAchat());
     if (produitRequest.getQuantite() != null) produit.setQuantite(produitRequest.getQuantite());
-    if (produitRequest.getCodeBare() != null) produit.setCodeBare(produitRequest.getCodeBare());
-    if (produitRequest.getSeuilAlert() != null) {
-        produit.setSeuilAlert(produitRequest.getSeuilAlert());
-        System.out.println("Seuil d'alerte mis à jour : " + produit.getSeuilAlert());
-    }
+    if (produitRequest.getSeuilAlert() != null) produit.setSeuilAlert(produitRequest.getSeuilAlert());
     if (produitRequest.getCodeBare() != null) produit.setCodeBare(produitRequest.getCodeBare());
     if (produitRequest.getPhoto() != null) produit.setPhoto(produitRequest.getPhoto());
 
@@ -407,54 +431,62 @@ public class ProduitService {
         produit.setUniteDeMesure(unite);
     }
 
-    // Sauvegarde immédiate pour éviter les conflits de données
-    produit = produitRepository.saveAndFlush(produit);
+    // Sauvegarde des modifications du produit
+    produitRepository.save(produit);
 
-    // Gestion du stock
+    // Gestion du stock : ajout ou suppression en fonction de addToStock
     if (addToStock) {
+        // Recherche du stock existant pour ce produit
         Stock stock = stockRepository.findByProduit(produit);
-
+    
         if (stock == null) {
-            // Création d'un nouveau stock
+            // Si le stock n'existe pas, création d'un nouveau stock
             Stock newStock = new Stock();
-            newStock.setProduit(produit);
+            newStock.setProduit(produit);  // Associer le produit au stock
             newStock.setStockActuel(produit.getQuantite() != null ? produit.getQuantite() : 0);
             newStock.setBoutique(produit.getBoutique());
             newStock.setCreatedAt(LocalDateTime.now());
             newStock.setLastUpdated(LocalDateTime.now());
-
-            // Mettre à jour le seuil d'alerte
-            newStock.setSeuilAlert(produitRequest.getSeuilAlert() != null ? produitRequest.getSeuilAlert() : produit.getSeuilAlert());
-
+    
+            // Ajouter le seuil d'alerte dans le stock
+            if (produitRequest.getSeuilAlert() != null) {
+                newStock.setSeuilAlert(produitRequest.getSeuilAlert());
+            } else {
+                newStock.setSeuilAlert(produit.getSeuilAlert());
+            }
+    
             stockRepository.save(newStock);
         } else {
-            // Mise à jour du stock existant
+            // Si le stock existe déjà, mise à jour des informations du stock
             stock.setStockActuel(produit.getQuantite() != null ? produit.getQuantite() : 0);
+    
             stock.setQuantiteAjoute(0);
             stock.setQuantiteRetirer(0);
-
+    
             // Mettre à jour le seuil d'alerte si nécessaire
             if (produitRequest.getSeuilAlert() != null) {
                 stock.setSeuilAlert(produitRequest.getSeuilAlert());
-                System.out.println("Seuil d'alerte du stock mis à jour : " + stock.getSeuilAlert());
             }
-
+    
             stock.setLastUpdated(LocalDateTime.now());
             stockRepository.save(stock);
         }
-
+    
         produit.setEnStock(true);
     } else {
+        // Si le produit ne doit plus être en stock, suppression du stock
         Stock stock = stockRepository.findByProduit(produit);
+    
         if (stock != null) {
             stockRepository.delete(stock);
         }
+    
         produit.setEnStock(false);
     }
+    
+    produitRepository.save(produit);
 
-    produit = produitRepository.saveAndFlush(produit);
-
-    // Construction de l'objet ProduitDTO pour la réponse
+    // Mapper Produit vers ProduitDTO pour la réponse
     ProduitDTO produitDTO = new ProduitDTO();
     produitDTO.setId(produit.getId());
     produitDTO.setNom(produit.getNom());
@@ -473,10 +505,13 @@ public class ProduitService {
     produitDTO.setNomCategorie(produit.getCategorie() != null ? produit.getCategorie().getNom() : null);
     produitDTO.setNomUnite(produit.getUniteDeMesure() != null ? produit.getUniteDeMesure().getNom() : null);
 
+
+    
+
     return produitDTO;
 }
 
-
+    
     //Methoce Supprime le produit s’il n'est pas en stock
     public void deleteProduit(Long produitId) {
         Produit produit = produitRepository.findById(produitId)
@@ -518,9 +553,6 @@ public class ProduitService {
         }
     }
     
-    public List<Stock> getAllStocks() {
-        return stockRepository.findAll();
-    }
 
     //Lister Produit par boutique
     public List<ProduitDTO> getProduitsParStock(Long boutiqueId) {
