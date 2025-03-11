@@ -180,8 +180,7 @@ public class ProduitController {
                     stock.setQuantiteAjoute(0);
                     stock.setQuantiteRetirer(0);
                     stock.setStockApres(stock.getStockActuel());
-                    stock.setDescriptionAjout(null);
-                    stock.setDescriptionRetire(null);
+                   
                     
                 }
                 if (produitRequest.getSeuilAlert() != null) {

@@ -502,6 +502,7 @@ public class ProduitService {
     
             stock.setQuantiteAjoute(0);
             stock.setQuantiteRetirer(0);
+            
     
             // Mettre à jour le seuil d'alerte si nécessaire
             if (produitRequest.getSeuilAlert() != null) {
