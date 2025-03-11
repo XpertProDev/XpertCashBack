@@ -9,6 +9,7 @@ import java.util.NoSuchElementException;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Description;
 import org.springframework.stereotype.Service;
 
 import com.xpertcash.DTOs.ProduitDTO;
@@ -247,6 +248,7 @@ public class ProduitService {
         produitRepository.save(produit);
     
         // Mise à jour du stock
+        stock.setDescriptionAjout(descriptionAjout);
         stock.setStockActuel(nouvelleQuantiteProduit);
         stock.setQuantiteAjoute(quantiteAjoute);
         stock.setStockApres(stock.getStockActuel());
@@ -307,6 +309,7 @@ public class ProduitService {
         produitRepository.save(produit);
     
         // Mise à jour du stock
+        stock.setDescriptionRetire(descriptionRetire);
         stock.setStockActuel(nouvelleQuantiteProduit);
         stock.setQuantiteRetirer(quantiteRetirer);
         stock.setStockApres(stock.getStockActuel());
@@ -366,13 +369,50 @@ public class ProduitService {
                     if (user != null) {
                         dto.setNomComplet(user.getNomComplet());
                         dto.setPhone(user.getPhone());
+                        if (user.getRole() != null) {
+                            dto.setRole(user.getRole().getName());
+                        }
                     }
+                    
+                    
                     
                     return dto;
                 })
                 .collect(Collectors.toList());
     }
 
+
+    // Récupérer tous les mouvements de stock
+    public List<StockHistoryDTO> getAllStockHistory() {
+        List<StockHistory> stockHistories = stockHistoryRepository.findAll();
+    
+        // Convertir en DTOs (si nécessaire)
+        return stockHistories.stream()
+        .map(stockHistory -> {
+            StockHistoryDTO dto = new StockHistoryDTO();
+            dto.setId(stockHistory.getId());
+            dto.setAction(stockHistory.getAction());
+            dto.setQuantite(stockHistory.getQuantite());
+            dto.setStockAvant(stockHistory.getStockAvant());
+            dto.setStockApres(stockHistory.getStockApres());
+            dto.setDescription(stockHistory.getDescription());
+            dto.setCreatedAt(stockHistory.getCreatedAt());
+
+            User user = stockHistory.getUser();
+            if (user != null) {
+                dto.setNomComplet(user.getNomComplet());
+                dto.setPhone(user.getPhone());
+            
+                if (user.getRole() != null) {
+                    dto.setRole(user.getRole().getName());
+                }
+            }
+            
+            return dto;
+        })
+                .collect(Collectors.toList());
+    }
+    
     
    //Lister Stock
    public List<Stock> getAllStocks() {
@@ -549,7 +589,6 @@ public class ProduitService {
             throw new RuntimeException("Aucun stock trouvé pour ce produit !");
         }
     }
-    
 
     //Lister Produit par boutique
     public List<ProduitDTO> getProduitsParStock(Long boutiqueId) {
