@@ -18,27 +18,21 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.xpertcash.DTOs.ProduitDTO;
 import com.xpertcash.DTOs.ProduitRequest;
 import com.xpertcash.DTOs.StockHistoryDTO;
-import com.xpertcash.composant.AuthorizationService;
-import com.xpertcash.configuration.JwtUtil;
 import com.xpertcash.entity.Categorie;
 import com.xpertcash.entity.Produit;
-import com.xpertcash.entity.RoleType;
 import com.xpertcash.entity.Stock;
-import com.xpertcash.entity.StockHistory;
 import com.xpertcash.entity.Unite;
-import com.xpertcash.entity.User;
 import com.xpertcash.exceptions.DuplicateProductException;
 import com.xpertcash.repository.CategorieRepository;
 import com.xpertcash.repository.ProduitRepository;
 import com.xpertcash.repository.StockRepository;
 import com.xpertcash.repository.UniteRepository;
-import com.xpertcash.repository.UsersRepository;
 import com.xpertcash.service.ProduitService;
-import com.xpertcash.service.UsersService;
 import com.xpertcash.service.IMAGES.ImageStorageService;
 
 import jakarta.servlet.http.HttpServletRequest;
-import lombok.RequiredArgsConstructor;
+import reactor.core.publisher.Flux;
+import java.time.Duration;
 
 @CrossOrigin(origins = "http://localhost:4200")
 @RestController
@@ -47,14 +41,6 @@ public class ProduitController {
 
     @Autowired
     private ProduitService produitService;
-    @Autowired
-    private UsersService usersService;
-    @Autowired
-    private JwtUtil jwtUtil;
-    @Autowired
-    private AuthorizationService authorizationService;
-    @Autowired
-    private UsersRepository usersRepository;
     @Autowired
     private ImageStorageService imageStorageService;
     @Autowired
@@ -66,12 +52,6 @@ public class ProduitController {
     @Autowired
     private UniteRepository uniteRepository;
 
-
-   /* @Autowired
-    public ProduitController(ImageStorageService imageStorageService, ProduitService produitService) {
-        this.imageStorageService = imageStorageService;
-        this.produitService = produitService;
-    }*/ 
 
     // Endpoint pour Créer un produit et décider si il doit être ajouté au stock
     @PostMapping(value = "/create/{boutiqueId}", consumes = { MediaType.MULTIPART_FORM_DATA_VALUE })
@@ -340,14 +320,10 @@ public class ProduitController {
             }
 
             // Endpoint pour récupérer l'historique général des mouvements de stock
-            @GetMapping("/stockhistorique")
-            public ResponseEntity<List<StockHistoryDTO>> getAllStockHistory() {
-                try {
-                    List<StockHistoryDTO> stockHistories = produitService.getAllStockHistory();
-                    return ResponseEntity.ok(stockHistories);
-                } catch (Exception e) {
-                    return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
-                }
+            @GetMapping(value = "/stockhistorique", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+            public Flux<List<StockHistoryDTO>> streamAllStockHistory() {
+                return Flux.interval(Duration.ofSeconds(10))
+                        .map(tick -> produitService.getAllStockHistory());
             }
 
             
