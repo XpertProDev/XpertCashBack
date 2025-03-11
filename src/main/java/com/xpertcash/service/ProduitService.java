@@ -511,7 +511,6 @@ public class ProduitService {
     return produitDTO;
 }
 
-    
     //Methoce Supprime le produit s’il n'est pas en stock
     public void deleteProduit(Long produitId) {
         Produit produit = produitRepository.findById(produitId)
@@ -530,10 +529,8 @@ public class ProduitService {
         produitRepository.delete(produit);
         System.out.println("✅ Produit supprimé avec succès !");
     }
-    
 
     //Methoce Supprimer uniquement le stock
-
     public void deleteStock(Long produitId) {
         Produit produit = produitRepository.findById(produitId)
                 .orElseThrow(() -> new RuntimeException("Produit non trouvé"));
