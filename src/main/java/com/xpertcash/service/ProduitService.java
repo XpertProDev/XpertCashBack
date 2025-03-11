@@ -97,9 +97,12 @@ public class ProduitService {
             }
 
             // Vérification de l'existence du produit par codeBare et boutiqueId
-            Produit existingProduitCode = produitRepository.findByCodeBareAndBoutiqueId(produitRequest.getCodeBare(), boutiqueId);
-            if (existingProduitCode != null) {
-                throw new RuntimeException("Un produit avec le même codeBare existe déjà dans cette boutique.");
+            String codeBare = produitRequest.getCodeBare();
+            if (codeBare != null && !codeBare.trim().isEmpty()) {
+                Produit existingProduitCode = produitRepository.findByCodeBareAndBoutiqueId(codeBare.trim(), boutiqueId);
+                if (existingProduitCode != null) {
+                    throw new RuntimeException("Un produit avec le même codeBare existe déjà dans cette boutique.");
+                }
             }
     
             // Vérifier si la catégorie existe dans la base de données 

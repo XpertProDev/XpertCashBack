@@ -54,7 +54,7 @@ public class ProduitController {
 
 
     // Endpoint pour Créer un produit et décider si il doit être ajouté au stock
-    @PostMapping(value = "/create/{boutiqueId}", consumes = { MediaType.MULTIPART_FORM_DATA_VALUE })
+    @PostMapping(value = "/create/{boutiqueId}", consumes = { MediaType.MULTIPART_FORM_DATA_VALUE }) 
     public ResponseEntity<?> createProduit(
             @PathVariable Long boutiqueId,
             @RequestPart("produit") String produitJson,
