@@ -89,4 +89,6 @@ public class StockService {
     public List<Stock> getStocksByBoutique(Long boutiqueId) {
         return stockRepository.findByBoutiqueId(boutiqueId);
     }
+
+    
 }

@@ -2,7 +2,7 @@ package com.xpertcash.DTOs;
 
 import java.time.LocalDateTime;
 
-import com.xpertcash.DTOs.USER.UserRequest;
+import com.xpertcash.entity.RoleType;
 
 import lombok.Data;
 
@@ -18,5 +18,6 @@ public class StockHistoryDTO {
     private LocalDateTime createdAt;
     private String nomComplet;
     private String phone;
+    private RoleType role;
 
 }

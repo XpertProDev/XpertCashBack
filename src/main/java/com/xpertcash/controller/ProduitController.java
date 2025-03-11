@@ -338,6 +338,18 @@ public class ProduitController {
                             .body(Collections.singletonMap("message", e.getMessage()));
                 }
             }
+
+            // Endpoint pour récupérer l'historique général des mouvements de stock
+            @GetMapping("/stockhistorique")
+            public ResponseEntity<List<StockHistoryDTO>> getAllStockHistory() {
+                try {
+                    List<StockHistoryDTO> stockHistories = produitService.getAllStockHistory();
+                    return ResponseEntity.ok(stockHistories);
+                } catch (Exception e) {
+                    return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
+                }
+            }
+
             
 
 
