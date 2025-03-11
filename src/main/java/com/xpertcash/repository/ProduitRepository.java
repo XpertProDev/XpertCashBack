@@ -4,11 +4,14 @@ import java.util.List;
 import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import com.xpertcash.entity.Boutique;
 import com.xpertcash.entity.Produit;
+import com.xpertcash.entity.Stock;
 
 @Repository
 public interface ProduitRepository extends JpaRepository<Produit, Long> {
@@ -31,6 +34,9 @@ public interface ProduitRepository extends JpaRepository<Produit, Long> {
 
      // Récupérer les produits enStock = true d'une boutique donnée
      List<Produit> findByBoutiqueIdAndEnStockTrue(Long boutiqueId);
+
+   
+
 
 }
 

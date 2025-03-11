@@ -47,4 +47,6 @@ public class Stock {
         return (produit != null) ? produit.getId() : null;
     }
 
+    
+
 }

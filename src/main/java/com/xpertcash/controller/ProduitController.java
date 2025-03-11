@@ -21,10 +21,12 @@ import com.xpertcash.DTOs.StockHistoryDTO;
 import com.xpertcash.entity.Categorie;
 import com.xpertcash.entity.Produit;
 import com.xpertcash.entity.Stock;
+import com.xpertcash.entity.StockHistory;
 import com.xpertcash.entity.Unite;
 import com.xpertcash.exceptions.DuplicateProductException;
 import com.xpertcash.repository.CategorieRepository;
 import com.xpertcash.repository.ProduitRepository;
+import com.xpertcash.repository.StockHistoryRepository;
 import com.xpertcash.repository.StockRepository;
 import com.xpertcash.repository.UniteRepository;
 import com.xpertcash.service.ProduitService;
@@ -51,6 +53,8 @@ public class ProduitController {
     private CategorieRepository categorieRepository;
     @Autowired
     private UniteRepository uniteRepository;
+    @Autowired
+    private StockHistoryRepository stockHistoryRepository;
 
 
     // Endpoint pour Créer un produit et décider si il doit être ajouté au stock
@@ -193,6 +197,10 @@ public class ProduitController {
                 produit.setEnStock(true);
             } else {
                 // Suppression du stock si `addToStock` est `false`
+                 List<StockHistory> historyRecords = stockHistoryRepository.findByStock(stock);
+                    if (!historyRecords.isEmpty()) {
+                        stockHistoryRepository.deleteAll(historyRecords);
+                    }
                 if (stock != null) {
                     stockRepository.delete(stock);
                     System.out.println("🗑️ Stock supprimé !");

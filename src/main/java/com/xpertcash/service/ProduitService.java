@@ -522,8 +522,17 @@ public class ProduitService {
         Stock stock = stockRepository.findByProduit(produit);
     
         if (stock != null) {
+            // Supprimer d'abord tous les historiques liés
+            List<StockHistory> historyRecords = stockHistoryRepository.findByStock(stock);
+            if (!historyRecords.isEmpty()) {
+                stockHistoryRepository.deleteAll(historyRecords);
+            }
+        
+            // Supprimer ensuite le stock
             stockRepository.delete(stock);
         }
+        
+        
     
         produit.setEnStock(false);
     }
@@ -577,7 +586,6 @@ public class ProduitService {
     
 
     //Methoce Supprimer uniquement le stock
-
     public void deleteStock(Long produitId) {
         Produit produit = produitRepository.findById(produitId)
                 .orElseThrow(() -> new RuntimeException("Produit non trouvé"));
