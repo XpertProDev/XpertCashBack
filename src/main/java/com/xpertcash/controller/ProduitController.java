@@ -162,7 +162,7 @@ public class ProduitController {
             }
     
             produitRepository.saveAndFlush(produit);
-            System.out.println("✅ Produit mis à jour avec succès !");
+            System.out.println("Produit mis à jour avec succès !");
     
             // Gestion du stock
             Stock stock = stockRepository.findByProduit(produit);
@@ -185,7 +185,7 @@ public class ProduitController {
                 }
                 if (produitRequest.getSeuilAlert() != null) {
                     stock.setSeuilAlert(produitRequest.getSeuilAlert());
-                    System.out.println("🔔 Seuil d'alerte mis à jour : " + stock.getSeuilAlert());
+                    System.out.println("Seuil d'alerte mis à jour : " + stock.getSeuilAlert());
                 }
     
                 stock.setLastUpdated(LocalDateTime.now());
@@ -201,12 +201,12 @@ public class ProduitController {
             }
     
             produitRepository.saveAndFlush(produit);
-            System.out.println("✅ Stock mis à jour avec succès !");
+            System.out.println("Stock mis à jour avec succès !");
     
             return ResponseEntity.status(HttpStatus.OK).body(produit);
         } catch (Exception e) {
             e.printStackTrace();
-            System.err.println("❌ Erreur lors de la mise à jour du produit : " + e.getMessage());
+            System.err.println("Erreur lors de la mise à jour du produit : " + e.getMessage());
     
             Map<String, String> errorResponse = new HashMap<>();
             errorResponse.put("error", "Une erreur est survenue lors de la mise à jour du produit : " + e.getMessage());
@@ -319,11 +319,16 @@ public class ProduitController {
             }
 
             // Endpoint pour récupérer l'historique général des mouvements de stock
-            @GetMapping(value = "/stockhistorique", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-            public Flux<List<StockHistoryDTO>> streamAllStockHistory() {
-                return Flux.interval(Duration.ofSeconds(10))
-                        .map(tick -> produitService.getAllStockHistory());
+                @GetMapping("/stockhistorique")
+            public ResponseEntity<List<StockHistoryDTO>> getAllStockHistory() {
+                try {
+                    List<StockHistoryDTO> stockHistories = produitService.getAllStockHistory();
+                    return ResponseEntity.ok(stockHistories);
+                } catch (Exception e) {
+                    return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
+                }
             }
+
 
             
 
