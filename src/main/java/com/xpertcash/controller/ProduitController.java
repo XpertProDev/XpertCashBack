@@ -327,15 +327,26 @@ public class ProduitController {
             }
 
             // Endpoint pour récupérer l'historique général des mouvements de stock
-                @GetMapping("/stockhistorique")
-            public ResponseEntity<List<StockHistoryDTO>> getAllStockHistory() {
+            @GetMapping("/stockhistorique")
+            public ResponseEntity<?> getAllStockHistory() {
                 try {
                     List<StockHistoryDTO> stockHistories = produitService.getAllStockHistory();
+            
+                    if (stockHistories.isEmpty()) {
+                        Map<String, String> response = new HashMap<>();
+                        response.put("message", "Aucun historique de stock disponible.");
+                        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+                    }
+            
                     return ResponseEntity.ok(stockHistories);
                 } catch (Exception e) {
-                    return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
+                    Map<String, String> errorResponse = new HashMap<>();
+                    errorResponse.put("error", "Erreur interne du serveur.");
+                    errorResponse.put("details", e.getMessage());
+                    return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
                 }
             }
+            
 
 
             
