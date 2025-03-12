@@ -1,6 +1,8 @@
 package com.xpertcash.service;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -19,6 +21,7 @@ import com.xpertcash.DTOs.USER.UserRequest;
 import com.xpertcash.configuration.JwtUtil;
 import com.xpertcash.entity.Boutique;
 import com.xpertcash.entity.Categorie;
+import com.xpertcash.entity.Facture;
 import com.xpertcash.entity.Produit;
 import com.xpertcash.entity.RoleType;
 import com.xpertcash.entity.Stock;
@@ -27,6 +30,7 @@ import com.xpertcash.entity.Unite;
 import com.xpertcash.entity.User;
 import com.xpertcash.repository.BoutiqueRepository;
 import com.xpertcash.repository.CategorieRepository;
+import com.xpertcash.repository.FactureRepository;
 import com.xpertcash.repository.ProduitRepository;
 import com.xpertcash.repository.StockHistoryRepository;
 import com.xpertcash.repository.StockRepository;
@@ -62,6 +66,8 @@ public class ProduitService {
   
     @Autowired
     private StockHistoryRepository stockHistoryRepository;
+    @Autowired
+    private FactureRepository factureRepository;
 
 
     // Ajouter un produit à la liste sans le stock
@@ -272,6 +278,7 @@ public class ProduitService {
 
         // Sauvegarder l'historique
         stockHistoryRepository.save(stockHistory);
+        enregistrerFacture("AJOUT", produit, quantiteAjoute, descriptionAjout, user);
       
     
         return stock;
@@ -331,10 +338,33 @@ public class ProduitService {
           stockHistory.setStock(stock);
           stockHistory.setUser(user);
           stockHistoryRepository.save(stockHistory);
+
+          enregistrerFacture("RETRAIT", produit, quantiteRetirer, descriptionRetire, user);
     
         return stock;
     }
     
+
+      // Génère un numéro unique de facture
+    private String generateNumeroFacture() {
+        Long dernierId = factureRepository.count() + 1;
+        String date = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
+        return "FAC-" + date + "-" + String.format("%04d", dernierId);
+    }
+
+    // Méthode pour enregistrer une facture
+    public Facture enregistrerFacture(String type, Produit produit, Integer quantite, String description, User user) {
+        Facture facture = new Facture();
+        facture.setNumeroFacture(generateNumeroFacture());
+        facture.setType(type);
+        facture.setQuantite(quantite);
+        facture.setDescription(description);
+        facture.setDateFacture(LocalDateTime.now());
+        facture.setUser(user);
+        facture.setProduit(produit);
+
+        return factureRepository.save(facture);
+    }
 
     //Methode liste Historique sur Stock
         public List<StockHistoryDTO> getStockHistory(Long produitId) {
