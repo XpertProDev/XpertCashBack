@@ -21,10 +21,12 @@ import com.xpertcash.DTOs.StockHistoryDTO;
 import com.xpertcash.entity.Categorie;
 import com.xpertcash.entity.Produit;
 import com.xpertcash.entity.Stock;
+import com.xpertcash.entity.StockHistory;
 import com.xpertcash.entity.Unite;
 import com.xpertcash.exceptions.DuplicateProductException;
 import com.xpertcash.repository.CategorieRepository;
 import com.xpertcash.repository.ProduitRepository;
+import com.xpertcash.repository.StockHistoryRepository;
 import com.xpertcash.repository.StockRepository;
 import com.xpertcash.repository.UniteRepository;
 import com.xpertcash.service.ProduitService;
@@ -51,10 +53,12 @@ public class ProduitController {
     private CategorieRepository categorieRepository;
     @Autowired
     private UniteRepository uniteRepository;
+    @Autowired
+    private StockHistoryRepository stockHistoryRepository;
 
 
     // Endpoint pour Créer un produit et décider si il doit être ajouté au stock
-    @PostMapping(value = "/create/{boutiqueId}", consumes = { MediaType.MULTIPART_FORM_DATA_VALUE })
+    @PostMapping(value = "/create/{boutiqueId}", consumes = { MediaType.MULTIPART_FORM_DATA_VALUE }) 
     public ResponseEntity<?> createProduit(
             @PathVariable Long boutiqueId,
             @RequestPart("produit") String produitJson,
@@ -65,9 +69,9 @@ public class ProduitController {
         try {
             // Vérification de l'image reçue
             if (imageFile != null) {
-                System.out.println("📷 Image reçue avec succès : " + imageFile.getOriginalFilename());
+                System.out.println("Image reçue avec succès : " + imageFile.getOriginalFilename());
             } else {
-                System.out.println("❌ Aucune image reçue !");
+                System.out.println("Aucune image reçue !");
             }
 
             // Convertir le JSON en objet ProduitRequest
@@ -116,13 +120,13 @@ public class ProduitController {
             @RequestHeader("Authorization") String token,
             HttpServletRequest request) {
         try {
-            System.out.println("🔄 Début de la mise à jour du produit ID: " + produitId);
+            System.out.println("Début de la mise à jour du produit ID: " + produitId);
     
             // Vérification de l'image reçue
             if (imageFile != null) {
                 System.out.println("📷 Image reçue : " + imageFile.getOriginalFilename());
             } else {
-                System.out.println("❌ Aucune image reçue !");
+                System.out.println("Aucune image reçue !");
             }
     
             // Désérialisation de l'objet JSON en ProduitRequest
@@ -131,7 +135,7 @@ public class ProduitController {
     
             // Vérification si le produit existe
             Produit produit = produitRepository.findById(produitId)
-                    .orElseThrow(() -> new RuntimeException("❌ Produit non trouvé !"));
+                    .orElseThrow(() -> new RuntimeException("Produit non trouvé !"));
     
             // Gestion de l'image
             if (imageFile != null && !imageFile.isEmpty()) {
@@ -193,6 +197,10 @@ public class ProduitController {
                 produit.setEnStock(true);
             } else {
                 // Suppression du stock si `addToStock` est `false`
+                 List<StockHistory> historyRecords = stockHistoryRepository.findByStock(stock);
+                    if (!historyRecords.isEmpty()) {
+                        stockHistoryRepository.deleteAll(historyRecords);
+                    }
                 if (stock != null) {
                     stockRepository.delete(stock);
                     System.out.println("🗑️ Stock supprimé !");
@@ -319,15 +327,26 @@ public class ProduitController {
             }
 
             // Endpoint pour récupérer l'historique général des mouvements de stock
-                @GetMapping("/stockhistorique")
-            public ResponseEntity<List<StockHistoryDTO>> getAllStockHistory() {
+            @GetMapping("/stockhistorique")
+            public ResponseEntity<?> getAllStockHistory() {
                 try {
                     List<StockHistoryDTO> stockHistories = produitService.getAllStockHistory();
+            
+                    if (stockHistories.isEmpty()) {
+                        Map<String, String> response = new HashMap<>();
+                        response.put("message", "Aucun historique de stock disponible.");
+                        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+                    }
+            
                     return ResponseEntity.ok(stockHistories);
                 } catch (Exception e) {
-                    return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
+                    Map<String, String> errorResponse = new HashMap<>();
+                    errorResponse.put("error", "Erreur interne du serveur.");
+                    errorResponse.put("details", e.getMessage());
+                    return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
                 }
             }
+            
 
 
             
