@@ -286,7 +286,7 @@ public class ProduitService {
         }
     
         // Enregistrer une facture avec plusieurs produits
-        return enregistrerFacture("AJOUT", produits, produitsQuantites, description, user);
+        return enregistrerFacture("AJOUTER", produits, produitsQuantites, description, user);
     }
     
     // Méthode pour ajuster la quantité du produit en stock (retirer des produits)
