@@ -138,7 +138,7 @@ public class ProduitService {
             produit.setPrixVente(produitRequest.getPrixVente());
             produit.setPrixAchat(produitRequest.getPrixAchat());
             produit.setQuantite(produitRequest.getQuantite() != null ? produitRequest.getQuantite() : 0);
-            produit.setSeuilAlert(produitRequest.getSeuilAlert());
+            produit.setSeuilAlert(produitRequest.getSeuilAlert() != null ? produitRequest.getSeuilAlert() : 0);
             produit.setCategorie(categorie);
             produit.setUniteDeMesure(unite);
             produit.setCodeGenerique(codeGenerique);
@@ -289,8 +289,8 @@ public class ProduitService {
         return enregistrerFacture("AJOUT", produits, produitsQuantites, description, user);
     }
     
-       // Méthode pour ajuster la quantité du produit en stock (retirer des produits)
-       public FactureDTO retirerStock(Map<Long, Integer> produitsQuantites, String description, HttpServletRequest request) {
+    // Méthode pour ajuster la quantité du produit en stock (retirer des produits)
+    public FactureDTO retirerStock(Map<Long, Integer> produitsQuantites, String description, HttpServletRequest request) {
     // Récupérer le token JWT depuis le header "Authorization"
     String token = request.getHeader("Authorization");
     if (token == null || !token.startsWith("Bearer ")) {
@@ -349,10 +349,8 @@ public class ProduitService {
         produits.add(produit);
     }
 
-    // Enregistrer une facture avec plusieurs produits
     Facture facture = enregistrerFacture("Réduction", produits, produitsQuantites, description, user);
 
-    // Convertir la facture en FactureDTO avant de la retourner
     return new FactureDTO(facture);
 }
 
