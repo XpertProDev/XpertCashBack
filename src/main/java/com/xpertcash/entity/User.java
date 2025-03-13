@@ -8,6 +8,7 @@ import lombok.Data;
 import java.time.LocalDateTime;
 
 import com.fasterxml.jackson.annotation.JsonBackReference;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 
 @Entity
 @Data
@@ -56,6 +57,7 @@ public class User {
 
     // Not Null de base de donnée
     @Column(nullable = false)
+     @JsonIgnore
     private String password;
 
     //=========================== POUR PHONE ===========================

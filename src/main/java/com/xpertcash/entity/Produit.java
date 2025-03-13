@@ -1,5 +1,6 @@
 package com.xpertcash.entity;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 
 import com.fasterxml.jackson.annotation.JsonBackReference;
@@ -51,6 +52,9 @@ public class Produit {
     @OneToMany(mappedBy = "produit")
     @JsonManagedReference("produit-stock")
     private List<Stock> stocks;
+
+    @OneToMany(mappedBy = "produit", cascade = CascadeType.ALL)
+    private List<FactureProduit> factureProduits = new ArrayList<>();
 
  
 

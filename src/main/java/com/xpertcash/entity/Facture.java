@@ -1,6 +1,11 @@
 package com.xpertcash.entity;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonManagedReference;
 
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
@@ -22,12 +27,11 @@ public class Facture {
     private LocalDateTime dateFacture;
     private String numeroFacture;
 
-     @ManyToOne
-     @JoinColumn(name = "user_id")
-     private User user;
+      @ManyToOne
+    @JoinColumn(name = "user_id")
+    private User user;
 
-     @ManyToOne
-     @JoinColumn(name = "produit_id")
-     private Produit produit;
+    @OneToMany(mappedBy = "facture", cascade = CascadeType.ALL)
+    private List<FactureProduit> factureProduits = new ArrayList<>();
 
 }
