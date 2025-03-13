@@ -14,6 +14,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Description;
 import org.springframework.stereotype.Service;
 
+import com.xpertcash.DTOs.FactureDTO;
 import com.xpertcash.DTOs.ProduitDTO;
 import com.xpertcash.DTOs.ProduitRequest;
 import com.xpertcash.DTOs.StockHistoryDTO;
@@ -22,6 +23,7 @@ import com.xpertcash.configuration.JwtUtil;
 import com.xpertcash.entity.Boutique;
 import com.xpertcash.entity.Categorie;
 import com.xpertcash.entity.Facture;
+import com.xpertcash.entity.FactureProduit;
 import com.xpertcash.entity.Produit;
 import com.xpertcash.entity.RoleType;
 import com.xpertcash.entity.Stock;
@@ -224,126 +226,136 @@ public class ProduitService {
     
         return code;
     }
-    
+     
     
 
     //Methode pour ajuster la quantiter du produit en stock
-    public Stock ajouterStock(Long produitId, Integer quantiteAjoute, String descriptionAjout, HttpServletRequest request) {
+    public Facture ajouterStock(Map<Long, Integer> produitsQuantites, String description, HttpServletRequest request) {
         // Récupérer le token JWT depuis le header "Authorization"
         String token = request.getHeader("Authorization");
         if (token == null || !token.startsWith("Bearer ")) {
             throw new RuntimeException("Token JWT manquant ou mal formaté");
         }
-
+    
         String jwtToken = token.substring(7);
         Long userId = jwtUtil.extractUserId(jwtToken);
-
+    
         User user = usersRepository.findById(userId)
-        .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+                .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+    
+        List<Produit> produits = new ArrayList<>();
+    
+        for (Map.Entry<Long, Integer> entry : produitsQuantites.entrySet()) {
+            Long produitId = entry.getKey();
+            Integer quantiteAjoute = entry.getValue();
+    
+            Produit produit = produitRepository.findById(produitId)
+                    .orElseThrow(() -> new RuntimeException("Produit non trouvé"));
+    
+            Stock stock = stockRepository.findByProduit(produit);
+            if (stock == null) {
+                throw new RuntimeException("Stock introuvable pour ce produit");
+            }
+    
+            int stockAvant = stock.getStockActuel();
+            int nouvelleQuantiteProduit = produit.getQuantite() + quantiteAjoute;
+    
+            // Mettre à jour le produit et le stock
+            produit.setQuantite(nouvelleQuantiteProduit);
+            produitRepository.save(produit);
+    
+            stock.setStockActuel(nouvelleQuantiteProduit);
+            stock.setQuantiteAjoute(quantiteAjoute);
+            stock.setStockApres(nouvelleQuantiteProduit);
+            stock.setLastUpdated(LocalDateTime.now());
+            stockRepository.save(stock);
+    
+            // Enregistrer l'historique du stock
+            StockHistory stockHistory = new StockHistory();
+            stockHistory.setAction("Ajout sur quantité");
+            stockHistory.setQuantite(quantiteAjoute);
+            stockHistory.setStockAvant(stockAvant);
+            stockHistory.setStockApres(nouvelleQuantiteProduit);
+            stockHistory.setDescription(description);
+            stockHistory.setCreatedAt(LocalDateTime.now());
+            stockHistory.setStock(stock);
+            stockHistory.setUser(user);
+            stockHistoryRepository.save(stockHistory);
+    
+            produits.add(produit);
+        }
+    
+        // Enregistrer une facture avec plusieurs produits
+        return enregistrerFacture("AJOUT", produits, produitsQuantites, description, user);
+    }
+    
+       // Méthode pour ajuster la quantité du produit en stock (retirer des produits)
+       public FactureDTO retirerStock(Map<Long, Integer> produitsQuantites, String description, HttpServletRequest request) {
+    // Récupérer le token JWT depuis le header "Authorization"
+    String token = request.getHeader("Authorization");
+    if (token == null || !token.startsWith("Bearer ")) {
+        throw new RuntimeException("Token JWT manquant ou mal formaté");
+    }
+
+    String jwtToken = token.substring(7);
+    Long userId = jwtUtil.extractUserId(jwtToken);
+
+    User user = usersRepository.findById(userId)
+            .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+
+    List<Produit> produits = new ArrayList<>();
+
+    for (Map.Entry<Long, Integer> entry : produitsQuantites.entrySet()) {
+        Long produitId = entry.getKey();
+        Integer quantiteRetirer = entry.getValue();
 
         Produit produit = produitRepository.findById(produitId)
                 .orElseThrow(() -> new RuntimeException("Produit non trouvé"));
-    
+
         Stock stock = stockRepository.findByProduit(produit);
         if (stock == null) {
             throw new RuntimeException("Stock introuvable pour ce produit");
         }
 
         int stockAvant = stock.getStockActuel();
-    
-        // Mettre à jour la quantité du produit
-        int nouvelleQuantiteProduit = produit.getQuantite() + quantiteAjoute;
+        if (quantiteRetirer > stockAvant) {
+            throw new RuntimeException("Impossible de retirer plus que la quantité disponible en stock");
+        }
+
+        int nouvelleQuantiteProduit = produit.getQuantite() - quantiteRetirer;
+
+        // Mettre à jour le produit et le stock
         produit.setQuantite(nouvelleQuantiteProduit);
         produitRepository.save(produit);
-    
-        // Mise à jour du stock
-        stock.setDescriptionAjout(descriptionAjout);
+
         stock.setStockActuel(nouvelleQuantiteProduit);
-        stock.setQuantiteAjoute(quantiteAjoute);
-        stock.setStockApres(stock.getStockActuel());
+        stock.setQuantiteRetirer(quantiteRetirer);
+        stock.setStockApres(nouvelleQuantiteProduit);
         stock.setLastUpdated(LocalDateTime.now());
-    
         stockRepository.save(stock);
 
-         // Enregistrer l’historique du mouvement (ajout)
-         StockHistory stockHistory = new StockHistory();
-        stockHistory.setAction("Ajout sur quantité");
-        stockHistory.setQuantite(quantiteAjoute);
+        // Enregistrer l'historique du stock
+        StockHistory stockHistory = new StockHistory();
+        stockHistory.setAction("Réduction sur quantité");
+        stockHistory.setQuantite(quantiteRetirer);
         stockHistory.setStockAvant(stockAvant);
-        stockHistory.setStockApres(stock.getStockActuel());
-        stockHistory.setDescription(descriptionAjout);
+        stockHistory.setStockApres(nouvelleQuantiteProduit);
+        stockHistory.setDescription(description);
         stockHistory.setCreatedAt(LocalDateTime.now());
         stockHistory.setStock(stock);
         stockHistory.setUser(user);
-
-        // Sauvegarder l'historique
         stockHistoryRepository.save(stockHistory);
-        enregistrerFacture("AJOUT", produit, quantiteAjoute, descriptionAjout, user);
-      
-    
-        return stock;
+
+        produits.add(produit);
     }
-    
-    //Methode pour reduire la quantiter du produit en stock
-    public Stock retirerStock(Long produitId, Integer quantiteRetirer, String descriptionRetire, HttpServletRequest request) {
 
-                // Récupérer le token JWT depuis le header "Authorization"
-                String token = request.getHeader("Authorization");
-                if (token == null || !token.startsWith("Bearer ")) {
-                    throw new RuntimeException("Token JWT manquant ou mal formaté");
-                }
-        
-                String jwtToken = token.substring(7);
-                Long userId = jwtUtil.extractUserId(jwtToken);
-        
-                User user = usersRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+    // Enregistrer une facture avec plusieurs produits
+    Facture facture = enregistrerFacture("Réduction", produits, produitsQuantites, description, user);
 
-        Produit produit = produitRepository.findById(produitId)
-                .orElseThrow(() -> new RuntimeException("Produit non trouvé"));
-    
-        Stock stock = stockRepository.findByProduit(produit);
-        if (stock == null) {
-            throw new RuntimeException("Stock introuvable pour ce produit");
-        }
-    
-        // Vérifier que la quantité à retirer ne dépasse pas la quantité disponible
-        if (quantiteRetirer > produit.getQuantite()) {
-            throw new RuntimeException("Impossible de retirer plus que la quantité disponible !");
-        }
+    // Convertir la facture en FactureDTO avant de la retourner
+    return new FactureDTO(facture);
+}
 
-        int stockAvant = stock.getStockActuel();
-    
-        int nouvelleQuantiteProduit = produit.getQuantite() - quantiteRetirer;
-        produit.setQuantite(nouvelleQuantiteProduit);
-        produitRepository.save(produit);
-    
-        // Mise à jour du stock
-        stock.setDescriptionRetire(descriptionRetire);
-        stock.setStockActuel(nouvelleQuantiteProduit);
-        stock.setQuantiteRetirer(quantiteRetirer);
-        stock.setStockApres(stock.getStockActuel());
-        stock.setLastUpdated(LocalDateTime.now());
-    
-        stockRepository.save(stock);
-
-          // Enregistrer l’historique du mouvement (Retire)
-          StockHistory stockHistory = new StockHistory();
-          stockHistory.setAction("Reduction sur quantité");
-          stockHistory.setQuantite(quantiteRetirer);
-          stockHistory.setStockAvant(stockAvant);
-          stockHistory.setStockApres(stock.getStockActuel());
-          stockHistory.setDescription(descriptionRetire);
-          stockHistory.setCreatedAt(LocalDateTime.now());
-          stockHistory.setStock(stock);
-          stockHistory.setUser(user);
-          stockHistoryRepository.save(stockHistory);
-
-          enregistrerFacture("RETRAIT", produit, quantiteRetirer, descriptionRetire, user);
-    
-        return stock;
-    }
-    
 
       // Génère un numéro unique de facture
     private String generateNumeroFacture() {
@@ -353,15 +365,28 @@ public class ProduitService {
     }
 
     // Méthode pour enregistrer une facture
-    public Facture enregistrerFacture(String type, Produit produit, Integer quantite, String description, User user) {
+    public Facture enregistrerFacture(String type, List<Produit> produits, Map<Long, Integer> quantites, String description, User user) {
         Facture facture = new Facture();
         facture.setNumeroFacture(generateNumeroFacture());
         facture.setType(type);
-        facture.setQuantite(quantite);
         facture.setDescription(description);
         facture.setDateFacture(LocalDateTime.now());
         facture.setUser(user);
-        facture.setProduit(produit);
+
+        List<FactureProduit> factureProduits = new ArrayList<>();
+        
+        for (Produit produit : produits) {
+            FactureProduit factureProduit = new FactureProduit();
+            factureProduit.setFacture(facture);
+            factureProduit.setProduit(produit);
+            factureProduit.setQuantite(quantites.get(produit.getId()));
+            factureProduit.setPrixUnitaire(produit.getPrixVente());
+            factureProduit.setTotal(factureProduit.getQuantite() * factureProduit.getPrixUnitaire());
+
+            factureProduits.add(factureProduit);
+        }
+
+        facture.setFactureProduits(factureProduits);
 
         return factureRepository.save(facture);
     }

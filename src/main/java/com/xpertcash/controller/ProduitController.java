@@ -15,10 +15,14 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.xpertcash.DTOs.AjouterStockRequest;
+import com.xpertcash.DTOs.FactureDTO;
 import com.xpertcash.DTOs.ProduitDTO;
 import com.xpertcash.DTOs.ProduitRequest;
+import com.xpertcash.DTOs.RetirerStockRequest;
 import com.xpertcash.DTOs.StockHistoryDTO;
 import com.xpertcash.entity.Categorie;
+import com.xpertcash.entity.Facture;
 import com.xpertcash.entity.Produit;
 import com.xpertcash.entity.Stock;
 import com.xpertcash.entity.StockHistory;
@@ -285,32 +289,28 @@ public class ProduitController {
         
 
         //Endpoint pour ajuster la quantiter du produit en stock
-        @PatchMapping(value = "/ajouterStock/{produitId}", consumes = { MediaType.MULTIPART_FORM_DATA_VALUE })
+        @PatchMapping(value = "/ajouterStock", consumes = MediaType.APPLICATION_JSON_VALUE)
         public ResponseEntity<?> ajouterStock(
-                @PathVariable Long produitId,
-                @RequestPart(value = "stock") String stockJson, 
-                @RequestHeader("Authorization") String token, HttpServletRequest request) {
+                @RequestBody AjouterStockRequest request, 
+                @RequestHeader("Authorization") String token, 
+                HttpServletRequest httpRequest) {
             try {
-                if (stockJson == null || stockJson.isEmpty()) {
+                if (request.getProduitsQuantites() == null || request.getProduitsQuantites().isEmpty()) {
                     return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                            .body("Erreur : Le champ 'stock' est obligatoire.");
+                            .body("Erreur : La liste des produits et quantités est obligatoire.");
                 }
         
-                ObjectMapper objectMapper = new ObjectMapper();
-                Stock stockRequest = objectMapper.readValue(stockJson, Stock.class);
-                String description = stockRequest.getDescriptionAjout() != null ? stockRequest.getDescriptionAjout() : null;
+                // Appel du service pour ajouter plusieurs produits en stock
+                Facture facture = produitService.ajouterStock(request.getProduitsQuantites(), request.getDescription(), httpRequest);
         
-                Stock updatedStock = produitService.ajouterStock(produitId, stockRequest.getQuantiteAjoute(), description, request);
-        
-                return ResponseEntity.status(HttpStatus.OK).body(updatedStock);
+                return ResponseEntity.status(HttpStatus.OK).body(new FactureDTO(facture));
         
             } catch (Exception e) {
-                e.printStackTrace();
                 return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                        .body("Une erreur est survenue lors de l'ajout du stock : " + e.getMessage());
+                        .body("Erreur lors de l'ajout du stock : " + e.getMessage());
             }
         }
-
+        
             // Endpoint Stock Historique
             @GetMapping("/stockhistorique/{produitId}")
             public ResponseEntity<?> getStockHistory(@PathVariable Long produitId) {
@@ -353,35 +353,33 @@ public class ProduitController {
 
 
 
-        //Endpoint pour retirer la quantiter du produit en stock
-        @PatchMapping(value = "/retirerStock/{produitId}", consumes = { MediaType.MULTIPART_FORM_DATA_VALUE })
+        // Endpoint pour retirer la quantité du produit en stock (un ou plusieurs produits)
+        @PatchMapping(value = "/retirerStock", consumes = { MediaType.APPLICATION_JSON_VALUE })
         public ResponseEntity<?> retirerStock(
-                @PathVariable Long produitId,
-                @RequestPart(value = "stock") String stockJson, 
+                @RequestBody RetirerStockRequest retirerStockRequest,
                 @RequestHeader("Authorization") String token,
                 HttpServletRequest request) {
             try {
-                if (stockJson == null || stockJson.isEmpty()) {
+                if (retirerStockRequest.getProduitsQuantites() == null || retirerStockRequest.getProduitsQuantites().isEmpty()) {
                     return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                            .body("Erreur : Le champ 'stock' est obligatoire.");
+                            .body("Erreur : Le champ 'produitsQuantites' est obligatoire.");
                 }
         
-                ObjectMapper objectMapper = new ObjectMapper();
-                Stock stockRequest = objectMapper.readValue(stockJson, Stock.class);
-
-                String descriptionRetire = stockRequest.getDescriptionRetire() != null ? stockRequest.getDescriptionRetire() : null;
+                String descriptionRetire = retirerStockRequest.getDescription() != null ? retirerStockRequest.getDescription() : null;
         
-                Stock updatedStock = produitService.retirerStock(produitId, stockRequest.getQuantiteRetirer(), descriptionRetire, request);
+                // Appel à la méthode qui retourne un FactureDTO
+                FactureDTO factureDTO = produitService.retirerStock(retirerStockRequest.getProduitsQuantites(), descriptionRetire, request);
         
-                return ResponseEntity.status(HttpStatus.OK).body(updatedStock);
+                // Retourner la factureDTO dans la réponse
+                return ResponseEntity.status(HttpStatus.OK).body(factureDTO);
         
             } catch (Exception e) {
                 e.printStackTrace();
                 return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                        .body("Une erreur est survenue lors de reduction du stock : " + e.getMessage());
+                        .body("Une erreur est survenue lors de la réduction du stock : " + e.getMessage());
             }
         }
-  
+        
         //Endpoint List des Stock
         @GetMapping("/getAllStock")
         public ResponseEntity<List<Stock>> getAllStocks() {
