@@ -49,11 +49,15 @@ public class Produit {
     @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
     private Unite uniteDeMesure;
 
-    @OneToMany(mappedBy = "produit")
-    @JsonManagedReference("produit-stock")
+    @OneToMany(fetch = FetchType.LAZY)
+    @JoinColumn(name = "stocks_id", nullable = true)
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
     private List<Stock> stocks;
 
-    @OneToMany(mappedBy = "produit", cascade = CascadeType.ALL)
+    @OneToMany(fetch = FetchType.LAZY)
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
+    @JoinColumn(name = "factureProduits_id", nullable = true)
+
     private List<FactureProduit> factureProduits = new ArrayList<>();
 
  
