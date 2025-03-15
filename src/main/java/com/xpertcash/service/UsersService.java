@@ -401,21 +401,36 @@ public class UsersService {
         User user = usersRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
 
-        // Si le numéro de téléphone a été modifié, faire la vérification
+        // Vérification du mot de passe avant toute modification
+        if (request.getPassword() == null || !passwordEncoder.matches(request.getPassword(), user.getPassword())) {
+            throw new RuntimeException("Mot de passe incorrect. Modification refusée.");
+        }
+
+        // Vérification du numéro de téléphone s'il est modifié
         if (request.getPhone() != null && !request.getPhone().equals(user.getPhone())) {
-            // Vérifier si le numéro de téléphone est déjà utilisé par un autre utilisateur
             Optional<User> existingUserWithPhone = usersRepository.findByPhone(request.getPhone());
             if (existingUserWithPhone.isPresent() && !existingUserWithPhone.get().getId().equals(userId)) {
                 throw new RuntimeException("Ce numéro de téléphone est déjà utilisé par un autre utilisateur.");
             }
         }
 
-        // Si le nom a changé, le mettre à jour
+        // Vérification de l'email s'il est modifié
+        if (request.getEmail() != null && !request.getEmail().equals(user.getEmail())) {
+            Optional<User> existingUserWithEmail = usersRepository.findByEmail(request.getEmail());
+            if (existingUserWithEmail.isPresent() && !existingUserWithEmail.get().getId().equals(userId)) {
+                throw new RuntimeException("Cet email est déjà utilisé par un autre utilisateur.");
+            }
+        }
+
+        // Mise à jour des informations
         if (request.getNomComplet() != null) {
             user.setNomComplet(request.getNomComplet());
         }
         if (request.getPhone() != null) {
             user.setPhone(request.getPhone());
+        }
+        if (request.getEmail() != null) {
+            user.setEmail(request.getEmail());
         }
 
         usersRepository.save(user);
