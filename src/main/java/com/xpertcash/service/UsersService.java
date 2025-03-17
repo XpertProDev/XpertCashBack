@@ -459,6 +459,7 @@ public class UsersService {
                 .collect(Collectors.toList());
 
         return new UserRequest(
+                user.getId(),
                 user.getNomComplet(),
                 user.getEntreprise().getNomEntreprise(),
                 user.getEmail(),
