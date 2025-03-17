@@ -22,7 +22,7 @@ public class Facture {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
     private String type;
-    private Integer quantite;
+    //private Integer quantite;
     private String description;
     private LocalDateTime dateFacture;
     private String numeroFacture;
