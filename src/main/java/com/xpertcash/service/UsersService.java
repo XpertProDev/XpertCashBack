@@ -401,12 +401,23 @@ public class UsersService {
         User user = usersRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
 
-        // Vérification du mot de passe avant toute modification
+        // Vérification obligatoire de l'ancien mot de passe avant toute modification
         if (request.getPassword() == null || !passwordEncoder.matches(request.getPassword(), user.getPassword())) {
             throw new RuntimeException("Mot de passe incorrect. Modification refusée.");
         }
 
-        // Vérification du numéro de téléphone s'il est modifié
+        // Vérification si le nouveau mot de passe est identique à l'ancien
+        if (request.getNewPassword() != null && !request.getNewPassword().isEmpty()) {
+            if (request.getNewPassword().length() < 8) {
+                throw new RuntimeException("Le nouveau mot de passe doit contenir au moins 8 caractères.");
+            }
+            if (passwordEncoder.matches(request.getNewPassword(), user.getPassword())) {
+                throw new RuntimeException("Le nouveau mot de passe ne peut pas être identique à l'ancien.");
+            }
+            user.setPassword(passwordEncoder.encode(request.getNewPassword()));
+        }
+
+        // Vérification et mise à jour du téléphone
         if (request.getPhone() != null && !request.getPhone().equals(user.getPhone())) {
             Optional<User> existingUserWithPhone = usersRepository.findByPhone(request.getPhone());
             if (existingUserWithPhone.isPresent() && !existingUserWithPhone.get().getId().equals(userId)) {
@@ -414,7 +425,7 @@ public class UsersService {
             }
         }
 
-        // Vérification de l'email s'il est modifié
+        // Vérification et mise à jour de l'email
         if (request.getEmail() != null && !request.getEmail().equals(user.getEmail())) {
             Optional<User> existingUserWithEmail = usersRepository.findByEmail(request.getEmail());
             if (existingUserWithEmail.isPresent() && !existingUserWithEmail.get().getId().equals(userId)) {
@@ -422,7 +433,7 @@ public class UsersService {
             }
         }
 
-        // Mise à jour des informations
+        // Mise à jour des autres informations
         if (request.getNomComplet() != null) {
             user.setNomComplet(request.getNomComplet());
         }
