@@ -110,7 +110,7 @@ public class UsersController {
             usersService.updateUser(id, request);
             return ResponseEntity.ok("Utilisateur mis à jour avec succès !");
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body("Erreur lors de la mise à jour : " + e.getMessage());
+            return ResponseEntity.badRequest().body(e.getMessage());
         }
     }
 
