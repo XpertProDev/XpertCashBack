@@ -73,9 +73,9 @@ public class ProduitController {
         try {
             // Vérification de l'image reçue
             if (imageFile != null) {
-                System.out.println("📷 Image reçue avec succès : " + imageFile.getOriginalFilename());
+                System.out.println("Image reçue avec succès : " + imageFile.getOriginalFilename());
             } else {
-                System.out.println("❌ Aucune image reçue !");
+                System.out.println("Aucune image reçue !");
             }
 
             // Convertir le JSON en objet ProduitRequest
@@ -124,13 +124,13 @@ public class ProduitController {
             @RequestHeader("Authorization") String token,
             HttpServletRequest request) {
         try {
-            System.out.println("🔄 Début de la mise à jour du produit ID: " + produitId);
+            System.out.println("Début de la mise à jour du produit ID: " + produitId);
     
             // Vérification de l'image reçue
             if (imageFile != null) {
                 System.out.println("📷 Image reçue : " + imageFile.getOriginalFilename());
             } else {
-                System.out.println("❌ Aucune image reçue !");
+                System.out.println("Aucune image reçue !");
             }
     
             // Désérialisation de l'objet JSON en ProduitRequest
@@ -139,7 +139,7 @@ public class ProduitController {
     
             // Vérification si le produit existe
             Produit produit = produitRepository.findById(produitId)
-                    .orElseThrow(() -> new RuntimeException("❌ Produit non trouvé !"));
+                    .orElseThrow(() -> new RuntimeException("Produit non trouvé !"));
     
             // Gestion de l'image
             if (imageFile != null && !imageFile.isEmpty()) {
@@ -188,7 +188,7 @@ public class ProduitController {
                     stock.setQuantiteAjoute(0);
                     stock.setQuantiteRetirer(0);
                     stock.setStockApres(stock.getStockActuel());
-                   
+
                     
                 }
                 if (produitRequest.getSeuilAlert() != null) {
