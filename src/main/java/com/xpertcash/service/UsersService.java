@@ -395,6 +395,45 @@ public class UsersService {
                 return savedUser;
             }
 
+    //Suprim UserToEntreprise
+    @Transactional
+    public void deleteUserFromEntreprise(HttpServletRequest request, Long userId) {
+        String token = request.getHeader("Authorization");
+        if (token == null || !token.startsWith("Bearer ")) {
+            throw new RuntimeException("Token JWT manquant ou mal formaté");
+        }
+
+        token = token.replace("Bearer ", "");
+
+        Long adminId;
+        try {
+            adminId = jwtUtil.extractUserId(token);
+        } catch (Exception e) {
+            throw new RuntimeException("Erreur lors de l'extraction de l'ID de l'admin depuis le token", e);
+        }
+
+        User admin = usersRepository.findById(adminId)
+                .orElseThrow(() -> new RuntimeException("Admin non trouvé"));
+
+        if (admin.getRole() == null || !admin.getRole().getName().equals(RoleType.ADMIN)) {
+            throw new RuntimeException("Seul un ADMIN peut supprimer des utilisateurs !");
+        }
+
+        if (admin.getEntreprise() == null) {
+            throw new RuntimeException("L'Admin n'a pas d'entreprise associée.");
+        }
+
+        User userToDelete = usersRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("Utilisateur à supprimer non trouvé"));
+
+        // Vérifier que l'utilisateur appartient bien à la même entreprise que l'admin
+        if (!userToDelete.getEntreprise().equals(admin.getEntreprise())) {
+            throw new RuntimeException("Vous ne pouvez supprimer que les utilisateurs de votre entreprise.");
+        }
+
+        usersRepository.delete(userToDelete);
+    }
+
     // Pour la modification de utilisateur
     @Transactional
     public User updateUser(Long userId, UpdateUserRequest request) {
@@ -432,7 +471,6 @@ public class UsersService {
                 throw new RuntimeException("Cet email est déjà utilisé par un autre utilisateur.");
             }
         }
-
         // Mise à jour des autres informations
         if (request.getNomComplet() != null) {
             user.setNomComplet(request.getNomComplet());

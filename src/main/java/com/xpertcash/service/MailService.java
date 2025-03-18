@@ -32,7 +32,7 @@ public class MailService {
 
 
     public void sendEmployeEmail(String to, String fullName, String companyName, String role, String email, String password) throws MessagingException {
-        String subject = "Création de votre compte XperCash";
+        String subject = "Création de votre compte XpertCash";
         String htmlContent = generateInfoEmail(fullName, companyName, role, email, password);
         sendEmail(to, subject, htmlContent);
     }
@@ -96,7 +96,7 @@ public class MailService {
                                 Activer mon compte
                             </a>
                             <p style="font-size: 12px; color: #555; margin-top: 30px;">Si vous n'avez pas effectué cette demande, veuillez ignorer cet e-mail.</p>
-                            <p style="font-size: 10px; color: #777;">L'équipe XperCash</p>
+                            <p style="font-size: 10px; color: #777;">L'équipe XpertCash</p>
                         </div>
                     </body>
             </html>
@@ -123,7 +123,7 @@ public class MailService {
                 <a href="http://localhost:8080/login" style="display: inline-block; padding: 12px 20px; background-color: #007bff; color: white; text-decoration: none; border-radius: 5px; font-weight: bold; margin-top: 10px;">
                     Se connecter
                 </a>
-                <p style="font-size: 10px; color: #777;">L'équipe XperCash</p>
+                <p style="font-size: 10px; color: #777;">L'équipe XpertCash</p>
             </div>
         </body>
         </html>
@@ -177,7 +177,7 @@ public class MailService {
                         </h3>
                         <p>Ce code est valable pendant <strong>10 minutes</strong>.</p>
                         <p style="font-size: 12px; color: #555; margin-top: 30px;">Si vous n'avez pas effectué cette demande, veuillez ignorer cet e-mail.</p>
-                       <p style="font-size: 10px; color: #777;">L'équipe XperCash</p>
+                       <p style="font-size: 10px; color: #777;">L'équipe XpertCash</p>
                     </div>
                 </body>
             </html>

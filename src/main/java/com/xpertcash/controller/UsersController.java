@@ -129,11 +129,16 @@ public class UsersController {
 
 
    // Endpoint pour ajouter un utilisateur à l'entreprise de l'Admin
-
     @PostMapping("/add")
     public User addUserToEntreprise(HttpServletRequest request, @RequestBody UserRequest userRequest) {
-        // On appelle le service qui gère l'ajout de l'utilisateur
         return usersService.addUserToEntreprise(request, userRequest);
+    }
+    
+    //Endpoint pour Delet un user a l'enreprise de l'admin
+    @DeleteMapping("/delete/{userId}")
+    public ResponseEntity<String> deleteUserFromEntreprise(HttpServletRequest request, @PathVariable Long userId) {
+        usersService.deleteUserFromEntreprise(request, userId);
+        return ResponseEntity.ok("Utilisateur supprimé avec succès.");
     }
 
 

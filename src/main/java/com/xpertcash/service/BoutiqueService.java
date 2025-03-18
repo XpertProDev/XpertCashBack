@@ -107,15 +107,13 @@ public class BoutiqueService {
 
     //Methode update de Boutique
     public Boutique updateBoutique(Long boutiqueId, String newNomBoutique, String newAdresse, HttpServletRequest request) {
-        // Vérifier que l'utilisateur est un admin
         String token = request.getHeader("Authorization");
         if (token == null || !token.startsWith("Bearer ")) {
             throw new RuntimeException("Token JWT manquant ou mal formaté");
         }
     
-        // 🔍 Extraction de l'ID de l'admin depuis le token
-        Long adminId = jwtUtil.extractUserId(token.substring(7)); // Enlever "Bearer "
-        System.out.println("ID ADMIN EXTRAIT : " + adminId); // 🔥 DEBUG ICI
+        Long adminId = jwtUtil.extractUserId(token.substring(7));
+        System.out.println("ID ADMIN EXTRAIT : " + adminId);
     
         User admin = usersRepository.findById(adminId)
                 .orElseThrow(() -> new RuntimeException("Admin non trouvé"));
@@ -124,7 +122,6 @@ public class BoutiqueService {
             throw new RuntimeException("Seul un ADMIN peut modifier une boutique !");
         }
     
-        // Vérifier si la boutique existe
         Boutique boutique = boutiqueRepository.findById(boutiqueId)
                 .orElseThrow(() -> new RuntimeException("Boutique non trouvée"));
     
@@ -133,7 +130,6 @@ public class BoutiqueService {
         if (newAdresse != null) boutique.setAdresse(newAdresse);
         boutique.setLastUpdated(LocalDateTime.now());
     
-        // Sauvegarder les modifications
         return boutiqueRepository.save(boutique);
     }
     
