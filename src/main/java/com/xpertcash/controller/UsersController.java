@@ -105,12 +105,15 @@ public class UsersController {
 
     // Pour la mise en jour de user
     @PatchMapping("/updateUsers/{id}")
-    public ResponseEntity<String> updateUser(@PathVariable Long id, @RequestBody UpdateUserRequest request) {
+    public ResponseEntity<Map<String, String>> updateUser(@PathVariable Long id, @RequestBody UpdateUserRequest request) {
+        Map<String, String> response = new HashMap<>();
         try {
             usersService.updateUser(id, request);
-            return ResponseEntity.ok("Utilisateur mis à jour avec succès !");
+            response.put("message", "Utilisateur mis à jour avec succès !");
+            return ResponseEntity.ok(response);
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body(e.getMessage());
+            response.put("error", e.getMessage());
+            return ResponseEntity.badRequest().body(response);
         }
     }
 
@@ -133,7 +136,7 @@ public class UsersController {
     public User addUserToEntreprise(HttpServletRequest request, @RequestBody UserRequest userRequest) {
         return usersService.addUserToEntreprise(request, userRequest);
     }
-    
+
     //Endpoint pour Delet un user a l'enreprise de l'admin
     @DeleteMapping("/delete/{userId}")
     public ResponseEntity<String> deleteUserFromEntreprise(HttpServletRequest request, @PathVariable Long userId) {
