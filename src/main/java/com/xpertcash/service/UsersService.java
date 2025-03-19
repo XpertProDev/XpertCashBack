@@ -10,6 +10,7 @@ import com.xpertcash.entity.*;
 import com.xpertcash.exceptions.BusinessException;
 import com.xpertcash.repository.BoutiqueRepository;
 import com.xpertcash.repository.EntrepriseRepository;
+import com.xpertcash.repository.PermissionRepository;
 import com.xpertcash.repository.RoleRepository;
 import com.xpertcash.repository.UsersRepository;
 
@@ -61,6 +62,8 @@ public class UsersService {
     @Autowired
     private BoutiqueRepository boutiqueRepository;
 
+    @Autowired
+    private PermissionRepository permissionRepository; // Injection du PermissionRepository
 
 
 
@@ -389,6 +392,43 @@ public class UsersService {
                 return savedUser;
             }
 
+    //Attribution des permissions à un utilisateur
+    @Transactional
+    public User assignPermissionsToUser(Long userId, Map<PermissionType, Boolean> permissions) {
+        User user = usersRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+
+        // Vérifier que l'utilisateur a un rôle
+        if (user.getRole() == null) {
+            throw new RuntimeException("L'utilisateur n'a pas de rôle attribué.");
+        }
+
+        // Récupérer les permissions existantes du rôle
+        List<Permission> existingPermissions = user.getRole().getPermissions();
+
+        // Ajouter ou retirer les permissions en fonction de la map reçue
+        permissions.forEach((permissionType, isEnabled) -> {
+            Permission permission = permissionRepository.findByType(permissionType)
+                    .orElseThrow(() -> new RuntimeException("Permission non trouvée : " + permissionType));
+
+            if (isEnabled) {
+                // Ajouter la permission si elle n'existe pas déjà
+                if (!existingPermissions.contains(permission)) {
+                    existingPermissions.add(permission);
+                }
+            } else {
+                // Retirer la permission si elle existe
+                existingPermissions.remove(permission);
+            }
+        });
+
+        // Mettre à jour les permissions du rôle
+        user.getRole().setPermissions(existingPermissions);
+        roleRepository.save(user.getRole());
+
+        return user;
+    }
+
     //Suprim UserToEntreprise
     @Transactional
     public void deleteUserFromEntreprise(HttpServletRequest request, Long userId) {
@@ -503,4 +543,11 @@ public class UsersService {
                 boutiqueResponses
         );
     }
+
+    // Pour la récupération de tous les utilisateurs d'une entreprise
+    public List<User> getAllUsersOfEntreprise(Long entrepriseId) {
+        return usersRepository.findByEntrepriseId(entrepriseId);
+    }
+    
+
 }

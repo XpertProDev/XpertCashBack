@@ -10,7 +10,6 @@ public class Permission {
     private Long id;
 
     @Enumerated(EnumType.STRING)
-    @Column(length = 50) // Assurez-vous que la longueur est suffisante
     private PermissionType type;
 
 }

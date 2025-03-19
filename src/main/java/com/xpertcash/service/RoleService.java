@@ -35,54 +35,61 @@ public class RoleService {
 
     @PostConstruct
     public void initRoles() {
-        System.out.println("Initialisation des rôles et permissions...");
+        if (roleRepository.count() == 0) {
+            System.out.println("nitialisation des rôles et permissions...");
 
-        // 1️⃣ Ajouter toutes les permissions en base si elles n'existent pas
-        for (PermissionType type : PermissionType.values()) {
-            if (!permissionRepository.existsByType(type)) {
-                Permission permission = new Permission();
-                permission.setType(type);
-                permissionRepository.save(permission);
+            // 1️⃣ Ajouter toutes les permissions en base si elles n'existent pas
+            for (PermissionType type : PermissionType.values()) {
+                if (!permissionRepository.existsByType(type)) {
+                    Permission permission = new Permission();
+                    permission.setType(type);
+                    permissionRepository.save(permission);
+                }
             }
+
+            // Récupérer toutes les permissions depuis la base
+            List<Permission> allPermissions = permissionRepository.findAll();
+            Map<PermissionType, Permission> permissionMap = allPermissions.stream()
+                    .collect(Collectors.toMap(Permission::getType, p -> p));
+
+            // 3️Créer les rôles et leur attribuer les permissions
+            Role adminRole = new Role();
+            adminRole.setName(RoleType.ADMIN);
+            adminRole.setPermissions(Arrays.asList(
+                permissionMap.get(PermissionType.GERER_PRODUITS),
+                permissionMap.get(PermissionType.VENDRE_PRODUITS),
+                permissionMap.get(PermissionType.VOIR_FLUX_COMPTABLE),
+                permissionMap.get(PermissionType.APPROVISIONNER_STOCK),
+                permissionMap.get(PermissionType.GERER_MAGASINS),
+                permissionMap.get(PermissionType.GERER_PERSONNEL)
+            ));
+
+            Role venteRole = new Role();
+            venteRole.setName(RoleType.VENDEUR);
+            venteRole.setPermissions(Collections.singletonList(
+                permissionMap.get(PermissionType.VENDRE_PRODUITS)
+            ));
+
+            Role rhRole = new Role();
+            rhRole.setName(RoleType.RH);
+            rhRole.setPermissions(Collections.singletonList(
+                permissionMap.get(PermissionType.GERER_PERSONNEL)
+            ));
+
+            Role comptableRole = new Role();
+            comptableRole.setName(RoleType.COMPTABLE);
+            comptableRole.setPermissions(Arrays.asList(
+                permissionMap.get(PermissionType.VOIR_FLUX_COMPTABLE),
+                permissionMap.get(PermissionType.APPROVISIONNER_STOCK)
+            ));
+
+            // 4️⃣ Sauvegarder les rôles avec les permissions associées
+            roleRepository.saveAll(Arrays.asList(adminRole, venteRole, comptableRole, rhRole));
+
+            System.out.println("✅ Rôles et permissions initialisés avec succès !");
         }
-
-        // Récupérer toutes les permissions depuis la base
-        List<Permission> allPermissions = permissionRepository.findAll();
-        Map<PermissionType, Permission> permissionMap = allPermissions.stream()
-                .collect(Collectors.toMap(Permission::getType, p -> p));
-
-        // 3️Créer ou mettre à jour les rôles et leur attribuer les permissions
-        createOrUpdateRole(RoleType.ADMIN, Arrays.asList(
-            permissionMap.get(PermissionType.GERER_PRODUITS),
-            permissionMap.get(PermissionType.VENDRE_PRODUITS),
-            permissionMap.get(PermissionType.VOIR_FLUX_COMPTABLE),
-            permissionMap.get(PermissionType.APPROVISIONNER_STOCK),
-            permissionMap.get(PermissionType.GERER_MAGASINS),
-            permissionMap.get(PermissionType.GERER_PERSONNEL)
-        ));
-
-        createOrUpdateRole(RoleType.VENDEUR, Collections.singletonList(
-            permissionMap.get(PermissionType.VENDRE_PRODUITS)
-        ));
-
-        createOrUpdateRole(RoleType.RH, Collections.singletonList(
-            permissionMap.get(PermissionType.GERER_PERSONNEL)
-        ));
-
-        createOrUpdateRole(RoleType.COMPTABLE, Arrays.asList(
-            permissionMap.get(PermissionType.VOIR_FLUX_COMPTABLE),
-            permissionMap.get(PermissionType.APPROVISIONNER_STOCK)
-        ));
-
-        System.out.println("✅ Rôles et permissions initialisés avec succès !");
     }
 
-    private void createOrUpdateRole(RoleType roleType, List<Permission> permissions) {
-        Role role = roleRepository.findByName(roleType).orElse(new Role());
-        role.setName(roleType);
-        role.setPermissions(permissions);
-        roleRepository.save(role);
-    }
 
     @Transactional
     public User updateUserRole(String token, Long userId, String newRoleName) {

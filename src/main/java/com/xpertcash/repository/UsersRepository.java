@@ -21,5 +21,8 @@ public interface UsersRepository extends JpaRepository<User, Long> {
     Optional<User> findByPhoneAndEntreprise(String phone, Entreprise entreprise);
     Optional<User> findByPhoneAndEntrepriseAndPays(String phone, Entreprise entreprise, String pays);
     List<User> findByEntreprise(Entreprise entreprise);
+
+    // Méthode pour récupérer tous les utilisateurs d'une entreprise
+    List<User> findByEntrepriseId(Long entrepriseId);
 }
 

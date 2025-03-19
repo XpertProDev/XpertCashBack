@@ -5,6 +5,7 @@ import com.xpertcash.DTOs.UpdateUserRequest;
 import com.xpertcash.DTOs.USER.UserRequest;
 import com.xpertcash.composant.AuthorizationService;
 import com.xpertcash.configuration.JwtUtil;
+import com.xpertcash.entity.PermissionType;
 import com.xpertcash.entity.User;
 import com.xpertcash.DTOs.LoginRequest;
 import com.xpertcash.DTOs.RegistrationRequest;
@@ -18,6 +19,7 @@ import org.springframework.http.HttpStatus;
 
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -165,4 +167,18 @@ public class UsersController {
         }
     }
 
+    @PostMapping("/{userId}/permissions")
+    public ResponseEntity<User> assignPermissionsToUser(
+            @PathVariable Long userId,
+            @RequestBody Map<PermissionType, Boolean> permissions) {
+        User updatedUser = usersService.assignPermissionsToUser(userId, permissions);
+        return ResponseEntity.ok(updatedUser);
+    }
+
+    //Get all users
+    @GetMapping("/entreprise/{entrepriseId}/users")
+    public ResponseEntity<List<User>> getAllUsersOfEntreprise(@PathVariable Long entrepriseId) {
+        List<User> users = usersService.getAllUsersOfEntreprise(entrepriseId);
+        return ResponseEntity.ok(users);
+    }
 }
