@@ -24,5 +24,8 @@ public interface UsersRepository extends JpaRepository<User, Long> {
 
     // Méthode pour récupérer tous les utilisateurs d'une entreprise
     List<User> findByEntrepriseId(Long entrepriseId);
+
+    // Méthode pour récupérer tous les utilisateurs d'une entreprise sauf l'ADMIN
+    List<User> findByEntrepriseIdAndIdNot(Long entrepriseId, Long adminId);
 }
 

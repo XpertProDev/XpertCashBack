@@ -176,7 +176,7 @@ public class UsersController {
     }
 
     //Get all users
-    @GetMapping("/entreprise/{entrepriseId}/users")
+    @GetMapping("/entreprise/{entrepriseId}/allusers")
     public ResponseEntity<List<User>> getAllUsersOfEntreprise(@PathVariable Long entrepriseId) {
         List<User> users = usersService.getAllUsersOfEntreprise(entrepriseId);
         return ResponseEntity.ok(users);

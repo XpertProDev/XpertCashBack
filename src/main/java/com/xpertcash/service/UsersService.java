@@ -546,7 +546,13 @@ public class UsersService {
 
     // Pour la récupération de tous les utilisateurs d'une entreprise
     public List<User> getAllUsersOfEntreprise(Long entrepriseId) {
-        return usersRepository.findByEntrepriseId(entrepriseId);
+        // Récupérer l'entreprise
+        Entreprise entreprise = entrepriseRepository.findById(entrepriseId)
+                .orElseThrow(() -> new RuntimeException("Entreprise non trouvée"));
+
+        // Exclure l'ADMIN de la liste des utilisateurs
+        Long adminId = entreprise.getAdmin().getId();
+        return usersRepository.findByEntrepriseIdAndIdNot(entrepriseId, adminId);
     }
     
 
