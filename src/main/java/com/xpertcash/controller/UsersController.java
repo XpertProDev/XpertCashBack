@@ -181,4 +181,11 @@ public class UsersController {
         List<User> users = usersService.getAllUsersOfEntreprise(entrepriseId);
         return ResponseEntity.ok(users);
     }
+
+    //Endpoint Get user by id
+    @GetMapping("/user/{userId}")
+    public ResponseEntity<User> getUserById(@PathVariable Long userId) {
+        User user = usersService.getUserById(userId);
+        return ResponseEntity.ok(user);
+    }
 }

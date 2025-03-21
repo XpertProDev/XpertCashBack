@@ -554,6 +554,12 @@ public class UsersService {
         Long adminId = entreprise.getAdmin().getId();
         return usersRepository.findByEntrepriseIdAndIdNot(entrepriseId, adminId);
     }
+
+    //Get user by id
+    public User getUserById(Long userId) {
+        return usersRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+    }
     
 
 }
