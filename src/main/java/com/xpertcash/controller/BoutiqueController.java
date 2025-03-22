@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.xpertcash.DTOs.ProduitDTO;
@@ -36,11 +37,11 @@ public class BoutiqueController {
     private JwtUtil jwtUtil;
     @Autowired
     private AuthorizationService authorizationService;
-     @Autowired
+    @Autowired
     private BoutiqueService boutiqueService;
 
 
-      // Ajouter une boutique (requête JSON)
+    // Ajouter une boutique (requête JSON)
     @PostMapping("/ajouterBoutique")
     public ResponseEntity<Map<String, String>> ajouterBoutique(
             HttpServletRequest request,
@@ -127,4 +128,25 @@ public class BoutiqueController {
 }
 
     //Endpoint listing Produit boutique
+
+    @PostMapping("/transferer-produits")
+    public ResponseEntity<String> transfererProduits(
+            HttpServletRequest request,
+            @RequestBody Map<String, Object> transfertDetails) {
+        Long boutiqueSourceId = Long.valueOf(transfertDetails.get("boutiqueSourceId").toString());
+        Long boutiqueDestinationId = Long.valueOf(transfertDetails.get("boutiqueDestinationId").toString());
+        Long produitId = Long.valueOf(transfertDetails.get("produitId").toString());
+        int quantite = Integer.parseInt(transfertDetails.get("quantite").toString());
+
+        boutiqueService.transfererProduits(request, boutiqueSourceId, boutiqueDestinationId, produitId, quantite);
+        return ResponseEntity.ok("Transfert de produits effectué avec succès.");
+    }
+
+    @GetMapping("/boutique/{id}/produits")
+    public ResponseEntity<List<Produit>> getProduitsParBoutique(
+            HttpServletRequest request,
+            @PathVariable Long id) {
+        List<Produit> produits = boutiqueService.getProduitsParBoutique(request, id);
+        return ResponseEntity.ok(produits);
+    }
 }

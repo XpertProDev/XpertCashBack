@@ -10,6 +10,9 @@ import lombok.Data;
 
 @Entity
 @Data
+@Table(
+    uniqueConstraints = @UniqueConstraint(columnNames = {"codeGenerique", "boutique_id"})
+)
 public class Produit {
 
     @Id
@@ -21,8 +24,8 @@ public class Produit {
     private Integer quantite;
     private Integer seuilAlert;
     private String description;
-    @Column(unique = true, nullable = false)
-    private String codeGenerique;
+    @Column(nullable = false)
+    private String codeGenerique; // Conserver le code générique unique par boutique
     private String codeBare;
     private String photo;
     private Boolean enStock = false;
@@ -32,7 +35,7 @@ public class Produit {
 
 
     @ManyToOne 
-    @JoinColumn(name = "boutique_id")
+    @JoinColumn(name = "boutique_id", nullable = false)
     @JsonBackReference("produit-boutique")
     private Boutique boutique; 
 
@@ -56,6 +59,12 @@ public class Produit {
     @JoinColumn(name = "factureProduits_id", nullable = true)
     private List<FactureProduit> factureProduits = new ArrayList<>();
 
- 
+    public Boutique getBoutique() {
+        return boutique;
+    }
+
+    public void setBoutique(Boutique boutique) {
+        this.boutique = boutique;
+    }
 
 }

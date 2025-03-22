@@ -36,6 +36,17 @@ public class Boutique {
     @JsonManagedReference("boutique-stock")
     private List<Stock> stocks = new ArrayList<>();
 
+    @OneToMany(mappedBy = "boutique", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<Produit> produits;
+
+    public List<Produit> getProduits() {
+        return produits;
+    }
+
+    public void setProduits(List<Produit> produits) {
+        this.produits = produits;
+    }
+
     @PrePersist
     public void prePersist() {
         this.createdAt = LocalDateTime.now();
