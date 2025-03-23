@@ -24,6 +24,8 @@ public class Boutique {
 
     private String nomBoutique;
     private String adresse;
+    private String telephone;
+    private String email;
     private LocalDateTime createdAt;
     private LocalDateTime lastUpdated;
 
@@ -35,6 +37,17 @@ public class Boutique {
     @OneToMany(mappedBy = "boutique", cascade = CascadeType.ALL)
     @JsonManagedReference("boutique-stock")
     private List<Stock> stocks = new ArrayList<>();
+
+    @OneToMany(mappedBy = "boutique", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<Produit> produits;
+
+    public List<Produit> getProduits() {
+        return produits;
+    }
+
+    public void setProduits(List<Produit> produits) {
+        this.produits = produits;
+    }
 
     @PrePersist
     public void prePersist() {

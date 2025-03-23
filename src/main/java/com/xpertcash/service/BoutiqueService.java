@@ -9,9 +9,12 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.xpertcash.configuration.JwtUtil;
 import com.xpertcash.entity.Boutique;
+import com.xpertcash.entity.Produit;
 import com.xpertcash.entity.RoleType;
+import com.xpertcash.entity.Transfert;
 import com.xpertcash.entity.User;
 import com.xpertcash.repository.BoutiqueRepository;
+import com.xpertcash.repository.TransfertRepository;
 import com.xpertcash.repository.UsersRepository;
 
 import jakarta.servlet.http.HttpServletRequest;
@@ -28,10 +31,12 @@ public class BoutiqueService {
     @Autowired
     private UsersRepository usersRepository;
 
+    @Autowired
+    private TransfertRepository transfertRepository;
 
     // Ajouter une nouvelle boutique pour l'admin
     @Transactional
-    public Boutique ajouterBoutique(HttpServletRequest request, String nomBoutique, String adresse) {
+    public Boutique ajouterBoutique(HttpServletRequest request, String nomBoutique, String adresse, String Telephone, String email) {
         // Vérifier la présence du token JWT dans l'entête de la requête
         String token = request.getHeader("Authorization");
         if (token == null || !token.startsWith("Bearer ")) {
@@ -63,6 +68,8 @@ public class BoutiqueService {
         Boutique boutique = new Boutique();
         boutique.setNomBoutique(nomBoutique);
         boutique.setAdresse(adresse);
+        boutique.setTelephone(Telephone);
+        boutique.setEmail(email);
         boutique.setEntreprise(admin.getEntreprise());
         boutique.setCreatedAt(LocalDateTime.now());
 
@@ -106,7 +113,7 @@ public class BoutiqueService {
 
 
     //Methode update de Boutique
-    public Boutique updateBoutique(Long boutiqueId, String newNomBoutique, String newAdresse, HttpServletRequest request) {
+    public Boutique updateBoutique(Long boutiqueId, String newNomBoutique, String newAdresse,String newTelephone, String newEmail, HttpServletRequest request) {
         String token = request.getHeader("Authorization");
         if (token == null || !token.startsWith("Bearer ")) {
             throw new RuntimeException("Token JWT manquant ou mal formaté");
@@ -128,41 +135,124 @@ public class BoutiqueService {
         // Modifier les informations de la boutique
         if (newNomBoutique != null) boutique.setNomBoutique(newNomBoutique);
         if (newAdresse != null) boutique.setAdresse(newAdresse);
+        if (newTelephone != null) boutique.setTelephone(newTelephone);
+        if (newEmail != null) boutique.setEmail(newEmail);
         boutique.setLastUpdated(LocalDateTime.now());
     
         return boutiqueRepository.save(boutique);
     }
 
-    // Boutique parc son Id
-    public Boutique getBoutiqueById(Long id, HttpServletRequest request) {
-        // Vérification du token JWT
+    @Transactional
+    public void transfererProduits(HttpServletRequest request, Long boutiqueSourceId, Long boutiqueDestinationId, Long produitId, int quantite) {
+        // Vérifier la présence du token JWT dans l'entête de la requête
         String token = request.getHeader("Authorization");
         if (token == null || !token.startsWith("Bearer ")) {
             throw new RuntimeException("Token JWT manquant ou mal formaté");
         }
 
-        // Extraction ID utilisateur
-        Long userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
+        // Extraire l'ID de l'utilisateur depuis le token
+        Long adminId = jwtUtil.extractUserId(token.substring(7));
 
-        // Récupération utilisateur
-        User user = usersRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+        // Récupérer l'utilisateur (admin)
+        User admin = usersRepository.findById(adminId)
+                .orElseThrow(() -> new RuntimeException("Admin non trouvé"));
 
-        // Vérification rôle ADMIN
-        if (!user.getRole().getName().equals(RoleType.ADMIN)) {
-            throw new RuntimeException("Accès non autorisé");
+        // Vérifier que l'utilisateur est bien un admin
+        if (admin.getRole() == null || !admin.getRole().getName().equals(RoleType.ADMIN)) {
+            throw new RuntimeException("Seul un admin peut transférer des produits !");
         }
 
-        // Récupération boutique
-        Boutique boutique = boutiqueRepository.findById(id)
+        // Récupérer les boutiques source et destination
+        Boutique boutiqueSource = boutiqueRepository.findById(boutiqueSourceId)
+                .orElseThrow(() -> new RuntimeException("Boutique source non trouvée"));
+        Boutique boutiqueDestination = boutiqueRepository.findById(boutiqueDestinationId)
+                .orElseThrow(() -> new RuntimeException("Boutique destination non trouvée"));
+
+        // Vérifier que les deux boutiques appartiennent à l'entreprise de l'admin
+        if (!boutiqueSource.getEntreprise().equals(admin.getEntreprise()) ||
+            !boutiqueDestination.getEntreprise().equals(admin.getEntreprise())) {
+            throw new RuntimeException("Les boutiques doivent appartenir à l'entreprise de l'admin !");
+        }
+
+        // Vérifier que le produit existe dans la boutique source et que la quantité est suffisante
+        Produit produit = boutiqueSource.getProduits().stream()
+                .filter(p -> p.getId().equals(produitId))
+                .findFirst()
+                .orElseThrow(() -> new RuntimeException("Produit non trouvé dans la boutique source"));
+
+        if (produit.getQuantite() < quantite) {
+            throw new RuntimeException("Quantité insuffisante dans la boutique source !");
+        }
+
+        // Réduire la quantité dans la boutique source
+        produit.setQuantite(produit.getQuantite() - quantite);
+
+        // Ajouter ou mettre à jour le produit dans la boutique destination
+        Produit produitDestination = boutiqueDestination.getProduits().stream()
+                .filter(p -> p.getCodeGenerique().equals(produit.getCodeGenerique()))
+                .findFirst()
+                .orElse(null);
+
+        if (produitDestination == null) {
+            // Si le produit n'existe pas dans la boutique destination, le créer
+            Produit nouveauProduit = new Produit();
+            nouveauProduit.setNom(produit.getNom());
+            nouveauProduit.setPrixVente(produit.getPrixVente());
+            nouveauProduit.setPrixAchat(produit.getPrixAchat());
+            nouveauProduit.setQuantite(quantite);
+            nouveauProduit.setCodeGenerique(produit.getCodeGenerique()); // Conserver le même code générique
+            nouveauProduit.setCodeBare(produit.getCodeBare()); // Conserver le même code barre
+            nouveauProduit.setPhoto(produit.getPhoto()); // Copier l'image du produit
+            nouveauProduit.setBoutique(boutiqueDestination); // Associer la boutique destination
+            boutiqueDestination.getProduits().add(nouveauProduit);
+        } else {
+            // Sinon, mettre à jour la quantité
+            produitDestination.setQuantite(produitDestination.getQuantite() + quantite);
+        }
+
+        // Enregistrer le transfert
+        Transfert transfert = new Transfert();
+        transfert.setProduit(produit);
+        transfert.setBoutiqueSource(boutiqueSource);
+        transfert.setBoutiqueDestination(boutiqueDestination);
+        transfert.setQuantite(quantite);
+        transfertRepository.save(transfert);
+
+        // Sauvegarder les modifications
+        boutiqueRepository.save(boutiqueSource);
+        boutiqueRepository.save(boutiqueDestination);
+    }
+
+    public List<Produit> getProduitsParBoutique(HttpServletRequest request, Long boutiqueId) {
+        // Vérifier la présence du token JWT dans l'entête de la requête
+        String token = request.getHeader("Authorization");
+        if (token == null || !token.startsWith("Bearer ")) {
+            throw new RuntimeException("Token JWT manquant ou mal formaté");
+        }
+
+        // Extraire l'ID de l'utilisateur depuis le token
+        Long userId = jwtUtil.extractUserId(token.substring(7));
+
+        // Récupérer l'utilisateur (admin)
+        User admin = usersRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("Admin non trouvé"));
+
+        // Vérifier que l'utilisateur est bien un admin
+        if (admin.getRole() == null || !admin.getRole().getName().equals(RoleType.ADMIN)) {
+            throw new RuntimeException("Seul un admin peut accéder aux produits !");
+        }
+
+        // Récupérer la boutique par son ID
+        Boutique boutique = boutiqueRepository.findById(boutiqueId)
                 .orElseThrow(() -> new RuntimeException("Boutique non trouvée"));
 
-        // Vérification appartenance à l'entreprise
-        if (!boutique.getEntreprise().getId().equals(user.getEntreprise().getId())) {
-            throw new RuntimeException("Accès interdit à cette boutique");
+        // Vérifier que la boutique appartient à l'entreprise de l'admin
+        if (!boutique.getEntreprise().equals(admin.getEntreprise())) {
+            throw new RuntimeException("Vous n'avez pas accès à cette boutique !");
         }
 
-        return boutique;
+        // Retourner la liste des produits de la boutique
+        return boutique.getProduits();
     }
 
 }

@@ -126,6 +126,8 @@ public class UsersService {
         Boutique boutique = new Boutique();
         boutique.setNomBoutique(nomBoutique);
         boutique.setEntreprise(entreprise);
+        boutique.setTelephone(phone);
+        boutique.setEmail(email);
         boutique.setCreatedAt(LocalDateTime.now());
         boutiqueRepository.save(boutique);
     
@@ -540,7 +542,7 @@ public class UsersService {
         List<BoutiqueResponse> boutiqueResponses = user.getEntreprise()
                 .getBoutiques()
                 .stream()
-                .map(b -> new BoutiqueResponse(b.getId(), b.getNomBoutique(), b.getAdresse(), b.getCreatedAt()))
+                .map(b -> new BoutiqueResponse(b.getId(), b.getNomBoutique(), b.getAdresse(),b.getTelephone(), b.getEmail(),b.getCreatedAt()))
                 .collect(Collectors.toList());
 
         return new UserRequest(
