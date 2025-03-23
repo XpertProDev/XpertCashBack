@@ -127,4 +127,15 @@ public class BoutiqueController {
 }
 
     //Endpoint listing Produit boutique
+
+    // BoutiqueController.java
+    @GetMapping("/boutique/{id}")
+    public ResponseEntity<?> getBoutiqueById(@PathVariable Long id, HttpServletRequest request) {
+        try {
+            Boutique boutique = boutiqueService.getBoutiqueById(id, request);
+            return ResponseEntity.ok(boutique);
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
+        }
+    }
 }

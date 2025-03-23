@@ -132,8 +132,37 @@ public class BoutiqueService {
     
         return boutiqueRepository.save(boutique);
     }
-    
 
+    // Boutique parc son Id
+    public Boutique getBoutiqueById(Long id, HttpServletRequest request) {
+        // Vérification du token JWT
+        String token = request.getHeader("Authorization");
+        if (token == null || !token.startsWith("Bearer ")) {
+            throw new RuntimeException("Token JWT manquant ou mal formaté");
+        }
 
+        // Extraction ID utilisateur
+        Long userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
+
+        // Récupération utilisateur
+        User user = usersRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+
+        // Vérification rôle ADMIN
+        if (!user.getRole().getName().equals(RoleType.ADMIN)) {
+            throw new RuntimeException("Accès non autorisé");
+        }
+
+        // Récupération boutique
+        Boutique boutique = boutiqueRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Boutique non trouvée"));
+
+        // Vérification appartenance à l'entreprise
+        if (!boutique.getEntreprise().getId().equals(user.getEntreprise().getId())) {
+            throw new RuntimeException("Accès interdit à cette boutique");
+        }
+
+        return boutique;
+    }
 
 }
