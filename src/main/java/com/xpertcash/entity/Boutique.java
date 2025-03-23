@@ -24,6 +24,8 @@ public class Boutique {
 
     private String nomBoutique;
     private String adresse;
+    private String telephone;
+    private String email;
     private LocalDateTime createdAt;
     private LocalDateTime lastUpdated;
 

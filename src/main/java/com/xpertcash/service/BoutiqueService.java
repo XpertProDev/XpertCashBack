@@ -11,8 +11,10 @@ import com.xpertcash.configuration.JwtUtil;
 import com.xpertcash.entity.Boutique;
 import com.xpertcash.entity.Produit;
 import com.xpertcash.entity.RoleType;
+import com.xpertcash.entity.Transfert;
 import com.xpertcash.entity.User;
 import com.xpertcash.repository.BoutiqueRepository;
+import com.xpertcash.repository.TransfertRepository;
 import com.xpertcash.repository.UsersRepository;
 
 import jakarta.servlet.http.HttpServletRequest;
@@ -29,10 +31,12 @@ public class BoutiqueService {
     @Autowired
     private UsersRepository usersRepository;
 
+    @Autowired
+    private TransfertRepository transfertRepository;
 
     // Ajouter une nouvelle boutique pour l'admin
     @Transactional
-    public Boutique ajouterBoutique(HttpServletRequest request, String nomBoutique, String adresse) {
+    public Boutique ajouterBoutique(HttpServletRequest request, String nomBoutique, String adresse, String Telephone, String email) {
         // Vérifier la présence du token JWT dans l'entête de la requête
         String token = request.getHeader("Authorization");
         if (token == null || !token.startsWith("Bearer ")) {
@@ -64,6 +68,8 @@ public class BoutiqueService {
         Boutique boutique = new Boutique();
         boutique.setNomBoutique(nomBoutique);
         boutique.setAdresse(adresse);
+        boutique.setTelephone(Telephone);
+        boutique.setEmail(email);
         boutique.setEntreprise(admin.getEntreprise());
         boutique.setCreatedAt(LocalDateTime.now());
 
@@ -107,7 +113,7 @@ public class BoutiqueService {
 
 
     //Methode update de Boutique
-    public Boutique updateBoutique(Long boutiqueId, String newNomBoutique, String newAdresse, HttpServletRequest request) {
+    public Boutique updateBoutique(Long boutiqueId, String newNomBoutique, String newAdresse,String newTelephone, String newEmail, HttpServletRequest request) {
         String token = request.getHeader("Authorization");
         if (token == null || !token.startsWith("Bearer ")) {
             throw new RuntimeException("Token JWT manquant ou mal formaté");
@@ -129,6 +135,8 @@ public class BoutiqueService {
         // Modifier les informations de la boutique
         if (newNomBoutique != null) boutique.setNomBoutique(newNomBoutique);
         if (newAdresse != null) boutique.setAdresse(newAdresse);
+        if (newTelephone != null) boutique.setTelephone(newTelephone);
+        if (newEmail != null) boutique.setEmail(newEmail);
         boutique.setLastUpdated(LocalDateTime.now());
     
         return boutiqueRepository.save(boutique);
@@ -201,6 +209,14 @@ public class BoutiqueService {
             // Sinon, mettre à jour la quantité
             produitDestination.setQuantite(produitDestination.getQuantite() + quantite);
         }
+
+        // Enregistrer le transfert
+        Transfert transfert = new Transfert();
+        transfert.setProduit(produit);
+        transfert.setBoutiqueSource(boutiqueSource);
+        transfert.setBoutiqueDestination(boutiqueDestination);
+        transfert.setQuantite(quantite);
+        transfertRepository.save(transfert);
 
         // Sauvegarder les modifications
         boutiqueRepository.save(boutiqueSource);

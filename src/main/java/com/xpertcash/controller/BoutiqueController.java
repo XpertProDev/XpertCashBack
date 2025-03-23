@@ -17,13 +17,17 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.xpertcash.DTOs.BoutiqueResponse;
 import com.xpertcash.DTOs.ProduitDTO;
+import com.xpertcash.DTOs.TransfertDTO;
 import com.xpertcash.composant.AuthorizationService;
 import com.xpertcash.configuration.JwtUtil;
 import com.xpertcash.entity.Boutique;
 import com.xpertcash.entity.Produit;
+import com.xpertcash.entity.Transfert;
 import com.xpertcash.service.BoutiqueService;
 import com.xpertcash.service.UsersService;
+import com.xpertcash.repository.TransfertRepository;
 
 import jakarta.servlet.http.HttpServletRequest;
 
@@ -39,7 +43,8 @@ public class BoutiqueController {
     private AuthorizationService authorizationService;
     @Autowired
     private BoutiqueService boutiqueService;
-
+    @Autowired
+    private TransfertRepository transfertRepository;
 
     // Ajouter une boutique (requête JSON)
     @PostMapping("/ajouterBoutique")
@@ -53,8 +58,10 @@ public class BoutiqueController {
             // Extraire les données depuis la requête
             String nomBoutique = boutiqueDetails.get("nomBoutique");
             String adresse = boutiqueDetails.get("adresse");
+            String telephone = boutiqueDetails.get("telephone");
+            String email = boutiqueDetails.get("email");
 
-            Boutique nouvelleBoutique = boutiqueService.ajouterBoutique(request, nomBoutique, adresse);
+            Boutique nouvelleBoutique = boutiqueService.ajouterBoutique(request, nomBoutique, adresse, telephone, email);
             
             response.put("message", "Boutique ajoutée avec succès !");
             return ResponseEntity.ok(response);
@@ -81,13 +88,24 @@ public class BoutiqueController {
 
     // Récupérer toutes les boutiques d'une entreprise
     @GetMapping("/boutiqueEntreprise")
-    public ResponseEntity<List<Boutique>> getBoutiquesByEntreprise(HttpServletRequest request) {
-        // Utilisation du service pour récupérer les boutiques
+    public ResponseEntity<List<BoutiqueResponse>> getBoutiquesByEntreprise(HttpServletRequest request) {
         List<Boutique> boutiques = boutiqueService.getBoutiquesByEntreprise(request);
 
-        // Retourner la liste des boutiques
-        return ResponseEntity.ok(boutiques);
+        List<BoutiqueResponse> boutiqueResponses = boutiques.stream()
+            .map(boutique -> new BoutiqueResponse(
+                boutique.getId(),
+                boutique.getNomBoutique(),
+                boutique.getAdresse(),
+                boutique.getTelephone(),
+                boutique.getEmail(),
+                boutique.getCreatedAt()
+            ))
+            .toList();
+
+        return ResponseEntity.ok(boutiqueResponses);
     }
+
+
 
 
     //Endpoint Update Boutique
@@ -103,8 +121,11 @@ public class BoutiqueController {
         // Extraire les nouveaux noms depuis le JSON
         String newNomBoutique = updates.get("nomBoutique");
         String newAdresse = updates.get("adresse");
+        String newTelephone = updates.get("telephone");
+        String newEmail = updates.get("email");
 
-        Boutique updatedBoutique = boutiqueService.updateBoutique(id, newNomBoutique, newAdresse, request);
+
+        Boutique updatedBoutique = boutiqueService.updateBoutique(id, newNomBoutique, newAdresse, newTelephone, newEmail, request);
         
         response.put("message", "Boutique mise à jour avec succès !");
         return ResponseEntity.ok(response);
@@ -148,5 +169,31 @@ public class BoutiqueController {
             @PathVariable Long id) {
         List<Produit> produits = boutiqueService.getProduitsParBoutique(request, id);
         return ResponseEntity.ok(produits);
+    }
+
+    @GetMapping("/transferts")
+    public ResponseEntity<List<TransfertDTO>> getTransferts(
+            @RequestParam(required = false) Long boutiqueId) {
+        List<Transfert> transferts;
+        if (boutiqueId != null) {
+            transferts = transfertRepository.findByBoutiqueSourceIdOrBoutiqueDestinationId(boutiqueId, boutiqueId);
+        } else {
+            transferts = transfertRepository.findAll();
+        }
+
+        // Convertir les entités Transfert en DTO
+        List<TransfertDTO> transfertDTOs = transferts.stream().map(transfert -> {
+            TransfertDTO dto = new TransfertDTO();
+            dto.setId(transfert.getId());
+            dto.setProduitNom(transfert.getProduit().getNom());
+            dto.setProduitCodeGenerique(transfert.getProduit().getCodeGenerique());
+            dto.setBoutiqueSourceNom(transfert.getBoutiqueSource().getNomBoutique());
+            dto.setBoutiqueDestinationNom(transfert.getBoutiqueDestination().getNomBoutique());
+            dto.setQuantite(transfert.getQuantite());
+            dto.setDateTransfert(transfert.getDateTransfert().toString());
+            return dto;
+        }).toList();
+
+        return ResponseEntity.ok(transfertDTOs);
     }
 }
