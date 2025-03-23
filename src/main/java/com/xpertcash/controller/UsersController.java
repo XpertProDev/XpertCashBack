@@ -188,4 +188,16 @@ public class UsersController {
         User user = usersService.getUserById(userId);
         return ResponseEntity.ok(user);
     }
+
+    // Endpoint pour suspendre ou réactiver un utilisateur
+    @PutMapping("/suspendre/{userId}")
+    public ResponseEntity<String> suspendUser(
+            HttpServletRequest request,
+            @PathVariable Long userId,
+            @RequestParam boolean suspend) {
+        usersService.suspendUser(request, userId, suspend);
+        String message = suspend ? "Utilisateur suspendu avec succès." : "Utilisateur réactivé avec succès.";
+        return ResponseEntity.ok(message);
+    }
+    
 }

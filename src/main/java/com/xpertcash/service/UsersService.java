@@ -179,53 +179,66 @@ public class UsersService {
 
     // Connexion : vérifie l'état du compte et retourne un token JWT
     public String login(String email, String password) {
-                // Récupérer l'utilisateur par son email
-                User user = usersRepository.findByEmail(email)
-                        .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
-
-                // Vérification du mot de passe
-                if (!passwordEncoder.matches(password, user.getPassword())) {
-                    throw new RuntimeException("Mot de passe incorrect.");
-                }
-
-                // Vérification si le compte est verrouillé
-                if (user.isLocked()) {
-                    throw new RuntimeException("Votre compte est verrouillé pour inactivité.");
-                }
-
-                // Récupérer l'admin associé à l'entreprise de l'utilisateur
-                User admin = user.getEntreprise().getAdmin();
-
-                // Vérifier si l'utilisateur est ADMIN
-                boolean isAdmin = user.getRole().getName().equals(RoleType.ADMIN);
-
-                // Vérifier si le compte a été créé il y a moins de 24h
-                LocalDateTime expirationDate = user.getCreatedAt().plusHours(24);
-                //LocalDateTime expirationDate = user.getCreatedAt().plusMinutes(5);
-                boolean within24Hours = LocalDateTime.now().isBefore(expirationDate);
-
-                // **Cas 1 : ADMIN**
-                if (isAdmin) {
-                    if (!user.isActivatedLien() && !within24Hours) {
-                        throw new RuntimeException("Votre compte administrateur n'est pas activé et la période de connexion temporaire est expirée.");
-                    }
-                } else {
-                    // **Cas 2 : EMPLOYÉ**
-                    if (!admin.isActivatedLien()) {
-                        if (!within24Hours) {
-                            throw new RuntimeException("Votre compte est désactivé car votre administrateur n'a pas activé son compte.");
-                        }
-                    }
-                }
-
-                // Si tout est OK, mise à jour de la dernière activité
-                user.setLastActivity(LocalDateTime.now());
-                usersRepository.save(user);
-
-                // Générer et retourner le JWT
-                return generateToken(user);
+        // Récupérer l'utilisateur par son email
+        User user = usersRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+    
+        // Vérification du mot de passe
+        if (!passwordEncoder.matches(password, user.getPassword())) {
+            throw new RuntimeException("Mot de passe incorrect.");
+        }
+    
+        // Vérification si le compte est verrouillé
+        if (user.isLocked()) {
+            throw new RuntimeException("Votre compte est verrouillé pour inactivité.");
+        }
+    
+        // Récupérer l'admin associé à l'entreprise de l'utilisateur
+        User admin = user.getEntreprise().getAdmin();
+    
+        // Vérifier si l'utilisateur est ADMIN
+        boolean isAdmin = user.getRole().getName().equals(RoleType.ADMIN);
+    
+        // Vérifier si le compte a été créé il y a moins de 24h
+        LocalDateTime expirationDate = user.getCreatedAt().plusHours(24);
+        boolean within24Hours = LocalDateTime.now().isBefore(expirationDate);
+    
+        // **Cas 1 : ADMIN**
+        if (isAdmin) {
+            if (!user.isActivatedLien() && !within24Hours) {
+                throw new RuntimeException("Votre compte administrateur n'est pas activé et la période de connexion temporaire est expirée.");
             }
-
+        } else {
+            // **Cas 2 : EMPLOYÉ**
+            boolean adminWithin24Hours = LocalDateTime.now().isBefore(admin.getCreatedAt().plusHours(24));
+            if (!admin.isEnabledLien() && !adminWithin24Hours) {
+                throw new RuntimeException("Votre compte est désactivé car votre administrateur n'a pas activé son compte.");
+            }
+    
+            // Vérifier si le compte de l'admin est désactivé après 24 heures
+            if (!admin.isEnabledLien()) {
+                throw new RuntimeException("Votre compte est désactivé car votre administrateur est désactivé.");
+            }
+        }
+    
+        // Vérification si le compte de l'admin est désactivé après 24 heures
+        if (!isAdmin && !admin.isEnabledLien() && !LocalDateTime.now().isBefore(admin.getCreatedAt().plusHours(24))) {
+            throw new RuntimeException("Votre compte est désactivé car votre administrateur n'a pas activé son compte.");
+        }
+    
+        // Vérifier si le compte utilisateur est activé
+        if (!user.isEnabledLien()) {
+            throw new RuntimeException("Votre compte est suspendu. Veuillez contacter l'administrateur.");
+        }
+    
+        // Si tout est OK, mise à jour de la dernière activité
+        user.setLastActivity(LocalDateTime.now());
+        usersRepository.save(user);
+    
+        // Générer et retourner le JWT
+        return generateToken(user);
+    }
+    
     // Génèration du token
     private String generateToken(User user) {
         long expirationTime = 1000 * 60 * 60 * 24; // 24 heures
@@ -560,6 +573,47 @@ public class UsersService {
         return usersRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
     }
-    
+
+
+    // Méthode pour suspendre ou réactiver un utilisateur
+    @Transactional
+    public void suspendUser(HttpServletRequest request, Long userId, boolean suspend) {
+        String token = request.getHeader("Authorization");
+        if (token == null || !token.startsWith("Bearer ")) {
+            throw new RuntimeException("Token JWT manquant ou mal formaté");
+        }
+
+        token = token.replace("Bearer ", "");
+
+        Long adminId;
+        try {
+            adminId = jwtUtil.extractUserId(token);
+        } catch (Exception e) {
+            throw new RuntimeException("Erreur lors de l'extraction de l'ID de l'admin depuis le token", e);
+        }
+
+        User admin = usersRepository.findById(adminId)
+                .orElseThrow(() -> new RuntimeException("Admin non trouvé"));
+
+        if (admin.getRole() == null || !admin.getRole().getName().equals(RoleType.ADMIN)) {
+            throw new RuntimeException("Seul un ADMIN peut suspendre ou réactiver des utilisateurs !");
+        }
+
+        if (admin.getEntreprise() == null) {
+            throw new RuntimeException("L'Admin n'a pas d'entreprise associée.");
+        }
+
+        User userToSuspend = usersRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+
+        // Vérifier que l'utilisateur appartient bien à la même entreprise que l'admin
+        if (!userToSuspend.getEntreprise().equals(admin.getEntreprise())) {
+            throw new RuntimeException("Vous ne pouvez suspendre que les utilisateurs de votre entreprise.");
+        }
+
+        // Suspendre ou réactiver l'utilisateur
+        userToSuspend.setEnabledLien(!suspend);
+        usersRepository.save(userToSuspend);
+    }
 
 }
