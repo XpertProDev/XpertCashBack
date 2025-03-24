@@ -734,7 +734,9 @@ public class ProduitService {
         Produit produit = produitRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Produit avec ID " + id + " non trouvé"));
 
-        return mapToProduitDTO(produit);
+        ProduitDTO dto = mapToProduitDTO(produit);
+        dto.setBoutiqueId(produit.getBoutique() != null ? produit.getBoutique().getId() : null); // Ajouter l'ID de la boutique
+        return dto;
     }
 
     private ProduitDTO mapToProduitDTO(Produit produit) {
@@ -756,7 +758,7 @@ public class ProduitService {
         dto.setLastUpdated(produit.getLastUpdated());
         dto.setNomCategorie(produit.getCategorie() != null ? produit.getCategorie().getNom() : null);
         dto.setNomUnite(produit.getUniteDeMesure() != null ? produit.getUniteDeMesure().getNom() : null);
-
+        dto.setBoutiqueId(produit.getBoutique() != null ? produit.getBoutique().getId() : null); // Ajouter l'ID de la boutique
         return dto;
     }
     

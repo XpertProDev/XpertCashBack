@@ -46,5 +46,15 @@ public class ProduitDTO {
 
     private LocalDateTime createdAt;
     private LocalDateTime lastUpdated;
+
+    private Long boutiqueId;
+
+    public Long getBoutiqueId() {
+        return boutiqueId;
+    }
+
+    public void setBoutiqueId(Long boutiqueId) {
+        this.boutiqueId = boutiqueId;
+    }
     
 }
