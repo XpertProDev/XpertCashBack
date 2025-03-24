@@ -22,16 +22,26 @@ public class Facture {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
     private String type;
-    //private Integer quantite;
     private String description;
     private LocalDateTime dateFacture;
     private String numeroFacture;
 
-      @ManyToOne
-    @JoinColumn(name = "user_id")
+    @ManyToOne
+    @JoinColumn(name = "boutique_id", referencedColumnName = "id", nullable = false)
+    private Boutique boutique;
+
+    @ManyToOne
+    @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
-    @OneToMany(mappedBy = "facture", cascade = CascadeType.ALL)
+    @OneToMany(mappedBy = "facture", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<FactureProduit> factureProduits = new ArrayList<>();
 
+    public Boutique getBoutique() {
+        return boutique;
+    }
+
+    public void setBoutique(Boutique boutique) {
+        this.boutique = boutique;
+    }
 }

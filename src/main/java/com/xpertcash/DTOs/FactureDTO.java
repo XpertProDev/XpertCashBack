@@ -22,6 +22,7 @@ public class FactureDTO {
     private String nomUtilisateur;
     private String telephoneUtilisateur;
     private List<ProduitFactureDTO> produits;
+    private Long boutiqueId;
 
     public FactureDTO(Facture facture) {
         this.id = facture.getId();
@@ -33,6 +34,10 @@ public class FactureDTO {
         if (facture.getUser() != null) {
             this.nomUtilisateur = facture.getUser().getNomComplet();
             this.telephoneUtilisateur = facture.getUser().getPhone();
+        }
+
+        if (facture.getBoutique() != null) {
+            this.boutiqueId = facture.getBoutique().getId();
         }
 
         // Convertir les FactureProduit en ProduitFactureDTO

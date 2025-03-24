@@ -91,7 +91,8 @@ public class ProduitService {
     
             // Trouver la boutique associée par son ID
             Boutique boutique = boutiqueRepository.findById(boutiqueId)
-                    .orElseThrow(() -> new RuntimeException("Boutique avec l'ID " + boutiqueId + " non trouvée"));
+        .orElseThrow(() -> new RuntimeException("Boutique non trouvée"));
+        
     
             // Vérification de l'existence du produit par nom, prix et boutiqueId
             Produit existingProduit = produitRepository.findByNomAndBoutiqueId(produitRequest.getNom(), boutiqueId);
@@ -225,7 +226,7 @@ public class ProduitService {
     
 
     //Methode pour ajuster la quantiter du produit en stock
-    public Facture ajouterStock(Map<Long, Integer> produitsQuantites, String description, HttpServletRequest request) {
+    public Facture ajouterStock(Long boutiqueId, Map<Long, Integer> produitsQuantites, String description, HttpServletRequest request) {
         // Récupérer le token JWT depuis le header "Authorization"
         String token = request.getHeader("Authorization");
         if (token == null || !token.startsWith("Bearer ")) {
@@ -285,7 +286,7 @@ public class ProduitService {
     }
     
     // Méthode pour ajuster la quantité du produit en stock (retirer des produits)
-    public FactureDTO retirerStock(Map<Long, Integer> produitsQuantites, String description, HttpServletRequest request) {
+    public FactureDTO retirerStock(Long boutiqueId, Map<Long, Integer> produitsQuantites, String description, HttpServletRequest request) {
     // Récupérer le token JWT depuis le header "Authorization"
     String token = request.getHeader("Authorization");
     if (token == null || !token.startsWith("Bearer ")) {
@@ -365,6 +366,13 @@ public class ProduitService {
         facture.setDescription(description);
         facture.setDateFacture(LocalDateTime.now());
         facture.setUser(user);
+
+        // Associer la boutique à la facture (en supposant que tous les produits appartiennent à la même boutique)
+        if (!produits.isEmpty() && produits.get(0).getBoutique() != null) {
+            facture.setBoutique(produits.get(0).getBoutique());
+        } else {
+            throw new RuntimeException("Impossible de créer une facture sans boutique associée.");
+        }
 
         List<FactureProduit> factureProduits = new ArrayList<>();
         

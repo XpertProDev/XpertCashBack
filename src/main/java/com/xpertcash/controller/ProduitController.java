@@ -299,7 +299,8 @@ public class ProduitController {
                 }
         
                 // Appel du service pour ajouter plusieurs produits en stock
-                Facture facture = produitService.ajouterStock(request.getProduitsQuantites(), request.getDescription(), httpRequest);
+                Facture facture = produitService.ajouterStock(request.getBoutiqueId(), request.getProduitsQuantites(), request.getDescription(), httpRequest);
+
         
                 return ResponseEntity.status(HttpStatus.OK).body(new FactureDTO(facture));
         
@@ -364,9 +365,9 @@ public class ProduitController {
                 }
         
                 String descriptionRetire = retirerStockRequest.getDescription() != null ? retirerStockRequest.getDescription() : null;
+                Long boutiqueId = retirerStockRequest.getBoutiqueId();
         
-                // Appel à la méthode qui retourne un FactureDTO
-                FactureDTO factureDTO = produitService.retirerStock(retirerStockRequest.getProduitsQuantites(), descriptionRetire, request);
+                FactureDTO factureDTO = produitService.retirerStock(boutiqueId, retirerStockRequest.getProduitsQuantites(), descriptionRetire, request);
         
                 // Retourner la factureDTO dans la réponse
                 return ResponseEntity.status(HttpStatus.OK).body(factureDTO);

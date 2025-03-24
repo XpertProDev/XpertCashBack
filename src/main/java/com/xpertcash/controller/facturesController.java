@@ -11,9 +11,12 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.PathVariable;
 
 import com.xpertcash.DTOs.FactureDTO;
+import com.xpertcash.entity.Boutique;
 import com.xpertcash.entity.Facture;
+import com.xpertcash.repository.BoutiqueRepository;
 import com.xpertcash.repository.FactureRepository;
 
 @RestController
@@ -22,6 +25,9 @@ public class facturesController {
 
     @Autowired
     private FactureRepository factureRepository;
+
+    @Autowired
+    private BoutiqueRepository boutiqueRepository;
 
     @GetMapping("/factures")
     public ResponseEntity<?> getAllFactures() {
@@ -40,6 +46,23 @@ public class facturesController {
         return ResponseEntity.ok(factureDTOS);
     }
 
+    @GetMapping("/factures/{boutiqueId}")
+    public ResponseEntity<?> getFacturesByBoutique(@PathVariable Long boutiqueId) {
+        List<Facture> factures = factureRepository.findByBoutiqueId(boutiqueId);
 
+        System.out.println("Nombre de factures trouvées pour la boutique " + boutiqueId + " : " + factures.size());
 
+        if (factures.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(Map.of("message", "Aucune facture disponible pour cette boutique."));
+        }
+
+        List<FactureDTO> factureDTOS = factures.stream()
+            .map(FactureDTO::new)
+            .collect(Collectors.toList());
+
+        return ResponseEntity.ok(factureDTOS);
+    }
+
+    
 }
