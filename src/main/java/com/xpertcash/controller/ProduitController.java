@@ -285,7 +285,7 @@ public class ProduitController {
         public ResponseEntity<ProduitDTO> getProduitById(@PathVariable("produitId") Long produitId) {
             ProduitDTO produitDTO = produitService.getProduitById(produitId);
             return ResponseEntity.ok(produitDTO);
-        }
+        } 
         
 
         //Endpoint pour ajuster la quantiter du produit en stock
