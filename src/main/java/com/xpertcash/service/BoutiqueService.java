@@ -3,6 +3,7 @@ package com.xpertcash.service;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import java.util.Optional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -14,6 +15,7 @@ import com.xpertcash.entity.RoleType;
 import com.xpertcash.entity.Transfert;
 import com.xpertcash.entity.User;
 import com.xpertcash.repository.BoutiqueRepository;
+import com.xpertcash.repository.ProduitRepository;
 import com.xpertcash.repository.TransfertRepository;
 import com.xpertcash.repository.UsersRepository;
 
@@ -33,6 +35,10 @@ public class BoutiqueService {
 
     @Autowired
     private TransfertRepository transfertRepository;
+    
+    @Autowired
+    private ProduitRepository produitRepository;
+
 
     // Ajouter une nouvelle boutique pour l'admin
     @Transactional
@@ -144,72 +150,63 @@ public class BoutiqueService {
     
     @Transactional
     public void transfererProduits(HttpServletRequest request, Long boutiqueSourceId, Long boutiqueDestinationId, Long produitId, int quantite) {
-        // Vérifier la présence du token JWT dans l'entête de la requête
+        // Vérifier la présence du token JWT
         String token = request.getHeader("Authorization");
         if (token == null || !token.startsWith("Bearer ")) {
             throw new RuntimeException("Token JWT manquant ou mal formaté");
         }
-
-        // Extraire l'ID de l'utilisateur depuis le token
+    
+        // Extraire l'ID de l'admin
         Long adminId = jwtUtil.extractUserId(token.substring(7));
-
-        // Récupérer l'utilisateur (admin)
         User admin = usersRepository.findById(adminId)
                 .orElseThrow(() -> new RuntimeException("Admin non trouvé"));
-
-        // Vérifier que l'utilisateur est bien un admin
+    
         if (admin.getRole() == null || !admin.getRole().getName().equals(RoleType.ADMIN)) {
             throw new RuntimeException("Seul un admin peut transférer des produits !");
         }
-
+    
         // Récupérer les boutiques source et destination
         Boutique boutiqueSource = boutiqueRepository.findById(boutiqueSourceId)
                 .orElseThrow(() -> new RuntimeException("Boutique source non trouvée"));
         Boutique boutiqueDestination = boutiqueRepository.findById(boutiqueDestinationId)
                 .orElseThrow(() -> new RuntimeException("Boutique destination non trouvée"));
-
-        // Vérifier que les deux boutiques appartiennent à l'entreprise de l'admin
+    
+        // Vérifier l'appartenance des boutiques à l'entreprise de l'admin
         if (!boutiqueSource.getEntreprise().equals(admin.getEntreprise()) || 
             !boutiqueDestination.getEntreprise().equals(admin.getEntreprise())) {
             throw new RuntimeException("Les boutiques doivent appartenir à l'entreprise de l'admin !");
         }
-
-        // Vérifier que le produit existe dans la boutique source et que la quantité est suffisante
-        Produit produit = boutiqueSource.getProduits().stream()
-                .filter(p -> p.getId().equals(produitId))
-                .findFirst()
+    
+        // Vérifier que le produit existe et que la quantité est suffisante
+        Produit produit = produitRepository.findByBoutiqueAndId(boutiqueSourceId, produitId)
                 .orElseThrow(() -> new RuntimeException("Produit non trouvé dans la boutique source"));
-
+    
         if (produit.getQuantite() < quantite) {
             throw new RuntimeException("Quantité insuffisante dans la boutique source !");
         }
-
+    
         // Réduire la quantité dans la boutique source
         produit.setQuantite(produit.getQuantite() - quantite);
-
-        // Ajouter ou mettre à jour le produit dans la boutique destination
-        Produit produitDestination = boutiqueDestination.getProduits().stream()
-                .filter(p -> p.getCodeGenerique().equals(produit.getCodeGenerique()))
-                .findFirst()
-                .orElse(null);
-
-        if (produitDestination == null) {
-            // Si le produit n'existe pas dans la boutique destination, le créer
+    
+        // Vérifier si le produit existe dans la boutique destination
+        Optional<Produit> produitDestinationOpt = produitRepository.findByBoutiqueAndCodeGenerique(boutiqueDestination.getId(), produit.getCodeGenerique());
+    
+        if (produitDestinationOpt.isPresent()) {
+            Produit produitDestination = produitDestinationOpt.get();
+            produitDestination.setQuantite(produitDestination.getQuantite() + quantite);
+        } else {
             Produit nouveauProduit = new Produit();
             nouveauProduit.setNom(produit.getNom());
             nouveauProduit.setPrixVente(produit.getPrixVente());
             nouveauProduit.setPrixAchat(produit.getPrixAchat());
             nouveauProduit.setQuantite(quantite);
-            nouveauProduit.setCodeGenerique(produit.getCodeGenerique()); // Conserver le même code générique
-            nouveauProduit.setCodeBare(produit.getCodeBare()); // Conserver le même code barre
-            nouveauProduit.setPhoto(produit.getPhoto()); // Copier l'image du produit
-            nouveauProduit.setBoutique(boutiqueDestination); // Associer la boutique destination
-            boutiqueDestination.getProduits().add(nouveauProduit);
-        } else {
-            // Sinon, mettre à jour la quantité
-            produitDestination.setQuantite(produitDestination.getQuantite() + quantite);
+            nouveauProduit.setCodeGenerique(produit.getCodeGenerique());
+            nouveauProduit.setCodeBare(produit.getCodeBare());
+            nouveauProduit.setPhoto(produit.getPhoto());
+            nouveauProduit.setBoutique(boutiqueDestination);
+            produitRepository.save(nouveauProduit);
         }
-
+    
         // Enregistrer le transfert
         Transfert transfert = new Transfert();
         transfert.setProduit(produit);
@@ -217,12 +214,9 @@ public class BoutiqueService {
         transfert.setBoutiqueDestination(boutiqueDestination);
         transfert.setQuantite(quantite);
         transfertRepository.save(transfert);
-
-        // Sauvegarder les modifications
-        boutiqueRepository.save(boutiqueSource);
-        boutiqueRepository.save(boutiqueDestination);
     }
 
+    
     public List<Produit> getProduitsParBoutique(HttpServletRequest request, Long boutiqueId) {
         // Vérifier la présence du token JWT dans l'entête de la requête
         String token = request.getHeader("Authorization");
