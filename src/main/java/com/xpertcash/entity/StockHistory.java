@@ -19,6 +19,7 @@ public class StockHistory {
     private Integer stockApres;
     private String description;
     private LocalDateTime createdAt;
+    private String codeFournisseur;
 
     @ManyToOne
     @JoinColumn(name = "stock_id")

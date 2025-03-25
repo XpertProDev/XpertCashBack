@@ -13,4 +13,5 @@ public class AjouterStockRequest {
     private Map<Long, Integer> produitsQuantites;
     private String description;
     private Long boutiqueId;
+    private String codeFournisseur;
 }

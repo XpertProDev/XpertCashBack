@@ -299,7 +299,12 @@ public class ProduitController {
                 }
         
                 // Appel du service pour ajouter plusieurs produits en stock
-                Facture facture = produitService.ajouterStock(request.getBoutiqueId(), request.getProduitsQuantites(), request.getDescription(), httpRequest);
+                Facture facture = produitService.ajouterStock(
+                    request.getBoutiqueId(),
+                    request.getProduitsQuantites(),
+                    request.getDescription(),
+                    request.getCodeFournisseur(),
+                    httpRequest);
 
         
                 return ResponseEntity.status(HttpStatus.OK).body(new FactureDTO(facture));

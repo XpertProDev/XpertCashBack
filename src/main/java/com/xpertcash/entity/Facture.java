@@ -25,6 +25,7 @@ public class Facture {
     private String description;
     private LocalDateTime dateFacture;
     private String numeroFacture;
+    private String codeFournisseur;
 
     @ManyToOne
     @JoinColumn(name = "boutique_id", referencedColumnName = "id", nullable = false)

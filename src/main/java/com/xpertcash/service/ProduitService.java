@@ -226,7 +226,7 @@ public class ProduitService {
     
 
     //Methode pour ajuster la quantiter du produit en stock
-    public Facture ajouterStock(Long boutiqueId, Map<Long, Integer> produitsQuantites, String description, HttpServletRequest request) {
+    public Facture ajouterStock(Long boutiqueId, Map<Long, Integer> produitsQuantites, String description,String codeFournisseur, HttpServletRequest request) {
         // Récupérer le token JWT depuis le header "Authorization"
         String token = request.getHeader("Authorization");
         if (token == null || !token.startsWith("Bearer ")) {
@@ -276,13 +276,17 @@ public class ProduitService {
             stockHistory.setCreatedAt(LocalDateTime.now());
             stockHistory.setStock(stock);
             stockHistory.setUser(user);
+            if (codeFournisseur != null && !codeFournisseur.isEmpty()) {
+                stockHistory.setCodeFournisseur(codeFournisseur);
+            }
+
             stockHistoryRepository.save(stockHistory);
     
             produits.add(produit);
         }
     
         // Enregistrer une facture avec plusieurs produits
-        return enregistrerFacture("AJOUTER", produits, produitsQuantites, description, user);
+        return enregistrerFacture("AJOUTER", produits, produitsQuantites, description,codeFournisseur, user);
     }
     
     // Méthode pour ajuster la quantité du produit en stock (retirer des produits)
@@ -345,7 +349,8 @@ public class ProduitService {
         produits.add(produit);
     }
 
-    Facture facture = enregistrerFacture("Réduction", produits, produitsQuantites, description, user);
+    Facture facture = enregistrerFacture("Réduction", produits, produitsQuantites, description, null, user);
+
 
     return new FactureDTO(facture);
 }
@@ -359,7 +364,7 @@ public class ProduitService {
     }
 
     // Méthode pour enregistrer une facture
-    public Facture enregistrerFacture(String type, List<Produit> produits, Map<Long, Integer> quantites, String description, User user) {
+    public Facture enregistrerFacture(String type, List<Produit> produits, Map<Long, Integer> quantites, String description,String codeFournisseur, User user) {
         Facture facture = new Facture();
         facture.setNumeroFacture(generateNumeroFacture());
         facture.setType(type);
@@ -388,6 +393,10 @@ public class ProduitService {
         }
 
         facture.setFactureProduits(factureProduits);
+
+        if (codeFournisseur != null && !codeFournisseur.isEmpty()) {
+            facture.setCodeFournisseur(codeFournisseur);
+        }
 
         return factureRepository.save(facture);
     }
