@@ -1,12 +1,8 @@
 package com.xpertcash.controller;
-
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -18,15 +14,11 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.xpertcash.DTOs.BoutiqueResponse;
-import com.xpertcash.DTOs.ProduitDTO;
 import com.xpertcash.DTOs.TransfertDTO;
-import com.xpertcash.composant.AuthorizationService;
-import com.xpertcash.configuration.JwtUtil;
 import com.xpertcash.entity.Boutique;
 import com.xpertcash.entity.Produit;
 import com.xpertcash.entity.Transfert;
 import com.xpertcash.service.BoutiqueService;
-import com.xpertcash.service.UsersService;
 import com.xpertcash.repository.TransfertRepository;
 
 import jakarta.servlet.http.HttpServletRequest;
@@ -35,12 +27,8 @@ import jakarta.servlet.http.HttpServletRequest;
 @RequestMapping("/api/auth")
 public class BoutiqueController {
 
-    @Autowired
-    private UsersService usersService;
-    @Autowired
-    private JwtUtil jwtUtil;
-    @Autowired
-    private AuthorizationService authorizationService;
+  
+   
     @Autowired
     private BoutiqueService boutiqueService;
     @Autowired
@@ -191,7 +179,7 @@ public class BoutiqueController {
             dto.setBoutiqueDestinationNom(transfert.getBoutiqueDestination().getNomBoutique());
             dto.setQuantite(transfert.getQuantite());
             dto.setDateTransfert(transfert.getDateTransfert().toString());
-            return dto;
+            return dto; 
         }).toList();
 
         return ResponseEntity.ok(transfertDTOs);

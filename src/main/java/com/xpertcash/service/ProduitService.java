@@ -9,16 +9,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.stream.Collectors;
-
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Description;
 import org.springframework.stereotype.Service;
-
 import com.xpertcash.DTOs.FactureDTO;
 import com.xpertcash.DTOs.ProduitDTO;
 import com.xpertcash.DTOs.ProduitRequest;
 import com.xpertcash.DTOs.StockHistoryDTO;
-import com.xpertcash.DTOs.USER.UserRequest;
 import com.xpertcash.configuration.JwtUtil;
 import com.xpertcash.entity.Boutique;
 import com.xpertcash.entity.Categorie;
@@ -38,7 +34,6 @@ import com.xpertcash.repository.StockHistoryRepository;
 import com.xpertcash.repository.StockRepository;
 import com.xpertcash.repository.UniteRepository;
 import com.xpertcash.repository.UsersRepository;
-
 import jakarta.servlet.http.HttpServletRequest;
 
 

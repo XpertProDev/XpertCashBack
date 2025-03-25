@@ -35,6 +35,15 @@ public interface ProduitRepository extends JpaRepository<Produit, Long> {
      // Récupérer les produits enStock = true d'une boutique donnée
      List<Produit> findByBoutiqueIdAndEnStockTrue(Long boutiqueId);
 
+
+     @Query("SELECT p FROM Produit p WHERE p.boutique.id = :boutiqueId AND p.id = :produitId")
+    Optional<Produit> findByBoutiqueAndId(@Param("boutiqueId") Long boutiqueId, @Param("produitId") Long produitId);
+
+    @Query("SELECT p FROM Produit p WHERE p.boutique.id = :boutiqueId AND p.codeGenerique = :codeGenerique")
+    Optional<Produit> findByBoutiqueAndCodeGenerique(@Param("boutiqueId") Long boutiqueId, @Param("codeGenerique") String codeGenerique);
+
+
+
    
 
 

@@ -35,10 +35,8 @@ import com.xpertcash.repository.StockRepository;
 import com.xpertcash.repository.UniteRepository;
 import com.xpertcash.service.ProduitService;
 import com.xpertcash.service.IMAGES.ImageStorageService;
-
 import jakarta.servlet.http.HttpServletRequest;
-import reactor.core.publisher.Flux;
-import java.time.Duration;
+
 
 @CrossOrigin(origins = "http://localhost:4200")
 @RestController
