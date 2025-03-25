@@ -12,4 +12,5 @@ import lombok.NoArgsConstructor;
 public class AjouterStockRequest {
     private Map<Long, Integer> produitsQuantites;
     private String description;
+    private Long boutiqueId;
 }

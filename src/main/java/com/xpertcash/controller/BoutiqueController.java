@@ -160,13 +160,19 @@ public class BoutiqueController {
     }
 
     @GetMapping("/transferts")
-    public ResponseEntity<List<TransfertDTO>> getTransferts(
+    public ResponseEntity<Object> getTransferts(
             @RequestParam(required = false) Long boutiqueId) {
         List<Transfert> transferts;
         if (boutiqueId != null) {
             transferts = transfertRepository.findByBoutiqueSourceIdOrBoutiqueDestinationId(boutiqueId, boutiqueId);
         } else {
             transferts = transfertRepository.findAll();
+        }
+
+        if (transferts.isEmpty()) {
+            Map<String, String> response = new HashMap<>();
+            response.put("message", "Aucun transfert trouvé.");
+            return ResponseEntity.ok(response);
         }
 
         // Convertir les entités Transfert en DTO
@@ -184,4 +190,5 @@ public class BoutiqueController {
 
         return ResponseEntity.ok(transfertDTOs);
     }
+
 }

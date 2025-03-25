@@ -8,4 +8,5 @@ import lombok.Data;
 public class RetirerStockRequest {
     private Map<Long, Integer> produitsQuantites;
     private String description;
+    private Long boutiqueId;
 }
