@@ -42,10 +42,8 @@ public interface ProduitRepository extends JpaRepository<Produit, Long> {
     @Query("SELECT p FROM Produit p WHERE p.boutique.id = :boutiqueId AND p.codeGenerique = :codeGenerique")
     Optional<Produit> findByBoutiqueAndCodeGenerique(@Param("boutiqueId") Long boutiqueId, @Param("codeGenerique") String codeGenerique);
 
-
-
-   
-
+    @Query("SELECT p FROM Produit p WHERE p.boutique.entreprise.id = :entrepriseId")
+    List<Produit> findByEntrepriseId(@Param("entrepriseId") Long entrepriseId);
 
 }
 
