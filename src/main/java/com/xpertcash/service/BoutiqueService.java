@@ -203,6 +203,10 @@ public class BoutiqueService {
             nouveauProduit.setCodeGenerique(produit.getCodeGenerique());
             nouveauProduit.setCodeBare(produit.getCodeBare());
             nouveauProduit.setPhoto(produit.getPhoto());
+            nouveauProduit.setCategorie(produit.getCategorie());
+            nouveauProduit.setUniteDeMesure(produit.getUniteDeMesure());
+            nouveauProduit.setCreatedAt(produit.getCreatedAt());
+            nouveauProduit.setLastUpdated(produit.getLastUpdated());
             nouveauProduit.setBoutique(boutiqueDestination);
             produitRepository.save(nouveauProduit);
         }
@@ -249,4 +253,5 @@ public class BoutiqueService {
         return boutique.getProduits();
     }
 
+    
 }

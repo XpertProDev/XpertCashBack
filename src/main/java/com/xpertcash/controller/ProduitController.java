@@ -299,7 +299,12 @@ public class ProduitController {
                 }
         
                 // Appel du service pour ajouter plusieurs produits en stock
-                Facture facture = produitService.ajouterStock(request.getBoutiqueId(), request.getProduitsQuantites(), request.getDescription(), httpRequest);
+                Facture facture = produitService.ajouterStock(
+                    request.getBoutiqueId(),
+                    request.getProduitsQuantites(),
+                    request.getDescription(),
+                    request.getCodeFournisseur(),
+                    httpRequest);
 
         
                 return ResponseEntity.status(HttpStatus.OK).body(new FactureDTO(facture));
@@ -395,5 +400,17 @@ public class ProduitController {
         }
       
 
+        //Récupérer tous les produits de toutes les boutiques d'une entreprise
+        @GetMapping("/produits/entreprise/{entrepriseId}")
+        public ResponseEntity<?> getProduitsParEntreprise(@PathVariable Long entrepriseId) {
+            try {
+                List<ProduitDTO> produitsDTO = produitService.getProduitsParEntreprise(entrepriseId);
+                return ResponseEntity.ok(produitsDTO);
+            } catch (Exception e) {
+                Map<String, String> errorResponse = new HashMap<>();
+                errorResponse.put("error", "Une erreur est survenue lors de la récupération des produits.");
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
+            }
+        }
        
 }
