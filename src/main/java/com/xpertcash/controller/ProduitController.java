@@ -36,6 +36,8 @@ import com.xpertcash.repository.UniteRepository;
 import com.xpertcash.service.ProduitService;
 import com.xpertcash.service.IMAGES.ImageStorageService;
 import jakarta.servlet.http.HttpServletRequest;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 
 @CrossOrigin(origins = "http://localhost:4200")
@@ -60,57 +62,56 @@ public class ProduitController {
 
 
     // Endpoint pour Créer un produit et décider si il doit être ajouté au stock
-    @PostMapping(value = "/create/{boutiqueId}", consumes = { MediaType.MULTIPART_FORM_DATA_VALUE }) 
+    @PostMapping(value = "/create", consumes = { MediaType.MULTIPART_FORM_DATA_VALUE })
     public ResponseEntity<?> createProduit(
-            @PathVariable Long boutiqueId,
-            @RequestPart("produit") String produitJson,
-            @RequestPart(value = "image", required = false) MultipartFile imageFile,
-            @RequestParam boolean addToStock,
-            @RequestHeader("Authorization") String token,
-            HttpServletRequest request) {
-        try {
-            // Vérification de l'image reçue
-            if (imageFile != null) {
-                System.out.println("Image reçue avec succès : " + imageFile.getOriginalFilename());
-            } else {
-                System.out.println("Aucune image reçue !");
-            }
-
-            // Convertir le JSON en objet ProduitRequest
-            ObjectMapper objectMapper = new ObjectMapper();
-            ProduitRequest produitRequest = objectMapper.readValue(produitJson, ProduitRequest.class);
-
-            // Sauvegarde de l'image si elle est présente
-            String photo = null;
-            if (imageFile != null && !imageFile.isEmpty()) {
-                photo = imageStorageService.saveImage(imageFile);
-                System.out.println("URL enregistrée dans photo : " + photo);
-            }
-
-            produitRequest.setPhoto(photo);
-            System.out.println("🔍 ProduitRequest après ajout de la photo : " + produitRequest);
-
-            // Créer le produit en appelant le service
-            ProduitDTO produitDTO = produitService.createProduit(request, boutiqueId, produitRequest, addToStock);
-
-            // Retourner le produit créé avec son DTO
-            return ResponseEntity.status(HttpStatus.CREATED).body(produitDTO);
-
-        } catch (DuplicateProductException e) {
-            // Gestion du cas où le produit existe déjà
-            System.out.println("⚠️ Produit déjà existant : " + e.getMessage());
-            Map<String, String> errorResponse = new HashMap<>();
-            errorResponse.put("error", e.getMessage());
-            return ResponseEntity.status(HttpStatus.CONFLICT).body(errorResponse);
-
-        } catch (Exception e) {
-            // Erreur générique
-            e.printStackTrace();
-            Map<String, String> errorResponse = new HashMap<>();
-            errorResponse.put("error", "Une erreur est survenue : " + e.getMessage());
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
+        @RequestPart("boutiqueIds") String boutiqueIdsJson, // Liste des IDs des boutiques
+        @RequestPart("produit") String produitJson,
+        @RequestPart(value = "image", required = false) MultipartFile imageFile,
+        @RequestParam boolean addToStock,
+        @RequestHeader("Authorization") String token,
+        HttpServletRequest request) {
+    try {
+        // Vérification de l'image reçue
+        if (imageFile != null) {
+            System.out.println("📸 Image reçue : " + imageFile.getOriginalFilename());
+        } else {
+            System.out.println("🚫 Aucune image reçue !");
         }
+
+        ObjectMapper objectMapper = new ObjectMapper();
+
+        // conversion boutiqueIdsJson en liste
+        List<Long> boutiqueIds = objectMapper.readValue(boutiqueIdsJson, new TypeReference<List<Long>>() {});
+        
+        ProduitRequest produitRequest = objectMapper.readValue(produitJson, ProduitRequest.class);
+        
+        // Sauvegarde de l'image si elle est présente
+        String photo = null;
+        if (imageFile != null && !imageFile.isEmpty()) {
+            photo = imageStorageService.saveImage(imageFile);
+            System.out.println("✅ URL enregistrée : " + photo);
+        }
+        produitRequest.setPhoto(photo);
+
+        // Creation de produit pour toutes les boutiques spécifiées
+        List<ProduitDTO> produitsAjoutes = produitService.createProduit(request, boutiqueIds, produitRequest, addToStock);
+
+        // Retourner la liste des produits ajoutés
+        return ResponseEntity.status(HttpStatus.CREATED).body(produitsAjoutes);
+
+    } catch (DuplicateProductException e) {
+        System.out.println("⚠️ Produit déjà existant : " + e.getMessage());
+        Map<String, String> errorResponse = new HashMap<>();
+        errorResponse.put("error", e.getMessage());
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(errorResponse);
+
+    } catch (Exception e) {
+        e.printStackTrace();
+        Map<String, String> errorResponse = new HashMap<>();
+        errorResponse.put("error", "Une erreur est survenue : " + e.getMessage());
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
     }
+}
 
     // Endpoint Update Produit
     @PatchMapping(value = "/updateProduit/{produitId}", consumes = { MediaType.MULTIPART_FORM_DATA_VALUE })
