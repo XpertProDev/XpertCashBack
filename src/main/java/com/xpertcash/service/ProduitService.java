@@ -68,120 +68,83 @@ public class ProduitService {
 
 
     // Ajouter un produit à la liste sans le stock
-    public ProduitDTO createProduit(HttpServletRequest request, Long boutiqueId, ProduitRequest produitRequest, boolean addToStock) {
+    public List<ProduitDTO> createProduit(HttpServletRequest request, List<Long> boutiqueIds, ProduitRequest produitRequest, boolean addToStock) {
         try {
             // Récupérer le token JWT depuis le header "Authorization"
             String token = request.getHeader("Authorization");
             if (token == null || !token.startsWith("Bearer ")) {
                 throw new RuntimeException("Token JWT manquant ou mal formaté");
             }
-    
-            // Extraire le token sans le "Bearer " (les 7 premiers caractères)
+            
             String jwtToken = token.substring(7);
-            Long adminId = jwtUtil.extractUserId(jwtToken);  // Extraire l'ID de l'admin à partir du token
-    
-            // Récupérer l'utilisateur (admin) à partir de l'ID extrait
+            Long adminId = jwtUtil.extractUserId(jwtToken);
             User admin = usersRepository.findById(adminId)
                     .orElseThrow(() -> new RuntimeException("Admin non trouvé"));
-    
-            // Vérifier que l'utilisateur a bien le rôle ADMIN
+            
             if (admin.getRole() == null || !admin.getRole().getName().equals(RoleType.ADMIN)) {
                 throw new RuntimeException("Seul un ADMIN peut ajouter des produits !");
             }
     
-            // Trouver la boutique associée par son ID
-            Boutique boutique = boutiqueRepository.findById(boutiqueId)
-        .orElseThrow(() -> new RuntimeException("Boutique non trouvée"));
-        
-    
-            // Vérification de l'existence du produit par nom, prix et boutiqueId
-            Produit existingProduit = produitRepository.findByNomAndBoutiqueId(produitRequest.getNom(), boutiqueId);
-            if (existingProduit != null) {
-                throw new RuntimeException("Un produit avec le même nom existe déjà dans cette boutique.");
-            }
-
-            // Vérification de l'existence du produit par codeBare et boutiqueId
-            String codeBare = produitRequest.getCodeBare();
-            if (codeBare != null && !codeBare.trim().isEmpty()) {
-                Produit existingProduitCode = produitRepository.findByCodeBareAndBoutiqueId(codeBare.trim(), boutiqueId);
-                if (existingProduitCode != null) {
-                    throw new RuntimeException("Un produit avec le même codeBare existe déjà dans cette boutique.");
-                }
-            }
-    
-            // Vérifier si la catégorie existe dans la base de données 
-            Categorie categorie = null;
-            if (produitRequest.getCategorieId() != null) {
-                categorie = categorieRepository.findById(produitRequest.getCategorieId())
-                        .orElseThrow(() -> new RuntimeException("Catégorie non trouvée"));
-            }
-    
-            // Vérifier si l'unité de mesure existe dans la base de données
-            Unite unite = null;
-            if (produitRequest.getUniteId() != null) {
-                unite = uniteRepository.findById(produitRequest.getUniteId())
-                        .orElseThrow(() -> new RuntimeException("Unité de mesure non trouvée"));
-            }
-    
+            List<ProduitDTO> produitsAjoutes = new ArrayList<>();
             String codeGenerique = generateProductCode();
-
-            // Mapper ProduitRequest à
-            // Produit
-
-            Produit produit = new Produit();
-            produit.setNom(produitRequest.getNom());
-            produit.setDescription(produitRequest.getDescription());
-            produit.setPrixVente(produitRequest.getPrixVente());
-            produit.setPrixAchat(produitRequest.getPrixAchat());
-            produit.setQuantite(produitRequest.getQuantite() != null ? produitRequest.getQuantite() : 0);
-            produit.setSeuilAlert(produitRequest.getSeuilAlert() != null ? produitRequest.getSeuilAlert() : 0);
-            produit.setCategorie(categorie);
-            produit.setUniteDeMesure(unite);
-            produit.setCodeGenerique(codeGenerique);
-            produit.setCodeBare(produitRequest.getCodeBare());
-            produit.setPhoto(produitRequest.getPhoto());
-            produit.setCreatedAt(LocalDateTime.now());
-            produit.setLastUpdated(LocalDateTime.now());
-            produit.setBoutique(boutique);
     
-            // Enregistrer le produit dans la base de données
-            Produit savedProduit = produitRepository.save(produit);
+            for (Long boutiqueId : boutiqueIds) {
+                Boutique boutique = boutiqueRepository.findById(boutiqueId)
+                        .orElseThrow(() -> new RuntimeException("Boutique non trouvée"));
     
-            // Si addToStock est vrai, ajouter le produit au stock
-            if (addToStock) {
-                Stock stock = new Stock();
-            
-                // Définir stockActuel comme la quantité du produit (ou 0 si non renseigné)
-                stock.setStockActuel(produitRequest.getQuantite() != null ? produitRequest.getQuantite() : 0);
-            
-                // Initialiser stockApres avec la même valeur que stockActuel
-                stock.setStockApres(stock.getStockActuel());
-            
-                // Initialiser quantiteAjoute à 0 (car pas encore de mise à jour de stock)
-                stock.setQuantiteAjoute(0);
-            
-                stock.setBoutique(boutique);
-                stock.setProduit(savedProduit);  // Associer le produit au stock
-                stock.setCreatedAt(LocalDateTime.now());
-                stock.setLastUpdated(LocalDateTime.now());
-            
-                // Si un seuil d'alerte est spécifié, on le copie dans le stock
-                if (produitRequest.getSeuilAlert() != null) {
-                    stock.setSeuilAlert(produitRequest.getSeuilAlert());
+                // Vérification si le produit existe déjà dans cette boutique
+                if (produitRepository.findByNomAndBoutiqueId(produitRequest.getNom(), boutiqueId) != null) {
+                    throw new RuntimeException("Un produit avec le même nom existe déjà dans la boutique ID: " + boutiqueId);
                 }
-            
-                stockRepository.save(stock);
-            
-                savedProduit.setEnStock(true);
-                produitRepository.save(savedProduit);
+                if (produitRequest.getCodeBare() != null && !produitRequest.getCodeBare().trim().isEmpty() &&
+                        produitRepository.findByCodeBareAndBoutiqueId(produitRequest.getCodeBare().trim(), boutiqueId) != null) {
+                    throw new RuntimeException("Un produit avec le même code-barre existe déjà dans la boutique ID: " + boutiqueId);
+                }
+    
+                Categorie categorie = (produitRequest.getCategorieId() != null) ?
+                        categorieRepository.findById(produitRequest.getCategorieId())
+                                .orElseThrow(() -> new RuntimeException("Catégorie non trouvée")) : null;
+                
+                Unite unite = (produitRequest.getUniteId() != null) ?
+                        uniteRepository.findById(produitRequest.getUniteId())
+                                .orElseThrow(() -> new RuntimeException("Unité de mesure non trouvée")) : null;
+                
+                Produit produit = new Produit();
+                produit.setNom(produitRequest.getNom());
+                produit.setDescription(produitRequest.getDescription());
+                produit.setPrixVente(produitRequest.getPrixVente());
+                produit.setPrixAchat(produitRequest.getPrixAchat());
+                produit.setQuantite(produitRequest.getQuantite() != null ? produitRequest.getQuantite() : 0);
+                produit.setSeuilAlert(produitRequest.getSeuilAlert() != null ? produitRequest.getSeuilAlert() : 0);
+                produit.setCategorie(categorie);
+                produit.setUniteDeMesure(unite);
+                produit.setCodeGenerique(codeGenerique);
+                produit.setCodeBare(produitRequest.getCodeBare());
+                produit.setPhoto(produitRequest.getPhoto());
+                produit.setCreatedAt(LocalDateTime.now());
+                produit.setLastUpdated(LocalDateTime.now());
+                produit.setBoutique(boutique);
+    
+                Produit savedProduit = produitRepository.save(produit);
+                
+                if (addToStock) {
+                    Stock stock = new Stock();
+                    stock.setStockActuel(produitRequest.getQuantite() != null ? produitRequest.getQuantite() : 0);
+                    stock.setStockApres(stock.getStockActuel());
+                    stock.setQuantiteAjoute(0);
+                    stock.setBoutique(boutique);
+                    stock.setProduit(savedProduit);
+                    stock.setCreatedAt(LocalDateTime.now());
+                    stock.setLastUpdated(LocalDateTime.now());
+                    stock.setSeuilAlert(produitRequest.getSeuilAlert());
+                    stockRepository.save(stock);
+                    savedProduit.setEnStock(true);
+                    produitRepository.save(savedProduit);
+                }
+                
+                produitsAjoutes.add(mapToDTO(savedProduit));
             }
-            
-    
-            // Mapper l'entité Produit en DTO
-            ProduitDTO produitDTO = mapToDTO(savedProduit);
-    
-            // Retourner le DTO
-            return produitDTO;
+            return produitsAjoutes;
         } catch (RuntimeException e) {
             System.err.println("Erreur lors de la création du produit : " + e.getMessage());
             throw new RuntimeException(e.getMessage(), e);
