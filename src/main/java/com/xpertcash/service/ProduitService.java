@@ -86,8 +86,7 @@ public class ProduitService {
             }
     
             List<ProduitDTO> produitsAjoutes = new ArrayList<>();
-            String codeGenerique = generateProductCode();
-    
+            
             for (Long boutiqueId : boutiqueIds) {
                 Boutique boutique = boutiqueRepository.findById(boutiqueId)
                         .orElseThrow(() -> new RuntimeException("Boutique non trouvée"));
@@ -109,6 +108,9 @@ public class ProduitService {
                         uniteRepository.findById(produitRequest.getUniteId())
                                 .orElseThrow(() -> new RuntimeException("Unité de mesure non trouvée")) : null;
                 
+                // Générer un code unique pour chaque boutique
+                String codeGenerique = generateProductCode();
+                
                 Produit produit = new Produit();
                 produit.setNom(produitRequest.getNom());
                 produit.setDescription(produitRequest.getDescription());
@@ -118,7 +120,7 @@ public class ProduitService {
                 produit.setSeuilAlert(produitRequest.getSeuilAlert() != null ? produitRequest.getSeuilAlert() : 0);
                 produit.setCategorie(categorie);
                 produit.setUniteDeMesure(unite);
-                produit.setCodeGenerique(codeGenerique);
+                produit.setCodeGenerique(codeGenerique); // Chaque boutique aura un code différent
                 produit.setCodeBare(produitRequest.getCodeBare());
                 produit.setPhoto(produitRequest.getPhoto());
                 produit.setCreatedAt(LocalDateTime.now());
@@ -150,7 +152,7 @@ public class ProduitService {
             throw new RuntimeException(e.getMessage(), e);
         }
     }
-    
+
     private ProduitDTO mapToDTO(Produit produit) {
         ProduitDTO produitDTO = new ProduitDTO();
         produitDTO.setId(produit.getId());
@@ -160,6 +162,7 @@ public class ProduitService {
         produitDTO.setQuantite(produit.getQuantite());
         produitDTO.setSeuilAlert(produit.getSeuilAlert());
         produitDTO.setCodeBare(produit.getCodeBare());
+        produitDTO.setCodeGenerique(produit.getCodeGenerique());
         produitDTO.setPhoto(produit.getPhoto());
         produitDTO.setEnStock(produit.getEnStock());
         produitDTO.setCreatedAt(produit.getCreatedAt());
