@@ -4,7 +4,8 @@ public enum RoleType {
     SUPER_ADMIN,
     ADMIN,
     VENDEUR,
-    COMPTABLE,
-    RH;
+    Manageur,
+   // COMPTABLE,
+  // RH;
     
 }

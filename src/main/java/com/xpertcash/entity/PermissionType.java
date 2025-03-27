@@ -1,10 +1,16 @@
 package com.xpertcash.entity;
 
 public enum PermissionType {
-    GERER_PRODUITS, // CRUD Produits
-    VENDRE_PRODUITS, // Vendre uniquement
-    VOIR_FLUX_COMPTABLE, // Voir Flux Comptable
-    APPROVISIONNER_STOCK, // Ajouter produits
-    GERER_MAGASINS,
+    GERER_PRODUITS,
+    VENDRE_PRODUITS,
+    APPROVISIONNER_STOCK,
+    Gestion_Facture,
+    GERER_CLIENTS,
+    GERER_UTILISATEURS,
+    GERER_BOUTIQUE,
+    
+    /*
+    VOIR_FLUX_COMPTABLE,
     GERER_PERSONNEL,
+    */
 }

@@ -38,7 +38,7 @@ public class RoleService {
         if (roleRepository.count() == 0) {
             System.out.println("nitialisation des rôles et permissions...");
 
-            // 1️⃣ Ajouter toutes les permissions en base si elles n'existent pas
+            // Ajouter toutes les permissions en base si elles n'existent pas
             for (PermissionType type : PermissionType.values()) {
                 if (!permissionRepository.existsByType(type)) {
                     Permission permission = new Permission();
@@ -58,10 +58,18 @@ public class RoleService {
             adminRole.setPermissions(Arrays.asList(
                 permissionMap.get(PermissionType.GERER_PRODUITS),
                 permissionMap.get(PermissionType.VENDRE_PRODUITS),
-                permissionMap.get(PermissionType.VOIR_FLUX_COMPTABLE),
-                permissionMap.get(PermissionType.APPROVISIONNER_STOCK),
-                permissionMap.get(PermissionType.GERER_MAGASINS),
-                permissionMap.get(PermissionType.GERER_PERSONNEL)
+                permissionMap.get(PermissionType.GERER_CLIENTS),
+                permissionMap.get(PermissionType.GERER_BOUTIQUE),
+                permissionMap.get(PermissionType.Gestion_Facture),
+                permissionMap.get(PermissionType.GERER_UTILISATEURS),
+                permissionMap.get(PermissionType.APPROVISIONNER_STOCK)
+            ));
+
+            Role managerRole = new Role();
+            managerRole.setName(RoleType.Manageur);
+            managerRole.setPermissions(Collections.singletonList(
+                permissionMap.get(PermissionType.GERER_UTILISATEURS)
+
             ));
 
             Role venteRole = new Role();
@@ -70,7 +78,7 @@ public class RoleService {
                 permissionMap.get(PermissionType.VENDRE_PRODUITS)
             ));
 
-            Role rhRole = new Role();
+            /*   Role rhRole = new Role();
             rhRole.setName(RoleType.RH);
             rhRole.setPermissions(Collections.singletonList(
                 permissionMap.get(PermissionType.GERER_PERSONNEL)
@@ -82,9 +90,10 @@ public class RoleService {
                 permissionMap.get(PermissionType.VOIR_FLUX_COMPTABLE),
                 permissionMap.get(PermissionType.APPROVISIONNER_STOCK)
             ));
+            */
 
             // 4️⃣ Sauvegarder les rôles avec les permissions associées
-            roleRepository.saveAll(Arrays.asList(adminRole, venteRole, comptableRole, rhRole));
+            roleRepository.saveAll(Arrays.asList(adminRole, venteRole));
 
             System.out.println("✅ Rôles et permissions initialisés avec succès !");
         }
