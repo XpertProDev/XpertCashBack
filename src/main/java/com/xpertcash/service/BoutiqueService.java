@@ -253,5 +253,49 @@ public class BoutiqueService {
         return boutique.getProduits();
     }
 
+
+    // Methode pour descativer une boutique
+    public Boutique desactiverBoutique(Long boutiqueId, HttpServletRequest request) {
+        String token = request.getHeader("Authorization");
+        if (token == null || !token.startsWith("Bearer ")) {
+            throw new RuntimeException("Token JWT manquant ou mal formaté");
+        }
+
+        Long adminId = jwtUtil.extractUserId(token.substring(7));
+        User admin = usersRepository.findById(adminId)
+                .orElseThrow(() -> new RuntimeException("Admin non trouvé"));
+
+        if (admin.getRole() == null || !admin.getRole().getName().equals(RoleType.ADMIN)) {
+            throw new RuntimeException("Seul un ADMIN peut désactiver une boutique !");
+        }
+
+        Boutique boutique = boutiqueRepository.findById(boutiqueId)
+                .orElseThrow(() -> new RuntimeException("Boutique non trouvée"));
+
+        boutique.setActif(false);
+        return boutiqueRepository.save(boutique);
+    }
+    
+    // Methode pour activer une boutique
+    public Boutique activerBoutique(Long boutiqueId, HttpServletRequest request) {
+        String token = request.getHeader("Authorization");
+        if (token == null || !token.startsWith("Bearer ")) {
+            throw new RuntimeException("Token JWT manquant ou mal formaté");
+        }
+
+        Long adminId = jwtUtil.extractUserId(token.substring(7));
+        User admin = usersRepository.findById(adminId)
+                .orElseThrow(() -> new RuntimeException("Admin non trouvé"));
+
+        if (admin.getRole() == null || !admin.getRole().getName().equals(RoleType.ADMIN)) {
+            throw new RuntimeException("Seul un ADMIN peut activer une boutique !");
+        }
+
+        Boutique boutique = boutiqueRepository.findById(boutiqueId)
+                .orElseThrow(() -> new RuntimeException("Boutique non trouvée"));
+
+        boutique.setActif(true);
+        return boutiqueRepository.save(boutique);
+    }
     
 }

@@ -28,6 +28,7 @@ public class Boutique {
     private String email;
     private LocalDateTime createdAt;
     private LocalDateTime lastUpdated;
+    private boolean actif = true;
 
     @ManyToOne
     @JoinColumn(name = "entreprise_id", nullable = false)

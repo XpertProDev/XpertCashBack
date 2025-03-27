@@ -737,16 +737,18 @@ public class ProduitService {
         return dto;
     }
     
-    // Méthode pour récupérer tous les produits de toutes les boutiques d'une entreprise
-    public List<ProduitDTO> getProduitsParEntreprise(Long entrepriseId) {
-        // Récupérer tous les produits associés à l'entreprise via les boutiques
-        List<Produit> produits = produitRepository.findByEntrepriseId(entrepriseId);
-    
-        // Mapper les entités Produit en ProduitDTO
-        return produits.stream()
-                .map(this::convertToProduitDTO)
-                .collect(Collectors.toList());
-    }
+        // Méthode pour récupérer tous les produits de toutes les boutiques d'une entreprise
+        public List<ProduitDTO> getProduitsParEntreprise(Long entrepriseId) {
+            // Récupérer tous les produits associés à l'entreprise via les boutiques
+            List<Produit> produits = produitRepository.findByEntrepriseId(entrepriseId);
+            List<Produit> produitsFiltres = produits.stream()
+                    .filter(produit -> produit.getBoutique() != null && produit.getBoutique().isActif())
+                    .collect(Collectors.toList());
+            return produitsFiltres.stream()
+                    .map(this::convertToProduitDTO)
+                    .collect(Collectors.toList());
+        }
+
     
 
 }

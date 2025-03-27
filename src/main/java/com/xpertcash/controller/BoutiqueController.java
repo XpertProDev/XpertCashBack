@@ -86,7 +86,9 @@ public class BoutiqueController {
                 boutique.getAdresse(),
                 boutique.getTelephone(),
                 boutique.getEmail(),
-                boutique.getCreatedAt()
+                boutique.getCreatedAt(),
+                boutique.isActif()
+                
             ))
             .toList();
 
@@ -189,6 +191,39 @@ public class BoutiqueController {
         }).toList();
 
         return ResponseEntity.ok(transfertDTOs);
+    }
+
+    // Endpoint pour Desactiver une boutique
+    @PutMapping("/desactiverBoutique/{id}")
+    public ResponseEntity<Map<String, String>> desactiverBoutique(
+            @PathVariable Long id,
+            HttpServletRequest request) {
+        Map<String, String> response = new HashMap<>();
+
+        try {
+            boutiqueService.desactiverBoutique(id, request);
+            response.put("message", "Boutique désactivée avec succès !");
+            return ResponseEntity.ok(response);
+        } catch (RuntimeException e) {
+            response.put("error", e.getMessage());
+            return ResponseEntity.badRequest().body(response);
+        }
+    }
+    // Endpoint pour réactiver une boutique
+    @PutMapping("/activerBoutique/{id}")
+    public ResponseEntity<Map<String, String>> reactiverBoutique(
+            @PathVariable Long id,
+            HttpServletRequest request) {
+        Map<String, String> response = new HashMap<>();
+
+        try {
+            boutiqueService.activerBoutique(id, request);
+            response.put("message", "Boutique réactivée avec succès !");
+            return ResponseEntity.ok(response);
+        } catch (RuntimeException e) {
+            response.put("error", e.getMessage());
+            return ResponseEntity.badRequest().body(response);
+        }
     }
 
 }

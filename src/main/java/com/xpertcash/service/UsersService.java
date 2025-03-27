@@ -542,7 +542,7 @@ public class UsersService {
         List<BoutiqueResponse> boutiqueResponses = user.getEntreprise()
                 .getBoutiques()
                 .stream()
-                .map(b -> new BoutiqueResponse(b.getId(), b.getNomBoutique(), b.getAdresse(),b.getTelephone(), b.getEmail(),b.getCreatedAt()))
+                .map(b -> new BoutiqueResponse(b.getId(), b.getNomBoutique(), b.getAdresse(),b.getTelephone(), b.getEmail(),b.getCreatedAt(), b.isActif()))
                 .collect(Collectors.toList());
 
         return new UserRequest(
