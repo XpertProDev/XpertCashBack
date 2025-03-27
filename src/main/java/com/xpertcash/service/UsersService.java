@@ -539,22 +539,31 @@ public class UsersService {
         User user = usersRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
 
+        Entreprise entreprise = user.getEntreprise();
+
         List<BoutiqueResponse> boutiqueResponses = user.getEntreprise()
                 .getBoutiques()
                 .stream()
-                .map(b -> new BoutiqueResponse(b.getId(), b.getNomBoutique(), b.getAdresse(),b.getTelephone(), b.getEmail(),b.getCreatedAt()))
+                .map(b -> new BoutiqueResponse(
+                        b.getId(), b.
+                        getNomBoutique(),
+                        b.getAdresse(),
+                        b.getTelephone(),
+                        b.getEmail(),
+                        b.getCreatedAt()))
                 .collect(Collectors.toList());
 
         return new UserRequest(
                 user.getId(),
                 user.getNomComplet(),
-                user.getEntreprise().getNomEntreprise(),
+                entreprise.getNomEntreprise(),
                 user.getEmail(),
                 user.getRole().getName(),
                 user.getPhone(),
                 user.getPays(),
-                user.getEntreprise().getAdresse(),
-                user.getEntreprise().getLogo(),
+                entreprise.getAdresse(),
+                entreprise.getLogo(),
+                entreprise.getId(),
                 boutiqueResponses
         );
     }
