@@ -147,7 +147,7 @@ public class BoutiqueService {
     
         return boutiqueRepository.save(boutique);
     }
-    
+
     @Transactional
     public void transfererProduits(HttpServletRequest request, Long boutiqueSourceId, Long boutiqueDestinationId, Long produitId, int quantite) {
         // Vérifier la présence du token JWT
@@ -170,9 +170,9 @@ public class BoutiqueService {
                 .orElseThrow(() -> new RuntimeException("Boutique source non trouvée"));
         Boutique boutiqueDestination = boutiqueRepository.findById(boutiqueDestinationId)
                 .orElseThrow(() -> new RuntimeException("Boutique destination non trouvée"));
-    
-        // Vérifier l'appartenance des boutiques à l'entreprise de l'admin
-        if (!boutiqueSource.getEntreprise().equals(admin.getEntreprise()) || 
+
+        // Vérifier que les deux boutiques appartiennent à l'entreprise de l'admin
+        if (!boutiqueSource.getEntreprise().equals(admin.getEntreprise()) ||
             !boutiqueDestination.getEntreprise().equals(admin.getEntreprise())) {
             throw new RuntimeException("Les boutiques doivent appartenir à l'entreprise de l'admin !");
         }
