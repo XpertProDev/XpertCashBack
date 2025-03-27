@@ -35,7 +35,7 @@ public class BoutiqueService {
 
     @Autowired
     private TransfertRepository transfertRepository;
-    
+
     @Autowired
     private ProduitRepository produitRepository;
 
@@ -155,42 +155,42 @@ public class BoutiqueService {
         if (token == null || !token.startsWith("Bearer ")) {
             throw new RuntimeException("Token JWT manquant ou mal formaté");
         }
-    
+
         // Extraire l'ID de l'admin
         Long adminId = jwtUtil.extractUserId(token.substring(7));
         User admin = usersRepository.findById(adminId)
                 .orElseThrow(() -> new RuntimeException("Admin non trouvé"));
-    
+
         if (admin.getRole() == null || !admin.getRole().getName().equals(RoleType.ADMIN)) {
             throw new RuntimeException("Seul un admin peut transférer des produits !");
         }
-    
+
         // Récupérer les boutiques source et destination
         Boutique boutiqueSource = boutiqueRepository.findById(boutiqueSourceId)
                 .orElseThrow(() -> new RuntimeException("Boutique source non trouvée"));
         Boutique boutiqueDestination = boutiqueRepository.findById(boutiqueDestinationId)
                 .orElseThrow(() -> new RuntimeException("Boutique destination non trouvée"));
 
-        // Vérifier que les deux boutiques appartiennent à l'entreprise de l'admin
-        if (!boutiqueSource.getEntreprise().equals(admin.getEntreprise()) ||
+        // Vérifier l'appartenance des boutiques à l'entreprise de l'admin
+        if (!boutiqueSource.getEntreprise().equals(admin.getEntreprise()) || 
             !boutiqueDestination.getEntreprise().equals(admin.getEntreprise())) {
             throw new RuntimeException("Les boutiques doivent appartenir à l'entreprise de l'admin !");
         }
-    
+
         // Vérifier que le produit existe et que la quantité est suffisante
         Produit produit = produitRepository.findByBoutiqueAndId(boutiqueSourceId, produitId)
                 .orElseThrow(() -> new RuntimeException("Produit non trouvé dans la boutique source"));
-    
+
         if (produit.getQuantite() < quantite) {
             throw new RuntimeException("Quantité insuffisante dans la boutique source !");
         }
-    
+
         // Réduire la quantité dans la boutique source
         produit.setQuantite(produit.getQuantite() - quantite);
-    
+
         // Vérifier si le produit existe dans la boutique destination
         Optional<Produit> produitDestinationOpt = produitRepository.findByBoutiqueAndCodeGenerique(boutiqueDestination.getId(), produit.getCodeGenerique());
-    
+
         if (produitDestinationOpt.isPresent()) {
             Produit produitDestination = produitDestinationOpt.get();
             produitDestination.setQuantite(produitDestination.getQuantite() + quantite);
@@ -210,7 +210,7 @@ public class BoutiqueService {
             nouveauProduit.setBoutique(boutiqueDestination);
             produitRepository.save(nouveauProduit);
         }
-    
+
         // Enregistrer le transfert
         Transfert transfert = new Transfert();
         transfert.setProduit(produit);
@@ -220,7 +220,7 @@ public class BoutiqueService {
         transfertRepository.save(transfert);
     }
 
-    
+
     public List<Produit> getProduitsParBoutique(HttpServletRequest request, Long boutiqueId) {
         // Vérifier la présence du token JWT dans l'entête de la requête
         String token = request.getHeader("Authorization");

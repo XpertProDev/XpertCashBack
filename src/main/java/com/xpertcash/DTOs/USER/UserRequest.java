@@ -26,5 +26,6 @@ public class UserRequest {
     private String pays;
     private String adresseEntreprise;
     private String logoEntreprise;
+    private Long entrepriseId;
     private List<BoutiqueResponse> boutiques;
 }
