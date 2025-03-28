@@ -209,6 +209,7 @@ public class BoutiqueController {
             return ResponseEntity.badRequest().body(response);
         }
     }
+    
     // Endpoint pour réactiver une boutique
     @PutMapping("/activerBoutique/{id}")
     public ResponseEntity<Map<String, String>> reactiverBoutique(

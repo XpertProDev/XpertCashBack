@@ -171,6 +171,15 @@ public class BoutiqueService {
         Boutique boutiqueDestination = boutiqueRepository.findById(boutiqueDestinationId)
                 .orElseThrow(() -> new RuntimeException("Boutique destination non trouvée"));
 
+        // verification si l'une des boutiques est désactivée
+        
+        if (!boutiqueSource.isActif()) {
+            throw new RuntimeException("La boutique source est désactivée, transfert impossible !");
+        }
+        if (!boutiqueDestination.isActif()) {
+            throw new RuntimeException("La boutique destination est désactivée, transfert impossible !");
+        }
+
         // Vérifier l'appartenance des boutiques à l'entreprise de l'admin
         if (!boutiqueSource.getEntreprise().equals(admin.getEntreprise()) || 
             !boutiqueDestination.getEntreprise().equals(admin.getEntreprise())) {
@@ -243,6 +252,11 @@ public class BoutiqueService {
         // Récupérer la boutique par son ID
         Boutique boutique = boutiqueRepository.findById(boutiqueId)
                 .orElseThrow(() -> new RuntimeException("Boutique non trouvée"));
+        
+        // Vérifier si la boutique est active
+        if (!boutique.isActif()) {
+            throw new RuntimeException("Cette boutique est désactivée, ses produits ne sont pas accessibles !");
+        }
 
         // Vérifier que la boutique appartient à l'entreprise de l'admin
         if (!boutique.getEntreprise().equals(admin.getEntreprise())) {
