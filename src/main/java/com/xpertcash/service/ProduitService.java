@@ -367,7 +367,7 @@ public class ProduitService {
         return factureRepository.save(facture);
     }
 
-    //Methode liste Historique sur Stock
+     //Methode liste Historique sur Stock
         public List<StockHistoryDTO> getStockHistory(Long produitId) {
         // Vérifier si le produit existe
         Produit produit = produitRepository.findById(produitId)
@@ -636,28 +636,36 @@ public class ProduitService {
 
     //Lister Produit par boutique
     public List<ProduitDTO> getProduitsParStock(Long boutiqueId) {
-    // Récupérer les produits enStock = false
-    List<Produit> produitsEnStockFalse = produitRepository.findByBoutiqueIdAndEnStockFalse(boutiqueId);
-
-    // Récupérer les produits enStock = true
-    List<Produit> produitsEnStockTrue = produitRepository.findByBoutiqueIdAndEnStockTrue(boutiqueId);
-
-    // Mapper les entités Produit en ProduitDTO
-    List<ProduitDTO> produitsDTO = new ArrayList<>();
-
-    // Ajouter les produits enStock = false au DTO
-    for (Produit produit : produitsEnStockFalse) {
-        produitsDTO.add(convertToProduitDTO(produit));
+        // Vérifier si la boutique existe et est active
+        Boutique boutique = boutiqueRepository.findById(boutiqueId)
+                .orElseThrow(() -> new RuntimeException("Boutique non trouvée"));
+    
+        if (!boutique.isActif()) {
+            throw new RuntimeException("Cette boutique est désactivée, ses produits ne sont pas accessibles !");
+        }
+    
+        // Récupérer les produits enStock = false
+        List<Produit> produitsEnStockFalse = produitRepository.findByBoutiqueIdAndEnStockFalse(boutiqueId);
+    
+        // Récupérer les produits enStock = true
+        List<Produit> produitsEnStockTrue = produitRepository.findByBoutiqueIdAndEnStockTrue(boutiqueId);
+    
+        // Mapper les entités Produit en ProduitDTO
+        List<ProduitDTO> produitsDTO = new ArrayList<>();
+    
+        // Ajouter les produits enStock = false au DTO
+        for (Produit produit : produitsEnStockFalse) {
+            produitsDTO.add(convertToProduitDTO(produit));
+        }
+    
+        // Ajouter les produits enStock = true au DTO
+        for (Produit produit : produitsEnStockTrue) {
+            produitsDTO.add(convertToProduitDTO(produit));
+        }
+    
+        return produitsDTO;
     }
-
-    // Ajouter les produits enStock = true au DTO
-    for (Produit produit : produitsEnStockTrue) {
-        produitsDTO.add(convertToProduitDTO(produit));
-    }
-
-    return produitsDTO;
-}
-
+    
     // Méthode pour convertir un Produit en ProduitDTO
     private ProduitDTO convertToProduitDTO(Produit produit) {
         ProduitDTO produitDTO = new ProduitDTO();

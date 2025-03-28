@@ -251,17 +251,23 @@ public class ProduitController {
         @GetMapping("/produits/{boutiqueId}/stock")
         public ResponseEntity<?> getProduitsParStock(@PathVariable Long boutiqueId) {
             try {
-                // Récupérer les produits en stock
                 List<ProduitDTO> produitsDTO = produitService.getProduitsParStock(boutiqueId);
-
                 return ResponseEntity.ok(produitsDTO);
+
+            } catch (RuntimeException e) {
+                Map<String, String> errorResponse = new HashMap<>();
+                errorResponse.put("error", e.getMessage());
+
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
+
             } catch (Exception e) {
                 Map<String, String> errorResponse = new HashMap<>();
-                errorResponse.put("error", "Une erreur est survenue lors de la récupération des produits.");
+                errorResponse.put("error", "Une erreur interne est survenue lors de la récupération des produits.");
 
                 return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
             }
         }
+
 
 
         //Get Total Produit
