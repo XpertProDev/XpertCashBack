@@ -117,6 +117,38 @@ public class BoutiqueService {
         return boutiqueRepository.findByEntrepriseId(user.getEntreprise().getId());
     }
 
+    // Methode pour recuperer une boutique par son ID
+    public Boutique getBoutiqueById(Long boutiqueId, HttpServletRequest request) {
+        // Vérifier la présence du token JWT dans l'entête de la requête
+        String token = request.getHeader("Authorization");
+        if (token == null || !token.startsWith("Bearer ")) {
+            throw new RuntimeException("Token JWT manquant ou mal formaté");
+        }
+
+        // Extraire l'ID de l'utilisateur depuis le token
+        Long userId = jwtUtil.extractUserId(token.substring(7));
+
+        // Récupérer l'utilisateur (admin)
+        User admin = usersRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("Admin non trouvé"));
+
+        // Vérifier que l'utilisateur est bien un admin
+        if (admin.getRole() == null || !admin.getRole().getName().equals(RoleType.ADMIN)) {
+            throw new RuntimeException("Seul un admin peut accéder aux boutiques !");
+        }
+
+        // Récupérer la boutique par son ID
+        Boutique boutique = boutiqueRepository.findById(boutiqueId)
+                .orElseThrow(() -> new RuntimeException("Boutique non trouvée"));
+
+        // Vérifier que la boutique appartient à l'entreprise de l'admin
+        if (!boutique.getEntreprise().equals(admin.getEntreprise())) {
+            throw new RuntimeException("Vous n'avez pas accès à cette boutique !");
+        }
+
+        return boutique;
+    }
+
 
     //Methode update de Boutique
     public Boutique updateBoutique(Long boutiqueId, String newNomBoutique, String newAdresse,String newTelephone, String newEmail, HttpServletRequest request) {

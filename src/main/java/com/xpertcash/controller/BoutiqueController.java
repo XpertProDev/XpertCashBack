@@ -3,6 +3,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -95,7 +96,25 @@ public class BoutiqueController {
         return ResponseEntity.ok(boutiqueResponses);
     }
 
-
+   // Endpoint recuperer une boutique par son ID
+    @GetMapping("/boutique/{id}")
+    public ResponseEntity<BoutiqueResponse> getBoutiqueById(@PathVariable Long id, HttpServletRequest request) {
+        try {
+            Boutique boutique = boutiqueService.getBoutiqueById(id, request);
+            BoutiqueResponse response = new BoutiqueResponse(
+                boutique.getId(),
+                boutique.getNomBoutique(),
+                boutique.getAdresse(),
+                boutique.getTelephone(),
+                boutique.getEmail(),
+                boutique.getCreatedAt(),
+                boutique.isActif()
+            );
+            return ResponseEntity.ok(response);
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(null);
+        }
+    }
 
 
     //Endpoint Update Boutique
