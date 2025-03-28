@@ -66,7 +66,7 @@ public class RoleService {
             ));
 
             Role managerRole = new Role();
-            managerRole.setName(RoleType.Manageur);
+            managerRole.setName(RoleType.MANAGER);
             managerRole.setPermissions(Collections.singletonList(
                 permissionMap.get(PermissionType.GERER_UTILISATEURS)
 
@@ -93,7 +93,7 @@ public class RoleService {
             */
 
             // 4️⃣ Sauvegarder les rôles avec les permissions associées
-            roleRepository.saveAll(Arrays.asList(adminRole, venteRole));
+            roleRepository.saveAll(Arrays.asList(adminRole, venteRole, managerRole));
 
             System.out.println("✅ Rôles et permissions initialisés avec succès !");
         }

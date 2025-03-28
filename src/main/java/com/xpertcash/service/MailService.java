@@ -20,20 +20,20 @@ public class MailService {
     @Value("${spring.mail.username}")
     private String from;
 
-    public void sendActivationLinkEmail(String to, String code) throws MessagingException {
+    public void sendActivationLinkEmail(String to, String code, String personalCode) throws MessagingException {
         String baseUrl = "http://localhost:8080"; // Adaptez cette URL à votre environnement
         String activationUrl = baseUrl + "/api/auth/activate?email=" + to + "&code=" + code;
 
         String subject = "Activation de votre compte";
-        String htmlContent = generateActivationEmail(activationUrl);
+        String htmlContent = generateActivationEmail(personalCode, activationUrl);
 
         sendEmail(to, subject, htmlContent);
     }
 
 
-    public void sendEmployeEmail(String to, String fullName, String companyName, String role, String email, String password) throws MessagingException {
+    public void sendEmployeEmail(String to, String fullName, String companyName, String role, String email, String password, String personalCode) throws MessagingException {
         String subject = "Création de votre compte XpertCash";
-        String htmlContent = generateInfoEmail(fullName, companyName, role, email, password);
+        String htmlContent = generateInfoEmail(fullName, companyName, role, email, password, personalCode);
         sendEmail(to, subject, htmlContent);
     }
     
@@ -82,7 +82,7 @@ public class MailService {
     }
 
     
-    private String generateActivationEmail(String activationUrl) {
+    private String generateActivationEmail(String personalCode ,String activationUrl) {
         return """
             <html>
                     <body style="font-family: Arial, sans-serif; background-color: #f4f4f4; padding: 20px;">
@@ -91,6 +91,7 @@ public class MailService {
                             <h2 style="color: #333; margin-top: -9px; font-size: 19px;">Activation de votre compte</h2> 
                             <p>Bonjour,</p>
                             <p>Lors de votre inscription, vous bénéficiez de <strong>24h d'utilisation gratuite</strong> du système.</p>
+                            <p>Votre code PIN est :<strong>%s</strong></p>
                             <p>Pour continuer à utiliser votre compte, veuillez l'activer en cliquant ci-dessous :</p>
                             <a href="%s" style="display: inline-block; padding: 12px 20px; background-color: rgb(19, 137, 247); color: white; text-decoration: none; border-radius: 5px; font-weight: bold;">
                                 Activer mon compte
@@ -101,11 +102,11 @@ public class MailService {
                     </body>
             </html>
 
-        """.formatted(activationUrl);
+        """.formatted(personalCode ,activationUrl);
     }
 
 
-    private String generateInfoEmail(String fullName, String companyName, String role, String email, String password) {
+    private String generateInfoEmail(String fullName, String companyName, String role, String email, String password, String personalCode) {
         return """
         <html>
         <body style="font-family: Arial, sans-serif; background-color: #f4f4f4; padding: 20px;">
@@ -118,6 +119,7 @@ public class MailService {
                 <div style="background: #f8f9fa; padding: 10px; border-radius: 5px; display: inline-block; text-align: left;">
                     <p><strong>Email :</strong> %s</p>
                     <p><strong>Mot de passe :</strong> %s</p>
+                    <p><strong>Code PIN :</strong> %s</p>
                 </div>
                 <p style="margin-top: 8px;">Nous vous recommandons de changer votre mot de passe dès votre première connexion.</p>
                 <a href="http://localhost:8080/login" style="display: inline-block; padding: 12px 20px; background-color: #007bff; color: white; text-decoration: none; border-radius: 5px; font-weight: bold; margin-top: 10px;">
@@ -127,7 +129,7 @@ public class MailService {
             </div>
         </body>
         </html>
-        """.formatted(companyName, fullName, companyName, role, email, password);
+        """.formatted(companyName, fullName, companyName, role, email, password, personalCode);
     }
     
     

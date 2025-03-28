@@ -18,6 +18,10 @@ public class User {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(nullable = false)
+    private String personalCode;
+    
+
     //=========================== POUR NOM COMPLET ===========================
     // Not nul de Spring boot
     //@NotNull(message = "Champs vide")
