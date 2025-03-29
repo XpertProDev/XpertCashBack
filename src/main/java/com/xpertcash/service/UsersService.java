@@ -389,9 +389,9 @@ public class UsersService {
                     String personalCode;
                     boolean isUnique;
                     do {
-                        personalCode = String.format("%04d", new Random().nextInt(10000));  // 4 chiffres (0000 à 9999)
+                        personalCode = String.format("%04d", new Random().nextInt(10000));
                         isUnique = !usersRepository.existsByPersonalCode(personalCode);  // Vérifier si le code PIN existe déjà dans la base de données
-                    } while (!isUnique);  // Répéter jusqu'à ce qu'un code unique soit généré
+                    } while (!isUnique);
 
 
                 // Créer un nouvel utilisateur avec l'activation dépendante de l'admin
@@ -401,7 +401,7 @@ public class UsersService {
                 newUser.setNomComplet(userRequest.getNomComplet());
                 newUser.setPays(userRequest.getPays());
                 newUser.setPhone(userRequest.getPhone());
-                newUser.setEnabledLien(admin.isActivatedLien()); // L'employé est activé SEULEMENT si l'admin est activé
+                newUser.setEnabledLien(admin.isActivatedLien());
                 newUser.setCreatedAt(LocalDateTime.now());
                 newUser.setEntreprise(admin.getEntreprise());
                 newUser.setPersonalCode(personalCode);
@@ -579,18 +579,18 @@ public class UsersService {
                 .collect(Collectors.toList());
 
         return new UserRequest(
-                user.getId(),
-                user.getNomComplet(),
-                entreprise.getNomEntreprise(),
-                user.getEmail(),
-                user.getRole().getName(),
-                user.getPhone(),
-                user.getPays(),
-                user.getPersonalCode(),
-                entreprise.getAdresse(),
-                entreprise.getLogo(),
-                entreprise.getId(),
-                boutiqueResponses
+            user.getId(),
+            user.getNomComplet(),
+            entreprise.getNomEntreprise(),
+            user.getEmail(),
+            user.getRole().getName(),
+            user.getPhone(),
+            user.getPays(),
+            entreprise.getAdresse(),
+            entreprise.getLogo(),
+            entreprise.getId(),
+            boutiqueResponses,
+            user.getPersonalCode()
         );
     }
 
