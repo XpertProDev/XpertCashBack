@@ -19,5 +19,6 @@ public class StockHistoryDTO {
     private String nomComplet;
     private String phone;
     private RoleType role;
+    private String codeFournisseur;
 
 }
