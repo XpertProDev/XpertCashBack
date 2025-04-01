@@ -17,4 +17,5 @@ public class BoutiqueResponse {
     private String email;
     private LocalDateTime createdAt;
     private boolean actif = true;
+    
 }

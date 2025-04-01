@@ -20,6 +20,7 @@ public class UserRequest {
     private String email;
     private RoleType roleType;
 
+
     @Pattern(regexp = "^\\+?[0-9]{8,15}$", message = "Le téléphone doit être au format valide")
     private String phone;
 
@@ -28,4 +29,6 @@ public class UserRequest {
     private String logoEntreprise;
     private Long entrepriseId;
     private List<BoutiqueResponse> boutiques;
+    private String personalCode;
+    
 }

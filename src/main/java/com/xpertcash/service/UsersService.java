@@ -91,13 +91,23 @@ public class UsersService {
         // Génération du mot de passe haché
         BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
         String hashedPassword = passwordEncoder.encode(password);
+
+       // Générer un code PIN de 4 chiffres unique pour la connexion future
+       String personalCode;
+       boolean isUnique;
+       do {
+           personalCode = String.format("%04d", new Random().nextInt(10000));  // 4 chiffres (0000 à 9999)
+           isUnique = !usersRepository.existsByPersonalCode(personalCode);  // Vérifier si le code PIN existe déjà dans la base de données
+       } while (!isUnique);  // Répéter jusqu'à ce qu'un code unique soit généré
+
+
     
         // Générer le code PIN d'activation
         String activationCode = String.format("%04d", new Random().nextInt(10000));
     
         // Envoi de l'email d'activation avec le code PIN AVANT l'enregistrement
         try {
-            mailService.sendActivationLinkEmail(email, activationCode);
+            mailService.sendActivationLinkEmail(email, activationCode, personalCode);
         } catch (MessagingException e) {
             System.err.println("Erreur lors de l'envoi de l'email d'activation : " + e.getMessage());
             throw new RuntimeException("L'inscription a échoué. Veuillez vérifier votre connexion Internet ou réessayer plus tard.");
@@ -148,6 +158,7 @@ public class UsersService {
         user.setEntreprise(entreprise);
         user.setRole(adminRole);
         user.setActivationCode(activationCode);
+        user.setPersonalCode(personalCode);
         user.setCreatedAt(LocalDateTime.now());
         user.setActivatedLien(false);
         user.setEnabledLien(true);
@@ -374,6 +385,15 @@ public class UsersService {
                 String generatedPassword = PasswordGenerator.generatePassword();
                 String encodedPassword = passwordEncoder.encode(generatedPassword);
 
+                // Générer un code PIN de 4 chiffres unique pour la connexion future
+                    String personalCode;
+                    boolean isUnique;
+                    do {
+                        personalCode = String.format("%04d", new Random().nextInt(10000));
+                        isUnique = !usersRepository.existsByPersonalCode(personalCode);  // Vérifier si le code PIN existe déjà dans la base de données
+                    } while (!isUnique);
+
+
                 // Créer un nouvel utilisateur avec l'activation dépendante de l'admin
                 User newUser = new User();
                 newUser.setEmail(userRequest.getEmail());
@@ -381,9 +401,10 @@ public class UsersService {
                 newUser.setNomComplet(userRequest.getNomComplet());
                 newUser.setPays(userRequest.getPays());
                 newUser.setPhone(userRequest.getPhone());
-                newUser.setEnabledLien(admin.isActivatedLien()); // L'employé est activé SEULEMENT si l'admin est activé
+                newUser.setEnabledLien(admin.isActivatedLien());
                 newUser.setCreatedAt(LocalDateTime.now());
                 newUser.setEntreprise(admin.getEntreprise());
+                newUser.setPersonalCode(personalCode);
                 newUser.setRole(role);
 
                 // Enregistrer l'utilisateur
@@ -397,7 +418,9 @@ public class UsersService {
                         savedUser.getEntreprise().getNomEntreprise(),
                         savedUser.getRole().getName().toString(),
                         savedUser.getEmail(),
-                        generatedPassword
+                        generatedPassword,
+                        savedUser.getPersonalCode()
+
                     );
                 } catch (MessagingException e) {
                     System.err.println("Erreur lors de l'envoi de l'email à " + savedUser.getEmail() + " : " + e.getMessage());
@@ -556,17 +579,18 @@ public class UsersService {
                 .collect(Collectors.toList());
 
         return new UserRequest(
-                user.getId(),
-                user.getNomComplet(),
-                entreprise.getNomEntreprise(),
-                user.getEmail(),
-                user.getRole().getName(),
-                user.getPhone(),
-                user.getPays(),
-                entreprise.getAdresse(),
-                entreprise.getLogo(),
-                entreprise.getId(),
-                boutiqueResponses
+            user.getId(),
+            user.getNomComplet(),
+            entreprise.getNomEntreprise(),
+            user.getEmail(),
+            user.getRole().getName(),
+            user.getPhone(),
+            user.getPays(),
+            entreprise.getAdresse(),
+            entreprise.getLogo(),
+            entreprise.getId(),
+            boutiqueResponses,
+            user.getPersonalCode()
         );
     }
 
