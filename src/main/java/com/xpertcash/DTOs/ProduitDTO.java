@@ -1,6 +1,7 @@
 package com.xpertcash.DTOs;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.validation.constraints.NotNull;
@@ -48,6 +49,8 @@ public class ProduitDTO {
     private LocalDateTime lastUpdated;
 
     private Long boutiqueId;
+
+    private List<String> boutiques; 
 
     public Long getBoutiqueId() {
         return boutiqueId;
