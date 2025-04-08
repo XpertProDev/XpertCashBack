@@ -12,5 +12,8 @@ import com.xpertcash.entity.Client;
 public interface ClientRepository extends JpaRepository<Client, Long>{
     List<Client> findByEntrepriseClientId(Long entrepriseClientId);
     Optional<Client> findByEmailOrTelephone(String email, String telephone);
+    Optional<Client> findByEmail(String email);
+    Optional<Client> findByTelephone(String telephone);
+    
 
 }
