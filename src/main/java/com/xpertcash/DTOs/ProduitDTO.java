@@ -49,17 +49,25 @@ public class ProduitDTO {
     private LocalDateTime createdAt;
     private LocalDateTime lastUpdated;
 
-    //private Long boutiqueId;
+    private Long boutiqueId;
 
     private List<Map<String, Object>> boutiques;
 
-    /*public Long getBoutiqueId() {
+    public Long getBoutiqueId() {
         return boutiqueId;
+    }
+
+    public List<Map<String, Object>> getBoutiques() {
+        return boutiques;
+    }
+
+    public void setBoutiques(List<Map<String, Object>> boutiques) {
+        this.boutiques = boutiques;
     }
 
     public void setBoutiqueId(Long boutiqueId) {
         this.boutiqueId = boutiqueId;
     }
-        */
+        
     
 }

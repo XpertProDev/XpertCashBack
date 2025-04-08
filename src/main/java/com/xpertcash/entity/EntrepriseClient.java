@@ -4,6 +4,7 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 import jakarta.persistence.*;
@@ -23,6 +24,7 @@ public class EntrepriseClient {
     private String adresse;
     private String email;
     private String telephone;
+    private LocalDateTime createdAt;
 
     
     @OneToMany(mappedBy = "entrepriseClient", cascade = CascadeType.ALL)

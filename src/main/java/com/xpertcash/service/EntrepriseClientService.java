@@ -1,5 +1,6 @@
 package com.xpertcash.service;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -21,6 +22,15 @@ public class EntrepriseClientService {
     private ClientRepository clientRepository;
 
     public EntrepriseClient saveEntreprise(EntrepriseClient entrepriseClient) {
+        // Vérifier si une entreprise avec le même email ou téléphone existe déjà
+        Optional<EntrepriseClient> existingEntreprise = entrepriseClientRepository
+            .findByEmailOrTelephone(entrepriseClient.getEmail(), entrepriseClient.getTelephone());
+
+        if (existingEntreprise.isPresent()) {
+            throw new RuntimeException("Une entreprise avec les même informations existe déjà !");
+        }
+
+        entrepriseClient.setCreatedAt(LocalDateTime.now());
         return entrepriseClientRepository.save(entrepriseClient);
     }
 
@@ -32,7 +42,7 @@ public class EntrepriseClientService {
         return entrepriseClientRepository.findAll();
     }
 
-    public void deleteEntreprise(Long id) {
+    public void deleteEntreprise(Long id) { 
         entrepriseClientRepository.deleteById(id);
     }
 

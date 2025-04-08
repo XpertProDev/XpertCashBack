@@ -1,9 +1,13 @@
 package com.xpertcash.controller;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -24,25 +28,25 @@ public class ClientController {
     @Autowired
     private ClientService clientService;
 
-    @Autowired
-    private EntrepriseClientRepository entrepriseClientRepository;
-
-    @PostMapping("/clients")
-    public Client createClient(@RequestBody Client client) {
-        // Si une entreprise est fournie, vérifie si l'entreprise a un ID
-        if (client.getEntrepriseClient() != null) {
-            // Si l'entreprise n'a pas d'ID (nouvelle entreprise)
-            if (client.getEntrepriseClient().getId() == null) {
-                // Sauvegarder l'entreprise avant de l'associer au client
-                EntrepriseClient savedEntreprise = entrepriseClientRepository.save(client.getEntrepriseClient());
-                // Associer l'entreprise nouvellement créée au client
-                client.setEntrepriseClient(savedEntreprise);
-            }
+  
+        @PostMapping("/clients")
+    public ResponseEntity<?> createClient(@RequestBody Client client) {
+        Map<String, String> response = new HashMap<>();
+        try {
+            // Sauvegarder le client avec son entreprise (si elle est associée)
+            Client savedClient = clientService.saveClient(client);
+            response.put("message", "Client créé avec succès");
+            response.put("clientId", savedClient.getId().toString());
+            response.put("createdAt", savedClient.getCreatedAt().toString());
+            return ResponseEntity.ok(response);
+        } catch (RuntimeException e) {
+            // Gestion des erreurs pour les doublons de client ou entreprise
+            response.put("error", e.getMessage());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
         }
-
-        // Sauvegarder le client avec son entreprise (si elle est associée)
-        return clientService.saveClient(client);
     }
+
+    
 
     @GetMapping("/clients/{id}")
     public Optional<Client> getClientById(@PathVariable Long id) {
