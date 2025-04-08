@@ -70,28 +70,44 @@ public class ProduitService {
     // Ajouter un produit à la liste sans le stock
     public List<ProduitDTO> createProduit(HttpServletRequest request, List<Long> boutiqueIds, ProduitRequest produitRequest, boolean addToStock) {
         try {
-            // Récupérer le token JWT depuis le header "Authorization"
+            // Récupération et validation du token
             String token = request.getHeader("Authorization");
             if (token == null || !token.startsWith("Bearer ")) {
                 throw new RuntimeException("Token JWT manquant ou mal formaté");
             }
-            
             String jwtToken = token.substring(7);
             Long adminId = jwtUtil.extractUserId(jwtToken);
             User admin = usersRepository.findById(adminId)
                     .orElseThrow(() -> new RuntimeException("Admin non trouvé"));
-            
+    
             if (admin.getRole() == null || !admin.getRole().getName().equals(RoleType.ADMIN)) {
                 throw new RuntimeException("Seul un ADMIN peut ajouter des produits !");
             }
     
             List<ProduitDTO> produitsAjoutes = new ArrayList<>();
-            
+    
+            // Récupérer la première boutique pour identifier l'entreprise
+            Boutique premiereBoutique = boutiqueRepository.findById(boutiqueIds.get(0))
+                    .orElseThrow(() -> new RuntimeException("Boutique non trouvée"));
+            Long entrepriseId = premiereBoutique.getEntreprise().getId();
+    
+            // Vérifier si le produit existe déjà dans une boutique de la même entreprise
+            Produit produitExistant = produitRepository.findByNomAndEntrepriseId(produitRequest.getNom(), entrepriseId);
+    
+            String codeGenerique;
+            if (produitExistant != null) {
+                // Réutiliser le codeGenerique existant
+                codeGenerique = produitExistant.getCodeGenerique();
+            } else {
+                // Générer un nouveau codeGenerique unique
+                codeGenerique = generateProductCode();
+            }
+    
             for (Long boutiqueId : boutiqueIds) {
                 Boutique boutique = boutiqueRepository.findById(boutiqueId)
                         .orElseThrow(() -> new RuntimeException("Boutique non trouvée"));
     
-                // Vérification si le produit existe déjà dans cette boutique
+                // Vérification si le produit est déjà enregistré dans cette boutique
                 if (produitRepository.findByNomAndBoutiqueId(produitRequest.getNom(), boutiqueId) != null) {
                     throw new RuntimeException("Un produit avec le même nom existe déjà dans la boutique ID: " + boutiqueId);
                 }
@@ -103,14 +119,11 @@ public class ProduitService {
                 Categorie categorie = (produitRequest.getCategorieId() != null) ?
                         categorieRepository.findById(produitRequest.getCategorieId())
                                 .orElseThrow(() -> new RuntimeException("Catégorie non trouvée")) : null;
-                
+    
                 Unite unite = (produitRequest.getUniteId() != null) ?
                         uniteRepository.findById(produitRequest.getUniteId())
                                 .orElseThrow(() -> new RuntimeException("Unité de mesure non trouvée")) : null;
-                
-                // Générer un code unique pour chaque boutique
-                String codeGenerique = generateProductCode();
-                
+    
                 Produit produit = new Produit();
                 produit.setNom(produitRequest.getNom());
                 produit.setDescription(produitRequest.getDescription());
@@ -120,7 +133,7 @@ public class ProduitService {
                 produit.setSeuilAlert(produitRequest.getSeuilAlert() != null ? produitRequest.getSeuilAlert() : 0);
                 produit.setCategorie(categorie);
                 produit.setUniteDeMesure(unite);
-                produit.setCodeGenerique(codeGenerique); // Chaque boutique aura un code différent
+                produit.setCodeGenerique(codeGenerique); // Partage le même code
                 produit.setCodeBare(produitRequest.getCodeBare());
                 produit.setPhoto(produitRequest.getPhoto());
                 produit.setCreatedAt(LocalDateTime.now());
@@ -128,7 +141,7 @@ public class ProduitService {
                 produit.setBoutique(boutique);
     
                 Produit savedProduit = produitRepository.save(produit);
-                
+    
                 if (addToStock) {
                     Stock stock = new Stock();
                     stock.setStockActuel(produitRequest.getQuantite() != null ? produitRequest.getQuantite() : 0);
@@ -143,7 +156,7 @@ public class ProduitService {
                     savedProduit.setEnStock(true);
                     produitRepository.save(savedProduit);
                 }
-                
+    
                 produitsAjoutes.add(mapToDTO(savedProduit));
             }
             return produitsAjoutes;
@@ -152,6 +165,9 @@ public class ProduitService {
             throw new RuntimeException(e.getMessage(), e);
         }
     }
+    
+
+
 
     private ProduitDTO mapToDTO(Produit produit) {
         ProduitDTO produitDTO = new ProduitDTO();
@@ -750,15 +766,33 @@ public class ProduitService {
     
         // Méthode pour récupérer tous les produits de toutes les boutiques d'une entreprise
         public List<ProduitDTO> getProduitsParEntreprise(Long entrepriseId) {
-            // Récupérer tous les produits associés à l'entreprise via les boutiques
+            // Récupérer tous les produits de l'entreprise
             List<Produit> produits = produitRepository.findByEntrepriseId(entrepriseId);
-            List<Produit> produitsFiltres = produits.stream()
-                    .filter(produit -> produit.getBoutique() != null && produit.getBoutique().isActif())
-                    .collect(Collectors.toList());
-            return produitsFiltres.stream()
-                    .map(this::convertToProduitDTO)
-                    .collect(Collectors.toList());
+        
+            // Regrouper les produits par codeGenerique
+            Map<String, ProduitDTO> produitsUniques = new HashMap<>();
+        
+            for (Produit produit : produits) {
+                if (produit.getBoutique() != null && produit.getBoutique().isActif()) {
+                    String codeGenerique = produit.getCodeGenerique();
+                    
+                    // Vérifier si ce produit unique existe déjà dans la map
+                    if (!produitsUniques.containsKey(codeGenerique)) {
+                        ProduitDTO produitDTO = convertToProduitDTO(produit);
+                        produitDTO.setBoutiques(new ArrayList<>()); // Initialiser la liste des boutiques
+                        produitsUniques.put(codeGenerique, produitDTO);
+                    }
+        
+                    // Ajouter la boutique actuelle à la liste des boutiques où ce produit est disponible
+                    Boutique boutique = produit.getBoutique();
+                    String boutiqueInfo = boutique.getNomBoutique() + " (ID: " + boutique.getId() + ")";
+                    produitsUniques.get(codeGenerique).getBoutiques().add(boutiqueInfo);
+                }
+            }
+        
+            return new ArrayList<>(produitsUniques.values());
         }
+        
 
     
 
