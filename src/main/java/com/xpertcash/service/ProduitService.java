@@ -737,7 +737,7 @@ public class ProduitService {
                 .orElseThrow(() -> new RuntimeException("Produit avec ID " + id + " non trouvé"));
 
         ProduitDTO dto = mapToProduitDTO(produit);
-        dto.setBoutiqueId(produit.getBoutique() != null ? produit.getBoutique().getId() : null); // Ajouter l'ID de la boutique
+       // dto.setBoutiqueId(produit.getBoutique() != null ? produit.getBoutique().getId() : null); 
         return dto;
     }
 
@@ -760,7 +760,7 @@ public class ProduitService {
         dto.setLastUpdated(produit.getLastUpdated());
         dto.setNomCategorie(produit.getCategorie() != null ? produit.getCategorie().getNom() : null);
         dto.setNomUnite(produit.getUniteDeMesure() != null ? produit.getUniteDeMesure().getNom() : null);
-        dto.setBoutiqueId(produit.getBoutique() != null ? produit.getBoutique().getId() : null); // Ajouter l'ID de la boutique
+        //dto.setBoutiqueId(produit.getBoutique() != null ? produit.getBoutique().getId() : null);
         return dto;
     }
     
@@ -775,18 +775,28 @@ public class ProduitService {
             for (Produit produit : produits) {
                 if (produit.getBoutique() != null && produit.getBoutique().isActif()) {
                     String codeGenerique = produit.getCodeGenerique();
-                    
+        
                     // Vérifier si ce produit unique existe déjà dans la map
                     if (!produitsUniques.containsKey(codeGenerique)) {
                         ProduitDTO produitDTO = convertToProduitDTO(produit);
                         produitDTO.setBoutiques(new ArrayList<>()); // Initialiser la liste des boutiques
+                        produitDTO.setQuantite(0); // Initialiser la quantité totale à 0
                         produitsUniques.put(codeGenerique, produitDTO);
                     }
         
-                    // Ajouter la boutique actuelle à la liste des boutiques où ce produit est disponible
+                    // Ajouter la boutique et sa quantité
                     Boutique boutique = produit.getBoutique();
-                    String boutiqueInfo = boutique.getNomBoutique() + " (ID: " + boutique.getId() + ")";
+                    Map<String, Object> boutiqueInfo = new HashMap<>();
+                    boutiqueInfo.put("nom", boutique.getNomBoutique());
+                    boutiqueInfo.put("id", boutique.getId());
+                    boutiqueInfo.put("quantite", produit.getQuantite());
+        
                     produitsUniques.get(codeGenerique).getBoutiques().add(boutiqueInfo);
+        
+                    // Additionner la quantité totale
+                    produitsUniques.get(codeGenerique).setQuantite(
+                        produitsUniques.get(codeGenerique).getQuantite() + produit.getQuantite()
+                    );
                 }
             }
         
