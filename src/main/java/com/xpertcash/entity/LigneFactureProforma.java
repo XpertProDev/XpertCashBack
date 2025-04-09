@@ -36,7 +36,11 @@ public class LigneFactureProforma {
     @PrePersist
     @PreUpdate
     public void calculerMontantTotal() {
-        this.montantTotal = this.quantite * this.prixUnitaire;
+        if (this.quantite != null && this.prixUnitaire != null) {
+            this.montantTotal = this.quantite * this.prixUnitaire;
+        } else {
+            this.montantTotal = 0.0;
+        }
     }
 
     // Sérialisation personnalisée pour le nom du produit

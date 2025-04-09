@@ -1,6 +1,7 @@
 package com.xpertcash.service;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -10,6 +11,7 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import com.xpertcash.entity.Client;
@@ -214,21 +216,69 @@ public class FactureProformaService {
                 throw new RuntimeException("Impossible de modifier une facture VALIDÉE, sauf son statut de paiement !");
             }
     
-            return facture; // Retourner la facture sans aucune modification si c'est une facture VALIDÉE
+            //return facture; // Retourner la facture sans aucune modification si c'est une facture VALIDÉE
         }
-    
-        // Si la facture n'est pas VALIDÉE, on applique les autres modifications
-        if (modifications.getLignesFacture() != null) {
-            facture.getLignesFacture().clear();
-            for (LigneFactureProforma ligne : modifications.getLignesFacture()) {
-                Produit produit = produitRepository.findById(ligne.getProduit().getId())
-                        .orElseThrow(() -> new RuntimeException("Produit introuvable !"));
-                ligne.setFactureProForma(facture);
-                ligne.setProduit(produit);
-                ligne.setMontantTotal(ligne.getQuantite() * produit.getPrixVente());
-                facture.getLignesFacture().add(ligne);
+
+         // Si le statut est modifié et passe à "BROUILLON", "APPROUVE" ou "VALIDE", réinitialiser les champs dateRelance et dernierRappelEnvoye
+            if (modifications.getStatut() != null && 
+                (modifications.getStatut() == StatutFactureProForma.BROUILLON ||
+                modifications.getStatut() == StatutFactureProForma.APPROUVE ||
+                modifications.getStatut() == StatutFactureProForma.VALIDE)) {
+                facture.setDateRelance(null);
+                facture.setDernierRappelEnvoye(null);
+            }
+
+              // Si le statut est modifié et passe à "BROUILLON", "APPROUVE" ou "ENVOYE", réinitialiser le statutPaiement
+              if (modifications.getStatut() != null && 
+              (modifications.getStatut() == StatutFactureProForma.BROUILLON ||
+              modifications.getStatut() == StatutFactureProForma.APPROUVE ||
+              modifications.getStatut() == StatutFactureProForma.ENVOYE)) {
+              facture.setStatutPaiement(null);
+          }
+
+
+         // Vérifier si on passe en "ENVOYÉ" et définir la date de relance
+        if (modifications.getStatut() != null && modifications.getStatut() == StatutFactureProForma.ENVOYE) {
+            if (facture.getDateRelance() == null) {
+                //facture.setDateRelance(LocalDateTime.now().plusHours(72)); // Par défaut 72h
+                // Exemple pour une relance dans une minute
+                facture.setDateRelance(LocalDateTime.now().plusMinutes(1));
             }
         }
+
+    
+     // Si la facture n'est pas VALIDÉE, on applique les autres modifications
+if (modifications.getLignesFacture() != null) {
+    facture.getLignesFacture().clear();
+    for (LigneFactureProforma ligne : modifications.getLignesFacture()) {
+        // Récupérer le produit à partir de son ID
+        Produit produit = produitRepository.findById(ligne.getProduit().getId())
+                .orElseThrow(() -> new RuntimeException("Produit introuvable !"));
+
+        // Debugging: Vérifiez si le produit a bien un prix unitaire
+        System.out.println("Produit ID: " + produit.getId() + " - Prix de vente: " + produit.getPrixVente());
+
+        // Vérification que le prix de vente du produit n'est pas nul
+        if (produit.getPrixVente() == null) {
+            throw new RuntimeException("Le prix de vente du produit avec l'ID " + produit.getId() + " est nul.");
+        }
+
+        // Mettre à jour le prix unitaire de la ligne avec le prix du produit
+        ligne.setPrixUnitaire(produit.getPrixVente());
+
+        // Calcul du montant total pour cette ligne (quantité * prix unitaire)
+        double montantTotal = ligne.getQuantite() * ligne.getPrixUnitaire();
+        System.out.println("Montant total pour la ligne: " + montantTotal);
+
+        // Mettre à jour la ligne de facture avec le montant calculé
+        ligne.setFactureProForma(facture);
+        ligne.setProduit(produit);
+        ligne.setMontantTotal(montantTotal);
+
+        // Ajouter la ligne de facture modifiée à la facture
+        facture.getLignesFacture().add(ligne);
+    }
+}
     
         // Vérifier et appliquer la remise
         remisePourcentage = (remisePourcentage == null) ? 0.0 : remisePourcentage;
@@ -259,6 +309,34 @@ public class FactureProformaService {
     
         return factureProformaRepository.save(facture);
     }
+
+      // âche planifiée : Vérifie tous les jours à 08h00 quelles factures doivent être relancées
+      //@Scheduled(cron = "0 0 8 * * ?")
+      @Scheduled(cron = "0 * * * * ?")  // Tâche planifiée toutes les minutes
+      public void verifierFacturesAEnvoyer() {
+          LocalDateTime maintenant = LocalDateTime.now();
+  
+          // 🔍 Récupérer les factures à relancer qui n'ont pas encore reçu de rappel aujourd'hui
+          List<FactureProForma> facturesAEnvoyer = factureProformaRepository.findByDateRelanceBeforeAndDernierRappelEnvoyeIsNullOrDernierRappelEnvoyeBefore(maintenant);
+
+  
+          for (FactureProForma facture : facturesAEnvoyer) {
+              try {
+                  envoyerNotification(facture);
+                  
+                  // Mise à jour du champ `dernierRappelEnvoye`
+                  facture.setDernierRappelEnvoye(LocalDateTime.now());
+                  factureProformaRepository.save(facture);
+              } catch (Exception e) {
+                  System.err.println("❌ Erreur lors de l'envoi de la notification pour la facture " + facture.getNumeroFacture() + " : " + e.getMessage());
+              }
+          }
+      }
+  
+      // 📢 Envoi une notification pour relancer une facture
+      private void envoyerNotification(FactureProForma facture) {
+          System.out.println("📢 Rappel : La facture " + facture.getNumeroFacture() + " pour " + facture.getClient().getNomComplet() + " doit être relancée !");
+      }
     
 }
  

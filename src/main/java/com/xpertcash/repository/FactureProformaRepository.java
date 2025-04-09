@@ -1,6 +1,7 @@
 package com.xpertcash.repository;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -28,6 +29,12 @@ public interface FactureProformaRepository extends JpaRepository<FactureProForma
                                                @Param("statut") StatutFactureProForma statut);
 
     Optional<FactureProForma> findTopByDateCreationOrderByNumeroFactureDesc(LocalDate dateCreation);
+
+     // 🔍 Trouver les factures à relancer qui n'ont jamais reçu de rappel
+    // ou dont le dernier rappel a été envoyé avant aujourd'hui
+    @Query("SELECT f FROM FactureProForma f WHERE f.dateRelance < :now AND (f.dernierRappelEnvoye IS NULL OR f.dernierRappelEnvoye < :now)")
+    List<FactureProForma> findByDateRelanceBeforeAndDernierRappelEnvoyeIsNullOrDernierRappelEnvoyeBefore(@Param("now") LocalDateTime now);
+    
 }
 
 
