@@ -24,15 +24,15 @@ public class ClientService {
 
   
     public Client saveClient(Client client) {
-        // Vérifier si un client avec le même email ou téléphone existe déjà
+        if (client.getNomComplet() == null || client.getNomComplet().trim().isEmpty()) {
+            throw new RuntimeException("Le nom du client est obligatoire !");
+        }
+    
         checkClientExists(client);
     
-        // Vérifier et associer une entreprise si fournie
         if (client.getEntrepriseClient() != null) {
-            // Vérifier l'existence de l'entreprise par email ou téléphone
             checkEntrepriseExists(client.getEntrepriseClient());
     
-            // Si l'entreprise a un ID, l'associer au client, sinon, la créer
             if (client.getEntrepriseClient().getId() != null) {
                 associateExistingEntreprise(client);
             } else {
@@ -41,24 +41,61 @@ public class ClientService {
         }
     
         client.setCreatedAt(LocalDateTime.now());
-        // Sauvegarder le client avec son entreprise (si elle est associée)
         return clientRepository.save(client);
     }
     
     private void checkClientExists(Client client) {
-        Optional<Client> existingClient = clientRepository.findByEmailOrTelephone(client.getEmail(), client.getTelephone());
-        if (existingClient.isPresent()) {
-            throw new RuntimeException("Un client avec les mêmes informations existe déjà !");
+        String email = client.getEmail();
+        String telephone = client.getTelephone();
+    
+        Optional<Client> existingByEmail = Optional.empty();
+        Optional<Client> existingByTelephone = Optional.empty();
+    
+        if (email != null && !email.isEmpty()) {
+            existingByEmail = clientRepository.findByEmail(email);
+        }
+    
+        if (telephone != null && !telephone.isEmpty()) {
+            existingByTelephone = clientRepository.findByTelephone(telephone);
+        }
+    
+        if (existingByEmail.isPresent() && existingByTelephone.isPresent()) {
+            throw new RuntimeException("Un client avec cet email et ce téléphone existe déjà !");
+        } else if (existingByEmail.isPresent()) {
+            throw new RuntimeException("Un client avec cet email existe déjà !");
+        } else if (existingByTelephone.isPresent()) {
+            throw new RuntimeException("Un client avec ce téléphone existe déjà !");
         }
     }
     
     private void checkEntrepriseExists(EntrepriseClient entrepriseClient) {
-        Optional<EntrepriseClient> existingEntreprise = entrepriseClientRepository.findByEmailOrTelephone(entrepriseClient.getEmail(), entrepriseClient.getTelephone());
-        if (existingEntreprise.isPresent()) {
-            throw new RuntimeException("Cette entreprise existe déjà avec les mêmes coordonnées !");
+        String email = entrepriseClient.getEmail();
+        String telephone = entrepriseClient.getTelephone();
+    
+        Optional<EntrepriseClient> existingByEmail = Optional.empty();
+        Optional<EntrepriseClient> existingByTelephone = Optional.empty();
+    
+        // Vérifier si l'email est renseigné et existe déjà
+        if (email != null && !email.isEmpty()) {
+            existingByEmail = entrepriseClientRepository.findByEmail(email);
+        }
+    
+        // Vérifier si le téléphone est renseigné et existe déjà
+        if (telephone != null && !telephone.isEmpty()) {
+            existingByTelephone = entrepriseClientRepository.findByTelephone(telephone);
+        }
+    
+        // Construire un message d'erreur précis
+        if (existingByEmail.isPresent() && existingByTelephone.isPresent()) {
+            throw new RuntimeException("Une entreprise avec cet email et ce téléphone existe déjà !");
+        } else if (existingByEmail.isPresent()) {
+            throw new RuntimeException("Une entreprise avec cet email existe déjà !");
+        } else if (existingByTelephone.isPresent()) {
+            throw new RuntimeException("Une entreprise avec ce téléphone existe déjà !");
         }
     }
     
+  
     private void associateExistingEntreprise(Client client) {
         Optional<EntrepriseClient> existingEntrepriseById = entrepriseClientRepository.findById(client.getEntrepriseClient().getId());
         if (existingEntrepriseById.isPresent()) {

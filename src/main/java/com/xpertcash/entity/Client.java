@@ -14,6 +14,7 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @NoArgsConstructor
 
+
 public class Client {
 
     @Id
@@ -30,5 +31,6 @@ public class Client {
     @JsonBackReference
     @JoinColumn(name = "entreprise_client_id")
     private EntrepriseClient entrepriseClient;
+    
 
 }

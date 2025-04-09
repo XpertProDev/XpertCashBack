@@ -63,13 +63,14 @@ public class ProduitController {
 
     // Endpoint pour Créer un produit et décider si il doit être ajouté au stock
     @PostMapping(value = "/create", consumes = { MediaType.MULTIPART_FORM_DATA_VALUE })
-    public ResponseEntity<?> createProduit(
-        @RequestPart("boutiqueIds") String boutiqueIdsJson, // Liste des IDs des boutiques
-        @RequestPart("produit") String produitJson,
-        @RequestPart(value = "image", required = false) MultipartFile imageFile,
-        @RequestParam boolean addToStock,
-        @RequestHeader("Authorization") String token,
-        HttpServletRequest request) {
+public ResponseEntity<?> createProduit(
+    @RequestPart("boutiqueIds") String boutiqueIdsJson, // Liste des IDs des boutiques
+    @RequestPart("quantites") String quantitesJson, // Liste des quantités associées à chaque boutique
+    @RequestPart("produit") String produitJson, // Données du produit
+    @RequestPart(value = "image", required = false) MultipartFile imageFile, // Fichier d'image (optionnel)
+    @RequestParam boolean addToStock, // Si le produit doit être ajouté au stock
+    @RequestHeader("Authorization") String token, // Token d'authentification
+    HttpServletRequest request) {
     try {
         // Vérification de l'image reçue
         if (imageFile != null) {
@@ -80,38 +81,46 @@ public class ProduitController {
 
         ObjectMapper objectMapper = new ObjectMapper();
 
-        // conversion boutiqueIdsJson en liste
+        // Conversion des JSON reçus en listes ou objets
         List<Long> boutiqueIds = objectMapper.readValue(boutiqueIdsJson, new TypeReference<List<Long>>() {});
-        
+        List<Integer> quantites = objectMapper.readValue(quantitesJson, new TypeReference<List<Integer>>() {});
         ProduitRequest produitRequest = objectMapper.readValue(produitJson, ProduitRequest.class);
-        
+
+        // Validation que les quantités et les boutiques ont le même nombre d'éléments
+        if (boutiqueIds.size() != quantites.size()) {
+            throw new RuntimeException("Le nombre de boutiques ne correspond pas au nombre de quantités.");
+        }
+
         // Sauvegarde de l'image si elle est présente
         String photo = null;
         if (imageFile != null && !imageFile.isEmpty()) {
             photo = imageStorageService.saveImage(imageFile);
             System.out.println("✅ URL enregistrée : " + photo);
         }
-        produitRequest.setPhoto(photo);
+        produitRequest.setPhoto(photo); // Ajouter l'URL de l'image au produit
 
         // Creation de produit pour toutes les boutiques spécifiées
-        List<ProduitDTO> produitsAjoutes = produitService.createProduit(request, boutiqueIds, produitRequest, addToStock);
+        List<ProduitDTO> produitsAjoutes = produitService.createProduit(request, boutiqueIds, quantites, produitRequest, addToStock, photo);
 
         // Retourner la liste des produits ajoutés
         return ResponseEntity.status(HttpStatus.CREATED).body(produitsAjoutes);
 
     } catch (DuplicateProductException e) {
+        // Gestion des erreurs de duplication de produit
         System.out.println("⚠️ Produit déjà existant : " + e.getMessage());
         Map<String, String> errorResponse = new HashMap<>();
         errorResponse.put("error", e.getMessage());
         return ResponseEntity.status(HttpStatus.CONFLICT).body(errorResponse);
 
     } catch (Exception e) {
+        // Gestion des autres erreurs
         e.printStackTrace();
         Map<String, String> errorResponse = new HashMap<>();
         errorResponse.put("error", "Une erreur est survenue : " + e.getMessage());
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
     }
 }
+
 
     // Endpoint Update Produit
     @PatchMapping(value = "/updateProduit/{produitId}", consumes = { MediaType.MULTIPART_FORM_DATA_VALUE })
