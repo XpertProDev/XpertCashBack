@@ -190,12 +190,12 @@ public class FactureProformaService {
         // Ajouter un log pour voir ce que vous recevez comme modifications
         System.out.println("Modifications reçues: " + modifications);
     
-        // 🚫 Vérifier si la facture est ENCAISSÉE
+        // Vérifier si la facture est ENCAISSÉE
         if (facture.getStatutPaiement() == StatutPaiementFacture.ENCAISSE) {
             throw new RuntimeException("Impossible de modifier une facture dont le statut de paiement est ENCAISSÉ !");
         }
     
-        // 🚫 Vérifier si la facture est VALIDÉE
+        // Vérifier si la facture est VALIDÉE
         if (facture.getStatut() == StatutFactureProForma.VALIDE) {
             // Si seule la modification du statut de paiement est demandée
             if (modifications.getStatutPaiement() != null) {
@@ -217,7 +217,7 @@ public class FactureProformaService {
             return facture; // Retourner la facture sans aucune modification si c'est une facture VALIDÉE
         }
     
-        // 🔥 Si la facture n'est pas VALIDÉE, on applique les autres modifications
+        // Si la facture n'est pas VALIDÉE, on applique les autres modifications
         if (modifications.getLignesFacture() != null) {
             facture.getLignesFacture().clear();
             for (LigneFactureProforma ligne : modifications.getLignesFacture()) {
