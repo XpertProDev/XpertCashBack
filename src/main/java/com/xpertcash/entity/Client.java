@@ -1,5 +1,7 @@
 package com.xpertcash.entity;
 
+import java.time.LocalDateTime;
+
 import com.fasterxml.jackson.annotation.JsonBackReference;
 
 import jakarta.persistence.*;
@@ -22,6 +24,7 @@ public class Client {
     private String adresse;
     private String telephone;
     private String email;
+    private LocalDateTime createdAt;
     
    @ManyToOne
     @JsonBackReference

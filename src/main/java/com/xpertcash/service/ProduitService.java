@@ -735,11 +735,41 @@ public class ProduitService {
     public ProduitDTO getProduitById(Long id) {
         Produit produit = produitRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Produit avec ID " + id + " non trouvé"));
-
+    
         ProduitDTO dto = mapToProduitDTO(produit);
-       // dto.setBoutiqueId(produit.getBoutique() != null ? produit.getBoutique().getId() : null); 
+    
+        // Liste pour stocker les infos des boutiques
+        List<Map<String, Object>> boutiquesInfo = new ArrayList<>();
+        
+        // Récupérer tous les produits ayant le même codeGenerique
+        List<Produit> produitsMemeCode = produitRepository.findByCodeGenerique(produit.getCodeGenerique());
+    
+        // Variable pour accumuler la quantité totale
+        int totalQuantite = 0;
+    
+        // Boucle pour traiter chaque produit avec le même codeGenerique
+        for (Produit p : produitsMemeCode) {
+            if (p.getBoutique() != null && p.getBoutique().isActif()) {
+                Map<String, Object> boutiqueData = new HashMap<>();
+                boutiqueData.put("id", p.getBoutique().getId());
+                boutiqueData.put("nom", p.getBoutique().getNomBoutique());
+                boutiqueData.put("quantite", p.getQuantite()); // Quantité pour cette boutique
+    
+                // Ajouter cette boutique à la liste
+                boutiquesInfo.add(boutiqueData);
+    
+                // Ajouter la quantité de ce produit à la quantité totale
+                totalQuantite += p.getQuantite();
+            }
+        }
+    
+        // Définir la quantité totale dans le DTO
+        dto.setQuantite(totalQuantite);  // Mettre à jour la quantité totale
+        dto.setBoutiques(boutiquesInfo); // Ajouter la liste des boutiques
+    
         return dto;
     }
+    
 
     private ProduitDTO mapToProduitDTO(Produit produit) {
         ProduitDTO dto = new ProduitDTO();
@@ -760,7 +790,7 @@ public class ProduitService {
         dto.setLastUpdated(produit.getLastUpdated());
         dto.setNomCategorie(produit.getCategorie() != null ? produit.getCategorie().getNom() : null);
         dto.setNomUnite(produit.getUniteDeMesure() != null ? produit.getUniteDeMesure().getNom() : null);
-        //dto.setBoutiqueId(produit.getBoutique() != null ? produit.getBoutique().getId() : null);
+        dto.setBoutiqueId(produit.getBoutique() != null ? produit.getBoutique().getId() : null);
         return dto;
     }
     

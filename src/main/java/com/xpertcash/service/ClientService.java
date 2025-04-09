@@ -1,5 +1,6 @@
 package com.xpertcash.service;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -21,35 +22,57 @@ public class ClientService {
     @Autowired
     private EntrepriseClientRepository entrepriseClientRepository;
 
+  
     public Client saveClient(Client client) {
-        // Vérifie si un objet EntrepriseClient est associé au client
+        // Vérifier si un client avec le même email ou téléphone existe déjà
+        checkClientExists(client);
+    
+        // Vérifier et associer une entreprise si fournie
         if (client.getEntrepriseClient() != null) {
-            // Si l'entreprise a un ID (elle existe déjà dans la base de données)
+            // Vérifier l'existence de l'entreprise par email ou téléphone
+            checkEntrepriseExists(client.getEntrepriseClient());
+    
+            // Si l'entreprise a un ID, l'associer au client, sinon, la créer
             if (client.getEntrepriseClient().getId() != null) {
-                // Vérifier si l'entreprise existe déjà dans la base de données avec son ID
-                Optional<EntrepriseClient> existingEntreprise = entrepriseClientRepository
-                        .findById(client.getEntrepriseClient().getId());
-
-                if (existingEntreprise.isPresent()) {
-                    // Associer l'entreprise existante au client sans modifier ses informations
-                    client.setEntrepriseClient(existingEntreprise.get());
-                } else {
-                    // Si l'entreprise n'existe pas dans la base de données (ID est valide mais entreprise non trouvée)
-                    throw new IllegalArgumentException("L'entreprise avec cet ID n'existe pas.");
-                }
+                associateExistingEntreprise(client);
             } else {
-                // Si l'entreprise n'a pas d'ID (c'est une nouvelle entreprise)
-                // Sauvegarde l'entreprise avant d'associer au client
-                EntrepriseClient savedEntreprise = entrepriseClientRepository.save(client.getEntrepriseClient());
-                client.setEntrepriseClient(savedEntreprise);  // Associer l'entreprise nouvellement créée
+                saveNewEntreprise(client);
             }
-        } else {
-            // Si aucune entreprise n'est fournie, le client est simplement enregistré sans entreprise
         }
-
-        // Sauvegarde du client dans la base de données
+    
+        client.setCreatedAt(LocalDateTime.now());
+        // Sauvegarder le client avec son entreprise (si elle est associée)
         return clientRepository.save(client);
     }
+    
+    private void checkClientExists(Client client) {
+        Optional<Client> existingClient = clientRepository.findByEmailOrTelephone(client.getEmail(), client.getTelephone());
+        if (existingClient.isPresent()) {
+            throw new RuntimeException("Un client avec les mêmes informations existe déjà !");
+        }
+    }
+    
+    private void checkEntrepriseExists(EntrepriseClient entrepriseClient) {
+        Optional<EntrepriseClient> existingEntreprise = entrepriseClientRepository.findByEmailOrTelephone(entrepriseClient.getEmail(), entrepriseClient.getTelephone());
+        if (existingEntreprise.isPresent()) {
+            throw new RuntimeException("Cette entreprise existe déjà avec les mêmes coordonnées !");
+        }
+    }
+    
+    private void associateExistingEntreprise(Client client) {
+        Optional<EntrepriseClient> existingEntrepriseById = entrepriseClientRepository.findById(client.getEntrepriseClient().getId());
+        if (existingEntrepriseById.isPresent()) {
+            client.setEntrepriseClient(existingEntrepriseById.get());
+        } else {
+            throw new IllegalArgumentException("L'entreprise avec cet ID n'existe pas.");
+        }
+    }
+    
+    private void saveNewEntreprise(Client client) {
+        EntrepriseClient savedEntreprise = entrepriseClientRepository.save(client.getEntrepriseClient());
+        client.setEntrepriseClient(savedEntreprise);
+    }
+    
 
     public Optional<Client> getClientById(Long id) {
         return clientRepository.findById(id);
