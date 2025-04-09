@@ -255,10 +255,8 @@ if (modifications.getLignesFacture() != null) {
         Produit produit = produitRepository.findById(ligne.getProduit().getId())
                 .orElseThrow(() -> new RuntimeException("Produit introuvable !"));
 
-        // Debugging: Vérifiez si le produit a bien un prix unitaire
         System.out.println("Produit ID: " + produit.getId() + " - Prix de vente: " + produit.getPrixVente());
 
-        // Vérification que le prix de vente du produit n'est pas nul
         if (produit.getPrixVente() == null) {
             throw new RuntimeException("Le prix de vente du produit avec l'ID " + produit.getId() + " est nul.");
         }
