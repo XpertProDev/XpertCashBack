@@ -1,5 +1,6 @@
 package com.xpertcash.service;
 
+import java.lang.reflect.Field;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -8,9 +9,12 @@ import java.util.Optional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import com.xpertcash.entity.Client;
 import com.xpertcash.entity.EntrepriseClient;
 import com.xpertcash.repository.ClientRepository;
 import com.xpertcash.repository.EntrepriseClientRepository;
+
+import jakarta.persistence.EntityNotFoundException;
 
 @Service
 public class EntrepriseClientService {
@@ -70,6 +74,38 @@ public class EntrepriseClientService {
         entrepriseClientRepository.deleteById(id);
     }
 
+
+
+     //Methode pour modifier une Entreprise client
+    public EntrepriseClient updateEntrepriseClient(EntrepriseClient entrepriseClient) {
+        if (entrepriseClient.getId() == null) {
+            throw new IllegalArgumentException("L'ID d'entreprise est obligatoire !");
+        }
+    
+        //  si l'entreprise client existe
+        Optional<EntrepriseClient> existingEntrepriseClient = entrepriseClientRepository.findById(entrepriseClient.getId());
+        if (existingEntrepriseClient.isEmpty()) {
+            throw new EntityNotFoundException("L'entreprise avec cet ID n'existe pas !");
+        }
+    
+        EntrepriseClient updateEntrepriseClient = existingEntrepriseClient.get();
+    
+        // Utilisation de la réflexion pour mettre à jour seulement les champs non null
+        for (Field field : EntrepriseClient.class.getDeclaredFields()) {
+            field.setAccessible(true);
+            try {
+                Object newValue = field.get(entrepriseClient);
+                if (newValue != null) {
+                    field.set(updateEntrepriseClient, newValue);
+                }
+            } catch (IllegalAccessException e) {
+                e.printStackTrace();
+            }
+        }
+    
+        // Enregistrer les modifications
+        return entrepriseClientRepository.save(updateEntrepriseClient);
+    }
 
 
 

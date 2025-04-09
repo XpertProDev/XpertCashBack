@@ -189,4 +189,5 @@ public class ClientService {
         // Enregistrer les modifications
         return clientRepository.save(updatedClient);
     }
+
 }
