@@ -29,6 +29,9 @@ public class ClientService {
         }
     
         checkClientExists(client);
+
+        LocalDateTime now = LocalDateTime.now();
+        client.setCreatedAt(now);
     
         if (client.getEntrepriseClient() != null) {
             checkEntrepriseExists(client.getEntrepriseClient());
@@ -40,7 +43,6 @@ public class ClientService {
             }
         }
     
-        client.setCreatedAt(LocalDateTime.now());
         return clientRepository.save(client);
     }
     
@@ -106,9 +108,14 @@ public class ClientService {
     }
     
     private void saveNewEntreprise(Client client) {
-        EntrepriseClient savedEntreprise = entrepriseClientRepository.save(client.getEntrepriseClient());
-        client.setEntrepriseClient(savedEntreprise);
+        if (client.getEntrepriseClient() != null) {
+            client.getEntrepriseClient().setCreatedAt(client.getCreatedAt());
+            EntrepriseClient savedEntreprise = entrepriseClientRepository.save(client.getEntrepriseClient());
+            client.setEntrepriseClient(savedEntreprise);
+        }
     }
+    
+    
     
 
     public Optional<Client> getClientById(Long id) {

@@ -3,7 +3,9 @@ package com.xpertcash.entity;
 import java.time.LocalDate;
 import java.util.List;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonManagedReference;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
@@ -22,6 +24,16 @@ public class FactureProForma {
     private String numeroFacture;
     private LocalDate dateCreation;
     private String description;
+    
+     // Montants calculés
+     private double totalHT;  // Total avant taxes et remise
+     private Double remise;   // Remise en montant
+     private boolean tva;      // TVA 18% si applicable
+     private double totalFacture; // Montant final à payer
+
+     @Enumerated(EnumType.STRING)
+    private StatutPaiementFacture statutPaiement = StatutPaiementFacture.EN_ATTENTE;
+
 
     @Enumerated(EnumType.STRING)
     private StatutFactureProForma statut = StatutFactureProForma.BROUILLON;
@@ -30,13 +42,18 @@ public class FactureProForma {
     @JoinColumn(name = "client_id")
     private Client client;
 
-
+     @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "entrepriseClient_id")
+     @JsonIgnoreProperties({"clients", "createdAt"})
+    private EntrepriseClient entrepriseClient;
 
     @OneToMany(mappedBy = "factureProForma", cascade = CascadeType.ALL, orphanRemoval = true)
-    @JsonManagedReference
     private List<LigneFactureProforma> lignesFacture;
-    
-    
+
+
     
 
+   
+
+    
 }

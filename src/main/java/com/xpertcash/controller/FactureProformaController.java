@@ -22,15 +22,25 @@ public class FactureProformaController {
       @Autowired
     private FactureProformaService factureProformaService;
 
-      @PostMapping("/ajouter")
-    public ResponseEntity<?> ajouterFacture(@RequestBody FactureProForma facture) {
+    // Endpoint pour ajouter une facture pro forma
+    @PostMapping("/ajouter")
+    public ResponseEntity<?> ajouterFacture(
+            @RequestBody FactureProForma facture,
+            @RequestParam(defaultValue = "0") Double remisePourcentage,
+            @RequestParam(defaultValue = "false") Boolean appliquerTVA) { 
         try {
-            FactureProForma nouvelleFacture = factureProformaService.ajouterFacture(facture);
+            // Appel du service pour ajouter la facture
+            FactureProForma nouvelleFacture = factureProformaService.ajouterFacture(facture, remisePourcentage, appliquerTVA);
+    
+            // Retourner la facture créée en réponse HTTP 201 (CREATED)
             return ResponseEntity.status(HttpStatus.CREATED).body(nouvelleFacture);
         } catch (RuntimeException e) {
+            // Retourner l'erreur en réponse HTTP 400 (BAD REQUEST) si une exception est levée
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
         }
     }
+    
+    
     
 
     @PutMapping("/{id}/statut")
@@ -42,5 +52,19 @@ public class FactureProformaController {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
         }
     }
+
+
+    // Endpoint pour modifier une facture pro forma
+    @PutMapping("/updatefacture/{factureId}")
+    public ResponseEntity<FactureProForma> updateFacture(
+            @PathVariable Long factureId,
+            @RequestParam(required = false) Double remisePourcentage,
+            @RequestParam(required = false) Boolean appliquerTVA,
+            @RequestBody FactureProForma modifications) {
+    
+        FactureProForma factureModifiee = factureProformaService.modifierFacture(factureId, remisePourcentage, appliquerTVA, modifications);
+        return ResponseEntity.ok(factureModifiee);
+    }
+    
 
 }
