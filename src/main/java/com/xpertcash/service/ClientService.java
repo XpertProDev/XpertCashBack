@@ -1,5 +1,6 @@
 package com.xpertcash.service;
 
+import java.lang.reflect.Field;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -12,6 +13,8 @@ import com.xpertcash.entity.Client;
 import com.xpertcash.entity.EntrepriseClient;
 import com.xpertcash.repository.ClientRepository;
 import com.xpertcash.repository.EntrepriseClientRepository;
+
+import jakarta.persistence.EntityNotFoundException;
 
 @Service
 public class ClientService {
@@ -153,5 +156,37 @@ public class ClientService {
         clientsAndEntreprises.addAll(entreprises);  // Ajouter les entreprises comme clients sans leurs clients
 
         return clientsAndEntreprises;
+    }
+
+
+    //Methode pour modifier un client
+    public Client updateClient(Client client) {
+        if (client.getId() == null) {
+            throw new IllegalArgumentException("L'ID du client est obligatoire !");
+        }
+    
+        //  si le client existe
+        Optional<Client> existingClient = clientRepository.findById(client.getId());
+        if (existingClient.isEmpty()) {
+            throw new EntityNotFoundException("Le client avec cet ID n'existe pas !");
+        }
+    
+        Client updatedClient = existingClient.get();
+    
+        // Utilisation de la réflexion pour mettre à jour seulement les champs non null
+        for (Field field : Client.class.getDeclaredFields()) {
+            field.setAccessible(true);
+            try {
+                Object newValue = field.get(client);
+                if (newValue != null) {
+                    field.set(updatedClient, newValue);
+                }
+            } catch (IllegalAccessException e) {
+                e.printStackTrace();
+            }
+        }
+    
+        // Enregistrer les modifications
+        return clientRepository.save(updatedClient);
     }
 }
