@@ -41,6 +41,9 @@ public class Entreprise {
     @JoinColumn(name = "admin_id", nullable = true)  
     private User admin;
 
+    @OneToMany(mappedBy = "entreprise", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    private List<FactureProForma> facturesProforma = new ArrayList<>();
+
 
     // Générer un identifiant unique
     public static String generateIdentifiantEntreprise() {

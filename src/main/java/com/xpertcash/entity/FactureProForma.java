@@ -51,10 +51,17 @@ public class FactureProForma {
     @OneToMany(mappedBy = "factureProForma", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<LigneFactureProforma> lignesFacture;
 
+    // Relation avec l'Entreprise de l'Utilisateur
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "entreprise_id")
+    @JsonIgnoreProperties({"utilisateurs", "createdAt", "logo", "adresse"})
+    private Entreprise entreprise;
+
 
      private LocalDateTime dateRelance; 
 
      private LocalDateTime dernierRappelEnvoye;
+     private boolean notifie = false; 
     
 
    

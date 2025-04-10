@@ -34,6 +34,11 @@ public interface FactureProformaRepository extends JpaRepository<FactureProForma
     // ou dont le dernier rappel a été envoyé avant aujourd'hui
     @Query("SELECT f FROM FactureProForma f WHERE f.dateRelance < :now AND (f.dernierRappelEnvoye IS NULL OR f.dernierRappelEnvoye < :now)")
     List<FactureProForma> findByDateRelanceBeforeAndDernierRappelEnvoyeIsNullOrDernierRappelEnvoyeBefore(@Param("now") LocalDateTime now);
+
+    @Query("SELECT f FROM FactureProForma f WHERE f.dateRelance <= :now AND f.dernierRappelEnvoye IS NULL AND f.notifie = false")
+    List<FactureProForma> findFacturesAEnvoyer(@Param("now") LocalDateTime now);
+    
+
     
 }
 
