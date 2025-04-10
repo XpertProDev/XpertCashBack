@@ -32,8 +32,7 @@ public class FactureProForma {
      private boolean tva;      // TVA 18% si applicable
      private double totalFacture; // Montant final à payer
 
-     @Enumerated(EnumType.STRING)
-    private StatutPaiementFacture statutPaiement = StatutPaiementFacture.EN_ATTENTE;
+     
 
 
     @Enumerated(EnumType.STRING)
@@ -93,9 +92,13 @@ public class FactureProForma {
      private boolean notifie = false; 
     
 
-     @ManyToOne
-     @JoinColumn(name = "utilisateur_relanceur_id")
-     private User utilisateurRelanceur;
+
+
+
+     @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "utilisateur_relanceur_id")
+    @JsonIgnoreProperties({"personalCode", "phone", "photo", "createdAt", "activationCode", "activatedLien", "enabledLien", "lastActivity", "locked", "pays", "role"})
+    private User utilisateurRelanceur;
      
 
     

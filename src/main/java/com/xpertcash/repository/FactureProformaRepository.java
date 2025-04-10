@@ -37,6 +37,10 @@ public interface FactureProformaRepository extends JpaRepository<FactureProForma
 
     @Query("SELECT f FROM FactureProForma f WHERE f.dateRelance <= :now AND f.dernierRappelEnvoye IS NULL AND f.notifie = false")
     List<FactureProForma> findFacturesAEnvoyer(@Param("now") LocalDateTime now);
+
+    @Query("SELECT f FROM FactureProForma f WHERE f.entreprise.id = :entrepriseId")
+    List<FactureProForma> findByEntrepriseId(@Param("entrepriseId") Long entrepriseId);
+
     
 
     

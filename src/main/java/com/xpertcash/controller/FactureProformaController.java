@@ -1,8 +1,12 @@
 package com.xpertcash.controller;
 
+import java.util.List;
+import java.util.Map;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -61,18 +65,6 @@ public ResponseEntity<?> ajouterFacture(
 
     
     
-    
-
-    @PutMapping("/{id}/statut")
-    public ResponseEntity<?> changerStatut(@PathVariable Long id, @RequestParam StatutFactureProForma statut) {
-        try {
-            FactureProForma facture = factureProformaService.changerStatut(id, statut);
-            return ResponseEntity.ok(facture);
-        } catch (RuntimeException e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
-        }
-    }
-
 
     // Endpoint pour modifier une facture pro forma
     @PutMapping("/updatefacture/{factureId}")
@@ -85,6 +77,28 @@ public ResponseEntity<?> ajouterFacture(
         FactureProForma factureModifiee = factureProformaService.modifierFacture(factureId, remisePourcentage, appliquerTVA, modifications, request);
         return ResponseEntity.ok(factureModifiee);
     }
+
+    // Endpoint pour recuperer la liste des factures pro forma dune entreprise
+    @GetMapping("/mes-factures")
+    public ResponseEntity<List<Map<String, Object>>> getFacturesParEntreprise(HttpServletRequest request) {
+        String token = request.getHeader("Authorization");
+        if (token == null || !token.startsWith("Bearer ")) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(null);
+        }
+    
+        Long userId;
+        try {
+            userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(null);
+        }
+    
+        List<Map<String, Object>> factures = factureProformaService.getFacturesParEntreprise(userId);
+    
+        return ResponseEntity.ok(factures);
+    }
+    
+
     
 
 }
