@@ -290,7 +290,7 @@ public class FactureProformaService {
                     facture.setDateRelance(LocalDateTime.now().plusMinutes(1));
                 }
 
-                // 🔥 Enregistrer l'utilisateur qui a mis la facture en ENVOYÉ
+                // Enregistrer l'utilisateur qui a mis la facture en ENVOYÉ
                 facture.setUtilisateurRelanceur(facture.getUtilisateurModificateur());
             }
 
@@ -360,28 +360,17 @@ public class FactureProformaService {
 
     //Methode pour recuperer les factures pro forma dune entreprise
 
+        // Exemple de transformation des factures dans le service
 public List<Map<String, Object>> getFacturesParEntreprise(Long userId) {
-    // Récupérer l'utilisateur
-    User user = usersRepository.findById(userId)
-            .orElseThrow(() -> new RuntimeException("Utilisateur introuvable !"));
+    // Récupérer les factures de l'entreprise de l'utilisateur
+    List<FactureProForma> factures = factureProformaRepository.findByEntrepriseId(userId);
 
-    // Vérifier si l'utilisateur appartient bien à une entreprise
-    if (user.getEntreprise() == null) {
-        throw new RuntimeException("L'utilisateur n'est associé à aucune entreprise !");
-    }
-
-    Long entrepriseId = user.getEntreprise().getId();
-
-    // Récupérer toutes les factures de cette entreprise
-    List<FactureProForma> factures = factureProformaRepository.findByEntrepriseId(entrepriseId);
-
-    // Créer une liste de Map pour transformer les factures
-    List<Map<String, Object>> facturesDTO = new ArrayList<>();
+    List<Map<String, Object>> factureMaps = new ArrayList<>();
 
     for (FactureProForma facture : factures) {
         Map<String, Object> factureMap = new HashMap<>();
         
-        // Ajouter les champs nécessaires à la Map
+        // Ajouter les informations de la facture
         factureMap.put("id", facture.getId());
         factureMap.put("numeroFacture", facture.getNumeroFacture());
         factureMap.put("dateCreation", facture.getDateCreation());
@@ -392,33 +381,31 @@ public List<Map<String, Object>> getFacturesParEntreprise(Long userId) {
         factureMap.put("totalFacture", facture.getTotalFacture());
         factureMap.put("statut", facture.getStatut());
 
-        // Ajouter des informations sur le client
-        Map<String, Object> clientMap = new HashMap<>();
-        clientMap.put("id", facture.getClient().getId());
-        clientMap.put("nomComplet", facture.getClient().getNomComplet());
-        clientMap.put("email", facture.getClient().getEmail());
-        factureMap.put("client", clientMap);
-        factureMap.put("entrepriseClient", facture.getEntrepriseClient().getNom());
-
-        // Ajouter des informations sur l'entreprise
-        if (facture.getEntreprise() != null) {
-            Map<String, Object> entrepriseMap = new HashMap<>();
-            entrepriseMap.put("id", facture.getEntreprise().getId());
-            entrepriseMap.put("nomEntreprise", facture.getEntreprise().getNomEntreprise());
-            factureMap.put("entreprise", entrepriseMap);
+        // Vérifier si le client est associé à la facture
+        if (facture.getClient() != null) {
+            factureMap.put("client", facture.getClient().getNomComplet());
+        } else {
+            factureMap.put("client", null); 
         }
 
-        // Ajouter des informations sur la relance
+        // Vérifier si l'entreprise client est associée à la facture
+        if (facture.getEntrepriseClient() != null) {
+            factureMap.put("entrepriseClient", facture.getEntrepriseClient().getNom());
+        } else {
+            factureMap.put("entrepriseClient", null);
+        }
+
+        // Ajouter les informations de l'entreprise (s'il y en a une)
+        factureMap.put("entreprise", facture.getEntreprise() != null ? facture.getEntreprise().getNomEntreprise() : null);
+        
+        // Ajouter d'autres informations pertinentes comme la date de relance et le statut de notification
         factureMap.put("dateRelance", facture.getDateRelance());
         factureMap.put("notifie", facture.isNotifie());
 
-        
-
-        // Ajouter la facture transformée à la liste
-        facturesDTO.add(factureMap);
+        factureMaps.add(factureMap);
     }
 
-    return facturesDTO;
+    return factureMaps;
 }
 
     
