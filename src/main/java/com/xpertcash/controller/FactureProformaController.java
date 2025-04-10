@@ -7,13 +7,19 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.xpertcash.composant.AuthorizationService;
+import com.xpertcash.configuration.JwtUtil;
 import com.xpertcash.entity.FactureProForma;
 import com.xpertcash.entity.StatutFactureProForma;
 import com.xpertcash.service.FactureProformaService;
+import com.xpertcash.service.UsersService;
+
+import jakarta.servlet.http.HttpServletRequest;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -22,23 +28,37 @@ public class FactureProformaController {
       @Autowired
     private FactureProformaService factureProformaService;
 
-    // Endpoint pour ajouter une facture pro forma
-    @PostMapping("/ajouter")
-    public ResponseEntity<?> ajouterFacture(
-            @RequestBody FactureProForma facture,
-            @RequestParam(defaultValue = "0") Double remisePourcentage,
-            @RequestParam(defaultValue = "false") Boolean appliquerTVA) { 
-        try {
-            // Appel du service pour ajouter la facture
-            FactureProForma nouvelleFacture = factureProformaService.ajouterFacture(facture, remisePourcentage, appliquerTVA);
-    
-            // Retourner la facture créée en réponse HTTP 201 (CREATED)
-            return ResponseEntity.status(HttpStatus.CREATED).body(nouvelleFacture);
-        } catch (RuntimeException e) {
-            // Retourner l'erreur en réponse HTTP 400 (BAD REQUEST) si une exception est levée
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
-        }
+      @Autowired
+    private UsersService usersService;
+    @Autowired
+    private JwtUtil jwtUtil;
+    @Autowired
+    private AuthorizationService authorizationService;
+
+  // Endpoint pour ajouter une facture pro forma
+@PostMapping("/ajouter")
+public ResponseEntity<?> ajouterFacture(
+        @RequestBody FactureProForma facture,
+        @RequestParam(defaultValue = "0") Double remisePourcentage,
+        @RequestParam(defaultValue = "false") Boolean appliquerTVA,
+        @RequestHeader("Authorization") String token,  // Récupération du token depuis l'en-tête
+        HttpServletRequest request) {  // Passage du HttpServletRequest complet
+
+    try {
+        // Ajouter le token dans l'en-tête de la requête
+        request.setAttribute("Authorization", token);
+
+        // Appel du service pour ajouter la facture, en passant la requête avec le token
+        FactureProForma nouvelleFacture = factureProformaService.ajouterFacture(facture, remisePourcentage, appliquerTVA, request);
+
+        // Retourner la facture créée en réponse HTTP 201 (CREATED)
+        return ResponseEntity.status(HttpStatus.CREATED).body(nouvelleFacture);
+    } catch (RuntimeException e) {
+        // Retourner l'erreur en réponse HTTP 400 (BAD REQUEST) si une exception est levée
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
     }
+}
+
     
     
     
@@ -60,9 +80,9 @@ public class FactureProformaController {
             @PathVariable Long factureId,
             @RequestParam(required = false) Double remisePourcentage,
             @RequestParam(required = false) Boolean appliquerTVA,
-            @RequestBody FactureProForma modifications) {
+            @RequestBody FactureProForma modifications, HttpServletRequest request) {
     
-        FactureProForma factureModifiee = factureProformaService.modifierFacture(factureId, remisePourcentage, appliquerTVA, modifications);
+        FactureProForma factureModifiee = factureProformaService.modifierFacture(factureId, remisePourcentage, appliquerTVA, modifications, request);
         return ResponseEntity.ok(factureModifiee);
     }
     

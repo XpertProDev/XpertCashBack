@@ -51,12 +51,41 @@ public class FactureProForma {
     @OneToMany(mappedBy = "factureProForma", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<LigneFactureProforma> lignesFacture;
 
-    // Relation avec l'Entreprise de l'Utilisateur
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "entreprise_id")
-    @JsonIgnoreProperties({"utilisateurs", "createdAt", "logo", "adresse"})
+    @JsonIgnoreProperties({"facturesProforma", "identifiantEntreprise", "utilisateurs", "adresse", "boutiques", "createdAt", "logo", "admin"})
     private Entreprise entreprise;
 
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "utilisateur_modificateur_id")
+    @JsonIgnoreProperties({"personalCode", "phone", "photo", "createdAt", "activationCode", "activatedLien", "enabledLien", "lastActivity", "locked", "pays", "role"})
+    private User utilisateurModificateur;
+    
+    
+    @JsonProperty("nomProduit")
+    public String getNomEntreprise() {
+        return entreprise != null ? entreprise.getNomEntreprise() : null;
+    }
+
+    @JsonProperty("nomUtilisateurModificateur")
+    public String getNomComplet() {
+        return utilisateurModificateur != null ? utilisateurModificateur.getNomComplet() : null;
+    }
+
+
+    @JsonProperty("emailUtilisateurModificateur")
+    public String getEmail() {
+        return utilisateurModificateur != null ? utilisateurModificateur.getEmail() : null;
+    }
+
+    /*@JsonProperty("roleUtilisateurModificateur")
+    public String getRole() {
+        return utilisateurModificateur != null ? utilisateurModificateur.getRole().getName().name() : null;
+    }*/
+    
+
+    
+    
 
      private LocalDateTime dateRelance; 
 
@@ -64,7 +93,10 @@ public class FactureProForma {
      private boolean notifie = false; 
     
 
-   
+     @ManyToOne
+     @JoinColumn(name = "utilisateur_relanceur_id")
+     private User utilisateurRelanceur;
+     
 
     
 }
