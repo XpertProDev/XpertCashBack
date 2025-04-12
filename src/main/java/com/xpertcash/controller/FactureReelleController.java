@@ -44,4 +44,14 @@ public class FactureReelleController {
             return ResponseEntity.ok(factures);
         }
 
+    // Endpoint pour trier les factures par mois/année
+    @GetMapping("/filtrer-facturesReelles")
+    public ResponseEntity<List<FactureReelleDTO>> filtrerFacturesParMoisEtAnnee(
+            @RequestParam(required = false) Integer mois,
+            @RequestParam(required = false) Integer annee) {
+
+        List<FactureReelleDTO> factures = factureReelleService.filtrerFacturesParMoisEtAnnee(mois, annee);
+        return ResponseEntity.ok(factures);
+    }
+
 }

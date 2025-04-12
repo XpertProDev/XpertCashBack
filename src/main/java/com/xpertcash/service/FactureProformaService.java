@@ -182,17 +182,15 @@ public class FactureProformaService {
         private String generateNumeroFacture() {
             // la date actuelle
             LocalDate currentDate = LocalDate.now();
-            int month = currentDate.getMonthValue();
             int year = currentDate.getYear();
             String formattedDate = currentDate.format(DateTimeFormatter.ofPattern("MM-yyyy"));
 
-              // get les factures du même mois
-             List<FactureProForma> facturesDuMois = factureProformaRepository.findFacturesDuMois(month, year);
+             List<FactureProForma> facturesDeLAnnee = factureProformaRepository.findFacturesDeLAnnee(year);
 
             int newIndex = 1;
 
-            if (!facturesDuMois.isEmpty()) {
-                String lastNumeroFacture = facturesDuMois.get(0).getNumeroFacture();
+            if (!facturesDeLAnnee.isEmpty()) {
+                String lastNumeroFacture = facturesDeLAnnee.get(0).getNumeroFacture();
                 String[] parts = lastNumeroFacture.split("-");
                 String numeroPart = parts[0].replace("FACTURE PROFORMA N°", "").trim();
                 newIndex = Integer.parseInt(numeroPart) + 1;
@@ -206,8 +204,8 @@ public class FactureProformaService {
 
 
     // Méthode pour modifier une facture pro forma
-            @Transactional
-            public FactureProForma modifierFacture(Long factureId, Double remisePourcentage, Boolean appliquerTVA, FactureProForma modifications, HttpServletRequest request) {
+        @Transactional
+        public FactureProForma modifierFacture(Long factureId, Double remisePourcentage, Boolean appliquerTVA, FactureProForma modifications, HttpServletRequest request) {
                 FactureProForma facture = factureProformaRepository.findById(factureId)
                         .orElseThrow(() -> new RuntimeException("Facture non trouvée !"));
             

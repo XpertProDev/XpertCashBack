@@ -82,16 +82,14 @@ public class FactureReelleService {
     
     private String genererNumeroFactureReel() {
         LocalDate currentDate = LocalDate.now();
-        int month = currentDate.getMonthValue();
         int year = currentDate.getYear();
         String formattedDate = currentDate.format(DateTimeFormatter.ofPattern("MM-yyyy"));
     
-        // Récupère les factures du même mois
-        List<FactureReelle> facturesDuMois = factureReelleRepository.findFacturesDuMois(month, year);
+        List<FactureReelle> facturesDeLAnnee = factureReelleRepository.findFacturesDeLAnnee(year);
         int newIndex = 1;
     
-        if (!facturesDuMois.isEmpty()) {
-            String lastNumeroFacture = facturesDuMois.get(0).getNumeroFacture();
+        if (!facturesDeLAnnee.isEmpty()) {
+            String lastNumeroFacture = facturesDeLAnnee.get(0).getNumeroFacture();
             // Exemple : "FACTURE N°005-04-2025"
             String[] parts = lastNumeroFacture.split("-");
             String numeroPart = parts[0].replace("FACTURE N°", "").trim();
@@ -176,6 +174,25 @@ public class FactureReelleService {
             .map(FactureReelleDTO::new)
             .collect(Collectors.toList());
 }
+
+        // Trier les facture par mois/année
+        public List<FactureReelleDTO> filtrerFacturesParMoisEtAnnee(Integer mois, Integer annee) {
+            List<FactureReelle> factures;
+        
+            if (mois != null && annee != null) {
+                factures = factureReelleRepository.findByMonthAndYear(mois, annee);
+            } else if (mois != null) {
+                factures = factureReelleRepository.findByMonth(mois);
+            } else if (annee != null) {
+                factures = factureReelleRepository.findByYear(annee);
+            } else {
+                factures = factureReelleRepository.findAll();
+            }
+        
+            return factures.stream()
+                    .map(FactureReelleDTO::new)
+                    .collect(Collectors.toList());
+        }
 
 
 }

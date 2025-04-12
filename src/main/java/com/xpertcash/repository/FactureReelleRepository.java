@@ -17,10 +17,23 @@ public interface FactureReelleRepository extends JpaRepository<FactureReelle, Lo
 
     Optional<FactureReelle> findTopByDateCreationOrderByNumeroFactureDesc(LocalDate dateCreation);
 
-    @Query("SELECT f FROM FactureReelle f WHERE FUNCTION('MONTH', f.dateCreation) = :month AND FUNCTION('YEAR', f.dateCreation) = :year ORDER BY f.numeroFacture DESC")
-    List<FactureReelle> findFacturesDuMois(@Param("month") int month, @Param("year") int year);
+    @Query("SELECT f FROM FactureReelle f WHERE FUNCTION('YEAR', f.dateCreation) = :year ORDER BY f.numeroFacture DESC")
+    List<FactureReelle> findFacturesDeLAnnee(@Param("year") int year);
+    
 
     List<FactureReelle> findByEntreprise(Entreprise entreprise);
+
+    // Trie
+
+    @Query("SELECT f FROM FactureReelle f WHERE MONTH(f.dateCreation) = :mois AND YEAR(f.dateCreation) = :annee")
+    List<FactureReelle> findByMonthAndYear(@Param("mois") Integer mois, @Param("annee") Integer annee);
+
+    @Query("SELECT f FROM FactureReelle f WHERE MONTH(f.dateCreation) = :mois")
+    List<FactureReelle> findByMonth(@Param("mois") Integer mois);
+
+    @Query("SELECT f FROM FactureReelle f WHERE YEAR(f.dateCreation) = :annee")
+    List<FactureReelle> findByYear(@Param("annee") Integer annee);
+
 
 
 }
