@@ -1,5 +1,6 @@
 package com.xpertcash.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -28,6 +29,7 @@ public class EntrepriseClient {
 
     
     @OneToMany(mappedBy = "entrepriseClient", cascade = CascadeType.ALL)
+    @JsonIgnoreProperties("entrepriseClient")
     private List<Client> clients;
 
 }

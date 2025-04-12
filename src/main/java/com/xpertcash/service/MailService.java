@@ -3,12 +3,19 @@ package com.xpertcash.service;
 
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
+
+import java.text.SimpleDateFormat;
+import java.util.Date;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.FileSystemResource;
+import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
+
+import com.xpertcash.entity.FactureProForma;
 
 
 @Service
@@ -38,6 +45,20 @@ public class MailService {
     }
     
     
+     // Méthode d'envoi d'email pour relancer une facture
+     public void sendRelanceeEmail(String to, String fullName, String factureNumero, String clientName, Date relanceDate) throws MessagingException {
+        System.out.println("📧 Envoi d'un email à : " + to);
+        String subject = "Relance de la facture " + factureNumero;
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm");
+        String formattedDate = sdf.format(relanceDate);
+        String message = generateFactureRelanceMessage(factureNumero, clientName, formattedDate);
+        sendEmail(to, subject, message);
+    }
+    
+    
+    
+
+
 
     
 
@@ -187,5 +208,28 @@ public class MailService {
     }
 
 
+
+
+
+     // Envoi une notification par email pour relancer une facture
+      private String generateFactureRelanceMessage(String factureNumero, String clientName, String relanceDate) {
+        return """
+            <html>
+            <body style="font-family: Arial, sans-serif; background-color: #f4f4f4; padding: 20px;">
+                <div style="max-width: 600px; margin: auto; background: white; padding: 20px; border-radius: 10px; text-align: center;">
+                    <img src="cid:logo" alt="Logo" style="width: 100px; margin-bottom: 10px;">
+                    <h2 style="color: #333; margin-top: -19px; font-size: 19px;">Relance de la facture</h2>
+                    <p>Bonjour,</p>
+                    <p>La <strong style="font-style: italic;">%s</strong> pour le client <strong>%s</strong> doit être relancée.</p>
+                    <p>La date de relance prévue était : <strong>%s</strong>.</p>
+                    <p>Veuillez effectuer la relance.</p>
+                    <p style="font-size: 12px; color: #555; margin-top: 30px;">Si vous n'avez pas effectué cette demande, veuillez ignorer cet e-mail.</p>
+                    <p style="font-size: 10px; color: #777; margin-top: 30px;">L'équipe XpertCash</p>
+                </div>
+            </body>
+            </html>
+        """.formatted(factureNumero, clientName, relanceDate);
+    }
+      
 
 }

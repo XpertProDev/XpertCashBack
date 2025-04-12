@@ -8,6 +8,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
 @Entity
 @Data
 public class Entreprise {
@@ -40,6 +43,11 @@ public class Entreprise {
     @ManyToOne
     @JoinColumn(name = "admin_id", nullable = true)  
     private User admin;
+
+    @OneToMany(mappedBy = "entreprise", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @JsonIgnoreProperties({"entreprise"})
+    private List<FactureProForma> facturesProforma = new ArrayList<>();
+
 
 
     // Générer un identifiant unique

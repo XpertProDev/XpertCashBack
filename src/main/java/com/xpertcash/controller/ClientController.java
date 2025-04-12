@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -20,6 +21,8 @@ import com.xpertcash.entity.Client;
 import com.xpertcash.entity.EntrepriseClient;
 import com.xpertcash.repository.EntrepriseClientRepository;
 import com.xpertcash.service.ClientService;
+
+import jakarta.persistence.EntityNotFoundException;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -72,5 +75,21 @@ public class ClientController {
     @GetMapping("/clients-and-entreprises")
     public List<Object> getAllClientsAndEntreprises() {
         return clientService.getAllClientsAndEntreprises();
+    }
+
+    //Endpoint pour modifier un client
+     @PutMapping("/clientupdate/{id}")
+    public ResponseEntity<Client> updateClient(@PathVariable("id") Long id, @RequestBody Client client) {
+        try {
+            client.setId(id);
+            Client updatedClient = clientService.updateClient(client);
+            return ResponseEntity.ok(updatedClient);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(null);
+        } catch (EntityNotFoundException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
+        }
     }
 }

@@ -1,5 +1,6 @@
 package com.xpertcash.service;
 
+import java.lang.reflect.Field;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -12,6 +13,8 @@ import com.xpertcash.entity.Client;
 import com.xpertcash.entity.EntrepriseClient;
 import com.xpertcash.repository.ClientRepository;
 import com.xpertcash.repository.EntrepriseClientRepository;
+
+import jakarta.persistence.EntityNotFoundException;
 
 @Service
 public class ClientService {
@@ -29,6 +32,9 @@ public class ClientService {
         }
     
         checkClientExists(client);
+
+        LocalDateTime now = LocalDateTime.now();
+        client.setCreatedAt(now);
     
         if (client.getEntrepriseClient() != null) {
             checkEntrepriseExists(client.getEntrepriseClient());
@@ -40,7 +46,6 @@ public class ClientService {
             }
         }
     
-        client.setCreatedAt(LocalDateTime.now());
         return clientRepository.save(client);
     }
     
@@ -106,9 +111,14 @@ public class ClientService {
     }
     
     private void saveNewEntreprise(Client client) {
-        EntrepriseClient savedEntreprise = entrepriseClientRepository.save(client.getEntrepriseClient());
-        client.setEntrepriseClient(savedEntreprise);
+        if (client.getEntrepriseClient() != null) {
+            client.getEntrepriseClient().setCreatedAt(client.getCreatedAt());
+            EntrepriseClient savedEntreprise = entrepriseClientRepository.save(client.getEntrepriseClient());
+            client.setEntrepriseClient(savedEntreprise);
+        }
     }
+    
+    
     
 
     public Optional<Client> getClientById(Long id) {
@@ -147,4 +157,37 @@ public class ClientService {
 
         return clientsAndEntreprises;
     }
+
+
+    //Methode pour modifier un client
+    public Client updateClient(Client client) {
+        if (client.getId() == null) {
+            throw new IllegalArgumentException("L'ID du client est obligatoire !");
+        }
+    
+        //  si le client existe
+        Optional<Client> existingClient = clientRepository.findById(client.getId());
+        if (existingClient.isEmpty()) {
+            throw new EntityNotFoundException("Le client avec cet ID n'existe pas !");
+        }
+    
+        Client updatedClient = existingClient.get();
+    
+        // Utilisation de la réflexion pour mettre à jour seulement les champs non null
+        for (Field field : Client.class.getDeclaredFields()) {
+            field.setAccessible(true);
+            try {
+                Object newValue = field.get(client);
+                if (newValue != null) {
+                    field.set(updatedClient, newValue);
+                }
+            } catch (IllegalAccessException e) {
+                e.printStackTrace();
+            }
+        }
+    
+        // Enregistrer les modifications
+        return clientRepository.save(updatedClient);
+    }
+
 }
