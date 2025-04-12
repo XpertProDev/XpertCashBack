@@ -4,6 +4,7 @@ import java.time.LocalDateTime;
 
 import com.fasterxml.jackson.annotation.JsonBackReference;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -28,8 +29,9 @@ public class Client {
     private LocalDateTime createdAt;
     
    @ManyToOne
-    @JsonBackReference
+//    @JsonBackReference
     @JoinColumn(name = "entreprise_client_id")
+   @JsonIgnoreProperties("clientts")
     private EntrepriseClient entrepriseClient;
     
 

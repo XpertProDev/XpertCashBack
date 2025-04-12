@@ -165,29 +165,31 @@ public class ClientService {
             throw new IllegalArgumentException("L'ID du client est obligatoire !");
         }
     
-        //  si le client existe
-        Optional<Client> existingClient = clientRepository.findById(client.getId());
-        if (existingClient.isEmpty()) {
+        Optional<Client> existingClientOpt = clientRepository.findById(client.getId());
+        if (existingClientOpt.isEmpty()) {
             throw new EntityNotFoundException("Le client avec cet ID n'existe pas !");
         }
     
-        Client updatedClient = existingClient.get();
+        Client existingClient = existingClientOpt.get();
     
-        // Utilisation de la réflexion pour mettre à jour seulement les champs non null
         for (Field field : Client.class.getDeclaredFields()) {
             field.setAccessible(true);
             try {
                 Object newValue = field.get(client);
                 if (newValue != null) {
-                    field.set(updatedClient, newValue);
+                    field.set(existingClient, newValue);
                 }
             } catch (IllegalAccessException e) {
                 e.printStackTrace();
             }
         }
     
-        // Enregistrer les modifications
-        return clientRepository.save(updatedClient);
+        // ➕ Nouveau bloc : détacher l'entreprise si elle est explicitement mise à null
+        if (client.getEntrepriseClient() == null && existingClient.getEntrepriseClient() != null) {
+            existingClient.setEntrepriseClient(null);
+        }
+    
+        return clientRepository.save(existingClient);
     }
-
+    
 }

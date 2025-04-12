@@ -75,7 +75,7 @@ public class ClientController {
     @GetMapping("/clients-and-entreprises")
     public List<Object> getAllClientsAndEntreprises() {
         return clientService.getAllClientsAndEntreprises();
-    }
+    } 
 
     //Endpoint pour modifier un client
      @PutMapping("/clientupdate/{id}")
