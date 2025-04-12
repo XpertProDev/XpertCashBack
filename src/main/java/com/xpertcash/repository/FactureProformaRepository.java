@@ -12,6 +12,7 @@ import org.springframework.stereotype.Repository;
 
 import com.xpertcash.entity.Boutique;
 import com.xpertcash.entity.FactureProForma;
+import com.xpertcash.entity.FactureReelle;
 import com.xpertcash.entity.StatutFactureProForma;
 
 @Repository
@@ -40,6 +41,9 @@ public interface FactureProformaRepository extends JpaRepository<FactureProForma
 
     @Query("SELECT f FROM FactureProForma f WHERE f.entreprise.id = :entrepriseId")
     List<FactureProForma> findByEntrepriseId(@Param("entrepriseId") Long entrepriseId);
+
+    @Query("SELECT f FROM FactureProForma f WHERE FUNCTION('MONTH', f.dateCreation) = :month AND FUNCTION('YEAR', f.dateCreation) = :year ORDER BY f.numeroFacture DESC")
+    List<FactureProForma> findFacturesDuMois(@Param("month") int month, @Param("year") int year);
 
     
 

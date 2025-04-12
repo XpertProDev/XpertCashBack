@@ -182,20 +182,27 @@ public class FactureProformaService {
         private String generateNumeroFacture() {
             // la date actuelle
             LocalDate currentDate = LocalDate.now();
+            int month = currentDate.getMonthValue();
+            int year = currentDate.getYear();
             String formattedDate = currentDate.format(DateTimeFormatter.ofPattern("MM-yyyy"));
 
-            Optional<FactureProForma> lastFacture = factureProformaRepository.findTopByDateCreationOrderByNumeroFactureDesc(currentDate);
+              // get les factures du même mois
+             List<FactureProForma> facturesDuMois = factureProformaRepository.findFacturesDuMois(month, year);
 
             int newIndex = 1;
-            if (lastFacture.isPresent()) {
-                String lastNumeroFacture = lastFacture.get().getNumeroFacture();
-                // Assumer que le format est "FACTURE PROFORMA N°XXX-dd-MM-yyyy"
+
+            if (!facturesDuMois.isEmpty()) {
+                String lastNumeroFacture = facturesDuMois.get(0).getNumeroFacture();
                 String[] parts = lastNumeroFacture.split("-");
-                newIndex = Integer.parseInt(parts[0].replace("FACTURE PROFORMA N°", "")) + 1;
+                String numeroPart = parts[0].replace("FACTURE PROFORMA N°", "").trim();
+                newIndex = Integer.parseInt(numeroPart) + 1;
             }
 
             return String.format("FACTURE PROFORMA N°%03d-%s", newIndex, formattedDate);
         }
+
+
+        
 
 
     // Méthode pour modifier une facture pro forma
