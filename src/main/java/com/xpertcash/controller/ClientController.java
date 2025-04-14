@@ -89,7 +89,6 @@ public class ClientController {
             } catch (EntityNotFoundException e) {
                 return buildErrorResponse(HttpStatus.NOT_FOUND, e.getMessage());
             } catch (RuntimeException e) {
-                // Pour les erreurs personnalisées comme email/téléphone déjà utilisés
                 return buildErrorResponse(HttpStatus.CONFLICT, e.getMessage());
             } catch (Exception e) {
                 return buildErrorResponse(HttpStatus.INTERNAL_SERVER_ERROR, "Une erreur inattendue s'est produite : " + e.getMessage());
