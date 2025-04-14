@@ -78,18 +78,29 @@ public class ClientController {
     } 
 
     //Endpoint pour modifier un client
-     @PutMapping("/clientupdate/{id}")
-    public ResponseEntity<Client> updateClient(@PathVariable("id") Long id, @RequestBody Client client) {
-        try {
-            client.setId(id);
-            Client updatedClient = clientService.updateClient(client);
-            return ResponseEntity.ok(updatedClient);
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(null);
-        } catch (EntityNotFoundException e) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
+    @PutMapping("/clientupdate/{id}")
+        public ResponseEntity<?> updateClient(@PathVariable("id") Long id, @RequestBody Client client) {
+            try {
+                client.setId(id);
+                Client updatedClient = clientService.updateClient(client);
+                return ResponseEntity.ok(updatedClient);
+            } catch (IllegalArgumentException e) {
+                return buildErrorResponse(HttpStatus.BAD_REQUEST, e.getMessage());
+            } catch (EntityNotFoundException e) {
+                return buildErrorResponse(HttpStatus.NOT_FOUND, e.getMessage());
+            } catch (RuntimeException e) {
+                // Pour les erreurs personnalisées comme email/téléphone déjà utilisés
+                return buildErrorResponse(HttpStatus.CONFLICT, e.getMessage());
+            } catch (Exception e) {
+                return buildErrorResponse(HttpStatus.INTERNAL_SERVER_ERROR, "Une erreur inattendue s'est produite : " + e.getMessage());
+            }
         }
-    }
+
+        private ResponseEntity<Map<String, String>> buildErrorResponse(HttpStatus status, String message) {
+            Map<String, String> errorBody = new HashMap<>();
+            errorBody.put("message", message);
+            return ResponseEntity.status(status).body(errorBody);
+        }
+
+
 }
