@@ -69,7 +69,7 @@ public class ProduitService {
 
     // Ajouter un produit à la liste sans le stock
     public List<ProduitDTO> createProduit(HttpServletRequest request, List<Long> boutiqueIds, 
-                                      List<Integer> quantites, ProduitRequest produitRequest, boolean addToStock, String image) {
+                                      List<Integer> quantites, List<Integer> seuilAlert, ProduitRequest produitRequest, boolean addToStock, String image) {
     try {
         // Vérification de la validité du token
         String token = request.getHeader("Authorization");
@@ -113,6 +113,7 @@ public class ProduitService {
         for (int i = 0; i < boutiqueIds.size(); i++) {
             Long boutiqueId = boutiqueIds.get(i);
             Integer quantite = quantites.get(i); // Quantité spécifique à cette boutique
+            Integer seuil = seuilAlert.get(i);
 
             Boutique boutique = boutiqueRepository.findById(boutiqueId)
                     .orElseThrow(() -> new RuntimeException("Boutique non trouvée"));
@@ -141,7 +142,7 @@ public class ProduitService {
             produit.setPrixVente(produitRequest.getPrixVente());
             produit.setPrixAchat(produitRequest.getPrixAchat());
             produit.setQuantite(quantite != null ? quantite : 0); // Utiliser la quantité pour chaque boutique
-            produit.setSeuilAlert(produitRequest.getSeuilAlert() != null ? produitRequest.getSeuilAlert() : 0);
+           produit.setSeuilAlert(seuil != null ? seuil : 0);
             produit.setCategorie(categorie);
             produit.setUniteDeMesure(unite);
             produit.setCodeGenerique(codeGenerique); // Partage le même code
@@ -163,7 +164,7 @@ public class ProduitService {
                 stock.setProduit(savedProduit);
                 stock.setCreatedAt(LocalDateTime.now());
                 stock.setLastUpdated(LocalDateTime.now());
-                stock.setSeuilAlert(produitRequest.getSeuilAlert());
+                stock.setSeuilAlert(seuil != null ? seuil : 0);
                 stockRepository.save(stock);
                 savedProduit.setEnStock(true);
                 produitRepository.save(savedProduit);

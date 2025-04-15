@@ -67,6 +67,7 @@ public ResponseEntity<?> createProduit(
     @RequestPart("boutiqueIds") String boutiqueIdsJson, // Liste des IDs des boutiques
     @RequestPart("quantites") String quantitesJson, // Liste des quantités associées à chaque boutique
     @RequestPart("produit") String produitJson, // Données du produit
+    @RequestPart("seuilAlert") String seuilAlertJson, // Données du produit
     @RequestPart(value = "image", required = false) MultipartFile imageFile, // Fichier d'image (optionnel)
     @RequestParam boolean addToStock, // Si le produit doit être ajouté au stock
     @RequestHeader("Authorization") String token, // Token d'authentification
@@ -84,11 +85,16 @@ public ResponseEntity<?> createProduit(
         // Conversion des JSON reçus en listes ou objets
         List<Long> boutiqueIds = objectMapper.readValue(boutiqueIdsJson, new TypeReference<List<Long>>() {});
         List<Integer> quantites = objectMapper.readValue(quantitesJson, new TypeReference<List<Integer>>() {});
+        List<Integer> seuilAlert = objectMapper.readValue(seuilAlertJson, new TypeReference<List<Integer>>() {});
         ProduitRequest produitRequest = objectMapper.readValue(produitJson, ProduitRequest.class);
 
         // Validation que les quantités et les boutiques ont le même nombre d'éléments
         if (boutiqueIds.size() != quantites.size()) {
             throw new RuntimeException("Le nombre de boutiques ne correspond pas au nombre de quantités.");
+        }
+
+        if (boutiqueIds.size() != seuilAlert.size()) {
+            throw new RuntimeException("Le nombre de boutiques ne correspond pas au nombre de seuils.");
         }
 
         // Sauvegarde de l'image si elle est présente
@@ -100,7 +106,7 @@ public ResponseEntity<?> createProduit(
         produitRequest.setPhoto(photo); // Ajouter l'URL de l'image au produit
 
         // Creation de produit pour toutes les boutiques spécifiées
-        List<ProduitDTO> produitsAjoutes = produitService.createProduit(request, boutiqueIds, quantites, produitRequest, addToStock, photo);
+        List<ProduitDTO> produitsAjoutes = produitService.createProduit(request, boutiqueIds, quantites, seuilAlert, produitRequest, addToStock, photo);
 
         // Retourner la liste des produits ajoutés
         return ResponseEntity.status(HttpStatus.CREATED).body(produitsAjoutes);
