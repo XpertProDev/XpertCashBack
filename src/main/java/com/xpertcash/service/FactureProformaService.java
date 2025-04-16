@@ -8,7 +8,6 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -200,8 +199,6 @@ public class FactureProformaService {
         }
 
 
-        
-
 
     // Méthode pour modifier une facture pro forma
         @Transactional
@@ -392,6 +389,7 @@ public class FactureProformaService {
         factureMap.put("tva", facture.isTva());
         factureMap.put("totalFacture", facture.getTotalFacture());
         factureMap.put("statut", facture.getStatut());
+        factureMap.put("ligneFactureProforma", facture.getLignesFacture());
 
         // Vérifier si le client est associé à la facture
         if (facture.getClient() != null) {
@@ -420,6 +418,36 @@ public class FactureProformaService {
     return factureMaps;
 }
 
+
+    // Methode pour recuperer une facture pro forma par son id
+    public FactureProForma getFactureProformaById(Long id, HttpServletRequest request) {
+        String token = request.getHeader("Authorization");
+        if (token == null || !token.startsWith("Bearer ")) {
+            throw new RuntimeException("Token JWT manquant ou mal formaté");
+        }
+    
+        Long userId;
+        try {
+            userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
+        } catch (Exception e) {
+            throw new RuntimeException("Erreur lors de l'extraction de l'ID de l'utilisateur depuis le token", e);
+        }
+    
+        User user = usersRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("Utilisateur introuvable !"));
+    
+        FactureProForma facture = factureProformaRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Facture Proforma introuvable avec l'ID : " + id));
+    
+        if (!facture.getEntreprise().getId().equals(user.getEntreprise().getId())) {
+            throw new RuntimeException("Accès refusé : Cette facture ne vous appartient pas !");
+        }
+    
+        System.out.println("✅ Facture récupérée par l'utilisateur ID: " + userId);
+        return facture;
+    }
+    
+    
     
 }
  

@@ -7,6 +7,7 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
 import com.xpertcash.DTOs.FactureReelleDTO;
@@ -176,23 +177,83 @@ public class FactureReelleService {
 }
 
         // Trier les facture par mois/année
-        public List<FactureReelleDTO> filtrerFacturesParMoisEtAnnee(Integer mois, Integer annee) {
-            List<FactureReelle> factures;
-        
-            if (mois != null && annee != null) {
-                factures = factureReelleRepository.findByMonthAndYear(mois, annee);
-            } else if (mois != null) {
-                factures = factureReelleRepository.findByMonth(mois);
-            } else if (annee != null) {
-                factures = factureReelleRepository.findByYear(annee);
-            } else {
-                factures = factureReelleRepository.findAll();
-            }
-        
-            return factures.stream()
-                    .map(FactureReelleDTO::new)
-                    .collect(Collectors.toList());
+        public ResponseEntity<?> filtrerFacturesParMoisEtAnnee(Integer mois, Integer annee, HttpServletRequest request) {
+    // Extraire l'utilisateur à partir du token
+    String token = request.getHeader("Authorization");
+    if (token == null || !token.startsWith("Bearer ")) {
+        throw new RuntimeException("Token JWT manquant ou mal formaté");
+    }
+
+    Long userId;
+    try {
+        userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
+    } catch (Exception e) {
+        throw new RuntimeException("Erreur lors de l'extraction de l'ID utilisateur", e);
+    }
+
+    // Récupérer l'utilisateur
+    User user = usersRepository.findById(userId)
+            .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
+
+    Long entrepriseId = user.getEntreprise().getId();
+
+    // Récupérer les factures selon les filtres
+    List<FactureReelle> factures;
+
+    if (mois != null && annee != null) {
+        factures = factureReelleRepository.findByMonthAndYearAndEntreprise(mois, annee, entrepriseId);
+    } else if (mois != null) {
+        factures = factureReelleRepository.findByMonthAndEntreprise(mois, entrepriseId);
+    } else if (annee != null) {
+        factures = factureReelleRepository.findByYearAndEntreprise(annee, entrepriseId);
+    } else {
+        factures = factureReelleRepository.findByEntrepriseId(entrepriseId);
+    }
+
+    List<FactureReelleDTO> factureDTOs = factures.stream()
+            .map(FactureReelleDTO::new)
+            .collect(Collectors.toList());
+
+    if (factureDTOs.isEmpty()) {
+        return ResponseEntity.ok("Aucune facture trouvée.");
+    }
+
+    return ResponseEntity.ok(factureDTOs);
+}
+
+    // Methode Get facture reel by i
+
+    public FactureReelleDTO getFactureReelleById(Long factureId, HttpServletRequest request) {
+        // Extraire le token JWT
+        String token = request.getHeader("Authorization");
+        if (token == null || !token.startsWith("Bearer ")) {
+            throw new RuntimeException("Token JWT manquant ou mal formaté");
         }
+    
+        Long userId;
+        try {
+            userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
+        } catch (Exception e) {
+            throw new RuntimeException("Erreur lors de l'extraction de l'ID utilisateur", e);
+        }
+    
+        // Récupérer l'utilisateur et son entreprise
+        User user = usersRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
+        Long entrepriseId = user.getEntreprise().getId();
+    
+        // Récupérer la facture
+        FactureReelle facture = factureReelleRepository.findById(factureId)
+                .orElseThrow(() -> new RuntimeException("Aucune facture trouvée"));
+    
+        // Vérifier que la facture appartient bien à l'entreprise de l'utilisateur
+        if (!facture.getEntreprise().getId().equals(entrepriseId)) {
+            throw new RuntimeException("Accès refusé : cette facture ne vous appartient pas !");
+        }
+    
+        return new FactureReelleDTO(facture);
+    }
+    
 
 
 }

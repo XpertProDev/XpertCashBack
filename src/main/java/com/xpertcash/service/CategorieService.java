@@ -7,7 +7,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import com.xpertcash.entity.Categorie;
-import com.xpertcash.entity.Unite;
 import com.xpertcash.repository.CategorieRepository;
 
 import jakarta.servlet.http.HttpServletRequest;
