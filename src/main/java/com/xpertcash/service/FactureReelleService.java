@@ -221,8 +221,7 @@ public class FactureReelleService {
     return ResponseEntity.ok(factureDTOs);
 }
 
-    // Methode Get facture reel by i
-
+    // Methode Get facture reel by id
     public FactureReelleDTO getFactureReelleById(Long factureId, HttpServletRequest request) {
         // Extraire le token JWT
         String token = request.getHeader("Authorization");
@@ -254,6 +253,6 @@ public class FactureReelleService {
         return new FactureReelleDTO(facture);
     }
     
-
+    
 
 }

@@ -191,11 +191,11 @@ public class FactureProformaService {
             if (!facturesDeLAnnee.isEmpty()) {
                 String lastNumeroFacture = facturesDeLAnnee.get(0).getNumeroFacture();
                 String[] parts = lastNumeroFacture.split("-");
-                String numeroPart = parts[0].replace("FACTURE PROFORMA N°", "").trim();
+                String numeroPart = parts[0].replace("N°", "").trim();
                 newIndex = Integer.parseInt(numeroPart) + 1;
             }
 
-            return String.format("FACTURE PROFORMA N°%03d-%s", newIndex, formattedDate);
+            return String.format("N°%03d-%s", newIndex, formattedDate);
         }
 
 
