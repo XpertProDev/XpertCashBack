@@ -45,13 +45,23 @@ public class FactureReelleController {
         }
 
     // Endpoint pour trier les factures par mois/année
-    @GetMapping("/filtrer-facturesReelles")
-    public ResponseEntity<List<FactureReelleDTO>> filtrerFacturesParMoisEtAnnee(
-            @RequestParam(required = false) Integer mois,
-            @RequestParam(required = false) Integer annee) {
+            @GetMapping("/filtrer-facturesReelles")
+            public ResponseEntity<?> filtrerFacturesParMoisEtAnnee(
+                @RequestParam(required = false) Integer mois,
+                @RequestParam(required = false) Integer annee,
+                HttpServletRequest request) {
+            return factureReelleService.filtrerFacturesParMoisEtAnnee(mois, annee, request);
+        }
 
-        List<FactureReelleDTO> factures = factureReelleService.filtrerFacturesParMoisEtAnnee(mois, annee);
-        return ResponseEntity.ok(factures);
+    // ENdpoind Get facture rell by id
+    @GetMapping("/factures-reelles/{id}")
+    public ResponseEntity<FactureReelleDTO> getFactureReelleById(
+            @PathVariable Long id,
+            HttpServletRequest request
+    ) {
+        FactureReelleDTO factureDTO = factureReelleService.getFactureReelleById(id, request);
+        return ResponseEntity.ok(factureDTO);
     }
+
 
 }

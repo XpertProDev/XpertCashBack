@@ -1,5 +1,6 @@
 package com.xpertcash.DTOs;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.xpertcash.entity.LigneFactureReelle;
 
 import lombok.AllArgsConstructor;
@@ -9,6 +10,8 @@ import lombok.NoArgsConstructor;
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
+@JsonInclude(JsonInclude.Include.NON_NULL)
+
 public class LigneFactureDTO {
     private Long id;
     private String produitNom;

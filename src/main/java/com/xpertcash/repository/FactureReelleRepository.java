@@ -25,14 +25,17 @@ public interface FactureReelleRepository extends JpaRepository<FactureReelle, Lo
 
     // Trie
 
-    @Query("SELECT f FROM FactureReelle f WHERE MONTH(f.dateCreation) = :mois AND YEAR(f.dateCreation) = :annee")
-    List<FactureReelle> findByMonthAndYear(@Param("mois") Integer mois, @Param("annee") Integer annee);
-
-    @Query("SELECT f FROM FactureReelle f WHERE MONTH(f.dateCreation) = :mois")
-    List<FactureReelle> findByMonth(@Param("mois") Integer mois);
-
-    @Query("SELECT f FROM FactureReelle f WHERE YEAR(f.dateCreation) = :annee")
-    List<FactureReelle> findByYear(@Param("annee") Integer annee);
+    @Query("SELECT f FROM FactureReelle f WHERE MONTH(f.dateCreation) = :mois AND YEAR(f.dateCreation) = :annee AND f.entreprise.id = :entrepriseId")
+    List<FactureReelle> findByMonthAndYearAndEntreprise(@Param("mois") Integer mois, @Param("annee") Integer annee, @Param("entrepriseId") Long entrepriseId);
+    
+    @Query("SELECT f FROM FactureReelle f WHERE MONTH(f.dateCreation) = :mois AND f.entreprise.id = :entrepriseId")
+    List<FactureReelle> findByMonthAndEntreprise(@Param("mois") Integer mois, @Param("entrepriseId") Long entrepriseId);
+    
+    @Query("SELECT f FROM FactureReelle f WHERE YEAR(f.dateCreation) = :annee AND f.entreprise.id = :entrepriseId")
+    List<FactureReelle> findByYearAndEntreprise(@Param("annee") Integer annee, @Param("entrepriseId") Long entrepriseId);
+    
+    List<FactureReelle> findByEntrepriseId(Long entrepriseId);
+    
 
 
 

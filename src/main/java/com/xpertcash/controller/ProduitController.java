@@ -37,7 +37,6 @@ import com.xpertcash.service.ProduitService;
 import com.xpertcash.service.IMAGES.ImageStorageService;
 import jakarta.servlet.http.HttpServletRequest;
 import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 
 
 @CrossOrigin(origins = "http://localhost:4200")

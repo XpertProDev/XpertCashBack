@@ -97,6 +97,15 @@ public ResponseEntity<?> ajouterFacture(
     
         return ResponseEntity.ok(factures);
     }
+
+    // Endpoint Get bye id
+
+    @GetMapping("/factureProforma/{id}")
+    public ResponseEntity<FactureProForma> getFactureProformaById(@PathVariable Long id, HttpServletRequest request) {
+        FactureProForma facture = factureProformaService.getFactureProformaById(id, request);
+        return ResponseEntity.ok(facture);
+    }
+    
     
 
     
