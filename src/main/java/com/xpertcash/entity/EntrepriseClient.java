@@ -22,9 +22,12 @@ public class EntrepriseClient {
     private Long id;
     
     private String nom;
+    private String pays;
+    private String siege;
     private String adresse;
     private String email;
     private String telephone;
+    private String secteur;
     private LocalDateTime createdAt;
 
     

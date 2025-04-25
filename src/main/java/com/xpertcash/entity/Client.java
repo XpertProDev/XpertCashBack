@@ -11,7 +11,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 @Entity
-@Data
+@Data 
 @AllArgsConstructor
 @NoArgsConstructor
 
@@ -24,6 +24,9 @@ public class Client {
     
     private String nomComplet;
     private String adresse;
+    private String poste;
+    private String pays;
+    private String ville;
     private String telephone;
     private String email;
     private LocalDateTime createdAt;
