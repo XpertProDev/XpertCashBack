@@ -12,10 +12,14 @@ import com.xpertcash.configuration.JwtUtil;
 import com.xpertcash.entity.Boutique;
 import com.xpertcash.entity.Produit;
 import com.xpertcash.entity.RoleType;
+import com.xpertcash.entity.Stock;
+import com.xpertcash.entity.StockHistory;
 import com.xpertcash.entity.Transfert;
 import com.xpertcash.entity.User;
 import com.xpertcash.repository.BoutiqueRepository;
 import com.xpertcash.repository.ProduitRepository;
+import com.xpertcash.repository.StockHistoryRepository;
+import com.xpertcash.repository.StockRepository;
 import com.xpertcash.repository.TransfertRepository;
 import com.xpertcash.repository.UsersRepository;
 
@@ -38,6 +42,11 @@ public class BoutiqueService {
 
     @Autowired
     private ProduitRepository produitRepository;
+
+    @Autowired
+    private StockRepository stockRepository;
+    @Autowired
+    private StockHistoryRepository stockHistoryRepository;
 
 
     // Ajouter une nouvelle boutique pour l'admin
@@ -180,15 +189,14 @@ public class BoutiqueService {
         return boutiqueRepository.save(boutique);
     }
 
+    //Methode pour Transfert
     @Transactional
     public void transfererProduits(HttpServletRequest request, Long boutiqueSourceId, Long boutiqueDestinationId, Long produitId, int quantite) {
-        // Vérifier la présence du token JWT
         String token = request.getHeader("Authorization");
         if (token == null || !token.startsWith("Bearer ")) {
             throw new RuntimeException("Token JWT manquant ou mal formaté");
         }
 
-        // Extraire l'ID de l'admin
         Long adminId = jwtUtil.extractUserId(token.substring(7));
         User admin = usersRepository.findById(adminId)
                 .orElseThrow(() -> new RuntimeException("Admin non trouvé"));
@@ -197,28 +205,20 @@ public class BoutiqueService {
             throw new RuntimeException("Seul un admin peut transférer des produits !");
         }
 
-        // Récupérer les boutiques source et destination
         Boutique boutiqueSource = boutiqueRepository.findById(boutiqueSourceId)
                 .orElseThrow(() -> new RuntimeException("Boutique source non trouvée"));
         Boutique boutiqueDestination = boutiqueRepository.findById(boutiqueDestinationId)
                 .orElseThrow(() -> new RuntimeException("Boutique destination non trouvée"));
 
-        // verification si l'une des boutiques est désactivée
-        
-        if (!boutiqueSource.isActif()) {
-            throw new RuntimeException("La boutique source est désactivée, transfert impossible !");
-        }
-        if (!boutiqueDestination.isActif()) {
-            throw new RuntimeException("La boutique destination est désactivée, transfert impossible !");
+        if (!boutiqueSource.isActif() || !boutiqueDestination.isActif()) {
+            throw new RuntimeException("L'une des boutiques est désactivée !");
         }
 
-        // Vérifier l'appartenance des boutiques à l'entreprise de l'admin
-        if (!boutiqueSource.getEntreprise().equals(admin.getEntreprise()) || 
+        if (!boutiqueSource.getEntreprise().equals(admin.getEntreprise()) ||
             !boutiqueDestination.getEntreprise().equals(admin.getEntreprise())) {
             throw new RuntimeException("Les boutiques doivent appartenir à l'entreprise de l'admin !");
         }
 
-        // Vérifier que le produit existe et que la quantité est suffisante
         Produit produit = produitRepository.findByBoutiqueAndId(boutiqueSourceId, produitId)
                 .orElseThrow(() -> new RuntimeException("Produit non trouvé dans la boutique source"));
 
@@ -226,33 +226,66 @@ public class BoutiqueService {
             throw new RuntimeException("Quantité insuffisante dans la boutique source !");
         }
 
-        // Réduire la quantité dans la boutique source
         produit.setQuantite(produit.getQuantite() - quantite);
+        produitRepository.save(produit);
 
-        // Vérifier si le produit existe dans la boutique destination
         Optional<Produit> produitDestinationOpt = produitRepository.findByBoutiqueAndCodeGenerique(boutiqueDestination.getId(), produit.getCodeGenerique());
 
+        Produit produitDestination;
         if (produitDestinationOpt.isPresent()) {
-            Produit produitDestination = produitDestinationOpt.get();
+            produitDestination = produitDestinationOpt.get();
             produitDestination.setQuantite(produitDestination.getQuantite() + quantite);
         } else {
-            Produit nouveauProduit = new Produit();
-            nouveauProduit.setNom(produit.getNom());
-            nouveauProduit.setPrixVente(produit.getPrixVente());
-            nouveauProduit.setPrixAchat(produit.getPrixAchat());
-            nouveauProduit.setQuantite(quantite);
-            nouveauProduit.setCodeGenerique(produit.getCodeGenerique());
-            nouveauProduit.setCodeBare(produit.getCodeBare());
-            nouveauProduit.setPhoto(produit.getPhoto());
-            nouveauProduit.setCategorie(produit.getCategorie());
-            nouveauProduit.setUniteDeMesure(produit.getUniteDeMesure());
-            nouveauProduit.setCreatedAt(produit.getCreatedAt());
-            nouveauProduit.setLastUpdated(produit.getLastUpdated());
-            nouveauProduit.setBoutique(boutiqueDestination);
-            produitRepository.save(nouveauProduit);
+            produitDestination = new Produit();
+            produitDestination.setNom(produit.getNom());
+            produitDestination.setPrixVente(produit.getPrixVente());
+            produitDestination.setPrixAchat(produit.getPrixAchat());
+            produitDestination.setQuantite(quantite);
+            produitDestination.setCodeGenerique(produit.getCodeGenerique());
+            produitDestination.setCodeBare(produit.getCodeBare());
+            produitDestination.setPhoto(produit.getPhoto());
+            produitDestination.setCategorie(produit.getCategorie());
+            produitDestination.setUniteDeMesure(produit.getUniteDeMesure());
+            produitDestination.setCreatedAt(produit.getCreatedAt());
+            produitDestination.setLastUpdated(produit.getLastUpdated());
+            produitDestination.setBoutique(boutiqueDestination);
         }
 
-        // Enregistrer le transfert
+        produitDestination.setEnStock(true); // 🔥 Important
+        produitRepository.save(produitDestination);
+
+        // 🔧 Stock
+        Stock stock = stockRepository.findByProduit(produitDestination);
+        if (stock == null) {
+            stock = new Stock();
+            stock.setProduit(produitDestination);
+            stock.setStockActuel(produitDestination.getQuantite());
+            stock.setQuantiteAjoute(quantite);
+            stock.setStockApres(produitDestination.getQuantite());
+            stock.setLastUpdated(LocalDateTime.now());
+        } else {
+            int stockAvant = stock.getStockActuel();
+            int stockApres = stockAvant + quantite;
+            stock.setStockActuel(stockApres);
+            stock.setQuantiteAjoute(quantite);
+            stock.setStockApres(stockApres);
+            stock.setLastUpdated(LocalDateTime.now());
+        }
+        stockRepository.save(stock);
+
+        // 📝 Historique
+        StockHistory history = new StockHistory();
+        history.setAction("Transfert depuis boutique " + boutiqueSource.getNomBoutique());
+        history.setQuantite(quantite);
+        history.setStockAvant(stock.getStockApres() - quantite);
+        history.setStockApres(stock.getStockApres());
+        history.setDescription("Transfert automatique via fonctionnalité de transfert");
+        history.setCreatedAt(LocalDateTime.now());
+        history.setStock(stock);
+        history.setUser(admin);
+        stockHistoryRepository.save(history);
+
+        // 🔄 Transfert
         Transfert transfert = new Transfert();
         transfert.setProduit(produit);
         transfert.setBoutiqueSource(boutiqueSource);
