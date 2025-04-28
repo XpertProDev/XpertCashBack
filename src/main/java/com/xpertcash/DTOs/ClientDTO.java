@@ -15,13 +15,21 @@ import lombok.NoArgsConstructor;
 public class ClientDTO {
     private Long id;
     private String nom;
+    private String adresse;
+    private String poste;
     private String email;
+    private String pays;
+    private String ville;
     private String telephone;
 
     public ClientDTO(Client client) {
         this.id = client.getId();
         this.nom = client.getNomComplet();
+        this.adresse = client.getAdresse();
+        this.poste = client.getPoste();
         this.email = client.getEmail();
+        this.pays = client.getPays();
+        this.ville = client.getVille();
         this.telephone = client.getTelephone();
 
       

@@ -71,7 +71,7 @@ public class ClientService {
         } else if (existingByTelephone.isPresent()) {
             throw new RuntimeException("Un client avec ce téléphone existe déjà !");
         }
-    }
+    } 
     
     private void checkEntrepriseExists(EntrepriseClient entrepriseClient) {
         String email = entrepriseClient.getEmail();
@@ -159,7 +159,7 @@ public class ClientService {
     }
 
 
-        // Méthode pour modifier un client
+        // Méthode pour modifier un client 
         public Client updateClient(Client client) {
     if (client.getId() == null) {
         throw new IllegalArgumentException("L'ID du client est obligatoire !");
