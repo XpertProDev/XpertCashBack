@@ -307,7 +307,7 @@ public class FactureProformaService {
 
             
             // Si la facture n'est pas VALIDÉE, on applique les autres modifications
-        if (modifications.getLignesFacture() != null) {
+            if (modifications.getLignesFacture() != null) {
             facture.getLignesFacture().clear();
             for (LigneFactureProforma ligne : modifications.getLignesFacture()) {
                 // Récupérer le produit à partir de son ID
@@ -337,6 +337,11 @@ public class FactureProformaService {
             }
         }
             
+            //modifier description de facture
+            if (modifications.getDescription() != null) {
+                facture.setDescription(modifications.getDescription());
+            }
+
                 // Vérifier et appliquer la remise
                 remisePourcentage = (remisePourcentage == null) ? 0.0 : remisePourcentage;
                 if (remisePourcentage < 0 || remisePourcentage > 100) {
@@ -450,4 +455,3 @@ public class FactureProformaService {
     
     
 }
- 
