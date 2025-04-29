@@ -36,32 +36,31 @@ public class FactureProformaController {
     private UsersService usersService;
     @Autowired
     private JwtUtil jwtUtil;
-    @Autowired
-    private AuthorizationService authorizationService;
 
-  // Endpoint pour ajouter une facture pro forma
-@PostMapping("/ajouter")
-public ResponseEntity<?> ajouterFacture(
-        @RequestBody FactureProForma facture,
-        @RequestParam(defaultValue = "0") Double remisePourcentage,
-        @RequestParam(defaultValue = "false") Boolean appliquerTVA,
-        @RequestHeader("Authorization") String token,  // Récupération du token depuis l'en-tête
-        HttpServletRequest request) {  // Passage du HttpServletRequest complet
 
-    try {
-        // Ajouter le token dans l'en-tête de la requête
-        request.setAttribute("Authorization", token);
+    // Endpoint pour ajouter une facture pro forma
+    @PostMapping("/ajouter")
+    public ResponseEntity<?> ajouterFacture(
+            @RequestBody FactureProForma facture,
+            @RequestParam(defaultValue = "0") Double remisePourcentage,
+            @RequestParam(defaultValue = "false") Boolean appliquerTVA,
+            @RequestHeader("Authorization") String token,  // Récupération du token depuis l'en-tête
+            HttpServletRequest request) {  // Passage du HttpServletRequest complet
 
-        // Appel du service pour ajouter la facture, en passant la requête avec le token
-        FactureProForma nouvelleFacture = factureProformaService.ajouterFacture(facture, remisePourcentage, appliquerTVA, request);
+        try {
+            // Ajouter le token dans l'en-tête de la requête
+            request.setAttribute("Authorization", token);
 
-        // Retourner la facture créée en réponse HTTP 201 (CREATED)
-        return ResponseEntity.status(HttpStatus.CREATED).body(nouvelleFacture);
-    } catch (RuntimeException e) {
-        // Retourner l'erreur en réponse HTTP 400 (BAD REQUEST) si une exception est levée
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
+            // Appel du service pour ajouter la facture, en passant la requête avec le token
+            FactureProForma nouvelleFacture = factureProformaService.ajouterFacture(facture, remisePourcentage, appliquerTVA, request);
+
+            // Retourner la facture créée en réponse HTTP 201 (CREATED)
+            return ResponseEntity.status(HttpStatus.CREATED).body(nouvelleFacture);
+        } catch (RuntimeException e) {
+            // Retourner l'erreur en réponse HTTP 400 (BAD REQUEST) si une exception est levée
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
+        }
     }
-}
 
     
     
@@ -99,7 +98,6 @@ public ResponseEntity<?> ajouterFacture(
     }
 
     // Endpoint Get bye id
-
     @GetMapping("/factureProforma/{id}")
     public ResponseEntity<FactureProForma> getFactureProformaById(@PathVariable Long id, HttpServletRequest request) {
         FactureProForma facture = factureProformaService.getFactureProformaById(id, request);
@@ -108,6 +106,5 @@ public ResponseEntity<?> ajouterFacture(
     
     
 
-    
 
 }

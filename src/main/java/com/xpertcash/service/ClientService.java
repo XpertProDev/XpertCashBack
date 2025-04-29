@@ -203,7 +203,7 @@ public class ClientService {
         }
     }
 
-    // ➕ Nouveau bloc : détacher l'entreprise si elle est explicitement mise à null
+    //  Nouveau bloc : détacher l'entreprise si elle est explicitement mise à null
     if (client.getEntrepriseClient() == null && existingClient.getEntrepriseClient() != null) {
         existingClient.setEntrepriseClient(null);
     }
