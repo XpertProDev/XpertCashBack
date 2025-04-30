@@ -27,8 +27,8 @@ public class NotificationService {
 
 
       // tâche planifiée : Vérifie tous les jours à 08h00 quelles factures doivent être relancées
-      @Scheduled(cron = "0 0 8 * * ?")
-      //@Scheduled(cron = "0 * * * * ?")  // Tâche planifiée toutes les minutes
+     // @Scheduled(cron = "0 0 8 * * ?")
+      @Scheduled(cron = "0 * * * * ?")  // Tâche planifiée toutes les minutes
       public void verifierFacturesAEnvoyer() {
         LocalDateTime maintenant = LocalDateTime.now().withSecond(0).withNano(0);
     
@@ -45,31 +45,35 @@ public class NotificationService {
                                ", Notifiée : " + facture.isNotifie());
     
                                try {
-                                // ✅ Vérifier l'utilisateur qui a mis la facture en "ENVOYÉ"
                                 User utilisateurRelanceur = facture.getUtilisateurRelanceur();
                                 if (utilisateurRelanceur == null || utilisateurRelanceur.getEmail() == null) {
                                     System.err.println("⚠️ Impossible d'envoyer l'email : Aucun utilisateur relanceur défini pour la facture " + facture.getNumeroFacture());
                                     continue;
                                 }
-                    
+                            
                                 String emailUtilisateur = utilisateurRelanceur.getEmail();
                                 String nomUtilisateur = utilisateurRelanceur.getNomComplet();
-                    
+                            
                                 Date relanceDate = Date.from(facture.getDateRelance().atZone(ZoneId.systemDefault()).toInstant());
-                    
-                                String clientName = facture.getClient().getNomComplet();
-                    
-                                mailService.sendRelanceeEmail(emailUtilisateur, nomUtilisateur, facture.getNumeroFacture(), clientName, relanceDate);
-                    
-                                // Mettre à jour la facture après envoi
+                            
+                                String clientName = facture.getClient() != null 
+                                                    ? facture.getClient().getNomComplet() 
+                                                    : (facture.getEntrepriseClient() != null 
+                                                        ? facture.getEntrepriseClient().getNom() 
+                                                        : "Client inconnu");
+                            
+                                                        boolean estEntreprise = facture.getEntrepriseClient() != null;
+                                                        mailService.sendRelanceeEmail(emailUtilisateur, nomUtilisateur, facture.getNumeroFacture(), clientName, relanceDate, estEntreprise);
+                                                        
                                 facture.setNotifie(true);
                                 facture.setDernierRappelEnvoye(maintenant);
                                 factureProformaRepository.save(facture);
-                    
+                            
                                 System.out.println("✅ Notification envoyée pour la facture " + facture.getNumeroFacture());
                             } catch (Exception e) {
                                 System.err.println("❌ Erreur lors de l'envoi de la notification pour la facture " + facture.getNumeroFacture() + " : " + e.getMessage());
                             }
+                            
                         }
              
         

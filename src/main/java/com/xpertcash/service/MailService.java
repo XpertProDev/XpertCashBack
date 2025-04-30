@@ -23,7 +23,7 @@ public class MailService {
 
     @Autowired
     private JavaMailSender mailSender;
-
+ 
     @Value("${spring.mail.username}")
     private String from;
 
@@ -46,14 +46,15 @@ public class MailService {
     
     
      // Méthode d'envoi d'email pour relancer une facture
-     public void sendRelanceeEmail(String to, String fullName, String factureNumero, String clientName, Date relanceDate) throws MessagingException {
+     public void sendRelanceeEmail(String to, String fullName, String factureNumero, String clientName, Date relanceDate, boolean estEntreprise) throws MessagingException {
         System.out.println("📧 Envoi d'un email à : " + to);
         String subject = "Relance de la facture " + factureNumero;
         SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm");
         String formattedDate = sdf.format(relanceDate);
-        String message = generateFactureRelanceMessage(factureNumero, clientName, formattedDate);
+        String message = generateFactureRelanceMessage(factureNumero, clientName, formattedDate, estEntreprise);
         sendEmail(to, subject, message);
     }
+    
     
     
     
@@ -212,7 +213,9 @@ public class MailService {
 
 
      // Envoi une notification par email pour relancer une facture
-      private String generateFactureRelanceMessage(String factureNumero, String clientName, String relanceDate) {
+     private String generateFactureRelanceMessage(String factureNumero, String clientName, String relanceDate, boolean estEntreprise) {
+        String destinataireLabel = estEntreprise ? "l'entreprise" : "le client";
+    
         return """
             <html>
             <body style="font-family: Arial, sans-serif; background-color: #f4f4f4; padding: 20px;">
@@ -220,7 +223,7 @@ public class MailService {
                     <img src="cid:logo" alt="Logo" style="width: 100px; margin-bottom: 10px;">
                     <h2 style="color: #333; margin-top: -19px; font-size: 19px;">Relance de la facture</h2>
                     <p>Bonjour,</p>
-                    <p>La <strong style="font-style: italic;">%s</strong> pour le client <strong>%s</strong> doit être relancée.</p>
+                    <p>La facture <strong style="font-style: italic;">%s</strong> pour %s <strong>%s</strong> doit être relancée.</p>
                     <p>La date de relance prévue était : <strong>%s</strong>.</p>
                     <p>Veuillez effectuer la relance.</p>
                     <p style="font-size: 12px; color: #555; margin-top: 30px;">Si vous n'avez pas effectué cette demande, veuillez ignorer cet e-mail.</p>
@@ -228,8 +231,9 @@ public class MailService {
                 </div>
             </body>
             </html>
-        """.formatted(factureNumero, clientName, relanceDate);
+        """.formatted(factureNumero, destinataireLabel, clientName, relanceDate);
     }
+    
       
 
 }
