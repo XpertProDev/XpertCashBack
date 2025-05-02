@@ -1,6 +1,8 @@
 package com.xpertcash.entity;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 import com.fasterxml.jackson.annotation.JsonBackReference;
 import com.fasterxml.jackson.annotation.JsonManagedReference;
@@ -38,6 +40,7 @@ public class Stock {
     @JsonBackReference("boutique-stock")
     private Boutique boutique;
 
+
     private LocalDateTime createdAt;
     private LocalDateTime lastUpdated;
 
@@ -45,6 +48,8 @@ public class Stock {
     public Long getProduitId() {
         return (produit != null) ? produit.getId() : null;
     }
+
+ 
 
     
 

@@ -20,17 +20,21 @@ import com.xpertcash.entity.Boutique;
 import com.xpertcash.entity.Categorie;
 import com.xpertcash.entity.Facture;
 import com.xpertcash.entity.FactureProduit;
+import com.xpertcash.entity.Fournisseur;
 import com.xpertcash.entity.Produit;
 import com.xpertcash.entity.RoleType;
 import com.xpertcash.entity.Stock;
 import com.xpertcash.entity.StockHistory;
+import com.xpertcash.entity.StockProduitFournisseur;
 import com.xpertcash.entity.Unite;
 import com.xpertcash.entity.User;
 import com.xpertcash.repository.BoutiqueRepository;
 import com.xpertcash.repository.CategorieRepository;
 import com.xpertcash.repository.FactureRepository;
+import com.xpertcash.repository.FournisseurRepository;
 import com.xpertcash.repository.ProduitRepository;
 import com.xpertcash.repository.StockHistoryRepository;
+import com.xpertcash.repository.StockProduitFournisseurRepository;
 import com.xpertcash.repository.StockRepository;
 import com.xpertcash.repository.UniteRepository;
 import com.xpertcash.repository.UsersRepository;
@@ -65,6 +69,12 @@ public class ProduitService {
     private StockHistoryRepository stockHistoryRepository;
     @Autowired
     private FactureRepository factureRepository;
+    
+    @Autowired
+    private FournisseurRepository fournisseurRepository;
+
+    @Autowired
+    private StockProduitFournisseurRepository stockProduitFournisseurRepository;
 
 
     // Ajouter un produit à la liste sans le stock
@@ -223,7 +233,8 @@ public class ProduitService {
     
 
     //Methode pour ajuster la quantiter du produit en stock
-    public Facture ajouterStock(Long boutiqueId, Map<Long, Integer> produitsQuantites, String description,String codeFournisseur, HttpServletRequest request) {
+    public Facture ajouterStock(Long boutiqueId, Map<Long, Integer> produitsQuantites, String description, String codeFournisseur, Long fournisseurId, HttpServletRequest request) {
+
         // Récupérer le token JWT depuis le header "Authorization"
         String token = request.getHeader("Authorization");
         if (token == null || !token.startsWith("Bearer ")) {
@@ -238,50 +249,76 @@ public class ProduitService {
     
         List<Produit> produits = new ArrayList<>();
     
-        for (Map.Entry<Long, Integer> entry : produitsQuantites.entrySet()) {
-            Long produitId = entry.getKey();
-            Integer quantiteAjoute = entry.getValue();
-    
-            Produit produit = produitRepository.findById(produitId)
-                    .orElseThrow(() -> new RuntimeException("Produit non trouvé"));
-    
-            Stock stock = stockRepository.findByProduit(produit);
-            if (stock == null) {
-                throw new RuntimeException("Stock introuvable pour ce produit");
-            }
-    
-            int stockAvant = stock.getStockActuel();
-            int nouvelleQuantiteProduit = produit.getQuantite() + quantiteAjoute;
-    
-            // Mettre à jour le produit et le stock
-            produit.setQuantite(nouvelleQuantiteProduit);
-            produitRepository.save(produit);
-    
-            stock.setStockActuel(nouvelleQuantiteProduit);
-            stock.setQuantiteAjoute(quantiteAjoute);
-            stock.setStockApres(nouvelleQuantiteProduit);
-            stock.setLastUpdated(LocalDateTime.now());
-            stockRepository.save(stock);
-    
-            // Enregistrer l'historique du stock
-            StockHistory stockHistory = new StockHistory();
-            stockHistory.setAction("Ajout sur quantité");
-            stockHistory.setQuantite(quantiteAjoute);
-            stockHistory.setStockAvant(stockAvant);
-            stockHistory.setStockApres(nouvelleQuantiteProduit);
-            stockHistory.setDescription(description);
-            stockHistory.setCreatedAt(LocalDateTime.now());
-            stockHistory.setStock(stock);
-            stockHistory.setUser(user);
-            if (codeFournisseur != null && !codeFournisseur.isEmpty()) {
-                stockHistory.setCodeFournisseur(codeFournisseur);
-            }
+       for (Map.Entry<Long, Integer> entry : produitsQuantites.entrySet()) {
+    Long produitId = entry.getKey();
+    Integer quantiteAjoute = entry.getValue();
 
-            stockHistoryRepository.save(stockHistory);
+    Produit produit = produitRepository.findById(produitId)
+            .orElseThrow(() -> new RuntimeException("Produit non trouvé"));
+
+    Stock stock = stockRepository.findByProduit(produit);
+    if (stock == null) {
+        throw new RuntimeException("Stock introuvable pour ce produit");
+    }
+
+    int stockAvant = stock.getStockActuel();
+    int nouvelleQuantiteProduit = produit.getQuantite() + quantiteAjoute;
+
+    // Mettre à jour produit et stock
+    produit.setQuantite(nouvelleQuantiteProduit);
+    produitRepository.save(produit);
+
+    stock.setStockActuel(nouvelleQuantiteProduit);
+    stock.setQuantiteAjoute(quantiteAjoute);
+    stock.setStockApres(nouvelleQuantiteProduit);
+    stock.setLastUpdated(LocalDateTime.now());
+
+
+    // Initialiser la liste si null
+   
+    stockRepository.save(stock);
+
+    // Charger le fournisseur seulement s'il est fourni
+    Fournisseur fournisseurEntity = null;
+    if (fournisseurId != null) {
+        fournisseurEntity = fournisseurRepository.findById(fournisseurId)
+            .orElseThrow(() -> new RuntimeException("Fournisseur non trouvé avec l'ID : " + fournisseurId));
+    }
     
-            produits.add(produit);
-        }
+    // 🔁 Enregistrer dans StockProduitFournisseur
+    StockProduitFournisseur spf = new StockProduitFournisseur();
+    spf.setStock(stock);
+    spf.setProduit(produit);
+    spf.setQuantiteAjoutee(quantiteAjoute);
     
+    // Affecter le fournisseur uniquement s'il existe
+    if (fournisseurEntity != null) {
+        spf.setFournisseur(fournisseurEntity);
+    }
+    
+    stockProduitFournisseurRepository.save(spf);
+    
+    
+
+    // 🕒 Historique
+    StockHistory stockHistory = new StockHistory();
+    stockHistory.setAction("Ajout sur quantité");
+    stockHistory.setQuantite(quantiteAjoute);
+    stockHistory.setStockAvant(stockAvant);
+    stockHistory.setStockApres(nouvelleQuantiteProduit);
+    stockHistory.setDescription(description);
+    stockHistory.setCreatedAt(LocalDateTime.now());
+    stockHistory.setStock(stock);
+    stockHistory.setUser(user);
+    if (codeFournisseur != null && !codeFournisseur.isEmpty()) {
+        stockHistory.setCodeFournisseur(codeFournisseur);
+    }
+
+    stockHistoryRepository.save(stockHistory);
+
+    produits.add(produit);
+}
+
         // Enregistrer une facture avec plusieurs produits
         return enregistrerFacture("AJOUTER", produits, produitsQuantites, description,codeFournisseur, user);
     }
@@ -484,6 +521,22 @@ public class ProduitService {
     return stockRepository.findAll();
 }
 
+    // Lister tout les stocks lieu a un fournisseur
+    public List<Map<String, Object>> getNomProduitEtQuantiteAjoutee(Long fournisseurId) {
+        List<Object[]> rows = stockProduitFournisseurRepository.findNomProduitEtQuantiteAjoutee(fournisseurId);
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (Object[] row : rows) {
+            Map<String, Object> map = new HashMap<>();
+            map.put("nomProduit", row[0]);
+            map.put("quantiteAjoutee", row[1]);
+            result.add(map);
+        }
+        return result;
+    }
+    
+    
+
+    
 
     
    // Update Produit

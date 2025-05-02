@@ -325,6 +325,7 @@ public ResponseEntity<?> createProduit(
                     request.getProduitsQuantites(),
                     request.getDescription(),
                     request.getCodeFournisseur(),
+                    request.getFournisseurId(),
                     httpRequest);
 
         

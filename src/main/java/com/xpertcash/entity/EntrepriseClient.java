@@ -35,4 +35,10 @@ public class EntrepriseClient {
     @JsonIgnoreProperties("entrepriseClient")
     private List<Client> clients;
 
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "entreprise_id")
+    @JsonIgnoreProperties({"facturesProforma", "identifiantEntreprise", "utilisateurs", "adresse", "boutiques", "createdAt", "logo", "admin"})
+    private Entreprise entreprise;
+    
+
 }

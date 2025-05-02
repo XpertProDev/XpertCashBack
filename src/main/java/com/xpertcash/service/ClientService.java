@@ -5,16 +5,24 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
+import com.xpertcash.configuration.JwtUtil;
 import com.xpertcash.entity.Client;
+import com.xpertcash.entity.Entreprise;
 import com.xpertcash.entity.EntrepriseClient;
+import com.xpertcash.entity.User;
 import com.xpertcash.repository.ClientRepository;
 import com.xpertcash.repository.EntrepriseClientRepository;
+import com.xpertcash.repository.UsersRepository;
 
 import jakarta.persistence.EntityNotFoundException;
+import jakarta.servlet.http.HttpServletRequest;
 
 @Service
 public class ClientService {
@@ -25,11 +33,42 @@ public class ClientService {
     @Autowired
     private EntrepriseClientRepository entrepriseClientRepository;
 
+    @Autowired
+    private UsersRepository usersRepository;
+
+    @Autowired
+    private JwtUtil jwtUtil;
+
   
-    public Client saveClient(Client client) {
+    public Client saveClient(Client client,  HttpServletRequest request) {
         if (client.getNomComplet() == null || client.getNomComplet().trim().isEmpty()) {
             throw new RuntimeException("Le nom du client est obligatoire !");
         }
+
+               // Vérifier la présence du token JWT et récupérer l'ID de l'utilisateur connecté
+    String token = request.getHeader("Authorization");
+    if (token == null || !token.startsWith("Bearer ")) {
+        throw new RuntimeException("Token JWT manquant ou mal formaté");
+    }
+
+    Long userId = null;
+    try {
+        userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
+    } catch (Exception e) {
+        throw new RuntimeException("Erreur lors de l'extraction de l'ID de l'utilisateur depuis le token", e);
+    }
+
+    // Récupérer l'utilisateur par son ID
+    User user = usersRepository.findById(userId)
+            .orElseThrow(() -> new RuntimeException("Utilisateur introuvable !"));
+
+    // Vérifier que l'utilisateur a une entreprise associée (entreprise créatrice de la facture)
+    Entreprise entrepriseUtilisateur = user.getEntreprise();
+    if (entrepriseUtilisateur == null) {
+        throw new RuntimeException("L'utilisateur n'a pas d'entreprise associée.");
+    }
+
+    client.setEntreprise(entrepriseUtilisateur);
     
         checkClientExists(client);
 
@@ -134,13 +173,43 @@ public class ClientService {
     }
 
 
-    public List<Client> getAllClients() {
-        List<Client> clients = clientRepository.findAll();
-        List<EntrepriseClient> entreprises = entrepriseClientRepository.findAll();
-
-        
-        return clients; 
+    public List<Client> getAllClients(HttpServletRequest request) {
+    // 1. Extraire l'utilisateur à partir du token
+    String token = request.getHeader("Authorization");
+    if (token == null || !token.startsWith("Bearer ")) {
+        throw new RuntimeException("Token JWT manquant ou mal formaté");
     }
+
+    Long userId;
+    try {
+        userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
+    } catch (Exception e) {
+        throw new RuntimeException("Erreur lors de l'extraction de l'ID utilisateur", e);
+    }
+
+    User user = usersRepository.findById(userId)
+            .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
+
+    Entreprise entreprise = user.getEntreprise();
+    if (entreprise == null) {
+        throw new RuntimeException("Aucune entreprise associée à cet utilisateur");
+    }
+
+    // 2. Récupérer tous les clients
+    List<Client> allClients = clientRepository.findAll();
+
+    // 3. Filtrer : client lié à entreprise OU entrepriseClient liée à l'entreprise
+    return allClients.stream()
+            .filter(c ->
+                (c.getEntreprise() != null && c.getEntreprise().getId().equals(entreprise.getId())) ||
+                (c.getEntrepriseClient() != null && 
+                 c.getEntrepriseClient().getEntreprise() != null &&
+                 c.getEntrepriseClient().getEntreprise().getId().equals(entreprise.getId()))
+            )
+            .collect(Collectors.toList());
+
+
+}
 
     
       // Méthode pour récupérer tous les clients (personnes) et entreprises sans leurs clients associés
