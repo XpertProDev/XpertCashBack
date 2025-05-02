@@ -296,9 +296,9 @@ public class FactureProformaService {
                 // Vérifier si on passe en "ENVOYÉ" et définir la date de relance
                 if (modifications.getStatut() != null && modifications.getStatut() == StatutFactureProForma.ENVOYE) {
                     if (facture.getDateRelance() == null) {
-                        //facture.setDateRelance(LocalDateTime.now().plusHours(72)); // Par défaut 72h
+                        facture.setDateRelance(LocalDateTime.now().plusHours(72)); // Par défaut 72h
                         // Exemple pour une relance dans une minute
-                        facture.setDateRelance(LocalDateTime.now().plusMinutes(1));
+                       //facture.setDateRelance(LocalDateTime.now().plusMinutes(1)); // Mode Dev
                     }
 
                     // Enregistrer l'utilisateur qui a mis la facture en ENVOYÉ
