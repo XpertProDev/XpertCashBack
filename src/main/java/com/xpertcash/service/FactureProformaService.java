@@ -201,7 +201,7 @@ public class FactureProformaService {
 
     // Méthode pour modifier une facture pro forma
         @Transactional
-        public FactureProForma modifierFacture(Long factureId, Double remisePourcentage, Boolean appliquerTVA, FactureProForma modifications, HttpServletRequest request) {
+        public FactureProForma modifierFacture(Long factureId, Double remisePourcentage, Boolean appliquerTVA, FactureProForma modifications, List<Long> idsApprobateurs, HttpServletRequest request) {
                 FactureProForma facture = factureProformaRepository.findById(factureId)
                         .orElseThrow(() -> new RuntimeException("Facture non trouvée !"));
             
@@ -255,6 +255,43 @@ public class FactureProformaService {
                 }
 
 
+                // ici commence désignation pour Approuver
+                if (modifications.getStatut() == StatutFactureProForma.APPROUVE) {
+
+                    // Vérifie si la facture a déjà été approuvée par le passé
+                    boolean dejaApprouvee = facture.getDateApprobation() != null;
+
+                    // Si ce n’est pas le cas, il faut obligatoirement passer par APPROBATION avant
+                    if (!dejaApprouvee) {
+                        if (facture.getStatut() != StatutFactureProForma.APPROBATION) {
+                            throw new RuntimeException("La facture doit d'abord passer par le statut APPROBATION avant d'être APPROUVÉE.");
+                        }
+
+                        List<User> approbateurs = facture.getApprobateurs();
+                        if (approbateurs == null || approbateurs.isEmpty()) {
+                            throw new RuntimeException("Aucun approbateur défini pour cette facture.");
+                        }
+
+                        boolean estApprobateur = approbateurs.stream()
+                            .anyMatch(approbateur -> approbateur.getId().equals(user.getId()));
+
+                        if (!estApprobateur) {
+                            throw new RuntimeException("Vous n'êtes pas autorisé à approuver cette facture.");
+                        }
+
+                        // Première approbation : on enregistre l'approbateur et la date
+                        facture.setUtilisateurApprobateur(user);
+                        facture.setDateApprobation(LocalDateTime.now());
+                    } else {
+                        // Appropriation répétée : pas besoin de refaire les vérifications
+                        System.out.println("ℹ️ Facture déjà approuvée une fois. Appropriation directe autorisée.");
+                    }
+                }
+
+
+                
+
+
                     // Vérifier si la date de relance est modifiée
                     if (modifications.getDateRelance() != null && !modifications.getDateRelance().equals(facture.getDateRelance())) {
                         LocalDateTime dateCreationAsDateTime = facture.getDateCreation().atStartOfDay();
@@ -284,12 +321,39 @@ public class FactureProformaService {
                     }
 
                     // Si le statut est modifié et passe à "BROUILLON", "APPROUVE" ou "ENVOYE", réinitialiser le statutPaiement
+                   
                     if (modifications.getStatut() != null && 
                     (modifications.getStatut() == StatutFactureProForma.BROUILLON ||
                     modifications.getStatut() == StatutFactureProForma.APPROUVE ||
-                    modifications.getStatut() == StatutFactureProForma.ENVOYE)) {
-                    
+                    modifications.getStatut() == StatutFactureProForma.VALIDE)) {
+                    facture.setDateRelance(null);
+                    facture.setDernierRappelEnvoye(null);
                 }
+
+            // Ajout de la logique des approbateurs si statut = APPROBATION
+            if (modifications.getStatut() == StatutFactureProForma.APPROBATION) {
+                if (idsApprobateurs == null || idsApprobateurs.isEmpty()) {
+                    throw new RuntimeException("Vous devez fournir au moins un utilisateur pour approuver cette facture.");
+                }
+
+                List<User> approbateurs = usersRepository.findAllById(idsApprobateurs);
+
+                if (approbateurs.size() != idsApprobateurs.size()) {
+                    throw new RuntimeException("Un ou plusieurs approbateurs sont introuvables !");
+                }
+
+                for (User approbateur : approbateurs) {
+                    if (!user.getEntreprise().getId().equals(approbateur.getEntreprise().getId())) {
+                        throw new RuntimeException("Tous les approbateurs doivent appartenir à la même entreprise.");
+                    }
+                }
+
+                facture.setApprobateurs(approbateurs);
+                System.out.println("👥 Approbateurs ajoutés : " + approbateurs.stream().map(User::getId).toList());
+            }
+
+                    
+                
 
 
                 // Vérifier si on passe en "ENVOYÉ" et définir la date de relance
@@ -374,54 +438,77 @@ public class FactureProformaService {
     
 
     //Methode pour recuperer les factures pro forma dune entreprise
-    public List<Map<String, Object>> getFacturesParEntreprise(Long userId) {
-    // Récupérer les factures de l'entreprise de l'utilisateur
-    List<FactureProForma> factures = factureProformaRepository.findByEntrepriseId(userId);
-
-    List<Map<String, Object>> factureMaps = new ArrayList<>();
-
-    for (FactureProForma facture : factures) {
-        Map<String, Object> factureMap = new HashMap<>();
-        
-        // Ajouter les informations de la facture
-        factureMap.put("id", facture.getId());
-        factureMap.put("numeroFacture", facture.getNumeroFacture());
-        factureMap.put("dateCreation", facture.getDateCreation());
-        factureMap.put("description", facture.getDescription());
-        factureMap.put("totalHT", facture.getTotalHT());
-        factureMap.put("remise", facture.getRemise());
-        factureMap.put("tva", facture.isTva());
-        factureMap.put("totalFacture", facture.getTotalFacture());
-        factureMap.put("statut", facture.getStatut());
-        factureMap.put("ligneFactureProforma", facture.getLignesFacture());
-
-        // Vérifier si le client est associé à la facture
-        if (facture.getClient() != null) {
-            factureMap.put("client", facture.getClient().getNomComplet());
-        } else {
-            factureMap.put("client", null); 
+    public List<Map<String, Object>> getFacturesParEntrepriseParUtilisateur(Long userId) {
+        User user = usersRepository.findById(userId)
+            .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+    
+        Entreprise entreprise = user.getEntreprise();
+        if (entreprise == null) {
+            throw new RuntimeException("Utilisateur n'est associé à aucune entreprise");
         }
-
-        // Vérifier si l'entreprise client est associée à la facture
-        if (facture.getEntrepriseClient() != null) {
-            factureMap.put("entrepriseClient", facture.getEntrepriseClient().getNom());
-        } else {
-            factureMap.put("entrepriseClient", null);
+    
+        Long entrepriseId = entreprise.getId();
+        List<FactureProForma> factures = factureProformaRepository.findByEntrepriseId(entrepriseId);
+    
+        List<Map<String, Object>> factureMaps = new ArrayList<>();
+    
+        for (FactureProForma facture : factures) {
+            Map<String, Object> factureMap = new HashMap<>();
+    
+            // Informations principales
+            factureMap.put("id", facture.getId());
+            factureMap.put("numeroFacture", facture.getNumeroFacture());
+            factureMap.put("dateCreation", facture.getDateCreation());
+            factureMap.put("description", facture.getDescription());
+            factureMap.put("totalHT", facture.getTotalHT());
+            factureMap.put("remise", facture.getRemise());
+            factureMap.put("tva", facture.isTva());
+            factureMap.put("totalFacture", facture.getTotalFacture());
+            factureMap.put("statut", facture.getStatut());
+            factureMap.put("ligneFactureProforma", facture.getLignesFacture());
+    
+            // Client
+            factureMap.put("client", facture.getClient() != null ? facture.getClient().getNomComplet() : null);
+    
+            // Entreprise cliente
+            factureMap.put("entrepriseClient", facture.getEntrepriseClient() != null
+                ? facture.getEntrepriseClient().getNom()
+                : null);
+    
+            // Entreprise émettrice
+            factureMap.put("entreprise", facture.getEntreprise() != null
+                ? facture.getEntreprise().getNomEntreprise()
+                : null);
+    
+            // Relance et notification
+            factureMap.put("dateRelance", facture.getDateRelance());
+            factureMap.put("notifie", facture.isNotifie());
+    
+            // Optionnel : Créateur et approbateur
+            /*
+            if (facture.getUtilisateurModificateur() != null) {
+                factureMap.put("utilisateurCreateur", facture.getUtilisateurModificateur().getNomComplet());
+            } else {
+                factureMap.put("utilisateurCreateur", null);
+            }
+    
+            if (facture.getUtilisateurApprobateur() != null) {
+                Map<String, Object> approbateurMap = new HashMap<>();
+                approbateurMap.put("nomComplet", facture.getUtilisateurApprobateur().getNomComplet());
+                approbateurMap.put("email", facture.getUtilisateurApprobateur().getEmail());
+                factureMap.put("utilisateurApprobateur", approbateurMap);
+            } else {
+                factureMap.put("utilisateurApprobateur", null);
+            }
+            */
+    
+            // Ajout final
+            factureMaps.add(factureMap);
         }
-
-        // Ajouter les informations de l'entreprise (s'il y en a une)
-        factureMap.put("entreprise", facture.getEntreprise() != null ? facture.getEntreprise().getNomEntreprise() : null);
-        
-        // Ajouter d'autres informations pertinentes comme la date de relance et le statut de notification
-        factureMap.put("dateRelance", facture.getDateRelance());
-        factureMap.put("notifie", facture.isNotifie());
-
-        factureMaps.add(factureMap);
+    
+        return factureMaps;
     }
-
-    return factureMaps;
-}
-
+    
 
     // Methode pour recuperer une facture pro forma par son id
     public FactureProForma getFactureProformaById(Long id, HttpServletRequest request) {

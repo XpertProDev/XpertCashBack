@@ -62,9 +62,10 @@ public class FactureProformaController {
             @PathVariable Long factureId,
             @RequestParam(required = false) Double remisePourcentage,
             @RequestParam(required = false) Boolean appliquerTVA,
+            @RequestParam(required = false) List<Long> idsApprobateurs,
             @RequestBody FactureProForma modifications, HttpServletRequest request) {
     
-        FactureProForma factureModifiee = factureProformaService.modifierFacture(factureId, remisePourcentage, appliquerTVA, modifications, request);
+        FactureProForma factureModifiee = factureProformaService.modifierFacture(factureId, remisePourcentage, appliquerTVA, modifications,idsApprobateurs, request);
         return ResponseEntity.ok(factureModifiee);
     }
 
@@ -83,10 +84,14 @@ public class FactureProformaController {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(null);
         }
     
-        List<Map<String, Object>> factures = factureProformaService.getFacturesParEntreprise(userId);
-    
-        return ResponseEntity.ok(factures);
+        try {
+            List<Map<String, Object>> factures = factureProformaService.getFacturesParEntrepriseParUtilisateur(userId);
+            return ResponseEntity.ok(factures);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
+        }
     }
+    
 
     // Endpoint Get bye id
     @GetMapping("/factureProforma/{id}")
