@@ -401,6 +401,14 @@ public class FactureProformaService {
                 ligne.setProduit(produit);
                 ligne.setMontantTotal(montantTotal);
 
+                // Mettre a jour la description de la ligne
+                if (ligne.getLigneDescription() != null) {
+                    ligne.setLigneDescription(ligne.getLigneDescription());
+                } else {
+                    ligne.setLigneDescription(produit.getDescription());
+                }
+    
+
                 // Ajouter la ligne de facture modifiée à la facture
                 facture.getLignesFacture().add(ligne);
             }
