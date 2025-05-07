@@ -24,12 +24,17 @@ public class FactureProForma {
     private String numeroFacture;
     private LocalDate dateCreation;
     private String description;
+
+    private LocalDateTime dateApprobation;
+
     
      // Montants calculés
      private double totalHT;  // Total avant taxes et remise
      private Double remise;   // Remise en montant
      private boolean tva;      // TVA 18% si applicable
      private double totalFacture; // Montant final à payer
+
+     
 
      
 
@@ -98,6 +103,22 @@ public class FactureProForma {
     @JoinColumn(name = "utilisateur_relanceur_id")
     @JsonIgnoreProperties({"personalCode", "phone", "photo", "createdAt", "activationCode", "activatedLien", "enabledLien", "lastActivity", "locked", "pays", "role"})
     private User utilisateurRelanceur;
+
+    @ManyToOne
+    @JoinColumn(name = "utilisateur_approbateur_id")
+    private User utilisateurApprobateur;
+  
+    
+
+
+    @ManyToMany
+    @JoinTable(
+        name = "facture_proforma_approbateurs",
+        joinColumns = @JoinColumn(name = "facture_id"),
+        inverseJoinColumns = @JoinColumn(name = "user_id")
+    )
+    private List<User> approbateurs;
+
      
 
     
