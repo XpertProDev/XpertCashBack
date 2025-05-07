@@ -50,7 +50,7 @@ public class Produit {
     private Unite uniteDeMesure;
 
     @OneToMany(fetch = FetchType.LAZY)
-    @JoinColumn(name = "stocks_id", nullable = true)
+   // @JoinColumn(name = "stocks_id", nullable = true)
     @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
     private List<Stock> stocks;
 

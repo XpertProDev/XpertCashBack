@@ -183,8 +183,7 @@ public class FactureProformaService {
             LocalDate currentDate = LocalDate.now();
             int year = currentDate.getYear();
             String formattedDate = currentDate.format(DateTimeFormatter.ofPattern("MM-yyyy"));
-
-             List<FactureProForma> facturesDeLAnnee = factureProformaRepository.findFacturesDeLAnnee(year);
+            List<FactureProForma> facturesDeLAnnee = factureProformaRepository.findFacturesDeLAnnee(year);
 
             int newIndex = 1;
 

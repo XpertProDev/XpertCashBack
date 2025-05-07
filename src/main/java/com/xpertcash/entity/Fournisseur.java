@@ -1,9 +1,10 @@
 package com.xpertcash.entity;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
-import com.fasterxml.jackson.annotation.JsonBackReference;
-
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
@@ -14,34 +15,26 @@ import lombok.NoArgsConstructor;
 @Data 
 @AllArgsConstructor
 @NoArgsConstructor
+public class Fournisseur {
 
-
-public class Client {
-
-    @Id
+        @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
     
     private String nomComplet;
     private String adresse;
-    private String poste;
     private String pays;
     private String ville;
     private String telephone;
     private String email;
     private LocalDateTime createdAt;
-    
-   @ManyToOne
-//    @JsonBackReference
-    @JoinColumn(name = "entreprise_client_id")
-   @JsonIgnoreProperties("clientts")
-    private EntrepriseClient entrepriseClient;
-
 
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "entreprise_id")
     @JsonIgnoreProperties({"facturesProforma", "identifiantEntreprise", "utilisateurs", "adresse", "boutiques", "createdAt", "logo", "admin"})
     private Entreprise entreprise;
-    
+
+   
+
 
 }

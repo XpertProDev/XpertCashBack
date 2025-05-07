@@ -1,5 +1,6 @@
 package com.xpertcash.controller;
 
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -23,6 +24,7 @@ import com.xpertcash.repository.EntrepriseClientRepository;
 import com.xpertcash.service.ClientService;
 
 import jakarta.persistence.EntityNotFoundException;
+import jakarta.servlet.http.HttpServletRequest;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -33,11 +35,11 @@ public class ClientController {
 
   
         @PostMapping("/clients")
-    public ResponseEntity<?> createClient(@RequestBody Client client) {
+    public ResponseEntity<?> createClient(@RequestBody Client client, HttpServletRequest request) {
         Map<String, String> response = new HashMap<>();
         try {
             // Sauvegarder le client avec son entreprise (si elle est associée)
-            Client savedClient = clientService.saveClient(client);
+            Client savedClient = clientService.saveClient(client, request);
             response.put("message", "Client créé avec succès");
             response.put("clientId", savedClient.getId().toString());
             response.put("createdAt", savedClient.getCreatedAt().toString());
@@ -56,10 +58,17 @@ public class ClientController {
         return clientService.getClientById(id);
     }
 
-   @GetMapping("/clients")
-    public List<Client> getAllClients() {
-        return clientService.getAllClients();
+    @GetMapping("/clients")
+    public ResponseEntity<?> getAllClients(HttpServletRequest request) {
+        try {
+            List<Client> clients = clientService.getAllClients(request);
+            return ResponseEntity.ok(clients);
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                                 .body(Collections.singletonMap("error", e.getMessage()));
+        }
     }
+    
 
     @GetMapping("/clients/entreprise/{entrepriseId}")
     public List<Client> getClientsByEntreprise(@PathVariable Long entrepriseId) {

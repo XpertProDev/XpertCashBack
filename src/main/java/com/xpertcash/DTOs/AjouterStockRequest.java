@@ -14,4 +14,6 @@ public class AjouterStockRequest {
     private String description;
     private Long boutiqueId;
     private String codeFournisseur;
+    private Long fournisseurId;
+
 }
