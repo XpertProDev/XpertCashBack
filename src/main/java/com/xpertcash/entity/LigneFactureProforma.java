@@ -32,6 +32,7 @@ public class LigneFactureProforma {
     private Integer quantite;
     private Double prixUnitaire;
     private Double montantTotal;
+    private String description;
 
     @PrePersist
     @PreUpdate

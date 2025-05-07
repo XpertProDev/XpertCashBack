@@ -152,6 +152,12 @@ public class FactureProformaService {
 
             ligne.setMontantTotal(ligne.getQuantite() * ligne.getPrixUnitaire());
 
+            if (ligne.getDescription() != null) {
+                ligne.setDescription(ligne.getDescription());
+            } else {
+                ligne.setDescription(produit.getDescription());
+            }
+
             // Ajout au montant total HT
             montantTotalHT += ligne.getMontantTotal();
         }
