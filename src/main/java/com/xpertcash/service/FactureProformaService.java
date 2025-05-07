@@ -46,6 +46,8 @@ public class FactureProformaService {
     @Autowired
     private FactureReelleService factureReelleService;
 
+    @Autowired
+    private FactProHistoriqueService factProHistoriqueService;
 
      @Autowired
     private UsersRepository usersRepository;
@@ -445,11 +447,25 @@ public class FactureProformaService {
                 if (modifications.getStatut() != null && facture.getStatut() != StatutFactureProForma.VALIDE) {
                     facture.setStatut(modifications.getStatut());
                 }
+
+                  // ✅ ENREGISTRER L’HISTORIQUE
+                  factProHistoriqueService.enregistrerActionHistorique(
+                    facture,
+                    user,
+                    "Modification",
+                    "La facture a été modifiée (description: " + facture.getDescription() + ")"
+                );
+
+
             
                 return factureProformaRepository.save(facture);
-            }
+
+                
+
+    }
 
     
+
 
     //Methode pour recuperer les factures pro forma dune entreprise
     public List<Map<String, Object>> getFacturesParEntrepriseParUtilisateur(Long userId) {
