@@ -15,9 +15,14 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+
+import com.xpertcash.composant.AuthorizationService;
 import com.xpertcash.configuration.JwtUtil;
 import com.xpertcash.entity.FactureProForma;
+import com.xpertcash.entity.StatutFactureProForma;
 import com.xpertcash.service.FactureProformaService;
+import com.xpertcash.service.UsersService;
+
 import jakarta.servlet.http.HttpServletRequest;
 
 @RestController
@@ -27,9 +32,11 @@ public class FactureProformaController {
       @Autowired
     private FactureProformaService factureProformaService;
 
+      @Autowired
+    private UsersService usersService;
     @Autowired
     private JwtUtil jwtUtil;
-    
+
 
     // Endpoint pour ajouter une facture pro forma
     @PostMapping("/ajouter")
@@ -55,6 +62,8 @@ public class FactureProformaController {
         }
     }
 
+    
+    
 
     // Endpoint pour modifier une facture pro forma
     @PutMapping("/updatefacture/{factureId}")

@@ -154,10 +154,10 @@ public class FactureProformaService {
 
             ligne.setMontantTotal(ligne.getQuantite() * ligne.getPrixUnitaire());
 
-            if (ligne.getDescription() != null) {
-                ligne.setDescription(ligne.getDescription());
+            if (ligne.getLigneDescription() != null) {
+                ligne.setLigneDescription(ligne.getLigneDescription());
             } else {
-                ligne.setDescription(produit.getDescription());
+                ligne.setLigneDescription(produit.getDescription());
             }
 
             // Ajout au montant total HT
@@ -404,10 +404,10 @@ public class FactureProformaService {
                 ligne.setMontantTotal(montantTotal);
 
                 // Mettre a jour la description de la ligne
-                if (ligne.getDescription() != null) {
-                    ligne.setDescription(ligne.getDescription());
+                if (ligne.getLigneDescription() != null) {
+                    ligne.setLigneDescription(ligne.getLigneDescription());
                 } else {
-                    ligne.setDescription(produit.getDescription());
+                    ligne.setLigneDescription(produit.getDescription());
                 }
     
 

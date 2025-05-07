@@ -26,13 +26,13 @@ public class LigneFactureProforma {
 
     @ManyToOne
     @JoinColumn(name = "produit_id", nullable = false)
-    @JsonIgnoreProperties({"prixVente", "prixAchat", "quantite", "seuilAlert", "description", "codeGenerique", "codeBare", "photo", "enStock", "createdAt", "lastUpdated", "categorie", "uniteDeMesure", "stocks", "factureProduits"})
+    @JsonIgnoreProperties({"prixVente", "prixAchat", "quantite", "seuilAlert", "ligneDescription", "codeGenerique", "codeBare", "photo", "enStock", "createdAt", "lastUpdated", "categorie", "uniteDeMesure", "stocks", "factureProduits"})
     private Produit produit;
 
     private Integer quantite;
     private Double prixUnitaire;
     private Double montantTotal;
-    private String description;
+    private String ligneDescription;
 
     @PrePersist
     @PreUpdate
