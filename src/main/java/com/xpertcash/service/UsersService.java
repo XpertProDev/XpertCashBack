@@ -125,6 +125,13 @@ public class UsersService {
         entreprise.setNomEntreprise(nomEntreprise);
         entreprise.setIdentifiantEntreprise(identifiantUnique);
         entreprise.setCreatedAt(LocalDateTime.now());
+        entreprise.setLogo("default.png");
+        entreprise.setAdresse("default");
+        entreprise.setSiege("default");
+        entreprise.setNina("default");
+        entreprise.setNif("default");
+        entreprise.setBanque("default");
+        
         entreprise = entrepriseRepository.save(entreprise);
 
         // Vérifier et attribuer un nom par défaut à la boutique
@@ -582,6 +589,7 @@ public class UsersService {
             user.getId(),
             user.getNomComplet(),
             entreprise.getNomEntreprise(),
+            entreprise.getSiege(),
             user.getEmail(),
             user.getRole().getName(),
             user.getPhone(),
@@ -652,5 +660,10 @@ public class UsersService {
         userToSuspend.setEnabledLien(!suspend);
         usersRepository.save(userToSuspend);
     }
+
+
+   
+
+
 
 }

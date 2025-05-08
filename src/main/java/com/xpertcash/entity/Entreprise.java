@@ -22,8 +22,22 @@ public class Entreprise {
     @Column(unique = true, nullable = false)
     private String nomEntreprise;
 
+
     @Column(unique = true, nullable = false)
     private String identifiantEntreprise;
+
+    @Column(nullable = true)
+    private String siege;
+    
+    @Column(nullable = true)
+    private String nina;
+    
+    @Column(nullable = true)
+    private String nif;
+    
+    @Column(nullable = true)
+    private String banque;
+
 
     @OneToMany(mappedBy = "entreprise", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<User> utilisateurs = new ArrayList<>();

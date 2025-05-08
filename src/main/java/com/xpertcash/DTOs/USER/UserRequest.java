@@ -21,6 +21,7 @@ public class UserRequest {
     private long id;
     private String nomComplet;
     private String nomEntreprise;
+    private String siege;
     private String email;
     private RoleType roleType;
 

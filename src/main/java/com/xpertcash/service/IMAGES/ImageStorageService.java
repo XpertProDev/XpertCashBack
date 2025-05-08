@@ -47,5 +47,36 @@ public class ImageStorageService {
         }
     }
 
+
+    public String saveLogoImage(MultipartFile imageLogoFile) {
+        if (imageLogoFile == null || imageLogoFile.isEmpty()) {
+            throw new NotFoundException("Le fichier image est vide ou invalide.");
+        }
+
+        try {
+            // Emplacement de l'image dans le dossier static/logoUpload
+            Path imageRootLocation = Paths.get("src/main/resources/static/logoUpload");
+
+            // Vérifie si le dossier existe, sinon le crée
+            if (!Files.exists(imageRootLocation)) {
+                Files.createDirectories(imageRootLocation);
+            }
+
+            String imageName = UUID.randomUUID().toString() + "_" + imageLogoFile.getOriginalFilename();
+            Path imagePath = imageRootLocation.resolve(imageName);
+            Files.copy(imageLogoFile.getInputStream(), imagePath, StandardCopyOption.REPLACE_EXISTING);
+
+            String imageUrl = "/logoUpload/" + imageName;
+            System.out.println("✅ Logo sauvegardée : " + imageUrl);
+            // Retourner l'URL de l'image
+            return "/logoUpload/" + imageName;
+
+
+        } catch (IOException e) {
+            System.out.println("❌ ERREUR lors de l'enregistrement de logo : " + e.getMessage());
+            throw new NotFoundException("Erreur lors de l'enregistrement de logo : " + e.getMessage());
+        }
+    }
+
 }
 

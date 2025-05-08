@@ -132,7 +132,7 @@ public ResponseEntity<?> createProduit(
     public ResponseEntity<?> updateProduit(
             @PathVariable Long produitId,
             @RequestPart("produit") String produitJson,
-            @RequestPart(value = "image", required = false) MultipartFile imageFile,
+            @RequestPart(value = "image", required = false) MultipartFile imageFile, 
             @RequestParam boolean addToStock,
             @RequestHeader("Authorization") String token,
             HttpServletRequest request) {
