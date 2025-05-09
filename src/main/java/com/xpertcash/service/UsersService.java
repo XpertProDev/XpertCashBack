@@ -1,6 +1,7 @@
 package com.xpertcash.service;
 
 import com.xpertcash.DTOs.BoutiqueResponse;
+import com.xpertcash.DTOs.EntrepriseDTO;
 import com.xpertcash.DTOs.UpdateUserRequest;
 import com.xpertcash.DTOs.USER.UserRequest;
 import com.xpertcash.configuration.JwtConfig;
@@ -14,8 +15,7 @@ import com.xpertcash.repository.PermissionRepository;
 import com.xpertcash.repository.RoleRepository;
 import com.xpertcash.repository.UsersRepository;
 
-
-
+import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import jakarta.mail.MessagingException;
@@ -131,6 +131,12 @@ public class UsersService {
         entreprise.setNina("default");
         entreprise.setNif("default");
         entreprise.setBanque("default");
+        entreprise.setEmail("default");
+        entreprise.setTelephone("default");
+        entreprise.setPays("default");
+        entreprise.setSecteur("default");
+        entreprise.setRccm("default");
+
         
         entreprise = entrepriseRepository.save(entreprise);
 
@@ -664,6 +670,50 @@ public class UsersService {
 
    
 
+    //Methode qui recupere linformation de lentrprise de user connecter
+    public EntrepriseDTO getEntrepriseOfConnectedUser(HttpServletRequest request) {
+    String authorizationHeader = request.getHeader("Authorization");
+
+    if (authorizationHeader == null || !authorizationHeader.startsWith("Bearer ")) {
+        throw new RuntimeException("Token JWT manquant ou mal formaté");
+    }
+
+    String token = authorizationHeader.substring(7); // Retirer "Bearer "
+
+    Long userId;
+    try {
+        userId = jwtUtil.extractUserId(token);
+    } catch (JwtException e) {
+        throw new RuntimeException("Token JWT invalide ou expiré", e);
+    }
+
+    User user = usersRepository.findById(userId)
+            .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+
+    Entreprise entreprise = user.getEntreprise();
+    if (entreprise == null) {
+        throw new RuntimeException("Entreprise associée à l'utilisateur non trouvée");
+    }
+
+    // Création et retour du DTO
+    EntrepriseDTO dto = new EntrepriseDTO();
+    dto.setNom(entreprise.getNomEntreprise());
+    dto.setAdminNom(user.getNomComplet()); // l'utilisateur actuel est l'admin
+    dto.setCreatedAt(entreprise.getCreatedAt());
+    dto.setAdresse(entreprise.getAdresse());
+    dto.setLogo(entreprise.getLogo());
+    dto.setSiege(entreprise.getSiege());
+    dto.setNina(entreprise.getNina());
+    dto.setNif(entreprise.getNif());
+    dto.setBanque(entreprise.getBanque());
+    dto.setEmail(entreprise.getEmail());
+    dto.setTelephone(entreprise.getTelephone());
+    dto.setPays(entreprise.getPays());
+    dto.setSecteur(entreprise.getSecteur());
+    dto.setRccm(entreprise.getRccm());
+
+    return dto;
+}
 
 
 }

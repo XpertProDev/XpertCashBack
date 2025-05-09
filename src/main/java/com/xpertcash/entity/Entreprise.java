@@ -26,11 +26,23 @@ public class Entreprise {
     @Column(unique = true, nullable = false)
     private String identifiantEntreprise;
 
+    private String telephone;
+    private String pays;
+    private String secteur;   
+
+    @Column(nullable = true)
+    private String email;
+
+  
+
     @Column(nullable = true)
     private String siege;
     
     @Column(nullable = true)
     private String nina;
+
+    @Column(nullable = true)
+    private String rccm;
     
     @Column(nullable = true)
     private String nif;

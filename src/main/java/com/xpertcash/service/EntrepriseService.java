@@ -65,7 +65,12 @@ public class EntrepriseService {
                         entreprise.getSiege(),
                         entreprise.getNina(),
                         entreprise.getNif(),
-                        entreprise.getBanque()
+                        entreprise.getBanque(),
+                        entreprise.getEmail(),
+                        entreprise.getTelephone(),
+                        entreprise.getPays(),
+                        entreprise.getSecteur(),
+                        entreprise.getRccm()
                 ))
                 .collect(Collectors.toList());
 
@@ -78,8 +83,8 @@ public class EntrepriseService {
     Entreprise entreprise = entrepriseRepository.findById(id)
         .orElseThrow(() -> new RuntimeException("Entreprise non trouvée"));
 
-    if (dto.getNomEntreprise() != null) {
-        entreprise.setNomEntreprise(dto.getNomEntreprise());
+    if (dto.getNom() != null) {
+        entreprise.setNomEntreprise(dto.getNom());
     }
 
     if (dto.getAdresse() != null) {
@@ -102,6 +107,28 @@ public class EntrepriseService {
         entreprise.setBanque(dto.getBanque());
     }
 
+    if (dto.getEmail() != null) {
+            entreprise.setEmail(dto.getEmail());
+    }
+
+    if (dto.getTelephone() != null) {
+        entreprise.setTelephone(dto.getTelephone());
+    }
+    
+    if (dto.getPays() != null) {
+        entreprise.setPays(dto.getPays());
+    }
+
+    if (dto.getSecteur() != null) {
+        entreprise.setSecteur(dto.getSecteur());
+    }
+
+    if (dto.getRccm() != null) {
+        entreprise.setRccm(dto.getRccm());
+    }
+    
+    
+
 
    if (logoFile != null && !logoFile.isEmpty()) {
     String logo = imageStorageService.saveLogoImage(logoFile);
@@ -110,7 +137,8 @@ public class EntrepriseService {
 }
 
 
-    System.out.println("donner de dto : " + dto);
+    System.out.println("📥 DTO reçu dans le controller : " + dto);
+
 
     entrepriseRepository.save(entreprise);
 }

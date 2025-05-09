@@ -8,7 +8,7 @@ import lombok.Data;
 
 public class EntrepriseDTO {
 
-        private String nomEntreprise;
+        private String nom;
         private String adminNom;
         private LocalDateTime createdAt;
         private String adresse;
@@ -17,12 +17,20 @@ public class EntrepriseDTO {
         private String nina;
         private String nif;
         private String banque;
+        private String email;
+        private String telephone;
+        private String pays;
+        private String secteur;
+        private String rccm;
 
+        public EntrepriseDTO() {
+        }
 
         // Constructeur personnalisé
-    public EntrepriseDTO(String nomEntreprise, String adminNom, LocalDateTime createdAt, String adresse, 
-          String logo, String siege, String nina, String nif, String banque) {
-        this.nomEntreprise = nomEntreprise;
+    public EntrepriseDTO(String nom, String adminNom, LocalDateTime createdAt, String adresse, 
+          String logo, String siege, String nina, String nif, String banque, String email, String telephone, String pays,
+          String secteur, String rccm) {
+        this.nom = nom;
         this.adminNom = adminNom;
         this.createdAt = createdAt;
         this.adresse = adresse;
@@ -31,6 +39,11 @@ public class EntrepriseDTO {
         this.nina = nina;
         this.nif = nif;
         this.banque = banque;
+        this.email = email;
+        this.telephone = telephone;
+        this.pays = pays;
+        this.secteur = secteur;
+        this.rccm = rccm;
 
     }
 

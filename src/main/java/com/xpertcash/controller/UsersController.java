@@ -5,8 +5,10 @@ import com.xpertcash.DTOs.UpdateUserRequest;
 import com.xpertcash.DTOs.USER.UserRequest;
 import com.xpertcash.composant.AuthorizationService;
 import com.xpertcash.configuration.JwtUtil;
+import com.xpertcash.entity.Entreprise;
 import com.xpertcash.entity.PermissionType;
 import com.xpertcash.entity.User;
+import com.xpertcash.DTOs.EntrepriseDTO;
 import com.xpertcash.DTOs.LoginRequest;
 import com.xpertcash.DTOs.RegistrationRequest;
 import com.xpertcash.service.UsersService;
@@ -199,5 +201,13 @@ public class UsersController {
         String message = suspend ? "Utilisateur suspendu avec succès." : "Utilisateur réactivé avec succès.";
         return ResponseEntity.ok(message);
     }
+
+    //Endpoint qui recupere linformation de lentrprise de user connecter
+      @GetMapping("/myEntreprise")
+        public ResponseEntity<EntrepriseDTO> getEntrepriseOfConnectedUser(HttpServletRequest request) {
+            EntrepriseDTO entrepriseDTO = usersService.getEntrepriseOfConnectedUser(request);
+            return ResponseEntity.ok(entrepriseDTO);
+        }
+
     
 }
