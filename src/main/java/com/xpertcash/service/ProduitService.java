@@ -11,6 +11,8 @@ import java.util.NoSuchElementException;
 import java.util.stream.Collectors;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
+
 import com.xpertcash.DTOs.FactureDTO;
 import com.xpertcash.DTOs.ProduitDTO;
 import com.xpertcash.DTOs.ProduitRequest;
@@ -39,6 +41,14 @@ import com.xpertcash.repository.StockRepository;
 import com.xpertcash.repository.UniteRepository;
 import com.xpertcash.repository.UsersRepository;
 import jakarta.servlet.http.HttpServletRequest;
+
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.io.IOException;
+import com.xpertcash.service.IMAGES.ImageStorageService;
+
+
 
 
 @Service
@@ -75,6 +85,9 @@ public class ProduitService {
 
     @Autowired
     private StockProduitFournisseurRepository stockProduitFournisseurRepository;
+
+    @Autowired
+    private ImageStorageService imageStorageService;
 
 
     // Ajouter un produit à la liste sans le stock
@@ -534,13 +547,11 @@ public class ProduitService {
         return result;
     }
     
-    
-
-    
 
     
    // Update Produit
-    public ProduitDTO updateProduct(Long produitId, ProduitRequest produitRequest, boolean addToStock, HttpServletRequest request) {
+    public ProduitDTO updateProduct(Long produitId, ProduitRequest produitRequest, MultipartFile imageFile, boolean addToStock, HttpServletRequest request)
+ {
     // Vérification de l'autorisation de l'admin
     String token = request.getHeader("Authorization");
     if (token == null || !token.startsWith("Bearer ")) {
@@ -573,7 +584,26 @@ public class ProduitService {
     if (produitRequest.getQuantite() != null) produit.setQuantite(produitRequest.getQuantite());
     if (produitRequest.getSeuilAlert() != null) produit.setSeuilAlert(produitRequest.getSeuilAlert());
     if (produitRequest.getCodeBare() != null) produit.setCodeBare(produitRequest.getCodeBare());
-    if (produitRequest.getPhoto() != null) produit.setPhoto(produitRequest.getPhoto());
+   
+    if (imageFile != null && !imageFile.isEmpty()) {
+        // Supprimer l'ancienne image
+        if (produit.getPhoto() != null && !produit.getPhoto().isBlank()) {
+            String oldPhotoPathStr = "src/main/resources/static" + produit.getPhoto();
+            Path oldPhotoPath = Paths.get(oldPhotoPathStr);
+            try {
+                Files.deleteIfExists(oldPhotoPath);
+                System.out.println("🗑 Ancienne photo supprimée : " + oldPhotoPathStr);
+            } catch (IOException e) {
+                System.err.println("⚠️ Erreur lors de la suppression de l'ancienne photo : " + e.getMessage());
+            }
+        }
+    
+        // Enregistrement de la nouvelle image
+        String newPhotoPath = imageStorageService.saveImage(imageFile); // stocke et retourne le chemin
+        produit.setPhoto(newPhotoPath);
+    }
+    
+    
 
     // Mise à jour de la catégorie si nécessaire
     if (produitRequest.getCategorieId() != null) {

@@ -1,50 +1,37 @@
 package com.xpertcash.service;
 
+import java.nio.file.Files;
 import java.util.List;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.xpertcash.DTOs.EntrepriseDTO;
 import com.xpertcash.DTOs.UpdateEntrepriseDTO;
-import com.xpertcash.configuration.JwtConfig;
-import com.xpertcash.configuration.JwtUtil;
 import com.xpertcash.entity.Entreprise;
-import com.xpertcash.entity.RoleType;
-import com.xpertcash.entity.User;
 import com.xpertcash.repository.EntrepriseRepository;
-import com.xpertcash.repository.RoleRepository;
-import com.xpertcash.repository.UsersRepository;
 import com.xpertcash.service.IMAGES.ImageStorageService;
 
-import jakarta.servlet.http.HttpServletRequest;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.io.IOException;
+
+
 
 @Service
 public class EntrepriseService {
 
-    @Autowired
-    private UsersRepository usersRepository;
+
 
     @Autowired
     private EntrepriseRepository entrepriseRepository;
 
-    @Autowired
-    private MailService mailService;
-
-    @Autowired
-    private RoleRepository roleRepository;
-
-    @Autowired
-    private BCryptPasswordEncoder passwordEncoder;
      @Autowired
     private ImageStorageService imageStorageService;
 
-    @Autowired
-    private JwtUtil jwtUtil; 
 
     public List<EntrepriseDTO> getAllEntreprisesWithInfo() {
         // Récupérer toutes les entreprises
@@ -130,11 +117,25 @@ public class EntrepriseService {
     
 
 
-   if (logoFile != null && !logoFile.isEmpty()) {
-    String logo = imageStorageService.saveLogoImage(logoFile);
-    entreprise.setLogo(logo);
-    System.out.println("📸 URL de logo enregistrée : " + logo);
-}
+        if (logoFile != null && !logoFile.isEmpty()) {
+        // Supprimer l'ancien logo s'il existe
+        String oldLogoPath = entreprise.getLogo();
+        if (oldLogoPath != null && !oldLogoPath.isBlank()) {
+            Path oldPath = Paths.get("src/main/resources/static" + oldLogoPath);
+            try {
+                Files.deleteIfExists(oldPath);
+                System.out.println("🗑️ Ancien logo supprimé : " + oldLogoPath);
+            } catch (IOException e) {
+                System.out.println("⚠️ Impossible de supprimer l'ancien logo : " + e.getMessage());
+            }
+        }
+
+        // Sauvegarde du nouveau logo
+        String newLogoUrl = imageStorageService.saveLogoImage(logoFile);
+        entreprise.setLogo(newLogoUrl);
+        System.out.println("📸 Nouveau logo enregistré : " + newLogoUrl);
+    }
+
 
 
     System.out.println("📥 DTO reçu dans le controller : " + dto);
