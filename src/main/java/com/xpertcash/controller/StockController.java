@@ -55,27 +55,8 @@ public class StockController {
         return ResponseEntity.ok(stocks);
     }*/
 
-    
+     
 
-    @GetMapping("/quantite-par-fournisseur/{produitId}")
-    public ResponseEntity<?> getQuantiteParFournisseur(@PathVariable Long produitId) {
-        List<Object[]> resultats = stockProduitFournisseurRepository.findQuantiteParFournisseurPourProduit(produitId);
-        List<Map<String, Object>> data = resultats.stream().map(obj -> {
-            Map<String, Object> map = new HashMap<>();
-            map.put("fournisseur", obj[0]);
-            map.put("quantite", obj[1]);
-            map.put("produitId", produitId);
-            return map;
-        }).collect(Collectors.toList());
-
-        return ResponseEntity.ok(data);
-    }
-
-    //Get quantite d'un produit par fournisseur
-    @GetMapping("/stock-par-fournisseur/{fournisseurId}")
-    public ResponseEntity<List<Map<String, Object>>> getStockParFournisseurSimplifie(@PathVariable Long fournisseurId) {
-        return ResponseEntity.ok(produitService.getNomProduitEtQuantiteAjoutee(fournisseurId));
-    }
 
 
  

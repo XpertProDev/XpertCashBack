@@ -22,6 +22,7 @@ public class Fournisseur {
     private Long id;
     
     private String nomComplet;
+    private String nomSociete;
     private String adresse;
     private String pays;
     private String ville;

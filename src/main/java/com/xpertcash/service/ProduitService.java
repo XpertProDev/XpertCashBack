@@ -533,20 +533,8 @@ public class ProduitService {
    public List<Stock> getAllStocks() {
     return stockRepository.findAll();
 }
+ 
 
-    // Lister tout les stocks lieu a un fournisseur
-    public List<Map<String, Object>> getNomProduitEtQuantiteAjoutee(Long fournisseurId) {
-        List<Object[]> rows = stockProduitFournisseurRepository.findNomProduitEtQuantiteAjoutee(fournisseurId);
-        List<Map<String, Object>> result = new ArrayList<>();
-        for (Object[] row : rows) {
-            Map<String, Object> map = new HashMap<>();
-            map.put("nomProduit", row[0]);
-            map.put("quantiteAjoutee", row[1]);
-            result.add(map);
-        }
-        return result;
-    }
-    
 
     
    // Update Produit

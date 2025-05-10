@@ -15,6 +15,7 @@ import lombok.NoArgsConstructor;
 public class FournisseurDTO {
 
     private String nomComplet;
+    private String nomSociete;
     private String adresse;
     private String pays;
     private String ville;
@@ -24,6 +25,7 @@ public class FournisseurDTO {
 
      public FournisseurDTO(Fournisseur fournisseur) {
         this.nomComplet = fournisseur.getNomComplet();
+        this.nomSociete = fournisseur.getNomSociete();
         this.adresse = fournisseur.getAdresse();
         this.pays = fournisseur.getPays();
         this.ville = fournisseur.getVille();
