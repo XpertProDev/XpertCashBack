@@ -263,38 +263,50 @@ public class FactureProformaService {
                 }
 
 
-                // ici commence désignation pour Approuver
-                if (modifications.getStatut() == StatutFactureProForma.APPROUVE) {
+              // ici commence désignation pour Approuver
+             if (modifications.getStatut() == StatutFactureProForma.APPROUVE) {
 
-                    // Vérifie si la facture a déjà été approuvée par le passé
-                    boolean dejaApprouvee = facture.getDateApprobation() != null;
+                boolean dejaApprouvee = facture.getDateApprobation() != null;
 
-                    // Si ce n’est pas le cas, il faut obligatoirement passer par APPROBATION avant
-                    if (!dejaApprouvee) {
-                        if (facture.getStatut() != StatutFactureProForma.APPROBATION) {
-                            throw new RuntimeException("La facture doit d'abord passer par le statut APPROBATION avant d'être APPROUVÉE.");
-                        }
+                if (!dejaApprouvee) {
 
-                        List<User> approbateurs = facture.getApprobateurs();
-                        if (approbateurs == null || approbateurs.isEmpty()) {
-                            throw new RuntimeException("Aucun approbateur défini pour cette facture.");
-                        }
+                    // Vérifie si l'utilisateur est le modificateur
+                    boolean estModificateur = facture.getUtilisateurModificateur() != null &&
+                                            facture.getUtilisateurModificateur().getId().equals(user.getId());
 
-                        boolean estApprobateur = approbateurs.stream()
-                            .anyMatch(approbateur -> approbateur.getId().equals(user.getId()));
+                    // Vérifie si l'utilisateur est dans la liste des approbateurs
+                    List<User> approbateurs = facture.getApprobateurs();
+                    boolean estApprobateur = approbateurs != null &&
+                                            approbateurs.stream()
+                                                        .anyMatch(approbateur -> approbateur.getId().equals(user.getId()));
 
-                        if (!estApprobateur) {
-                            throw new RuntimeException("Vous n'êtes pas autorisé à approuver cette facture.");
-                        }
-
-                        // Première approbation : on enregistre l'approbateur et la date
-                        facture.setUtilisateurApprobateur(user);
-                        facture.setDateApprobation(LocalDateTime.now());
-                    } else {
-                        // Appropriation répétée : pas besoin de refaire les vérifications
-                        System.out.println("ℹ️ Facture déjà approuvée une fois. Appropriation directe autorisée.");
+                    // Autoriser si l'utilisateur est soit approbateur, soit modificateur
+                    if (!estApprobateur && !estModificateur) {
+                        throw new RuntimeException("Vous n'êtes pas autorisé à approuver cette facture.");
                     }
+
+                    // Si modificateur mais pas encore approbateur, on l'ajoute à la liste
+                    if (!estApprobateur && estModificateur) {
+                        if (approbateurs == null) {
+                            approbateurs = new ArrayList<>();
+                            facture.setApprobateurs(approbateurs);
+                        }
+                        approbateurs.add(user);
+                    }
+
+                    // On ne bloque sur le statut APPROBATION que si ce n’est pas le modificateur
+                    if (!estModificateur && facture.getStatut() != StatutFactureProForma.APPROBATION) {
+                        throw new RuntimeException("La facture doit d'abord passer par le statut APPROBATION avant d'être APPROUVÉE.");
+                    }
+
+                    // Enregistrement de l'approbation
+                    facture.setUtilisateurApprobateur(user);
+                    facture.setDateApprobation(LocalDateTime.now());
+
+                } else {
+                    System.out.println("ℹ️ Facture déjà approuvée une fois. Appropriation directe autorisée.");
                 }
+            }
 
 
                 
