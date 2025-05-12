@@ -214,7 +214,30 @@ public class FournisseurService {
 
 
   // Lister tout les stocks lieu a un fournisseur
-    public List<Map<String, Object>> getNomProduitEtQuantiteAjoutee(Long fournisseurId) {
+    public List<Map<String, Object>> getNomProduitEtQuantiteAjoutee(Long fournisseurId,
+    HttpServletRequest request) {
+          String token = request.getHeader("Authorization");
+    if (token == null || !token.startsWith("Bearer ")) {
+        throw new RuntimeException("Token JWT manquant ou mal formaté");
+    }
+      Long userId;
+    try {
+        userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
+    } catch (Exception e) {
+        throw new RuntimeException("Erreur lors de l'extraction de l'ID de l'utilisateur depuis le token", e);
+    }
+     User user = usersRepository.findById(userId)
+            .orElseThrow(() -> new RuntimeException("Utilisateur introuvable !"));
+
+    // 2. Vérifier que le fournisseur appartient à la même entreprise
+    Fournisseur fournisseur = fournisseurRepository.findById(fournisseurId)
+            .orElseThrow(() -> new RuntimeException("Fournisseur introuvable !"));
+
+    if (!fournisseur.getEntreprise().getId().equals(user.getEntreprise().getId())) {
+        throw new RuntimeException("Accès refusé : Ce fournisseur n'appartient pas à votre entreprise !");
+    }
+
+
         List<Object[]> rows = stockProduitFournisseurRepository.findNomProduitEtQuantiteAjoutee(fournisseurId);
         List<Map<String, Object>> result = new ArrayList<>();
         for (Object[] row : rows) {

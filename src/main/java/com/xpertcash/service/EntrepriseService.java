@@ -57,7 +57,8 @@ public class EntrepriseService {
                         entreprise.getTelephone(),
                         entreprise.getPays(),
                         entreprise.getSecteur(),
-                        entreprise.getRccm()
+                        entreprise.getRccm(),
+                        entreprise.getSiteWeb()
                 ))
                 .collect(Collectors.toList());
 
@@ -112,6 +113,10 @@ public class EntrepriseService {
 
     if (dto.getRccm() != null) {
         entreprise.setRccm(dto.getRccm());
+    }
+
+    if (dto.getSiteWeb() != null) {
+        entreprise.setSiteWeb(dto.getSiteWeb());
     }
     
     

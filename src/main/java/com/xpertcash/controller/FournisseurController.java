@@ -19,11 +19,14 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.xpertcash.DTOs.FactureDTO;
 import com.xpertcash.DTOs.FournisseurDTO;
+import com.xpertcash.configuration.JwtUtil;
 import com.xpertcash.entity.Facture;
 import com.xpertcash.entity.Fournisseur;
+import com.xpertcash.entity.User;
 import com.xpertcash.repository.FactureRepository;
 import com.xpertcash.repository.FournisseurRepository;
 import com.xpertcash.repository.StockProduitFournisseurRepository;
+import com.xpertcash.repository.UsersRepository;
 import com.xpertcash.service.FournisseurService;
 import com.xpertcash.service.ProduitService;
 
@@ -46,6 +49,11 @@ public class FournisseurController {
 
     @Autowired
     private FactureRepository factureRepository;
+
+     @Autowired
+    private JwtUtil jwtUtil;
+    @Autowired
+    private UsersRepository usersRepository;
 
     @PostMapping("/save-fournisseurs")
     public ResponseEntity<?> saveFournisseur(
@@ -78,11 +86,26 @@ public class FournisseurController {
     }
 
      // Get All fournisseurs dune entreprise de l utilisateur 
-     @GetMapping("/get-fournisseurs")
-     public ResponseEntity<List<Fournisseur>> getFournisseursByEntreprise(HttpServletRequest request) {
+    @GetMapping("/get-fournisseurs")
+    public ResponseEntity<List<Map<String, Object>>> getFournisseursByEntreprise(HttpServletRequest request) {
         List<Fournisseur> fournisseurs = fournisseurService.getFournisseursByEntreprise(request);
-        return ResponseEntity.ok(fournisseurs);
+
+        List<Map<String, Object>> result = fournisseurs.stream().map(fournisseur -> {
+            Map<String, Object> map = new HashMap<>();
+            map.put("nomComplet", fournisseur.getNomComplet());
+            map.put("nomSociete", fournisseur.getNomSociete());
+            map.put("adresse", fournisseur.getAdresse());
+            map.put("pays", fournisseur.getPays());
+            map.put("ville", fournisseur.getVille());
+            map.put("telephone", fournisseur.getTelephone());
+            map.put("email", fournisseur.getEmail());
+            map.put("createdAt", fournisseur.getCreatedAt());
+            return map;
+        }).collect(Collectors.toList());
+
+        return ResponseEntity.ok(result);
     }
+
       
     //Get fournisseur by id
     @GetMapping("/getFournisseur/{id}")
@@ -118,14 +141,45 @@ public class FournisseurController {
     }
 
     //Get quantite d'un produit par fournisseur
-    @GetMapping("/stock-par-fournisseur/{fournisseurId}")
-    public ResponseEntity<List<Map<String, Object>>> getStockParFournisseurSimplifie(@PathVariable Long fournisseurId) {
-        return ResponseEntity.ok(fournisseurService.getNomProduitEtQuantiteAjoutee(fournisseurId));
+    @GetMapping("/quantite-ajoutee-par-fournisseur/{fournisseurId}")
+    public ResponseEntity<List<Map<String, Object>>> getQuantiteAjoutee(
+            @PathVariable Long fournisseurId,
+            HttpServletRequest request
+    ) {
+        List<Map<String, Object>> result = fournisseurService.getNomProduitEtQuantiteAjoutee(fournisseurId, request);
+        return ResponseEntity.ok(result);
     }
+
 
     //Get fournisseur lier a des factures
     @GetMapping("/factures-par-fournisseur/{fournisseurId}")
-    public ResponseEntity<List<Map<String, Object>>> getFacturesParFournisseur(@PathVariable Long fournisseurId) {
+    public ResponseEntity<List<Map<String, Object>>> getFacturesParFournisseur(@PathVariable Long fournisseurId,
+         HttpServletRequest request) {
+
+        // 1. Extraire l'utilisateur depuis le token
+    String token = request.getHeader("Authorization");
+    if (token == null || !token.startsWith("Bearer ")) {
+        throw new RuntimeException("Token JWT manquant ou mal formaté");
+    }
+
+    Long userId;
+    try {
+        userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
+    } catch (Exception e) {
+        throw new RuntimeException("Erreur lors de l'extraction de l'ID de l'utilisateur depuis le token", e);
+    }
+
+    User user = usersRepository.findById(userId)
+            .orElseThrow(() -> new RuntimeException("Utilisateur introuvable !"));
+
+    // 2. Vérifier que le fournisseur appartient à la même entreprise que l'utilisateur
+    Fournisseur fournisseur = fournisseurRepository.findById(fournisseurId)
+            .orElseThrow(() -> new RuntimeException("Fournisseur introuvable !"));
+
+    if (!fournisseur.getEntreprise().getId().equals(user.getEntreprise().getId())) {
+        throw new RuntimeException("Accès refusé : Ce fournisseur n'appartient pas à votre entreprise !");
+    }
+
          DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
         List<Facture> factures = factureRepository.findByFournisseur_Id(fournisseurId);
 

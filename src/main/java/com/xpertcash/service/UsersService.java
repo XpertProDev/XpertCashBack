@@ -136,6 +136,7 @@ public class UsersService {
         entreprise.setPays("default");
         entreprise.setSecteur("default");
         entreprise.setRccm("default");
+        entreprise.setSiteWeb("wwww.votre-entreprise.com");
 
         
         entreprise = entrepriseRepository.save(entreprise);
@@ -698,7 +699,7 @@ public class UsersService {
     // Création et retour du DTO
     EntrepriseDTO dto = new EntrepriseDTO();
     dto.setNom(entreprise.getNomEntreprise());
-    dto.setAdminNom(user.getNomComplet()); // l'utilisateur actuel est l'admin
+    dto.setAdminNom(user.getNomComplet());
     dto.setCreatedAt(entreprise.getCreatedAt());
     dto.setAdresse(entreprise.getAdresse());
     dto.setLogo(entreprise.getLogo());
@@ -711,6 +712,7 @@ public class UsersService {
     dto.setPays(entreprise.getPays());
     dto.setSecteur(entreprise.getSecteur());
     dto.setRccm(entreprise.getRccm());
+    dto.setSiteWeb(entreprise.getSiteWeb());
 
     return dto;
 }

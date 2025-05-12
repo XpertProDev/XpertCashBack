@@ -33,7 +33,8 @@ public class Entreprise {
     @Column(nullable = true)
     private String email;
 
-  
+    @Column(nullable = true)
+    private String siteWeb;
 
     @Column(nullable = true)
     private String siege;
