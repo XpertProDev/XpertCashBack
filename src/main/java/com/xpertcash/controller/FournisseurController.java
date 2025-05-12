@@ -115,15 +115,30 @@ public class FournisseurController {
     }
 
     //Update fournisseur
-    @PutMapping("/updateFournisseur/{id}")
-    public ResponseEntity<Fournisseur> updateFournisseur(
-            @PathVariable Long id,
-            @RequestBody Fournisseur updatedFournisseur,
-            HttpServletRequest request) {
+      @PutMapping("/updateFournisseur/{id}")
+        public ResponseEntity<Map<String, Object>> updateFournisseur(
+        @PathVariable Long id,
+        @RequestBody Fournisseur updatedFournisseur,
+        HttpServletRequest request) {
 
-        Fournisseur updated = fournisseurService.updateFournisseur(id, updatedFournisseur, request);
-        return ResponseEntity.ok(updated);
+        Map<String, Object> response = new HashMap<>();
+
+        try {
+            Fournisseur updated = fournisseurService.updateFournisseur(id, updatedFournisseur, request);
+
+            response.put("message", "Fournisseur mis à jour avec succès");
+            return ResponseEntity.ok(response);
+
+        } catch (RuntimeException e) {
+            response.put("message", "Erreur : " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+
+        } catch (Exception e) {
+            response.put("message", "Une erreur interne est survenue.");
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+        }
     }
+
 
 
      @GetMapping("/quantite-par-fournisseur/{produitId}")
