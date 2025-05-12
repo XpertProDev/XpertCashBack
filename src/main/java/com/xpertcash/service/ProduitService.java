@@ -261,7 +261,8 @@ public class ProduitService {
                 .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
     
         List<Produit> produits = new ArrayList<>();
-    
+        Fournisseur fournisseurEntity = null; // Déclarer ici pour l'utiliser après la boucle
+
        for (Map.Entry<Long, Integer> entry : produitsQuantites.entrySet()) {
     Long produitId = entry.getKey();
     Integer quantiteAjoute = entry.getValue();
@@ -292,7 +293,6 @@ public class ProduitService {
     stockRepository.save(stock);
 
     // Charger le fournisseur seulement s'il est fourni
-    Fournisseur fournisseurEntity = null;
     if (fournisseurId != null) {
         fournisseurEntity = fournisseurRepository.findById(fournisseurId)
             .orElseThrow(() -> new RuntimeException("Fournisseur non trouvé avec l'ID : " + fournisseurId));
@@ -327,13 +327,17 @@ public class ProduitService {
         stockHistory.setCodeFournisseur(codeFournisseur);
     }
 
+    if (fournisseurId != null) {
+        stockHistory.setFournisseur(fournisseurEntity);
+    }
+    
     stockHistoryRepository.save(stockHistory);
 
     produits.add(produit);
 }
 
         // Enregistrer une facture avec plusieurs produits
-        return enregistrerFacture("AJOUTER", produits, produitsQuantites, description,codeFournisseur, user);
+        return enregistrerFacture("AJOUTER", produits, produitsQuantites, description, codeFournisseur, fournisseurEntity, user);
     }
     
     // Méthode pour ajuster la quantité du produit en stock (retirer des produits)
@@ -396,7 +400,7 @@ public class ProduitService {
         produits.add(produit);
     }
 
-    Facture facture = enregistrerFacture("Réduction", produits, produitsQuantites, description, null, user);
+    Facture facture = enregistrerFacture("Réduction", produits, produitsQuantites, description, null,null, user);
 
 
     return new FactureDTO(facture);
@@ -404,14 +408,37 @@ public class ProduitService {
 
 
       // Génère un numéro unique de facture
-    private String generateNumeroFacture() {
-        Long dernierId = factureRepository.count() + 1;
-        String date = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"));
-        return "FAC-" + date + "-" + String.format("%04d", dernierId);
+   private String generateNumeroFacture() {
+        int currentYear = LocalDate.now().getYear();
+        int currentMonth = LocalDate.now().getMonthValue();
+
+        // Récupérer les factures de l’année en cours (à adapter si besoin)
+        List<Facture> facturesAnnee = factureRepository.findByYear(currentYear);
+
+        // Trouver le plus grand numéro de facture pour cette année
+        int lastNumero = facturesAnnee.stream()
+            .map(f -> extraireNumero(f.getNumeroFacture()))
+            .max(Integer::compareTo)
+            .orElse(0);
+
+        int newNumero = lastNumero + 1;
+
+        return String.format("FAC-%04d-%02d-%d", newNumero, currentMonth, currentYear);
     }
 
+    private int extraireNumero(String numeroFacture) {
+        try {
+            String[] parts = numeroFacture.split("-");
+            return Integer.parseInt(parts[1]);
+        } catch (Exception e) {
+            return 0; // en cas d'erreur de parsing
+        }
+    }
+
+
+
     // Méthode pour enregistrer une facture
-    public Facture enregistrerFacture(String type, List<Produit> produits, Map<Long, Integer> quantites, String description,String codeFournisseur, User user) {
+    public Facture enregistrerFacture(String type, List<Produit> produits, Map<Long, Integer> quantites, String description,String codeFournisseur,Fournisseur fournisseur, User user) {
         Facture facture = new Facture();
         facture.setNumeroFacture(generateNumeroFacture());
         facture.setType(type);
@@ -444,6 +471,10 @@ public class ProduitService {
         if (codeFournisseur != null && !codeFournisseur.isEmpty()) {
             facture.setCodeFournisseur(codeFournisseur);
         }
+
+        Fournisseur fournisseurEntity = fournisseurRepository.findById(fournisseur.getId())
+            .orElseThrow(() -> new RuntimeException("Fournisseur introuvable"));
+        facture.setFournisseur(fournisseurEntity);
 
         return factureRepository.save(facture);
     }

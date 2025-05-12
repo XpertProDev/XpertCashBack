@@ -44,10 +44,8 @@ public class Stock {
     private LocalDateTime createdAt;
     private LocalDateTime lastUpdated;
 
-    @JsonProperty("produitId")
-    public Long getProduitId() {
-        return (produit != null) ? produit.getId() : null;
-    }
+
+
 
  
 

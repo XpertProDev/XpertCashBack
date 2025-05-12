@@ -29,5 +29,9 @@ public class StockHistory {
     @JoinColumn(name = "user_id")
     private User user; 
 
+    @ManyToOne
+    @JoinColumn(name = "fournisseur_id")
+    private Fournisseur fournisseur; 
+
 
 }

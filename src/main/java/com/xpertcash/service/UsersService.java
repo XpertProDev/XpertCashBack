@@ -125,7 +125,7 @@ public class UsersService {
         entreprise.setNomEntreprise(nomEntreprise);
         entreprise.setIdentifiantEntreprise(identifiantUnique);
         entreprise.setCreatedAt(LocalDateTime.now());
-        entreprise.setLogo("default.png");
+        entreprise.setLogo("defaultLogo/Votre.png");
         entreprise.setAdresse("default");
         entreprise.setSiege("default");
         entreprise.setNina("default");

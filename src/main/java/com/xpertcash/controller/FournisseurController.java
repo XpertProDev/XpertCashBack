@@ -1,5 +1,6 @@
 package com.xpertcash.controller;
 
+import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -16,8 +17,11 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.xpertcash.DTOs.FactureDTO;
 import com.xpertcash.DTOs.FournisseurDTO;
+import com.xpertcash.entity.Facture;
 import com.xpertcash.entity.Fournisseur;
+import com.xpertcash.repository.FactureRepository;
 import com.xpertcash.repository.FournisseurRepository;
 import com.xpertcash.repository.StockProduitFournisseurRepository;
 import com.xpertcash.service.FournisseurService;
@@ -39,6 +43,9 @@ public class FournisseurController {
 
      @Autowired
     private ProduitService produitService;
+
+    @Autowired
+    private FactureRepository factureRepository;
 
     @PostMapping("/save-fournisseurs")
     public ResponseEntity<?> saveFournisseur(
@@ -70,7 +77,7 @@ public class FournisseurController {
         }
     }
 
-     // Get fournisseur dune entreprise de l utilisateur 
+     // Get All fournisseurs dune entreprise de l utilisateur 
      @GetMapping("/get-fournisseurs")
      public ResponseEntity<List<Fournisseur>> getFournisseursByEntreprise(HttpServletRequest request) {
         List<Fournisseur> fournisseurs = fournisseurService.getFournisseursByEntreprise(request);
@@ -85,7 +92,6 @@ public class FournisseurController {
     }
 
     //Update fournisseur
-
     @PutMapping("/updateFournisseur/{id}")
     public ResponseEntity<Fournisseur> updateFournisseur(
             @PathVariable Long id,
@@ -116,6 +122,30 @@ public class FournisseurController {
     public ResponseEntity<List<Map<String, Object>>> getStockParFournisseurSimplifie(@PathVariable Long fournisseurId) {
         return ResponseEntity.ok(fournisseurService.getNomProduitEtQuantiteAjoutee(fournisseurId));
     }
+
+    //Get fournisseur lier a des factures
+    @GetMapping("/factures-par-fournisseur/{fournisseurId}")
+    public ResponseEntity<List<Map<String, Object>>> getFacturesParFournisseur(@PathVariable Long fournisseurId) {
+         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
+        List<Facture> factures = factureRepository.findByFournisseur_Id(fournisseurId);
+
+        List<Map<String, Object>> factureDTOs = factures.stream().map(facture -> {
+            Map<String, Object> map = new HashMap<>();
+            map.put("id", facture.getId());
+            map.put("type", facture.getType());
+            map.put("description", facture.getDescription());
+            map.put("dateFacture", facture.getDateFacture().format(formatter));
+            map.put("numeroFacture", facture.getNumeroFacture());
+            map.put("codeFournisseur", facture.getCodeFournisseur());
+            return map;
+        }).collect(Collectors.toList());
+
+        return ResponseEntity.ok(factureDTOs);
+    }
+
+
+
+
 
 
 }
