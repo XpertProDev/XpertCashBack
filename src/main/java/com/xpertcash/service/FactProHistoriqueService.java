@@ -1,9 +1,11 @@
 package com.xpertcash.service;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -43,8 +45,8 @@ public class FactProHistoriqueService {
 
 
 
-    public Map<String, Object> getHistoriqueFacture(Long factureId, HttpServletRequest request) {
-        String token = request.getHeader("Authorization");
+  public Map<String, Object> getHistoriqueFacture(Long factureId, HttpServletRequest request) {
+    String token = request.getHeader("Authorization");
     if (token == null || !token.startsWith("Bearer ")) {
         throw new RuntimeException("Token JWT manquant ou mal formaté");
     }
@@ -55,63 +57,56 @@ public class FactProHistoriqueService {
     } catch (Exception e) {
         throw new RuntimeException("Erreur lors de l'extraction de l'ID de l'utilisateur depuis le token", e);
     }
+
     User user = usersRepository.findById(userId)
             .orElseThrow(() -> new RuntimeException("Utilisateur introuvable !"));
 
-
-
-            FactureProForma facture = factureProformaRepository.findById(factureId)
+    FactureProForma facture = factureProformaRepository.findById(factureId)
             .orElseThrow(() -> new RuntimeException("Facture Proforma introuvable avec l'ID : " + factureId));
 
     if (!facture.getEntreprise().getId().equals(user.getEntreprise().getId())) {
         throw new RuntimeException("Accès refusé : Cette facture ne vous appartient pas !");
     }
 
-    // Vérification que l'utilisateur appartient à l'entreprise (si besoin ici aussi)
-    // ...
-
-
     Map<String, Object> historique = new HashMap<>();
-
     historique.put("id", facture.getId());
     historique.put("numeroFacture", facture.getNumeroFacture());
     historique.put("dateCreation", facture.getDateCreation());
     historique.put("description", facture.getDescription());
     historique.put("statut", facture.getStatut());
 
-    historique.put("creePar", facture.getUtilisateurModificateur() != null ?
-            facture.getUtilisateurModificateur().getNomComplet() : "Inconnu");
+    historique.put("creePar", facture.getUtilisateurCreateur() != null ?
+        facture.getUtilisateurCreateur().getNomComplet() : "Inconnu");
+
+    historique.put("dernierModificateur", facture.getUtilisateurModificateur() != null ?
+        facture.getUtilisateurModificateur().getNomComplet() : "Aucune modification");
 
     historique.put("approuvePar", facture.getUtilisateurApprobateur() != null ?
-            facture.getUtilisateurApprobateur().getNomComplet() : "Non approuvé");
+        facture.getUtilisateurApprobateur().getNomComplet() : "Non approuvé");
 
+    // Historique simplifié : actions clés
+    List<FactProHistoriqueAction> actionList = factProHistoriqueActionRepository
+            .findByFactureIdOrderByDateActionAsc(factureId);
 
+    List<Map<String, Object>> actionsResume = new ArrayList<>();
 
-    historique.put("modifications", facture.getLignesFacture().stream().map(ligne -> {
-        Map<String, Object> modification = new HashMap<>();
-        modification.put("produit", ligne.getProduit().getNom());
-        modification.put("quantite", ligne.getQuantite());
-        modification.put("prixUnitaire", ligne.getPrixUnitaire());
-        modification.put("montantTotal", ligne.getMontantTotal());
-        return modification;
-    }).collect(Collectors.toList()));
+    Set<String> actionsImportantes = Set.of("Création", "Modification", "Approbation", "Approuver", "Envoi", "Validation");
 
-    // Ajouter l’historique des actions
-    List<Map<String, Object>> actions = factProHistoriqueActionRepository.findByFactureIdOrderByDateActionAsc(factureId)
-        .stream()
-        .map(action -> {
-            Map<String, Object> map = new HashMap<>();
-            map.put("action", action.getAction());
-            map.put("date", action.getDateAction());
-            map.put("utilisateur", action.getUtilisateur().getNomComplet());
-            map.put("details", action.getDetails());
-            return map;
-        }).collect(Collectors.toList());
+    for (FactProHistoriqueAction action : actionList) {
+        if (actionsImportantes.contains(action.getAction())) {
+            Map<String, Object> entry = new HashMap<>();
+            entry.put("action", action.getAction());
+            entry.put("date", action.getDateAction());
+            entry.put("utilisateur", action.getUtilisateur().getNomComplet());
+            actionsResume.add(entry);
+        }
+    }
 
-    historique.put("historiqueActions", actions);
+    historique.put("historiqueActions", actionsResume);
 
     return historique;
 }
+
 
 
 public void enregistrerActionHistorique(FactureProForma facture, User user, String action, String details) {

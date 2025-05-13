@@ -60,6 +60,13 @@ public class FactureProForma {
     private Entreprise entreprise;
 
     @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "utilisateur_createur_id")
+    @JsonIgnoreProperties({"personalCode", "phone", "photo", "createdAt", "activationCode", "activatedLien", "enabledLien", "lastActivity", "locked", "pays", "role"})
+    private User utilisateurCreateur;
+
+
+
+    @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "utilisateur_modificateur_id")
     @JsonIgnoreProperties({"personalCode", "phone", "photo", "createdAt", "activationCode", "activatedLien", "enabledLien", "lastActivity", "locked", "pays", "role"})
     private User utilisateurModificateur;

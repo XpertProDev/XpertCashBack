@@ -181,6 +181,9 @@ public class FactureProformaService {
     facture.setTva(tvaActive);
     facture.setTotalFacture(montantTotalAPayer);
 
+    facture.setUtilisateurCreateur(user);
+
+
     return factureProformaRepository.save(facture);
 }
 
