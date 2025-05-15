@@ -5,5 +5,6 @@ public enum StatutFactureProForma {
     APPROBATION,
     APPROUVE,
     ENVOYE,
-    VALIDE
+    VALIDE,
+    ANNULE
 }

@@ -19,8 +19,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.xpertcash.entity.Client;
-import com.xpertcash.entity.EntrepriseClient;
-import com.xpertcash.repository.EntrepriseClientRepository;
 import com.xpertcash.service.ClientService;
 
 import jakarta.persistence.EntityNotFoundException;

@@ -8,6 +8,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -26,6 +27,7 @@ import com.xpertcash.entity.User;
 import com.xpertcash.repository.ClientRepository;
 import com.xpertcash.repository.EntrepriseClientRepository;
 import com.xpertcash.repository.FactureProformaRepository;
+import com.xpertcash.repository.FactureReelleRepository;
 import com.xpertcash.repository.ProduitRepository;
 import com.xpertcash.repository.UsersRepository;
 
@@ -51,6 +53,9 @@ public class FactureProformaService {
 
      @Autowired
     private UsersRepository usersRepository;
+
+    @Autowired
+    private FactureReelleRepository factureReelleRepository;
 
     @Autowired
     private JwtUtil jwtUtil;
@@ -208,278 +213,245 @@ public class FactureProformaService {
             return String.format("N°%03d-%s", newIndex, formattedDate);
         }
 
+    
 
 
     // Méthode pour modifier une facture pro forma
-        @Transactional
-        public FactureProForma modifierFacture(Long factureId, Double remisePourcentage, Boolean appliquerTVA, FactureProForma modifications, List<Long> idsApprobateurs, HttpServletRequest request) {
-                FactureProForma facture = factureProformaRepository.findById(factureId)
-                        .orElseThrow(() -> new RuntimeException("Facture non trouvée !"));
-            
-                // Extraire l'utilisateur connecté à partir du token JWT
-            String token = request.getHeader("Authorization");
-            if (token == null || !token.startsWith("Bearer ")) {
-                throw new RuntimeException("Token JWT manquant ou mal formaté");
-            }
+      @Transactional
+public FactureProForma modifierFacture(Long factureId, Double remisePourcentage, Boolean appliquerTVA, FactureProForma modifications, List<Long> idsApprobateurs, HttpServletRequest request) {
+    // 🔐 Récupération de la facture
+    FactureProForma facture = factureProformaRepository.findById(factureId)
+            .orElseThrow(() -> new RuntimeException("Facture non trouvée !"));
 
-            Long userId = null;
-            try {
-                userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
-            } catch (Exception e) {
-                throw new RuntimeException("Erreur lors de l'extraction de l'ID de l'utilisateur depuis le token", e);
-            }
-
-            // Récupérer l'utilisateur par son ID
-            User user = usersRepository.findById(userId)
-                    .orElseThrow(() -> new RuntimeException("Utilisateur introuvable !"));
-
-            // Ajouter l'ID de l'utilisateur dans la facture pour savoir qui a effectué la modification
-            facture.setUtilisateurModificateur(user);
-
-            System.out.println("Modification effectuée par l'utilisateur ID: " + userId);
-            
-                // Ajouter un log pour voir ce que vous recevez comme modifications
-                System.out.println("Modifications reçues: " + modifications);
-            
-            
-            
-                // Vérifier si la facture est VALIDÉE
-                if (facture.getStatut() == StatutFactureProForma.VALIDE) {
-                
-            
-                    // Si une tentative de modification autre que le statut de paiement est effectuée, on lève une exception
-                    if (modifications.getLignesFacture() != null || 
-                        remisePourcentage != null || 
-                        appliquerTVA != null || 
-                        modifications.getStatut() != null) {
-                        
-                        throw new RuntimeException("Impossible de modifier une facture VALIDÉE, sauf son statut de paiement !");
-                    }
-            
-                    //return facture; // Retourner la facture sans aucune modification si c'est une facture VALIDÉE
-                }
-
-                // Si la facture passe en "VALIDE", générer une facture réelle
-                if (modifications.getStatut() == StatutFactureProForma.VALIDE && facture.getStatut() != StatutFactureProForma.VALIDE) {
-                    FactureReelle factureReelle = factureReelleService.genererFactureReelle(facture);
-                    System.out.println("✅ Facture Réelle générée avec succès : " + factureReelle.getNumeroFacture());
-                }
-
-
-              // ici commence désignation pour Approuver
-             if (modifications.getStatut() == StatutFactureProForma.APPROUVE) {
-
-                boolean dejaApprouvee = facture.getDateApprobation() != null;
-
-                if (!dejaApprouvee) {
-
-                    // Vérifie si l'utilisateur est le modificateur
-                    boolean estModificateur = facture.getUtilisateurModificateur() != null &&
-                                            facture.getUtilisateurModificateur().getId().equals(user.getId());
-
-                    // Vérifie si l'utilisateur est dans la liste des approbateurs
-                    List<User> approbateurs = facture.getApprobateurs();
-                    boolean estApprobateur = approbateurs != null &&
-                                            approbateurs.stream()
-                                                        .anyMatch(approbateur -> approbateur.getId().equals(user.getId()));
-
-                    // Autoriser si l'utilisateur est soit approbateur, soit modificateur
-                    if (!estApprobateur && !estModificateur) {
-                        throw new RuntimeException("Vous n'êtes pas autorisé à approuver cette facture.");
-                    }
-
-                    // Si modificateur mais pas encore approbateur, on l'ajoute à la liste
-                    if (!estApprobateur && estModificateur) {
-                        if (approbateurs == null) {
-                            approbateurs = new ArrayList<>();
-                            facture.setApprobateurs(approbateurs);
-                        }
-                        approbateurs.add(user);
-                    }
-
-                    // On ne bloque sur le statut APPROBATION que si ce n’est pas le modificateur
-                    if (!estModificateur && facture.getStatut() != StatutFactureProForma.APPROBATION) {
-                        throw new RuntimeException("La facture doit d'abord passer par le statut APPROBATION avant d'être APPROUVÉE.");
-                    }
-
-                    // Enregistrement de l'approbation
-                    facture.setUtilisateurApprobateur(user);
-                    facture.setDateApprobation(LocalDateTime.now());
-
-                } else {
-                    System.out.println("ℹ️ Facture déjà approuvée une fois. Appropriation directe autorisée.");
-                }
-            }
-
-
-                
-
-
-                    // Vérifier si la date de relance est modifiée
-                    if (modifications.getDateRelance() != null && !modifications.getDateRelance().equals(facture.getDateRelance())) {
-                        LocalDateTime dateCreationAsDateTime = facture.getDateCreation().atStartOfDay();
-                        // Vérifier que la date de relance n'est pas antérieure à la date de création
-                        if (modifications.getDateRelance().isBefore(dateCreationAsDateTime)) {
-                            throw new RuntimeException("La date de relance ne peut pas être antérieure à la date de création de la facture !");
-                        }
-
-                        System.out.println("🚀 La date de relance a été modifiée. Réinitialisation des champs...");
-                        facture.setDernierRappelEnvoye(null);
-                        facture.setNotifie(false);
-                    }
-
-                    // Mettre à jour la date de relance
-                    if (modifications.getDateRelance() != null) {
-                        facture.setDateRelance(modifications.getDateRelance());
-                    }
-
-
-                // Si le statut est modifié et passe à "BROUILLON", "APPROUVE" ou "VALIDE", réinitialiser les champs dateRelance et dernierRappelEnvoye
-                    if (modifications.getStatut() != null && 
-                        (modifications.getStatut() == StatutFactureProForma.BROUILLON ||
-                        modifications.getStatut() == StatutFactureProForma.APPROUVE ||
-                        modifications.getStatut() == StatutFactureProForma.VALIDE)) {
-                        facture.setDateRelance(null);
-                        facture.setDernierRappelEnvoye(null);
-                    }
-
-                    // Si le statut est modifié et passe à "BROUILLON", "APPROUVE" ou "ENVOYE", réinitialiser le statutPaiement
-                   
-                    if (modifications.getStatut() != null && 
-                    (modifications.getStatut() == StatutFactureProForma.BROUILLON ||
-                    modifications.getStatut() == StatutFactureProForma.APPROUVE ||
-                    modifications.getStatut() == StatutFactureProForma.VALIDE)) {
-                    facture.setDateRelance(null);
-                    facture.setDernierRappelEnvoye(null);
-                }
-
-            // Ajout de la logique des approbateurs si statut = APPROBATION
-            if (modifications.getStatut() == StatutFactureProForma.APPROBATION) {
-                if (idsApprobateurs == null || idsApprobateurs.isEmpty()) {
-                    throw new RuntimeException("Vous devez fournir au moins un utilisateur pour approuver cette facture.");
-                }
-
-                List<User> approbateurs = usersRepository.findAllById(idsApprobateurs);
-
-                if (approbateurs.size() != idsApprobateurs.size()) {
-                    throw new RuntimeException("Un ou plusieurs approbateurs sont introuvables !");
-                }
-
-                for (User approbateur : approbateurs) {
-                    if (!user.getEntreprise().getId().equals(approbateur.getEntreprise().getId())) {
-                        throw new RuntimeException("Tous les approbateurs doivent appartenir à la même entreprise.");
-                    }
-                }
-
-                facture.setApprobateurs(approbateurs);
-                System.out.println("👥 Approbateurs ajoutés : " + approbateurs.stream().map(User::getId).toList());
-            }
-
-                    
-                
-
-
-                // Vérifier si on passe en "ENVOYÉ" et définir la date de relance
-                if (modifications.getStatut() != null && modifications.getStatut() == StatutFactureProForma.ENVOYE) {
-                    if (facture.getDateRelance() == null) {
-                        facture.setDateRelance(LocalDateTime.now().plusHours(72)); // Par défaut 72h
-                        // Exemple pour une relance dans une minute
-                       //facture.setDateRelance(LocalDateTime.now().plusMinutes(1)); // Mode Dev
-                    }
-
-                    // Enregistrer l'utilisateur qui a mis la facture en ENVOYÉ
-                    facture.setUtilisateurRelanceur(facture.getUtilisateurModificateur());
-                }
-
-            
-            // Si la facture n'est pas VALIDÉE, on applique les autres modifications
-            if (modifications.getLignesFacture() != null) {
-            facture.getLignesFacture().clear();
-            for (LigneFactureProforma ligne : modifications.getLignesFacture()) {
-                // Récupérer le produit à partir de son ID
-                Produit produit = produitRepository.findById(ligne.getProduit().getId())
-                        .orElseThrow(() -> new RuntimeException("Produit introuvable !"));
-
-                System.out.println("Produit ID: " + produit.getId() + " - Prix de vente: " + produit.getPrixVente());
-
-                if (produit.getPrixVente() == null) {
-                    throw new RuntimeException("Le prix de vente du produit avec l'ID " + produit.getId() + " est nul.");
-                }
-
-                // Mettre à jour le prix unitaire de la ligne avec le prix du produit
-                ligne.setPrixUnitaire(produit.getPrixVente());
-
-                // Calcul du montant total pour cette ligne (quantité * prix unitaire)
-                double montantTotal = ligne.getQuantite() * ligne.getPrixUnitaire();
-                System.out.println("Montant total pour la ligne: " + montantTotal);
-
-                // Mettre à jour la ligne de facture avec le montant calculé
-                ligne.setFactureProForma(facture);
-                ligne.setProduit(produit);
-                ligne.setMontantTotal(montantTotal);
-
-                // Mettre a jour la description de la ligne
-                if (ligne.getLigneDescription() != null) {
-                    ligne.setLigneDescription(ligne.getLigneDescription());
-                } else {
-                    ligne.setLigneDescription(produit.getDescription());
-                }
-    
-
-                // Ajouter la ligne de facture modifiée à la facture
-                facture.getLignesFacture().add(ligne);
-            }
-        }
-            
-            //modifier description de facture
-            if (modifications.getDescription() != null) {
-                facture.setDescription(modifications.getDescription());
-            }
-
-                // Vérifier et appliquer la remise
-                remisePourcentage = (remisePourcentage == null) ? 0.0 : remisePourcentage;
-                if (remisePourcentage < 0 || remisePourcentage > 100) {
-                    throw new RuntimeException("Le pourcentage de remise doit être compris entre 0 et 100 !");
-                }
-            
-                // Calcul du montant total HT
-                double montantTotalHT = facture.getLignesFacture().stream()
-                        .mapToDouble(LigneFactureProforma::getMontantTotal)
-                        .sum();
-            
-                double remiseMontant = montantTotalHT * (remisePourcentage / 100);
-                boolean tvaActive = (appliquerTVA != null && appliquerTVA);
-                double montantTVA = tvaActive ? (montantTotalHT - remiseMontant) * 0.18 : 0;
-                double montantTotalAPayer = (montantTotalHT - remiseMontant) + montantTVA;
-            
-                // Mise à jour des valeurs calculées
-                facture.setTotalHT(montantTotalHT);
-                facture.setRemise(remiseMontant);
-                facture.setTva(tvaActive);
-                facture.setTotalFacture(montantTotalAPayer);
-            
-                // Mise à jour du statut si fourni (sauf si la facture est VALIDÉE ou déjà ENCAISSÉ)
-                if (modifications.getStatut() != null && facture.getStatut() != StatutFactureProForma.VALIDE) {
-                    facture.setStatut(modifications.getStatut());
-                }
-
-                  // ✅ ENREGISTRER L’HISTORIQUE
-                  factProHistoriqueService.enregistrerActionHistorique(
-                    facture,
-                    user,
-                    "Modification",
-                    "La facture a été modifiée (description: " + facture.getDescription() + ")"
-                );
-
-
-            
-                return factureProformaRepository.save(facture);
-
-                
-
+    // 🔐 Extraction de l'utilisateur depuis le token JWT
+    String token = request.getHeader("Authorization");
+    if (token == null || !token.startsWith("Bearer ")) {
+        throw new RuntimeException("Token JWT manquant ou mal formaté");
     }
 
+    Long userId;
+    try {
+        userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
+    } catch (Exception e) {
+        throw new RuntimeException("Erreur lors de l'extraction de l'ID de l'utilisateur depuis le token", e);
+    }
+
+    User user = usersRepository.findById(userId)
+            .orElseThrow(() -> new RuntimeException("Utilisateur introuvable !"));
+
+    // 🔒 Blocage total si facture annulée
+    if (facture.getStatut() == StatutFactureProForma.ANNULE) {
+        throw new RuntimeException("Cette facture est annulée. Elle ne peut plus être modifiée.");
+    }
+
+    // 🔒 Traitement spécial si facture VALIDÉE
+    if (facture.getStatut() == StatutFactureProForma.VALIDE) {
+        boolean tentativeModification = modifications.getLignesFacture() != null
+            || remisePourcentage != null
+            || appliquerTVA != null
+            || (modifications.getStatut() != null && modifications.getStatut() != StatutFactureProForma.ANNULE);
+
+        if (tentativeModification) {
+            throw new RuntimeException("Impossible de modifier une facture VALIDÉE, sauf pour l’annuler.");
+        }
+
+   
     
+    }
+
+         // Si demande d’annulation
+        if (modifications.getStatut() == StatutFactureProForma.ANNULE) {
+            facture.setStatut(StatutFactureProForma.ANNULE);
+            facture.setDateAnnulation(LocalDateTime.now());
+            facture.setUtilisateurAnnulateur(user);
+            facture.setDateRelance(null);
+            facture.setDernierRappelEnvoye(null);
+            facture.setNotifie(false);
+
+            factureReelleRepository.findByFactureProForma(facture).ifPresent(factureReelle -> {
+                factureReelleRepository.delete(factureReelle);
+                System.out.println("🗑️ Facture réelle supprimée.");
+            });
+
+            factProHistoriqueService.enregistrerActionHistorique(
+                facture,
+                user,
+                "Annulation",
+                "La facture a été annulée. La facture réelle associée a été supprimée."
+            );
+
+            return factureProformaRepository.save(facture);
+        }
+
+    // 🔁 Application des modifications normales
+    facture.setUtilisateurModificateur(user);
+    System.out.println("Modification effectuée par l'utilisateur ID: " + userId);
+    System.out.println("Modifications reçues: " + modifications);
+
+    // 💡 Génération de facture réelle si passage à VALIDE
+    if (modifications.getStatut() == StatutFactureProForma.VALIDE && facture.getStatut() != StatutFactureProForma.VALIDE) {
+        FactureReelle factureReelle = factureReelleService.genererFactureReelle(facture);
+        System.out.println("✅ Facture Réelle générée avec succès : " + factureReelle.getNumeroFacture());
+    }
+
+    // ✅ Approbation de la facture
+    if (modifications.getStatut() == StatutFactureProForma.APPROUVE) {
+        boolean dejaApprouvee = facture.getDateApprobation() != null;
+        
+            facture.setDateAnnulation(null);
+            facture.setUtilisateurAnnulateur(null);
+
+        if (!dejaApprouvee) {
+            boolean estModificateur = facture.getUtilisateurModificateur() != null &&
+                    facture.getUtilisateurModificateur().getId().equals(user.getId());
+
+            List<User> approbateurs = facture.getApprobateurs();
+            boolean estApprobateur = approbateurs != null &&
+                    approbateurs.stream().anyMatch(a -> a.getId().equals(user.getId()));
+
+            if (!estApprobateur && !estModificateur) {
+                throw new RuntimeException("Vous n'êtes pas autorisé à approuver cette facture.");
+            }
+
+            if (!estApprobateur && estModificateur) {
+                if (approbateurs == null) {
+                    approbateurs = new ArrayList<>();
+                    facture.setApprobateurs(approbateurs);
+                }
+                approbateurs.add(user);
+            }
+
+            if (!estModificateur && facture.getStatut() != StatutFactureProForma.APPROBATION) {
+                throw new RuntimeException("La facture doit d'abord passer par le statut APPROBATION avant d'être APPROUVÉE.");
+            }
+
+            facture.setUtilisateurApprobateur(user);
+            facture.setDateApprobation(LocalDateTime.now());
+        } else {
+            System.out.println("ℹ️ Facture déjà approuvée une fois. Appropriation directe autorisée.");
+        }
+    }
+
+    // ✅ Ajout des approbateurs
+    if (modifications.getStatut() == StatutFactureProForma.APPROBATION) {
+        if (idsApprobateurs == null || idsApprobateurs.isEmpty()) {
+            throw new RuntimeException("Vous devez fournir au moins un utilisateur pour approuver cette facture.");
+        }
+
+        List<User> approbateurs = usersRepository.findAllById(idsApprobateurs);
+        if (approbateurs.size() != idsApprobateurs.size()) {
+            throw new RuntimeException("Un ou plusieurs approbateurs sont introuvables !");
+        }
+
+        for (User approbateur : approbateurs) {
+            if (!user.getEntreprise().getId().equals(approbateur.getEntreprise().getId())) {
+                throw new RuntimeException("Tous les approbateurs doivent appartenir à la même entreprise.");
+            }
+        }
+
+        facture.setApprobateurs(approbateurs);
+        System.out.println("👥 Approbateurs ajoutés : " + approbateurs.stream().map(User::getId).toList());
+    }
+
+    // 🔁 Mise à jour de la date de relance
+    if (modifications.getDateRelance() != null) {
+        if (modifications.getDateRelance().isBefore(facture.getDateCreation().atStartOfDay())) {
+            throw new RuntimeException("La date de relance ne peut pas être antérieure à la date de création de la facture !");
+        }
+
+        facture.setDernierRappelEnvoye(null);
+        facture.setNotifie(false);
+        facture.setDateRelance(modifications.getDateRelance());
+    }
+
+    // Réinitialisation de relance pour certains statuts
+    if (modifications.getStatut() != null && 
+        List.of(StatutFactureProForma.BROUILLON, StatutFactureProForma.APPROUVE, StatutFactureProForma.VALIDE).contains(modifications.getStatut())) {
+        facture.setDateRelance(null);
+        facture.setDernierRappelEnvoye(null);
+        facture.setDateAnnulation(null);
+        facture.setUtilisateurAnnulateur(null);
+    }
+
+    // 📩 Passage à ENVOYÉ
+    if (modifications.getStatut() == StatutFactureProForma.ENVOYE) {
+        facture.setMethodeEnvoi(modifications.getMethodeEnvoi());
+        
+        facture.setDateAnnulation(null);
+            facture.setUtilisateurAnnulateur(null);
+
+        if (facture.getDateRelance() == null) {
+            facture.setDateRelance(LocalDateTime.now().plusHours(72));
+        }
+        facture.setUtilisateurRelanceur(facture.getUtilisateurModificateur());
+    }
+
+    // 🧾 Mise à jour des lignes de facture
+    if (modifications.getLignesFacture() != null) {
+        facture.getLignesFacture().clear();
+        for (LigneFactureProforma ligne : modifications.getLignesFacture()) {
+            Produit produit = produitRepository.findById(ligne.getProduit().getId())
+                    .orElseThrow(() -> new RuntimeException("Produit introuvable !"));
+
+            if (produit.getPrixVente() == null) {
+                throw new RuntimeException("Le prix de vente du produit avec l'ID " + produit.getId() + " est nul.");
+            }
+
+            ligne.setPrixUnitaire(produit.getPrixVente());
+            ligne.setMontantTotal(ligne.getQuantite() * ligne.getPrixUnitaire());
+            ligne.setFactureProForma(facture);
+            ligne.setProduit(produit);
+            ligne.setLigneDescription(Optional.ofNullable(ligne.getLigneDescription()).orElse(produit.getDescription()));
+
+            facture.getLignesFacture().add(ligne);
+        }
+    }
+
+    // ✏️ Description
+    if (modifications.getDescription() != null) {
+        facture.setDescription(modifications.getDescription());
+    }
+
+    // 💰 Calcul des totaux
+    remisePourcentage = (remisePourcentage == null) ? 0.0 : remisePourcentage;
+    if (remisePourcentage < 0 || remisePourcentage > 100) {
+        throw new RuntimeException("Le pourcentage de remise doit être compris entre 0 et 100 !");
+    }
+
+    double montantTotalHT = facture.getLignesFacture().stream().mapToDouble(LigneFactureProforma::getMontantTotal).sum();
+    double remiseMontant = montantTotalHT * (remisePourcentage / 100);
+    boolean tvaActive = appliquerTVA != null && appliquerTVA;
+    double montantTVA = tvaActive ? (montantTotalHT - remiseMontant) * 0.18 : 0;
+    double montantTotalAPayer = (montantTotalHT - remiseMontant) + montantTVA;
+
+    facture.setTotalHT(montantTotalHT);
+    facture.setRemise(remiseMontant);
+    facture.setTva(tvaActive);
+    facture.setTotalFacture(montantTotalAPayer);
+
+    // ✅ Mise à jour du statut (hors VALIDÉ déjà traité)
+    if (modifications.getStatut() != null && facture.getStatut() != StatutFactureProForma.VALIDE) {
+        facture.setStatut(modifications.getStatut());
+    }
+
+    // 📝 Historique
+    factProHistoriqueService.enregistrerActionHistorique(
+        facture,
+        user,
+        "Modification",
+        "La facture a été modifiée (description: " + facture.getDescription() + ")"
+    );
+
+    return factureProformaRepository.save(facture);
+}
+
+                
+
+    
+
+    
+
+
 
 
     //Methode pour recuperer les factures pro forma dune entreprise

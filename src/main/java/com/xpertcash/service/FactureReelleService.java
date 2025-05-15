@@ -40,6 +40,8 @@ public class FactureReelleService {
     @Autowired
     private JwtUtil jwtUtil;
 
+    
+
 
     public FactureReelle genererFactureReelle(FactureProForma factureProForma) {
         FactureReelle factureReelle = new FactureReelle();
@@ -255,4 +257,15 @@ public class FactureReelleService {
     
     
 
+        // Methode pour Supprimer facturer deja generer une fois annuler
+
+    public void supprimerFactureReelleLiee(FactureProForma proforma) {
+        Optional<FactureReelle> factureReelleOpt = factureReelleRepository.findByFactureProForma(proforma);
+        if (factureReelleOpt.isPresent()) {
+            factureReelleRepository.delete(factureReelleOpt.get());
+            System.out.println("🗑️ Facture réelle supprimée suite à l'annulation.");
+        } else {
+            System.out.println("ℹ️ Aucune facture réelle associée à cette facture proforma.");
+        }
+    }
 }

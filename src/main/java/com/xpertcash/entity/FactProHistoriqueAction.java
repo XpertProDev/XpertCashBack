@@ -18,7 +18,7 @@ public class FactProHistoriqueAction {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    private String action; // "Création", "Modification", "Approbation"
+    private String action;
 
     private LocalDateTime dateAction;
 

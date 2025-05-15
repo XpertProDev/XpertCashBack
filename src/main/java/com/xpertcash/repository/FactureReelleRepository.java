@@ -10,6 +10,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import com.xpertcash.entity.Entreprise;
+import com.xpertcash.entity.FactureProForma;
 import com.xpertcash.entity.FactureReelle;
 
 @Repository
@@ -35,6 +36,10 @@ public interface FactureReelleRepository extends JpaRepository<FactureReelle, Lo
     List<FactureReelle> findByYearAndEntreprise(@Param("annee") Integer annee, @Param("entrepriseId") Long entrepriseId);
     
     List<FactureReelle> findByEntrepriseId(Long entrepriseId);
+
+
+   Optional<FactureReelle> findByFactureProForma(FactureProForma factureProForma);
+
     
 
 

@@ -24,8 +24,11 @@ public class FactureProForma {
     private String numeroFacture;
     private LocalDate dateCreation;
     private String description;
-
     private LocalDateTime dateApprobation;
+     private LocalDateTime dateAnnulation;
+
+     @Enumerated(EnumType.STRING)
+     private MethodeEnvoi methodeEnvoi;
 
     
      // Montants calculés
@@ -36,10 +39,19 @@ public class FactureProForma {
 
      
 
+
+    @ManyToOne
+    @JsonIgnoreProperties({"personalCode", "phone", "photo", "createdAt", "activationCode", "activatedLien", "enabledLien", "lastActivity", "locked", "pays", "role"})
+    private User utilisateurAnnulateur;
+
+
+     
+
      
 
 
     @Enumerated(EnumType.STRING)
+    @Column(name = "statut", length = 20)
     private StatutFactureProForma statut = StatutFactureProForma.BROUILLON;
 
     @ManyToOne(fetch = FetchType.EAGER)
