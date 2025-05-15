@@ -1,5 +1,6 @@
 package com.xpertcash.controller;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
@@ -57,8 +58,10 @@ public class FactureProformaController {
             // Retourner la facture créée en réponse HTTP 201 (CREATED)
             return ResponseEntity.status(HttpStatus.CREATED).body(nouvelleFacture);
         } catch (RuntimeException e) {
-            // Retourner l'erreur en réponse HTTP 400 (BAD REQUEST) si une exception est levée
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
+            Map<String,String> error = Collections.singletonMap("message", e.getMessage());
+            return ResponseEntity
+                    .status(HttpStatus.BAD_REQUEST)
+                    .body(error);
         }
     }
 
