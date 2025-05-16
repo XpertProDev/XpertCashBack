@@ -4,6 +4,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
@@ -23,6 +24,9 @@ public class FactureProForma {
 
     private String numeroFacture;
     private LocalDate dateCreation;
+    @JsonFormat(pattern = "dd-MM-yyyy")
+    @Column(name = "date_facture")
+    private LocalDate dateFacture;
     private String description;
     private LocalDateTime dateApprobation;
      private LocalDateTime dateAnnulation;
@@ -43,12 +47,6 @@ public class FactureProForma {
     @ManyToOne
     @JsonIgnoreProperties({"personalCode", "phone", "photo", "createdAt", "activationCode", "activatedLien", "enabledLien", "lastActivity", "locked", "pays", "role"})
     private User utilisateurAnnulateur;
-
-
-     
-
-     
-
 
     @Enumerated(EnumType.STRING)
     @Column(name = "statut", length = 20)

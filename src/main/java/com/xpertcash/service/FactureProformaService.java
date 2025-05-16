@@ -21,6 +21,7 @@ import com.xpertcash.entity.EntrepriseClient;
 import com.xpertcash.entity.FactureProForma;
 import com.xpertcash.entity.FactureReelle;
 import com.xpertcash.entity.LigneFactureProforma;
+import com.xpertcash.entity.MethodeEnvoi;
 import com.xpertcash.entity.Produit;
 import com.xpertcash.entity.StatutFactureProForma;
 import com.xpertcash.entity.User;
@@ -34,8 +35,13 @@ import com.xpertcash.repository.UsersRepository;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.transaction.Transactional;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 @Service
 public class FactureProformaService {
+
+    private static final Logger log = LoggerFactory.getLogger(FactureProformaService.class);
 
     @Autowired
     private FactureProformaRepository factureProformaRepository;
@@ -146,6 +152,10 @@ public class FactureProformaService {
     // Initialisation des valeurs
     facture.setStatut(StatutFactureProForma.BROUILLON);
     facture.setDateCreation(LocalDate.now());
+
+    if (facture.getDateFacture() == null) {
+        facture.setDateFacture(LocalDate.now());
+    }
 
     double montantTotalHT = 0;
     if (facture.getLignesFacture() != null) {
@@ -373,18 +383,36 @@ public FactureProForma modifierFacture(Long factureId, Double remisePourcentage,
         facture.setUtilisateurAnnulateur(null);
     }
 
-    // 📩 Passage à ENVOYÉ
-    if (modifications.getStatut() == StatutFactureProForma.ENVOYE) {
-        facture.setMethodeEnvoi(modifications.getMethodeEnvoi());
-        
-        facture.setDateAnnulation(null);
+
+        // 📩 Passage au statut ENVOYÉ
+        if (modifications.getStatut() == StatutFactureProForma.ENVOYE) {
+
+            // Vérification de la méthode d'envoi
+            if (modifications.getMethodeEnvoi() == null) {
+                throw new IllegalArgumentException("Veuillez spécifier la méthode d’envoi : PHYSIQUE ou EMAIL.");
+            }
+
+            facture.setStatut(StatutFactureProForma.ENVOYE);
+            facture.setMethodeEnvoi(modifications.getMethodeEnvoi());
+
+            facture.setDateAnnulation(null);
             facture.setUtilisateurAnnulateur(null);
 
-        if (facture.getDateRelance() == null) {
-            facture.setDateRelance(LocalDateTime.now().plusHours(72));
+            // Planification d'une relance automatique sous 72h
+            if (facture.getDateRelance() == null) {
+                facture.setDateRelance(LocalDateTime.now().plusHours(72));
+            }
+
+            facture.setUtilisateurRelanceur(facture.getUtilisateurModificateur());
+
+            // Si méthode d'envoi = EMAIL, on ne fait qu'enregistrer — le front déclenchera l'envoi réel
+            if (modifications.getMethodeEnvoi() == MethodeEnvoi.EMAIL) {
+                log.info("📨 La facture {} est marquée ENVOYÉE par EMAIL. Le front doit appeler le service d'envoi de mail.", facture.getNumeroFacture());
+            }
         }
-        facture.setUtilisateurRelanceur(facture.getUtilisateurModificateur());
-    }
+
+
+
 
     // 🧾 Mise à jour des lignes de facture
     if (modifications.getLignesFacture() != null) {

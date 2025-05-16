@@ -16,13 +16,18 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.xpertcash.DTOs.USER.factureProEmail.EmailRequest;
 import com.xpertcash.composant.AuthorizationService;
 import com.xpertcash.configuration.JwtUtil;
+import com.xpertcash.entity.Facture;
 import com.xpertcash.entity.FactureProForma;
+import com.xpertcash.entity.MethodeEnvoi;
 import com.xpertcash.entity.StatutFactureProForma;
 import com.xpertcash.service.FactureProformaService;
+import com.xpertcash.service.MailService;
 import com.xpertcash.service.UsersService;
 
+import jakarta.mail.MessagingException;
 import jakarta.servlet.http.HttpServletRequest;
 
 @RestController
@@ -36,6 +41,9 @@ public class FactureProformaController {
     private UsersService usersService;
     @Autowired
     private JwtUtil jwtUtil;
+
+    @Autowired
+    private MailService mailService;
 
 
     // Endpoint pour ajouter une facture pro forma
@@ -64,7 +72,6 @@ public class FactureProformaController {
 
     
     
-
     // Endpoint pour modifier une facture pro forma
     @PutMapping("/updatefacture/{factureId}")
     public ResponseEntity<FactureProForma> updateFacture(
@@ -77,6 +84,36 @@ public class FactureProformaController {
         FactureProForma factureModifiee = factureProformaService.modifierFacture(factureId, remisePourcentage, appliquerTVA, modifications,idsApprobateurs, request);
         return ResponseEntity.ok(factureModifiee);
     }
+
+    
+    //Endpoint Pour Envoyer une facture
+        @PostMapping("/factures/{id}/envoyer-email")
+        public ResponseEntity<?> envoyerFactureEmail(
+                @PathVariable Long id,
+                @RequestBody EmailRequest request,
+                HttpServletRequest httpRequest) {
+
+            FactureProForma facture = factureProformaService.getFactureProformaById(id, httpRequest);
+
+            if (facture.getStatut() != StatutFactureProForma.ENVOYE ||
+                facture.getMethodeEnvoi() != MethodeEnvoi.EMAIL) {
+                return ResponseEntity.badRequest().body("La facture n’est pas marquée comme envoyée par mail.");
+            }
+
+            try {
+                mailService.sendEmail(
+                    request.getTo(),
+                    request.getSubject(),
+                    request.getBody()
+                );
+                return ResponseEntity.ok("Email envoyé avec succès");
+            } catch (MessagingException e) {
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Erreur lors de l'envoi de l'email : " + e.getMessage());
+            }
+        }
+
+
 
     // Endpoint pour recuperer la liste des factures pro forma dune entreprise
     @GetMapping("/mes-factures")
