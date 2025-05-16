@@ -2,16 +2,13 @@ package com.xpertcash.service;
 
 import java.lang.reflect.Field;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import com.xpertcash.entity.Client;
 import com.xpertcash.entity.EntrepriseClient;
-import com.xpertcash.repository.ClientRepository;
 import com.xpertcash.repository.EntrepriseClientRepository;
 
 import jakarta.persistence.EntityNotFoundException;
@@ -22,8 +19,7 @@ public class EntrepriseClientService {
     @Autowired
     private EntrepriseClientRepository entrepriseClientRepository;
 
-    @Autowired
-    private ClientRepository clientRepository;
+  
 
     public EntrepriseClient saveEntreprise(EntrepriseClient entrepriseClient) {
         // Vérification que le nom est renseigné

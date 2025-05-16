@@ -261,7 +261,7 @@ public class ProduitService {
                 .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
     
         List<Produit> produits = new ArrayList<>();
-        Fournisseur fournisseurEntity = null; // Déclarer ici pour l'utiliser après la boucle
+        Fournisseur fournisseurEntity = null;
 
        for (Map.Entry<Long, Integer> entry : produitsQuantites.entrySet()) {
     Long produitId = entry.getKey();

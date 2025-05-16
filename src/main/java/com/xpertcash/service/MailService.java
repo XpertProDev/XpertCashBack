@@ -60,7 +60,6 @@ public class MailService {
     
 
 
-
     
 
     public void sendUnlockLinkEmail(String to, String code) throws MessagingException {
@@ -207,9 +206,6 @@ public class MailService {
             </html>
         """.formatted(otp);
     }
-
-
-
 
 
      // Envoi une notification par email pour relancer une facture

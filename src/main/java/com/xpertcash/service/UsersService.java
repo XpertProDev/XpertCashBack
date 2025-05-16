@@ -136,7 +136,7 @@ public class UsersService {
         entreprise.setPays("default");
         entreprise.setSecteur("default");
         entreprise.setRccm("default");
-        entreprise.setSiteWeb("wwww.votre-entreprise.com");
+        entreprise.setSiteWeb("www.votre-entreprise.com");
 
         
         entreprise = entrepriseRepository.save(entreprise);
@@ -189,7 +189,6 @@ public class UsersService {
     }
 
     //Admin name
-
     public String getNomCompletAdminDeEntreprise(Long entrepriseId) {
         // Récupérer l'entreprise par ID
         Entreprise entreprise = entrepriseRepository.findById(entrepriseId)
