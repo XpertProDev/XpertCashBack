@@ -4,11 +4,15 @@ package com.xpertcash.service;
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
 
+import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.List;
+import java.util.Objects;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
@@ -16,6 +20,7 @@ import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
 
 import com.xpertcash.entity.FactureProForma;
+import org.springframework.web.multipart.MultipartFile;
 
 
 @Service
@@ -229,7 +234,37 @@ public class MailService {
             </html>
         """.formatted(factureNumero, destinataireLabel, clientName, relanceDate);
     }
-    
-      
+
+    public void sendEmailWithAttachments(
+            String toEmail,
+            String subject,
+            String htmlContent,
+            List<MultipartFile> attachments
+    ) throws MessagingException, IOException {
+        MimeMessage message = mailSender.createMimeMessage();
+        MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+
+        helper.setFrom(from);
+        helper.setTo(toEmail.split(","));
+        helper.setSubject(subject);
+        helper.setText(htmlContent, true);
+
+        // Ajout du logo
+        FileSystemResource logoResource = new FileSystemResource("src/main/resources/assets/logoxpertpro.png");
+        helper.addInline("logo", logoResource);
+
+        // Ajout des pièces jointes
+        for (MultipartFile file : attachments) {
+            if (!file.isEmpty()) {
+                helper.addAttachment(
+                        Objects.requireNonNull(file.getOriginalFilename()),
+                        new ByteArrayResource(file.getBytes()),
+                        file.getContentType()
+                );
+            }
+        }
+
+        mailSender.send(message);
+    }
 
 }

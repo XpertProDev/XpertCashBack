@@ -1,11 +1,16 @@
 package com.xpertcash.controller;
 
+import java.io.IOException;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -30,6 +35,7 @@ import com.xpertcash.service.UsersService;
 
 import jakarta.mail.MessagingException;
 import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.web.multipart.MultipartFile;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -90,31 +96,46 @@ public class FactureProformaController {
 
     
     //Endpoint Pour Envoyer une facture
-        @PostMapping("/factures/{id}/envoyer-email")
-        public ResponseEntity<?> envoyerFactureEmail(
-                @PathVariable Long id,
-                @RequestBody EmailRequest request,
-                HttpServletRequest httpRequest) {
+    @PostMapping(value = "/factures/{id}/envoyer-email", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<?> envoyerFactureEmail(
+            @PathVariable Long id,
+            @RequestParam("to") String to,
+            @RequestParam("subject") String subject,
+            @RequestParam("body") String body,
+            @RequestParam(value = "attachments", required = false) MultipartFile[] attachments,
+            HttpServletRequest httpRequest) {
+
+        final Logger logger = LoggerFactory.getLogger(getClass());
+
+        try {
+            logger.info("=== REQUÊTE REÇUE ===");
+            logger.info("ID Facture: {}", id);
+            logger.info("Destinataire: {}", to);
+            logger.info("Sujet: {}", subject);
+            logger.info("Corps (taille): {}", body.length());
+            logger.info("Pièces jointes: {}", attachments != null ? attachments.length : 0);
 
             FactureProForma facture = factureProformaService.getFactureProformaById(id, httpRequest);
 
+            // Validation du statut
             if (facture.getStatut() != StatutFactureProForma.ENVOYE ||
-                facture.getMethodeEnvoi() != MethodeEnvoi.EMAIL) {
-                return ResponseEntity.badRequest().body("La facture n’est pas marquée comme envoyée par mail.");
+                    facture.getMethodeEnvoi() != MethodeEnvoi.EMAIL) {
+                logger.error("Statut/Méthode invalide");
+                return ResponseEntity.badRequest().body("Statut/Méthode invalide");
             }
 
-            try {
-                mailService.sendEmail(
-                    request.getTo(),
-                    request.getSubject(),
-                    request.getBody()
-                );
-                return ResponseEntity.ok("Email envoyé avec succès");
-            } catch (MessagingException e) {
-                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body("Erreur lors de l'envoi de l'email : " + e.getMessage());
-            }
+            // Envoi de l'email
+            mailService.sendEmailWithAttachments(to, subject, body,
+                    attachments != null ? Arrays.asList(attachments) : Collections.emptyList());
+
+            logger.info("Email envoyé avec succès");
+            return ResponseEntity.ok("Email envoyé");
+
+        } catch (Exception e) {
+            logger.error("ERREUR D'ENVOI", e);
+            return ResponseEntity.internalServerError().body("Erreur: " + e.getMessage());
         }
+    }
 
 
 
