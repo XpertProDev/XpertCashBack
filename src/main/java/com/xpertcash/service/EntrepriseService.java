@@ -58,7 +58,10 @@ public class EntrepriseService {
                         entreprise.getPays(),
                         entreprise.getSecteur(),
                         entreprise.getRccm(),
-                        entreprise.getSiteWeb()
+                        entreprise.getSiteWeb(),
+                        entreprise.getSignataire(),
+                        entreprise.getSignataireNom()
+
                 ))
                 .collect(Collectors.toList());
 
@@ -118,6 +121,14 @@ public class EntrepriseService {
     if (dto.getSiteWeb() != null) {
         entreprise.setSiteWeb(dto.getSiteWeb());
     }
+    if (dto.getSignataire() != null) {
+        entreprise.setSignataire(dto.getSignataire());
+    }
+    if (dto.getSignataireNom() != null) {
+        entreprise.setSignataireNom(dto.getSignataireNom());
+    }
+
+    
     
     
 

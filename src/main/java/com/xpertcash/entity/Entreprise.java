@@ -38,6 +38,12 @@ public class Entreprise {
 
     @Column(nullable = true)
     private String siege;
+
+    @Column(nullable = true)
+    private String signataire;
+
+    @Column(nullable = true)
+    private String signataireNom;
     
     @Column(nullable = true)
     private String nina;

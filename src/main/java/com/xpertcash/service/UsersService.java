@@ -136,6 +136,8 @@ public class UsersService {
         entreprise.setPays("default");
         entreprise.setSecteur("default");
         entreprise.setRccm("default");
+        entreprise.setSecteur("fournisseur");
+        entreprise.setSignataireNom("fournisseur");
         entreprise.setSiteWeb("www.votre-entreprise.com");
 
         
@@ -712,6 +714,8 @@ public class UsersService {
     dto.setSecteur(entreprise.getSecteur());
     dto.setRccm(entreprise.getRccm());
     dto.setSiteWeb(entreprise.getSiteWeb());
+    dto.setSignataire(entreprise.getSignataire());
+    dto.setSignataireNom(entreprise.getSignataireNom());
 
     return dto;
 }

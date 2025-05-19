@@ -16,6 +16,8 @@ public class UpdateEntrepriseDTO {
     private String pays;
     private String secteur;
     private String siteWeb;
+    private String signataire;
+    private String signataireNom;
    
 
 }

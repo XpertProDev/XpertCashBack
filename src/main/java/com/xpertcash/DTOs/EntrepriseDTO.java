@@ -23,6 +23,8 @@ public class EntrepriseDTO {
         private String secteur;
         private String rccm;
         private String siteWeb;
+        private String signataire;
+        private String signataireNom;
 
         public EntrepriseDTO() {
         }
@@ -30,7 +32,7 @@ public class EntrepriseDTO {
         // Constructeur personnalisé
     public EntrepriseDTO(String nom, String adminNom, LocalDateTime createdAt, String adresse, 
           String logo, String siege, String nina, String nif, String banque, String email, String telephone, String pays,
-          String secteur, String rccm, String siteWeb) {
+          String secteur, String rccm, String siteWeb, String signataire, String signataireNom) {
         this.nom = nom;
         this.adminNom = adminNom;
         this.createdAt = createdAt;
@@ -46,6 +48,8 @@ public class EntrepriseDTO {
         this.secteur = secteur;
         this.rccm = rccm;
         this.siteWeb = siteWeb;
+        this.signataire = signataire;
+        this.signataireNom = signataireNom;
 
     }
 
