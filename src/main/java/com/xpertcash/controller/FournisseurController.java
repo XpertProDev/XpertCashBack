@@ -92,6 +92,7 @@ public class FournisseurController {
 
         List<Map<String, Object>> result = fournisseurs.stream().map(fournisseur -> {
             Map<String, Object> map = new HashMap<>();
+            map.put("id", fournisseur.getId());
             map.put("nomComplet", fournisseur.getNomComplet());
             map.put("nomSociete", fournisseur.getNomSociete());
             map.put("adresse", fournisseur.getAdresse());
