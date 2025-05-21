@@ -1,9 +1,9 @@
 package com.xpertcash.entity;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 import jakarta.persistence.*;
-import jakarta.persistence.ManyToOne;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -21,6 +21,11 @@ public class FactProHistoriqueAction {
     private String action;
 
     private LocalDateTime dateAction;
+    @Column(precision = 15, scale = 2)
+    private BigDecimal montantFacture;
+
+
+
 
     @ManyToOne
     private User utilisateur;
@@ -29,5 +34,6 @@ public class FactProHistoriqueAction {
     private FactureProForma facture;
 
     private String details; 
+
 
 }

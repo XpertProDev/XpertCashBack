@@ -1,5 +1,6 @@
 package com.xpertcash.service;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -75,6 +76,10 @@ public class FactProHistoriqueService {
     historique.put("description", facture.getDescription());
     historique.put("statut", facture.getStatut());
 
+    //Montant du depart de la facture qui est le montant total HT
+    historique.put("montantDepart", facture.getTotalHT());
+    
+
     historique.put("creePar", facture.getUtilisateurCreateur() != null ?
         facture.getUtilisateurCreateur().getNomComplet() : "Inconnu");
 
@@ -98,6 +103,7 @@ public class FactProHistoriqueService {
             entry.put("action", action.getAction());
             entry.put("date", action.getDateAction());
             entry.put("utilisateur", action.getUtilisateur().getNomComplet());
+            entry.put("montant", action.getMontantFacture());
             actionsResume.add(entry);
         }
     }
@@ -115,6 +121,7 @@ public void enregistrerActionHistorique(FactureProForma facture, User user, Stri
     historique.setUtilisateur(user);
     historique.setAction(action);
     historique.setDateAction(LocalDateTime.now());
+    historique.setMontantFacture(BigDecimal.valueOf(facture.getTotalHT()));
     historique.setDetails(details);
 
     factProHistoriqueActionRepository.save(historique);

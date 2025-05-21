@@ -17,7 +17,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.xpertcash.DTOs.FactureDTO;
 import com.xpertcash.DTOs.FournisseurDTO;
 import com.xpertcash.configuration.JwtUtil;
 import com.xpertcash.entity.Facture;
@@ -28,8 +27,6 @@ import com.xpertcash.repository.FournisseurRepository;
 import com.xpertcash.repository.StockProduitFournisseurRepository;
 import com.xpertcash.repository.UsersRepository;
 import com.xpertcash.service.FournisseurService;
-import com.xpertcash.service.ProduitService;
-
 import jakarta.servlet.http.HttpServletRequest;
 
 @RestController
@@ -44,8 +41,6 @@ public class FournisseurController {
     @Autowired
     private StockProduitFournisseurRepository stockProduitFournisseurRepository;
 
-     @Autowired
-    private ProduitService produitService;
 
     @Autowired
     private FactureRepository factureRepository;
