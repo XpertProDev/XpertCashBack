@@ -237,6 +237,7 @@ public class MailService {
 
     public void sendEmailWithAttachments(
             String toEmail,
+            String ccEmail,
             String subject,
             String htmlContent,
             List<MultipartFile> attachments
@@ -246,6 +247,9 @@ public class MailService {
 
         helper.setFrom(from);
         helper.setTo(toEmail.split(","));
+        if (ccEmail != null && !ccEmail.isBlank()) {
+            helper.setCc(ccEmail.split(","));
+        }
         helper.setSubject(subject);
         helper.setText(htmlContent, true);
 

@@ -7,7 +7,7 @@ import lombok.Data;
 @Data
 
 public class EntrepriseDTO {
-
+        private Long id;
         private String nom;
         private String adminNom;
         private LocalDateTime createdAt;
@@ -30,9 +30,10 @@ public class EntrepriseDTO {
         }
 
         // Constructeur personnalisé
-    public EntrepriseDTO(String nom, String adminNom, LocalDateTime createdAt, String adresse, 
+    public EntrepriseDTO( Long id ,String nom, String adminNom, LocalDateTime createdAt, String adresse, 
           String logo, String siege, String nina, String nif, String banque, String email, String telephone, String pays,
           String secteur, String rccm, String siteWeb, String signataire, String signataireNom) {
+        this.id = id;
         this.nom = nom;
         this.adminNom = adminNom;
         this.createdAt = createdAt;

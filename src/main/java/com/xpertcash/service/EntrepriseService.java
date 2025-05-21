@@ -44,6 +44,7 @@ public class EntrepriseService {
         // Mapper les entreprises en DTO
         List<EntrepriseDTO> entrepriseDTOs = entreprises.stream()
                 .map(entreprise -> new EntrepriseDTO(
+                        entreprise.getId(),
                         entreprise.getNomEntreprise(),
                         entreprise.getAdmin() != null ? entreprise.getAdmin().getNomComplet() : "Aucun Admin", 
                         entreprise.getCreatedAt(),

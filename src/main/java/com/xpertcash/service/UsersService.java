@@ -699,6 +699,7 @@ public class UsersService {
 
     // Création et retour du DTO
     EntrepriseDTO dto = new EntrepriseDTO();
+    dto.setId(entreprise.getId());
     dto.setNom(entreprise.getNomEntreprise());
     dto.setAdminNom(user.getNomComplet());
     dto.setCreatedAt(entreprise.getCreatedAt());

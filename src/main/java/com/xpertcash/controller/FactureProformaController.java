@@ -100,6 +100,7 @@ public class FactureProformaController {
     public ResponseEntity<?> envoyerFactureEmail(
             @PathVariable Long id,
             @RequestParam("to") String to,
+            @RequestParam("cc") String cc,
             @RequestParam("subject") String subject,
             @RequestParam("body") String body,
             @RequestParam(value = "attachments", required = false) MultipartFile[] attachments,
@@ -111,6 +112,7 @@ public class FactureProformaController {
             logger.info("=== REQUÊTE REÇUE ===");
             logger.info("ID Facture: {}", id);
             logger.info("Destinataire: {}", to);
+            logger.info("Copie: {}", cc);
             logger.info("Sujet: {}", subject);
             logger.info("Corps (taille): {}", body.length());
             logger.info("Pièces jointes: {}", attachments != null ? attachments.length : 0);
@@ -125,7 +127,7 @@ public class FactureProformaController {
             }
 
             // Envoi de l'email
-            mailService.sendEmailWithAttachments(to, subject, body,
+            mailService.sendEmailWithAttachments(to,cc, subject, body,
                     attachments != null ? Arrays.asList(attachments) : Collections.emptyList());
 
             logger.info("Email envoyé avec succès");
