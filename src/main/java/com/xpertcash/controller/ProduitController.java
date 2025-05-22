@@ -1,6 +1,6 @@
 package com.xpertcash.controller;
 
-import java.time.LocalDateTime;
+
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -13,7 +13,6 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
-
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.xpertcash.DTOs.AjouterStockRequest;
 import com.xpertcash.DTOs.FactureDTO;
@@ -21,18 +20,9 @@ import com.xpertcash.DTOs.ProduitDTO;
 import com.xpertcash.DTOs.ProduitRequest;
 import com.xpertcash.DTOs.RetirerStockRequest;
 import com.xpertcash.DTOs.StockHistoryDTO;
-import com.xpertcash.entity.Categorie;
 import com.xpertcash.entity.Facture;
-import com.xpertcash.entity.Produit;
 import com.xpertcash.entity.Stock;
-import com.xpertcash.entity.StockHistory;
-import com.xpertcash.entity.Unite;
 import com.xpertcash.exceptions.DuplicateProductException;
-import com.xpertcash.repository.CategorieRepository;
-import com.xpertcash.repository.ProduitRepository;
-import com.xpertcash.repository.StockHistoryRepository;
-import com.xpertcash.repository.StockRepository;
-import com.xpertcash.repository.UniteRepository;
 import com.xpertcash.service.ProduitService;
 import com.xpertcash.service.IMAGES.ImageStorageService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -48,16 +38,7 @@ public class ProduitController {
     private ProduitService produitService;
     @Autowired
     private ImageStorageService imageStorageService;
-    @Autowired
-    private ProduitRepository produitRepository;
-    @Autowired
-    private StockRepository stockRepository;
-    @Autowired
-    private CategorieRepository categorieRepository;
-    @Autowired
-    private UniteRepository uniteRepository;
-    @Autowired
-    private StockHistoryRepository stockHistoryRepository;
+   
 
 
     // Endpoint pour Créer un produit et décider si il doit être ajouté au stock
@@ -286,11 +267,6 @@ public ResponseEntity<?> createProduit(
                 }
             }
             
-
-
-            
-
-
 
         // Endpoint pour retirer la quantité du produit en stock (un ou plusieurs produits)
         @PatchMapping(value = "/retirerStock", consumes = { MediaType.APPLICATION_JSON_VALUE })

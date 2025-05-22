@@ -438,46 +438,57 @@ public class ProduitService {
 
 
     // Méthode pour enregistrer une facture
-    public Facture enregistrerFacture(String type, List<Produit> produits, Map<Long, Integer> quantites, String description,String codeFournisseur,Fournisseur fournisseur, User user) {
-        Facture facture = new Facture();
-        facture.setNumeroFacture(generateNumeroFacture());
-        facture.setType(type);
-        facture.setDescription(description);
-        facture.setDateFacture(LocalDateTime.now());
-        facture.setUser(user);
+   public Facture enregistrerFacture(String type, List<Produit> produits, Map<Long, Integer> quantites,
+                                  String description, String codeFournisseur, Fournisseur fournisseur, User user) {
+    Facture facture = new Facture();
+    facture.setNumeroFacture(generateNumeroFacture());
+    facture.setType(type);
+    facture.setDescription(description);
+    facture.setDateFacture(LocalDateTime.now());
+    facture.setUser(user);
 
-        // Associer la boutique à la facture (en supposant que tous les produits appartiennent à la même boutique)
-        if (!produits.isEmpty() && produits.get(0).getBoutique() != null) {
-            facture.setBoutique(produits.get(0).getBoutique());
-        } else {
-            throw new RuntimeException("Impossible de créer une facture sans boutique associée.");
-        }
+    // Associer la boutique à la facture
+    if (!produits.isEmpty() && produits.get(0).getBoutique() != null) {
+        facture.setBoutique(produits.get(0).getBoutique());
+    } else {
+        throw new RuntimeException("Impossible de créer une facture sans boutique associée.");
+    }
 
-        List<FactureProduit> factureProduits = new ArrayList<>();
-        
-        for (Produit produit : produits) {
-            FactureProduit factureProduit = new FactureProduit();
-            factureProduit.setFacture(facture);
-            factureProduit.setProduit(produit);
-            factureProduit.setQuantite(quantites.get(produit.getId()));
-            factureProduit.setPrixUnitaire(produit.getPrixVente());
-            factureProduit.setTotal(factureProduit.getQuantite() * factureProduit.getPrixUnitaire());
+    List<FactureProduit> factureProduits = new ArrayList<>();
+    for (Produit produit : produits) {
+        FactureProduit factureProduit = new FactureProduit();
+        factureProduit.setFacture(facture);
+        factureProduit.setProduit(produit);
+        factureProduit.setQuantite(quantites.get(produit.getId()));
+        factureProduit.setPrixUnitaire(produit.getPrixVente());
+        factureProduit.setTotal(factureProduit.getQuantite() * factureProduit.getPrixUnitaire());
+        factureProduits.add(factureProduit);
+    }
 
-            factureProduits.add(factureProduit);
-        }
+    facture.setFactureProduits(factureProduits);
 
-        facture.setFactureProduits(factureProduits);
+    if (codeFournisseur != null && !codeFournisseur.isEmpty()) {
+        facture.setCodeFournisseur(codeFournisseur);
+    }
 
-        if (codeFournisseur != null && !codeFournisseur.isEmpty()) {
-            facture.setCodeFournisseur(codeFournisseur);
+    // Fournisseur requis seulement pour certaines opérations
+    if ("Ajout".equalsIgnoreCase(type) || "Approvisionnement".equalsIgnoreCase(type)) {
+        if (fournisseur == null) {
+            throw new RuntimeException("Le fournisseur est requis pour une facture de type '" + type + "'");
         }
 
         Fournisseur fournisseurEntity = fournisseurRepository.findById(fournisseur.getId())
             .orElseThrow(() -> new RuntimeException("Fournisseur introuvable"));
         facture.setFournisseur(fournisseurEntity);
-
-        return factureRepository.save(facture);
+    } else if (fournisseur != null) {
+        // Cas facultatif : on le récupère s'il est présent, sinon on l'ignore
+        Fournisseur fournisseurEntity = fournisseurRepository.findById(fournisseur.getId())
+            .orElseThrow(() -> new RuntimeException("Fournisseur introuvable"));
+        facture.setFournisseur(fournisseurEntity);
     }
+
+    return factureRepository.save(facture);
+}
 
      //Methode liste Historique sur Stock
         public List<StockHistoryDTO> getStockHistory(Long produitId) {
