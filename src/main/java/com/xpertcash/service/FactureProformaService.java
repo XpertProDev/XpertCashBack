@@ -496,16 +496,6 @@ public class FactureProformaService {
             facture.setStatut(modifications.getStatut());
         }
 
-    //          // 📝 Historique des modifications générales (déjà présent)
-    //          factProHistoriqueService.enregistrerActionHistorique(
-    //                  facture,
-    //                  user,
-    //                  "Modification",
-    //                  "Détails modifiés: " +
-    //                          (modifications.getDescription() != null ? "Description" : "") +
-    //                          (remisePourcentage != null ? ", Remise" : "") +
-    //                          (appliquerTVA != null ? ", TVA" : "")
-    //          );
 
         return factureProformaRepository.save(facture);
     }
