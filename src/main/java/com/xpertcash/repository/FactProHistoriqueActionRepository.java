@@ -9,6 +9,10 @@ import com.xpertcash.entity.FactProHistoriqueAction;
 
 @Repository
 public interface FactProHistoriqueActionRepository extends JpaRepository<FactProHistoriqueAction, Long> {
+
     List<FactProHistoriqueAction> findByFactureIdOrderByDateActionAsc(Long factureId);
+
+    // Tri descendant (nouvelle méthode)
+    List<FactProHistoriqueAction> findByFactureIdOrderByDateActionDesc(Long factureId);
 
 }

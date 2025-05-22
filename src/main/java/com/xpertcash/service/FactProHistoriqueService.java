@@ -84,23 +84,22 @@ public class FactProHistoriqueService {
     historique.put("approuvePar", facture.getUtilisateurApprobateur() != null ?
         facture.getUtilisateurApprobateur().getNomComplet() : "Non approuvé");
 
-    // Historique simplifié : actions clés
-    List<FactProHistoriqueAction> actionList = factProHistoriqueActionRepository
-            .findByFactureIdOrderByDateActionAsc(factureId);
+      // Récupérer TOUTES les actions historiques sans filtre
+      List<FactProHistoriqueAction> actionList = factProHistoriqueActionRepository
+              .findByFactureIdOrderByDateActionDesc(factureId); // Tri décroissant
 
-    List<Map<String, Object>> actionsResume = new ArrayList<>();
+      List<Map<String, Object>> actionsResume = new ArrayList<>();
 
     Set<String> actionsImportantes = Set.of("Création", "Modification", "Approbation", "Approuver", "Envoi", "Validation");
 
-    for (FactProHistoriqueAction action : actionList) {
-        if (actionsImportantes.contains(action.getAction())) {
-            Map<String, Object> entry = new HashMap<>();
-            entry.put("action", action.getAction());
-            entry.put("date", action.getDateAction());
-            entry.put("utilisateur", action.getUtilisateur().getNomComplet());
-            actionsResume.add(entry);
-        }
-    }
+      for (FactProHistoriqueAction action : actionList) {
+          Map<String, Object> entry = new HashMap<>();
+          entry.put("action", action.getAction());
+          entry.put("date", action.getDateAction());
+          entry.put("utilisateur", action.getUtilisateur().getNomComplet());
+          entry.put("details", action.getDetails());
+          actionsResume.add(entry);
+      }
 
     historique.put("historiqueActions", actionsResume);
 

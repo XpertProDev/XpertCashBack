@@ -302,6 +302,14 @@ public FactureProForma modifierFacture(Long factureId, Double remisePourcentage,
     if (modifications.getStatut() == StatutFactureProForma.VALIDE && facture.getStatut() != StatutFactureProForma.VALIDE) {
         FactureReelle factureReelle = factureReelleService.genererFactureReelle(facture);
         System.out.println("✅ Facture Réelle générée avec succès : " + factureReelle.getNumeroFacture());
+
+        // Enregistrement de la validation
+        factProHistoriqueService.enregistrerActionHistorique(
+                facture,
+                user,
+                "Validation",
+                "Facture validée définitivement. Facture réelle générée: " + factureReelle.getNumeroFacture()
+        );
     }
 
     // ✅ Approbation de la facture
@@ -337,6 +345,17 @@ public FactureProForma modifierFacture(Long factureId, Double remisePourcentage,
 
             facture.setUtilisateurApprobateur(user);
             facture.setDateApprobation(LocalDateTime.now());
+
+            // Enregistrement de l'action d'approbation
+            factProHistoriqueService.enregistrerActionHistorique(
+                    facture,
+                    user,
+                    "Approbation",
+                    "Facture approuvée par " + user.getNomComplet()
+//                            + (approbateurs != null ? " avec les approbateurs: " : "")
+//                                   + approbateurs.stream().map(User::getNomComplet).collect(Collectors.joining(", ")) : "")
+            );
+
         } else {
             System.out.println("ℹ️ Facture déjà approuvée une fois. Appropriation directe autorisée.");
         }
@@ -361,6 +380,16 @@ public FactureProForma modifierFacture(Long factureId, Double remisePourcentage,
 
         facture.setApprobateurs(approbateurs);
         System.out.println("👥 Approbateurs ajoutés : " + approbateurs.stream().map(User::getId).toList());
+
+        // Enregistrement de la demande d'approbation
+        factProHistoriqueService.enregistrerActionHistorique(
+                facture,
+                user,
+                "Demande Approbation",
+                "Demande d'approbation envoyée à : " +
+                        approbateurs.stream().map(User::getNomComplet).collect(Collectors.joining(", "))
+        );
+
     }
 
     // 🔁 Mise à jour de la date de relance
@@ -409,6 +438,15 @@ public FactureProForma modifierFacture(Long factureId, Double remisePourcentage,
             if (modifications.getMethodeEnvoi() == MethodeEnvoi.EMAIL) {
                 log.info("📨 La facture {} est marquée ENVOYÉE par EMAIL. Le front doit appeler le service d'envoi de mail.", facture.getNumeroFacture());
             }
+
+            // Enregistrement de l'envoi
+            factProHistoriqueService.enregistrerActionHistorique(
+                    facture,
+                    user,
+                    "Envoi",
+                    "Facture envoyée au client via " + facture.getMethodeEnvoi()
+                    // + (facture.getMethodeEnvoi() == MethodeEnvoi.EMAIL ) // ? " à " + LocalDateTime.now().plusHours(72) : "")
+            );
         }
 
 
@@ -462,13 +500,16 @@ public FactureProForma modifierFacture(Long factureId, Double remisePourcentage,
         facture.setStatut(modifications.getStatut());
     }
 
-    // 📝 Historique
-    factProHistoriqueService.enregistrerActionHistorique(
-        facture,
-        user,
-        "Modification",
-        "La facture a été modifiée (description: " + facture.getDescription() + ")"
-    );
+//          // 📝 Historique des modifications générales (déjà présent)
+//          factProHistoriqueService.enregistrerActionHistorique(
+//                  facture,
+//                  user,
+//                  "Modification",
+//                  "Détails modifiés: " +
+//                          (modifications.getDescription() != null ? "Description" : "") +
+//                          (remisePourcentage != null ? ", Remise" : "") +
+//                          (appliquerTVA != null ? ", TVA" : "")
+//          );
 
     return factureProformaRepository.save(facture);
 }
