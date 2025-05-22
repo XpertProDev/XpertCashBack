@@ -25,8 +25,6 @@ public class FactProHistoriqueAction {
     private BigDecimal montantFacture;
 
 
-
-
     @ManyToOne
     private User utilisateur;
 
