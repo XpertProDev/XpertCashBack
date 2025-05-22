@@ -229,6 +229,9 @@ public class FactureProformaService {
         FactureProForma facture = factureProformaRepository.findById(factureId)
                 .orElseThrow(() -> new RuntimeException("Facture non trouvée !"));
 
+        // Stocker l'ancien montant total HT avant toute modification
+        double ancienTotalHT = facture.getTotalHT();
+
         // 🔐 Extraction de l'utilisateur depuis le token JWT
         String token = request.getHeader("Authorization");
         if (token == null || !token.startsWith("Bearer ")) {
@@ -253,41 +256,38 @@ public class FactureProformaService {
         // 🔒 Traitement spécial si facture VALIDÉE
         if (facture.getStatut() == StatutFactureProForma.VALIDE) {
             boolean tentativeModification = modifications.getLignesFacture() != null
-                || remisePourcentage != null
-                || appliquerTVA != null
-                || (modifications.getStatut() != null && modifications.getStatut() != StatutFactureProForma.ANNULE);
+                    || remisePourcentage != null
+                    || appliquerTVA != null
+                    || (modifications.getStatut() != null && modifications.getStatut() != StatutFactureProForma.ANNULE);
 
             if (tentativeModification) {
                 throw new RuntimeException("Impossible de modifier une facture VALIDÉE, sauf pour l’annuler.");
             }
-
-
-
         }
 
-             // Si demande d’annulation
-            if (modifications.getStatut() == StatutFactureProForma.ANNULE) {
-                facture.setStatut(StatutFactureProForma.ANNULE);
-                facture.setDateAnnulation(LocalDateTime.now());
-                facture.setUtilisateurAnnulateur(user);
-                facture.setDateRelance(null);
-                facture.setDernierRappelEnvoye(null);
-                facture.setNotifie(false);
+        // Si demande d’annulation
+        if (modifications.getStatut() == StatutFactureProForma.ANNULE) {
+            facture.setStatut(StatutFactureProForma.ANNULE);
+            facture.setDateAnnulation(LocalDateTime.now());
+            facture.setUtilisateurAnnulateur(user);
+            facture.setDateRelance(null);
+            facture.setDernierRappelEnvoye(null);
+            facture.setNotifie(false);
 
-                factureReelleRepository.findByFactureProForma(facture).ifPresent(factureReelle -> {
-                    factureReelleRepository.delete(factureReelle);
-                    System.out.println("🗑️ Facture réelle supprimée.");
-                });
+            factureReelleRepository.findByFactureProForma(facture).ifPresent(factureReelle -> {
+                factureReelleRepository.delete(factureReelle);
+                System.out.println("🗑️ Facture réelle supprimée.");
+            });
 
-                factProHistoriqueService.enregistrerActionHistorique(
+            factProHistoriqueService.enregistrerActionHistorique(
                     facture,
                     user,
                     "Annulation",
                     "La facture a été annulée. La facture réelle associée a été supprimée."
-                );
+            );
 
-                return factureProformaRepository.save(facture);
-            }
+            return factureProformaRepository.save(facture);
+        }
 
         // 🔁 Application des modifications normales
         facture.setUtilisateurModificateur(user);
@@ -299,7 +299,6 @@ public class FactureProformaService {
             FactureReelle factureReelle = factureReelleService.genererFactureReelle(facture);
             System.out.println("✅ Facture Réelle générée avec succès : " + factureReelle.getNumeroFacture());
 
-            // Enregistrement de la validation
             factProHistoriqueService.enregistrerActionHistorique(
                     facture,
                     user,
@@ -312,8 +311,8 @@ public class FactureProformaService {
         if (modifications.getStatut() == StatutFactureProForma.APPROUVE) {
             boolean dejaApprouvee = facture.getDateApprobation() != null;
 
-                facture.setDateAnnulation(null);
-                facture.setUtilisateurAnnulateur(null);
+            facture.setDateAnnulation(null);
+            facture.setUtilisateurAnnulateur(null);
 
             if (!dejaApprouvee) {
                 boolean estModificateur = facture.getUtilisateurModificateur() != null &&
@@ -342,20 +341,42 @@ public class FactureProformaService {
                 facture.setUtilisateurApprobateur(user);
                 facture.setDateApprobation(LocalDateTime.now());
 
-                // Enregistrement de l'action d'approbation
-                factProHistoriqueService.enregistrerActionHistorique(
-                        facture,
-                        user,
-                        "Approbation",
-                        "Facture approuvée par " + user.getNomComplet()
-    //                            + (approbateurs != null ? " avec les approbateurs: " : "")
-    //                                   + approbateurs.stream().map(User::getNomComplet).collect(Collectors.joining(", ")) : "")
-                );
 
             } else {
                 System.out.println("ℹ️ Facture déjà approuvée une fois. Appropriation directe autorisée.");
             }
+
+            factProHistoriqueService.enregistrerActionHistorique(
+                    facture,
+                    user,
+                    "Approbation",
+                    "Facture approuvée par " + user.getNomComplet()
+            );
         }
+
+        if (modifications.getStatut() == StatutFactureProForma.BROUILLON) {
+            facture.setStatut(StatutFactureProForma.BROUILLON);
+            factProHistoriqueService.enregistrerActionHistorique(
+                    facture,
+                    user,
+                    "Retour au brouillon",
+                    "La facture est revenue au statut brouillon"
+            );
+        }
+
+        /*
+        // 💡 Bloc de retour automatique en brouillon (trop permissif)
+        if (modifications.getStatut() == StatutFactureProForma.BROUILLON
+                && !facture.getStatut().equals(StatutFactureProForma.BROUILLON)) {
+            facture.setStatut(StatutFactureProForma.BROUILLON);
+            factProHistoriqueService.enregistrerActionHistorique(
+                    facture,
+                    user,
+                    "Retour au brouillon",
+                    "La facture est revenue au statut brouillon"
+            );
+        }
+         */
 
         // ✅ Ajout des approbateurs
         if (modifications.getStatut() == StatutFactureProForma.APPROBATION) {
@@ -377,7 +398,6 @@ public class FactureProformaService {
             facture.setApprobateurs(approbateurs);
             System.out.println("👥 Approbateurs ajoutés : " + approbateurs.stream().map(User::getId).toList());
 
-            // Enregistrement de la demande d'approbation
             factProHistoriqueService.enregistrerActionHistorique(
                     facture,
                     user,
@@ -385,7 +405,6 @@ public class FactureProformaService {
                     "Demande d'approbation envoyée à : " +
                             approbateurs.stream().map(User::getNomComplet).collect(Collectors.joining(", "))
             );
-
         }
 
         // 🔁 Mise à jour de la date de relance
@@ -401,52 +420,42 @@ public class FactureProformaService {
 
         // Réinitialisation de relance pour certains statuts
         if (modifications.getStatut() != null &&
-            List.of(StatutFactureProForma.BROUILLON, StatutFactureProForma.APPROUVE, StatutFactureProForma.VALIDE).contains(modifications.getStatut())) {
+                List.of(StatutFactureProForma.BROUILLON, StatutFactureProForma.APPROUVE, StatutFactureProForma.VALIDE).contains(modifications.getStatut())) {
             facture.setDateRelance(null);
             facture.setDernierRappelEnvoye(null);
             facture.setDateAnnulation(null);
             facture.setUtilisateurAnnulateur(null);
         }
 
-
-            // 📩 Passage au statut ENVOYÉ
-            if (modifications.getStatut() == StatutFactureProForma.ENVOYE) {
-
-                // Vérification de la méthode d'envoi
-                if (modifications.getMethodeEnvoi() == null) {
-                    throw new IllegalArgumentException("Veuillez spécifier la méthode d’envoi : PHYSIQUE ou EMAIL.");
-                }
-
-                facture.setStatut(StatutFactureProForma.ENVOYE);
-                facture.setMethodeEnvoi(modifications.getMethodeEnvoi());
-
-                facture.setDateAnnulation(null);
-                facture.setUtilisateurAnnulateur(null);
-
-                // Planification d'une relance automatique sous 72h
-                if (facture.getDateRelance() == null) {
-                    facture.setDateRelance(LocalDateTime.now().plusHours(72));
-                }
-
-                facture.setUtilisateurRelanceur(facture.getUtilisateurModificateur());
-
-                // Si méthode d'envoi = EMAIL, on ne fait qu'enregistrer — le front déclenchera l'envoi réel
-                if (modifications.getMethodeEnvoi() == MethodeEnvoi.EMAIL) {
-                    log.info("📨 La facture {} est marquée ENVOYÉE par EMAIL. Le front doit appeler le service d'envoi de mail.", facture.getNumeroFacture());
-                }
-
-                // Enregistrement de l'envoi
-                factProHistoriqueService.enregistrerActionHistorique(
-                        facture,
-                        user,
-                        "Envoi",
-                        "Facture envoyée au client via " + facture.getMethodeEnvoi()
-                        // + (facture.getMethodeEnvoi() == MethodeEnvoi.EMAIL ) // ? " à " + LocalDateTime.now().plusHours(72) : "")
-                );
+        // 📩 Passage au statut ENVOYÉ
+        if (modifications.getStatut() == StatutFactureProForma.ENVOYE) {
+            if (modifications.getMethodeEnvoi() == null) {
+                throw new IllegalArgumentException("Veuillez spécifier la méthode d’envoi : PHYSIQUE ou EMAIL.");
             }
 
+            facture.setStatut(StatutFactureProForma.ENVOYE);
+            facture.setMethodeEnvoi(modifications.getMethodeEnvoi());
 
+            facture.setDateAnnulation(null);
+            facture.setUtilisateurAnnulateur(null);
 
+            if (facture.getDateRelance() == null) {
+                facture.setDateRelance(LocalDateTime.now().plusHours(72));
+            }
+
+            facture.setUtilisateurRelanceur(facture.getUtilisateurModificateur());
+
+            if (modifications.getMethodeEnvoi() == MethodeEnvoi.EMAIL) {
+                log.info("📨 La facture {} est marquée ENVOYÉE par EMAIL. Le front doit appeler le service d'envoi de mail.", facture.getNumeroFacture());
+            }
+
+            factProHistoriqueService.enregistrerActionHistorique(
+                    facture,
+                    user,
+                    "Envoi",
+                    "Facture envoyée au client via " + facture.getMethodeEnvoi()
+            );
+        }
 
         // 🧾 Mise à jour des lignes de facture
         if (modifications.getLignesFacture() != null) {
@@ -492,22 +501,29 @@ public class FactureProformaService {
         facture.setTotalFacture(montantTotalAPayer);
 
         // ✅ Mise à jour du statut (hors VALIDÉ déjà traité)
+//        if (modifications.getStatut() != null && facture.getStatut() != StatutFactureProForma.VALIDE) {
+//            facture.setStatut(modifications.getStatut());
+//        }
+
         if (modifications.getStatut() != null && facture.getStatut() != StatutFactureProForma.VALIDE) {
-            facture.setStatut(modifications.getStatut());
+            // Ne change le statut que si ce n'est pas une facture APPROUVE, ou si le changement est explicite
+            if (facture.getStatut() != StatutFactureProForma.APPROUVE || modifications.getStatut() == StatutFactureProForma.ANNULE) {
+                facture.setStatut(modifications.getStatut());
+            }
         }
 
-      // 📝 Historique des modifications générales (déjà présent)
-      factProHistoriqueService.enregistrerActionHistorique(
-              facture,
-              user,
-              "Modification",
-              "La facture a été modifiée\n(Montant: " + facture.getTotalHT() + ")"
-
-      );
+        // 📝 Enregistrement de l'action "Modification" uniquement si le montant a changé
+        if (montantTotalHT != ancienTotalHT) {
+            factProHistoriqueService.enregistrerActionHistorique(
+                    facture,
+                    user,
+                    "Modification",
+                    "La facture a été modifiée (montant: " + montantTotalHT + ")"
+            );
+        }
 
         return factureProformaRepository.save(facture);
     }
-
     //Methode pour recuperer les factures pro forma dune entreprise
     public List<Map<String, Object>> getFacturesParEntrepriseParUtilisateur(Long userId) {
         User user = usersRepository.findById(userId)
