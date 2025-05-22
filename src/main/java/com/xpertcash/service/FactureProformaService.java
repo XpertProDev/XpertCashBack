@@ -501,7 +501,8 @@ public class FactureProformaService {
               facture,
               user,
               "Modification",
-              "La facture a été modifier (description: " + facture.getDescription() + ")"
+              "La facture a été modifiée\n(Montant: " + facture.getTotalHT() + ")"
+
       );
 
         return factureProformaRepository.save(facture);
