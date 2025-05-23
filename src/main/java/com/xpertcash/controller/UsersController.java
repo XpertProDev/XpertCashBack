@@ -18,6 +18,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.web.multipart.MultipartFile;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+
 
 import java.util.Collections;
 import java.util.HashMap;
@@ -107,18 +112,26 @@ public class UsersController {
         }
     }
 
-    // Pour la mise en jour de user
-    @PatchMapping("/updateUsers/{id}")
-    public ResponseEntity<Map<String, String>> updateUser(@PathVariable Long id, @RequestBody UpdateUserRequest request) {
-        Map<String, String> response = new HashMap<>();
-        try {
-            usersService.updateUser(id, request);
-            response.put("message", "Utilisateur mis à jour avec succès !");
-            return ResponseEntity.ok(response);
+    // Pour la mise en jour de user en multipart/form-data avec image
+      @PatchMapping(value = "/updateUsers/{id}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE) 
+     public ResponseEntity<?>updateUser(
+            @PathVariable Long id,
+            @RequestPart(value = "user", required = false) String userJson,
+            @RequestPart(value = "photo", required = false) MultipartFile imageUserFile,
+            HttpServletRequest request) {
+        try {  
+            UpdateUserRequest dto = new UpdateUserRequest();
+            if (userJson != null && !userJson.isBlank()) {
+                dto = new ObjectMapper().readValue(userJson, UpdateUserRequest.class);
+            }
+            usersService.updateUser(id, dto, imageUserFile);
+            return ResponseEntity.ok("Utilisateur mis à jour avec succès !");
         } catch (Exception e) {
-            response.put("error", e.getMessage());
-            return ResponseEntity.badRequest().body(response);
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Erreur : " + e.getMessage());
         }
+     
+       
+       
     }
 
     // Déverrouillage du compte via le lien de déverrouillage (GET avec paramètres)

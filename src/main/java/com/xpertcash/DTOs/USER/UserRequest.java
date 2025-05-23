@@ -35,6 +35,7 @@ public class UserRequest {
     private Long entrepriseId;
     private List<BoutiqueResponse> boutiques;
     private String personalCode;
+    private String photo;
 
     public UserRequest(User user) {
         this.id = user.getId();
@@ -42,6 +43,7 @@ public class UserRequest {
         //this.email = user.getEmail();
         this.phone = user.getPhone();
         this.roleType = user.getRole().getName();
+        this.photo = user.getPhoto();
     }
     
 }

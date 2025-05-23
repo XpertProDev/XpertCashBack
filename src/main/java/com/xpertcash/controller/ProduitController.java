@@ -311,7 +311,7 @@ public ResponseEntity<?> createProduit(
         }
       
 
-        //Endpoint tous les produits de toutes les boutiques d'une entreprise
+        //Endpoint GetAll produits de toutes les boutiques d'une entreprise
         @GetMapping("/produits/entreprise/{entrepriseId}")
         public ResponseEntity<?> getProduitsParEntreprise(@PathVariable Long entrepriseId) {
             try {

@@ -14,6 +14,7 @@ import com.xpertcash.repository.EntrepriseRepository;
 import com.xpertcash.repository.PermissionRepository;
 import com.xpertcash.repository.RoleRepository;
 import com.xpertcash.repository.UsersRepository;
+import com.xpertcash.service.IMAGES.ImageStorageService;
 
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
@@ -25,6 +26,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.Date;
@@ -36,6 +41,8 @@ import java.util.Random;
 import java.util.stream.Collectors;
 
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
+
 
 
 @Service
@@ -64,6 +71,9 @@ public class UsersService {
 
     @Autowired
     private PermissionRepository permissionRepository; // Injection du PermissionRepository
+
+     @Autowired
+    private ImageStorageService imageStorageService;
 
 
 
@@ -421,6 +431,7 @@ public class UsersService {
                 newUser.setEntreprise(admin.getEntreprise());
                 newUser.setPersonalCode(personalCode);
                 newUser.setRole(role);
+                newUser.setPhoto("defaultProfile/profil.png");
 
                 // Enregistrer l'utilisateur
                 User savedUser = usersRepository.save(newUser);
@@ -522,17 +533,25 @@ public class UsersService {
     }
 
     // Pour la modification de utilisateur
-    @Transactional
-    public User updateUser(Long userId, UpdateUserRequest request) {
-        User user = usersRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
+   @Transactional
+public User updateUser(Long userId, UpdateUserRequest request, MultipartFile imageUserFile) {
+    User user = usersRepository.findById(userId)
+            .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
 
-        // Vérification obligatoire de l'ancien mot de passe avant toute modification
+    // Détecter s’il y a une modification sensible
+    boolean isSensitiveChange =
+            (request.getNewPassword() != null && !request.getNewPassword().isEmpty()) ||
+            (request.getEmail() != null && !request.getEmail().equals(user.getEmail())) ||
+            (request.getPhone() != null && !request.getPhone().equals(user.getPhone())) ||
+            (request.getNomComplet() != null && !request.getNomComplet().equals(user.getNomComplet()));
+
+    // Si modification sensible, vérification du mot de passe
+    if (isSensitiveChange) {
         if (request.getPassword() == null || !passwordEncoder.matches(request.getPassword(), user.getPassword())) {
             throw new RuntimeException("Mot de passe incorrect. Modification refusée.");
         }
 
-        // Vérification si le nouveau mot de passe est identique à l'ancien
+        // Mise à jour du mot de passe
         if (request.getNewPassword() != null && !request.getNewPassword().isEmpty()) {
             if (request.getNewPassword().length() < 8) {
                 throw new RuntimeException("Le nouveau mot de passe doit contenir au moins 8 caractères.");
@@ -549,6 +568,7 @@ public class UsersService {
             if (existingUserWithPhone.isPresent() && !existingUserWithPhone.get().getId().equals(userId)) {
                 throw new RuntimeException("Ce numéro de téléphone est déjà utilisé par un autre utilisateur.");
             }
+            user.setPhone(request.getPhone());
         }
 
         // Vérification et mise à jour de l'email
@@ -557,21 +577,37 @@ public class UsersService {
             if (existingUserWithEmail.isPresent() && !existingUserWithEmail.get().getId().equals(userId)) {
                 throw new RuntimeException("Cet email est déjà utilisé par un autre utilisateur.");
             }
-        }
-        // Mise à jour des autres informations
-        if (request.getNomComplet() != null) {
-            user.setNomComplet(request.getNomComplet());
-        }
-        if (request.getPhone() != null) {
-            user.setPhone(request.getPhone());
-        }
-        if (request.getEmail() != null) {
             user.setEmail(request.getEmail());
         }
 
-        usersRepository.save(user);
-        return user;
+        // Mise à jour du nom complet
+        if (request.getNomComplet() != null) {
+            user.setNomComplet(request.getNomComplet());
+        }
     }
+
+    // Mise à jour de la photo si image présente
+    if (imageUserFile != null && !imageUserFile.isEmpty()) {
+        String oldImagePath = user.getPhoto();
+        if (oldImagePath != null && !oldImagePath.isBlank()) {
+            Path oldPath = Paths.get("src/main/resources/static" + oldImagePath);
+            try {
+                Files.deleteIfExists(oldPath);
+                System.out.println("🗑️ Ancien photo profile supprimé : " + oldImagePath);
+            } catch (IOException e) {
+                System.out.println("⚠️ Impossible de supprimer l'ancien photo profile : " + e.getMessage());
+            }
+        }
+
+        String newImageUrl = imageStorageService.saveUserImage(imageUserFile);
+        user.setPhoto(newImageUrl);
+        System.out.println("📸 Nouveau logo enregistré : " + newImageUrl);
+    }
+
+    System.out.println("📥 DTO reçu dans le controller : " + request);
+    usersRepository.save(user);
+    return user;
+}
 
     public UserRequest getInfo(Long userId) {
         User user = usersRepository.findById(userId)
@@ -606,7 +642,8 @@ public class UsersService {
             entreprise.getLogo(),
             entreprise.getId(),
             boutiqueResponses,
-            user.getPersonalCode()
+            user.getPersonalCode(),
+            user.getPhoto()
         );
     }
 

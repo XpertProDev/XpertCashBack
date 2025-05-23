@@ -101,7 +101,8 @@ public class FactProHistoriqueService {
           entry.put("action", action.getAction());
           entry.put("date", action.getDateAction());
           entry.put("utilisateur", action.getUtilisateur().getNomComplet());
-            entry.put("montant", action.getMontantFacture());
+          entry.put("photo", action.getUtilisateur().getPhoto());
+          entry.put("montant", action.getMontantFacture());
           entry.put("details", action.getDetails());
           actionsResume.add(entry);
       }
