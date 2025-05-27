@@ -12,7 +12,10 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 
 import com.xpertcash.configuration.JwtUtil;
 import com.xpertcash.entity.Client;
@@ -22,6 +25,7 @@ import com.xpertcash.entity.FactureProForma;
 import com.xpertcash.entity.FactureReelle;
 import com.xpertcash.entity.LigneFactureProforma;
 import com.xpertcash.entity.MethodeEnvoi;
+import com.xpertcash.entity.NoteFactureProForma;
 import com.xpertcash.entity.Produit;
 import com.xpertcash.entity.StatutFactureProForma;
 import com.xpertcash.entity.User;
@@ -29,6 +33,7 @@ import com.xpertcash.repository.ClientRepository;
 import com.xpertcash.repository.EntrepriseClientRepository;
 import com.xpertcash.repository.FactureProformaRepository;
 import com.xpertcash.repository.FactureReelleRepository;
+import com.xpertcash.repository.NoteFactureProFormaRepository;
 import com.xpertcash.repository.ProduitRepository;
 import com.xpertcash.repository.UsersRepository;
 
@@ -62,6 +67,9 @@ public class FactureProformaService {
 
     @Autowired
     private FactureReelleRepository factureReelleRepository;
+
+    @Autowired
+    private NoteFactureProFormaRepository noteFactureProFormaRepository;
 
     @Autowired
     private JwtUtil jwtUtil;
@@ -522,6 +530,20 @@ public class FactureProformaService {
             );
         }
 
+        if (modifications.getNoteModification() != null && !modifications.getNoteModification().isBlank()) {
+            NoteFactureProForma note = new NoteFactureProForma();
+            note.setFacture(facture);
+            note.setAuteur(user);
+            note.setContenu(modifications.getNoteModification());
+            note.setDateCreation(LocalDateTime.now());
+
+            noteFactureProFormaRepository.save(note);
+
+            System.out.println("📝 Note ajoutée à la facture : " + modifications.getNoteModification());
+
+        }
+
+
         return factureProformaRepository.save(facture);
     }
     //Methode pour recuperer les factures pro forma dune entreprise
@@ -624,6 +646,120 @@ public class FactureProformaService {
         return facture;
     }
     
+    //Methode pour modifier note d'une facture pro forma que user lui meme a creer
+    @Transactional
+    public FactureProForma modifierNoteFacture(Long factureId, Long noteId, String nouveauContenu, HttpServletRequest request) {
+    // Récupération de la facture
+    FactureProForma facture = factureProformaRepository.findById(factureId)
+            .orElseThrow(() -> new RuntimeException("Facture non trouvée !"));
+    // Vérification du token JWT
+    String token = request.getHeader("Authorization");
+    if (token == null || !token.startsWith("Bearer ")) {
+        throw new RuntimeException("Token JWT manquant ou mal formaté");
+    }
+    Long userId;
+    try {
+        userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
+    } catch (Exception e) {
+        throw new RuntimeException("Erreur lors de l'extraction de l'ID de l'utilisateur depuis le token", e);
+    }
+    User user = usersRepository.findById(userId)
+            .orElseThrow(() -> new RuntimeException("Utilisateur introuvable !"));
+    // Vérification que l'utilisateur est le créateur de la facture
+    if (!facture.getUtilisateurCreateur().getId().equals(user.getId())) {
+        throw new RuntimeException("Vous n'êtes pas autorisé à modifier les notes de cette facture !");
+    }
+    // Récupération de la note à modifier
+    NoteFactureProForma note = noteFactureProFormaRepository.findById(noteId)
+            .orElseThrow(() -> new RuntimeException("Note introuvable avec l'ID : " + noteId));
+    // Vérification que la note appartient à la facture
+    if (!note.getFacture().getId().equals(factureId)) {
+        throw new RuntimeException("Cette note n'appartient pas à la facture spécifiée !");
+    }
+    // Mise à jour du contenu de la note
+    note.setContenu(nouveauContenu);
+    note.setDateDerniereModification(LocalDateTime.now());
+    note.setModifiee(true);
+    note.setAuteur(user);
     
-    
+    noteFactureProFormaRepository.save(note);
+    return factureProformaRepository.save(facture);
+}
+  
+   // Methode pour supprimer une note d'une facture pro forma que user lui meme a creer
+    @Transactional
+    public FactureProForma supprimerNoteFacture(Long factureId, Long noteId, HttpServletRequest request) {
+        // Récupération de la facture
+        FactureProForma facture = factureProformaRepository.findById(factureId)
+                .orElseThrow(() -> new RuntimeException("Facture non trouvée !"));
+        // Vérification du token JWT
+        String token = request.getHeader("Authorization");
+        if (token == null || !token.startsWith("Bearer ")) {
+            throw new RuntimeException("Token JWT manquant ou mal formaté");
+        }
+        Long userId;
+        try {
+            userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
+        } catch (Exception e) {
+            throw new RuntimeException("Erreur lors de l'extraction de l'ID de l'utilisateur depuis le token", e);
+        }
+        User user = usersRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("Utilisateur introuvable !"));
+        // Vérification que l'utilisateur est le créateur de la facture
+        if (!facture.getUtilisateurCreateur().getId().equals(user.getId())) {
+            throw new RuntimeException("Vous n'êtes pas autorisé à supprimer les notes de cette facture !");
+        }
+        // Récupération de la note à supprimer
+        NoteFactureProForma note = noteFactureProFormaRepository.findById(noteId)
+
+                .orElseThrow(() -> new RuntimeException("Note introuvable avec l'ID : " + noteId));
+        // Vérification que la note appartient à la facture
+        if (!note.getFacture().getId().equals(factureId)) {
+            throw new RuntimeException("Cette note n'appartient pas à la facture spécifiée !");
+        }
+        // Suppression de la note
+        noteFactureProFormaRepository.delete(note);
+        // Enregistrement de l'historique de suppression
+        factProHistoriqueService.enregistrerActionHistorique(
+                facture,
+                user,
+                "Suppression Note",
+                "Note supprimée avec succès."
+        );
+        // Retourner la facture mise à jour
+        return factureProformaRepository.save(facture);
+    }
+   
+    //Methode get note dune facture by id
+    public NoteFactureProForma getNotesByFactureId(Long factureId, Long noteId, HttpServletRequest request) {
+        String token = request.getHeader("Authorization");
+        if (token == null || !token.startsWith("Bearer ")) {
+            throw new RuntimeException("Token JWT manquant ou mal formaté");
+        }
+        Long userId;
+        try {
+            userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
+        } catch (Exception e) {
+            throw new RuntimeException("Erreur lors de l'extraction de l'ID de l'utilisateur depuis le token", e);
+        }
+        User user = usersRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("Utilisateur introuvable !"));
+        // Récupération de la facture
+        FactureProForma facture = factureProformaRepository.findById(factureId)
+                .orElseThrow(() -> new RuntimeException("Facture non trouvée avec l'ID : " + factureId));
+        // Vérification que l'utilisateur a accès à la facture
+        if (!facture.getEntreprise().getId().equals(user.getEntreprise().getId())) {
+            throw new RuntimeException("Accès refusé : Cette facture ne vous appartient pas !");
+        }
+        // Récupération de la note
+        NoteFactureProForma note = noteFactureProFormaRepository.findById(noteId)
+                .orElseThrow(() -> new RuntimeException("Note introuvable avec l'ID : " + noteId));
+        // Vérification que la note appartient à la facture
+        if (!note.getFacture().getId().equals(factureId)) {
+            throw new RuntimeException("Cette note n'appartient pas à la facture spécifiée !");
+        }
+        // Retourner la note
+        return note;
+    }
+
 }

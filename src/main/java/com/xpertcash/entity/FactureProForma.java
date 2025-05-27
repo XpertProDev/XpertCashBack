@@ -24,8 +24,6 @@ public class FactureProForma {
 
     private String numeroFacture;
     private LocalDate dateCreation;
-    @JsonFormat(pattern = "dd-MM-yyyy")
-    @Column(name = "date_facture")
     private LocalDate dateFacture;
     private String description;
     private LocalDateTime dateApprobation;
@@ -40,6 +38,8 @@ public class FactureProForma {
      private Double remise;   // Remise en montant
      private boolean tva;      // TVA 18% si applicable
      private double totalFacture; // Montant final à payer
+
+     private String noteModification;
 
      
 
