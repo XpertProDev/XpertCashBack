@@ -29,6 +29,8 @@ public class NoteFactureProForma {
 
     private boolean modifiee = false;
 
+    private String numeroIdentifiant;
+
     private LocalDateTime dateDerniereModification;
 
 }

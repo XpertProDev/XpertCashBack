@@ -45,6 +45,8 @@ public class ProduitDTO {
     // Nouveaux attributs pour afficher les noms
     private String nomCategorie;
     private String nomUnite;
+    private String typeProduit;
+    
 
     private LocalDateTime createdAt;
     private LocalDateTime lastUpdated;

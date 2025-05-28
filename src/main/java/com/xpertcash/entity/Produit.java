@@ -5,6 +5,8 @@ import java.util.List;
 
 import com.fasterxml.jackson.annotation.JsonBackReference;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.xpertcash.entity.Enum.TypeProduit;
+
 import jakarta.persistence.*;
 import lombok.Data;
 
@@ -32,6 +34,10 @@ public class Produit {
 
     private LocalDateTime createdAt;
     private LocalDateTime lastUpdated;
+
+    @Enumerated(EnumType.STRING)
+    private TypeProduit typeProduit;
+
 
 
     @ManyToOne 

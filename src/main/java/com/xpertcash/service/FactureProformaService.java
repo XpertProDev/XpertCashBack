@@ -8,6 +8,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -27,8 +28,8 @@ import com.xpertcash.entity.LigneFactureProforma;
 import com.xpertcash.entity.MethodeEnvoi;
 import com.xpertcash.entity.NoteFactureProForma;
 import com.xpertcash.entity.Produit;
-import com.xpertcash.entity.StatutFactureProForma;
 import com.xpertcash.entity.User;
+import com.xpertcash.entity.Enum.StatutFactureProForma;
 import com.xpertcash.repository.ClientRepository;
 import com.xpertcash.repository.EntrepriseClientRepository;
 import com.xpertcash.repository.FactureProformaRepository;
@@ -536,6 +537,8 @@ public class FactureProformaService {
             note.setAuteur(user);
             note.setContenu(modifications.getNoteModification());
             note.setDateCreation(LocalDateTime.now());
+            note.setNumeroIdentifiant(genererNumeroNotePourFacture(facture));
+
 
             noteFactureProFormaRepository.save(note);
 
@@ -649,7 +652,6 @@ public class FactureProformaService {
     //Methode pour modifier note d'une facture pro forma que user lui meme a creer
     @Transactional
     public FactureProForma modifierNoteFacture(Long factureId, Long noteId, String nouveauContenu, HttpServletRequest request) {
-    // Récupération de la facture
     FactureProForma facture = factureProformaRepository.findById(factureId)
             .orElseThrow(() -> new RuntimeException("Facture non trouvée !"));
     // Vérification du token JWT
@@ -681,10 +683,36 @@ public class FactureProformaService {
     note.setDateDerniereModification(LocalDateTime.now());
     note.setModifiee(true);
     note.setAuteur(user);
+   
+
+
+
+   
+
     
     noteFactureProFormaRepository.save(note);
     return factureProformaRepository.save(facture);
 }
+
+//Generate
+private String genererNumeroNotePourFacture(FactureProForma facture) {
+    int maxNumero = noteFactureProFormaRepository
+        .findByFacture(facture).stream()
+        .map(NoteFactureProForma::getNumeroIdentifiant)
+        .filter(Objects::nonNull)
+        .map(numero -> {
+            try {
+                return Integer.parseInt(numero.replace("Nº ", ""));
+            } catch (NumberFormatException e) {
+                return 0; // Si le format ne correspond pas
+            }
+        })
+        .max(Integer::compareTo)
+        .orElse(0);
+
+    return "Nº " + (maxNumero + 1);
+}
+
   
    // Methode pour supprimer une note d'une facture pro forma que user lui meme a creer
     @Transactional
@@ -717,6 +745,8 @@ public class FactureProformaService {
         if (!note.getFacture().getId().equals(factureId)) {
             throw new RuntimeException("Cette note n'appartient pas à la facture spécifiée !");
         }
+        String numeroNote = note.getNumeroIdentifiant();
+
         // Suppression de la note
         noteFactureProFormaRepository.delete(note);
         // Enregistrement de l'historique de suppression
@@ -724,7 +754,7 @@ public class FactureProformaService {
                 facture,
                 user,
                 "Suppression Note",
-                "Note supprimée avec succès."
+                "La note " + numeroNote + " a été supprimée."
         );
         // Retourner la facture mise à jour
         return factureProformaRepository.save(facture);

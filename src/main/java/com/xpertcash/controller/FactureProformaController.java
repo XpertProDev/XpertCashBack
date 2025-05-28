@@ -26,8 +26,8 @@ import com.xpertcash.configuration.JwtUtil;
 import com.xpertcash.entity.FactureProForma;
 import com.xpertcash.entity.MethodeEnvoi;
 import com.xpertcash.entity.NoteFactureProForma;
-import com.xpertcash.entity.StatutFactureProForma;
 import com.xpertcash.entity.User;
+import com.xpertcash.entity.Enum.StatutFactureProForma;
 import com.xpertcash.repository.FactureProformaRepository;
 import com.xpertcash.repository.NoteFactureProFormaRepository;
 import com.xpertcash.repository.UsersRepository;
@@ -225,6 +225,7 @@ public class FactureProformaController {
             noteMap.put("note", note.getContenu());
             noteMap.put("dateCreation", note.getDateCreation());
             noteMap.put("modifiee", note.isModifiee());
+            noteMap.put("numeroIdentifiant", note.getNumeroIdentifiant());
             return noteMap;
         }).toList();
 
