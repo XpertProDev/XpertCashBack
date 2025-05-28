@@ -1,6 +1,5 @@
 package com.xpertcash.service.IMAGES;
 
-import com.xpertcash.exceptions.CustomException;
 import com.xpertcash.exceptions.NotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -78,5 +77,29 @@ public class ImageStorageService {
         }
     }
 
+    // Gestion image pour les utilisateurs
+    public String saveUserImage(MultipartFile imageUserFile) {
+        if (imageUserFile == null || imageUserFile.isEmpty()) {
+            throw new NotFoundException("Le fichier image est vide ou invalide.");
+        }
+        try {
+            Path imageRootLocation = Paths.get("src/main/resources/static/userUpload");
+            // Vérifie si le dossier existe, sinon le crée
+            if (!Files.exists(imageRootLocation)) {
+                Files.createDirectories(imageRootLocation);
+            }
+
+            String imageName = UUID.randomUUID().toString() + "_" + imageUserFile.getOriginalFilename();
+            Path imagePath = imageRootLocation.resolve(imageName);
+            Files.copy(imageUserFile.getInputStream(), imagePath, StandardCopyOption.REPLACE_EXISTING);
+
+            String imageUrl = "/userUpload/" + imageName;
+            System.out.println("✅ Image utilisateur sauvegardée : " + imageUrl);
+            return "/userUpload/" + imageName;
+        } catch (IOException e) {
+            System.out.println("❌ ERREUR lors de l'enregistrement de l'image utilisateur : " + e.getMessage());
+            throw new NotFoundException("Erreur lors de l'enregistrement de l'image utilisateur : " + e.getMessage());
+        }
+    }
 }
 

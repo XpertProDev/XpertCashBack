@@ -76,8 +76,7 @@ public class FactProHistoriqueService {
     historique.put("description", facture.getDescription());
     historique.put("statut", facture.getStatut());
 
-    //Montant du depart de la facture qui est le montant total HT
-    historique.put("montantDepart", facture.getTotalHT());
+
     
 
     historique.put("creePar", facture.getUtilisateurCreateur() != null ?
@@ -102,7 +101,8 @@ public class FactProHistoriqueService {
           entry.put("action", action.getAction());
           entry.put("date", action.getDateAction());
           entry.put("utilisateur", action.getUtilisateur().getNomComplet());
-            entry.put("montant", action.getMontantFacture());
+          entry.put("photo", action.getUtilisateur().getPhoto());
+          entry.put("montant", action.getMontantFacture());
           entry.put("details", action.getDetails());
           actionsResume.add(entry);
       }
@@ -123,7 +123,7 @@ public void enregistrerActionHistorique(FactureProForma facture, User user, Stri
     historique.setMontantFacture(BigDecimal.valueOf(facture.getTotalHT()));
     historique.setDetails(details);
 
-    factProHistoriqueActionRepository.save(historique);
+     factProHistoriqueActionRepository.save(historique);
 }
 
 

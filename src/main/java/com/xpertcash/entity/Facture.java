@@ -31,9 +31,10 @@ public class Facture {
     @JoinColumn(name = "boutique_id", referencedColumnName = "id", nullable = false)
     private Boutique boutique;
 
-    @ManyToOne(optional = false)
-    @JoinColumn(name = "fournisseur_id")
+    @ManyToOne(optional = true)
+    @JoinColumn(name = "fournisseur_id", nullable = true)
     private Fournisseur fournisseur;
+
 
 
 

@@ -58,7 +58,7 @@ public class EntrepriseController {
 
   
     
-    @PatchMapping(value = "/updateEntreprise/{entrepriseId}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PatchMapping(value = "/updateEntreprise/{entrepriseId}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE) 
     public ResponseEntity<?> updateEntreprise(
             @PathVariable Long entrepriseId,
             @RequestPart(value = "entreprise", required = false) String entrepriseJson,
