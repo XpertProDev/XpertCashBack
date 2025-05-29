@@ -61,7 +61,9 @@ public class EntrepriseService {
                         entreprise.getRccm(),
                         entreprise.getSiteWeb(),
                         entreprise.getSignataire(),
-                        entreprise.getSignataireNom()
+                        entreprise.getSignataireNom(),
+                        entreprise.getPrefixe(),
+                        entreprise.getSuffixe()
 
                 ))
                 .collect(Collectors.toList());
@@ -127,6 +129,12 @@ public class EntrepriseService {
     }
     if (dto.getSignataireNom() != null) {
         entreprise.setSignataireNom(dto.getSignataireNom());
+    }
+    if (dto.getPrefixe() != null) {
+        entreprise.setPrefixe(dto.getPrefixe());
+    }
+     if (dto.getSuffixe() != null) {
+        entreprise.setSuffixe(dto.getSuffixe());
     }
 
     

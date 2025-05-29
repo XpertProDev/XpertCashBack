@@ -18,6 +18,9 @@ public class UpdateEntrepriseDTO {
     private String siteWeb;
     private String signataire;
     private String signataireNom;
+    private String prefixe;
+    private String suffixe;
+
    
 
 }

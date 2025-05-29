@@ -118,7 +118,8 @@ public class FactureProformaService {
     }
 
     // Génération du numéro de la facture automatiquement
-    facture.setNumeroFacture(generateNumeroFacture());
+    facture.setNumeroFacture(generateNumeroFacture(entrepriseUtilisateur));
+
 
     // Vérifier que la remise est comprise entre 0 et 100%
     if (remisePourcentage == null) {
@@ -216,24 +217,35 @@ public class FactureProformaService {
 }
 
     // Méthode pour générer un numéro de facture unique
-    private String generateNumeroFacture() {
-            // la date actuelle
-            LocalDate currentDate = LocalDate.now();
-            int year = currentDate.getYear();
-            String formattedDate = currentDate.format(DateTimeFormatter.ofPattern("MM-yyyy"));
-            List<FactureProForma> facturesDeLAnnee = factureProformaRepository.findFacturesDeLAnnee(year);
+    private String generateNumeroFacture(Entreprise entreprise) {
+    LocalDate currentDate = LocalDate.now();
+    int year = currentDate.getYear();
+    String formattedDate = currentDate.format(DateTimeFormatter.ofPattern("MM-yyyy"));
+    List<FactureProForma> facturesDeLAnnee = factureProformaRepository.findFacturesDeLAnnee(year);
 
-            int newIndex = 1;
+    int newIndex = 1;
 
-            if (!facturesDeLAnnee.isEmpty()) {
-                String lastNumeroFacture = facturesDeLAnnee.get(0).getNumeroFacture();
-                String[] parts = lastNumeroFacture.split("-");
-                String numeroPart = parts[0].replace("N°", "").trim();
-                newIndex = Integer.parseInt(numeroPart) + 1;
-            }
+    if (!facturesDeLAnnee.isEmpty()) {
+        String lastNumeroFacture = facturesDeLAnnee.get(0).getNumeroFacture();
+        String[] parts = lastNumeroFacture.split("-");
+        String numeroPart = parts[0].replace("N°", "").trim();
+        newIndex = Integer.parseInt(numeroPart) + 1;
+    }
 
-            return String.format("N°%03d-%s", newIndex, formattedDate);
-        }
+    String prefixe = entreprise.getPrefixe();
+    String suffixe = entreprise.getSuffixe();
+
+    if (prefixe != null && !prefixe.isEmpty()) {
+        return String.format("N°: %s-%03d-%s", prefixe, newIndex, formattedDate);
+    }
+
+    if (suffixe != null && !suffixe.isEmpty()) {
+        return String.format("N°: %03d-%s-%s", newIndex, formattedDate, suffixe);
+    }
+
+    return String.format("N°%03d-%s", newIndex, formattedDate);
+}
+
 
     // Méthode pour modifier une facture pro forma
     @Transactional

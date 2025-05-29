@@ -138,7 +138,7 @@ public class UsersService {
         entreprise.setCreatedAt(LocalDateTime.now());
         entreprise.setLogo("defaultLogo/Votre.png");
         entreprise.setAdresse("default");
-        entreprise.setSiege("default");
+        entreprise.setSiege("Ville");
         entreprise.setNina("default");
         entreprise.setNif("default");
         entreprise.setBanque("default");
@@ -147,9 +147,11 @@ public class UsersService {
         entreprise.setPays("default");
         entreprise.setSecteur("default");
         entreprise.setRccm("default");
-        entreprise.setSecteur("fournisseur");
         entreprise.setSignataireNom("fournisseur");
         entreprise.setSiteWeb("www.votre-entreprise.com");
+        entreprise.setPrefixe(null);
+        entreprise.setSuffixe(null);
+        
 
         
         entreprise = entrepriseRepository.save(entreprise);
