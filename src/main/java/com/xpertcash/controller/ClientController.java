@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.xpertcash.entity.Client;
+import com.xpertcash.entity.EntrepriseClient;
 import com.xpertcash.service.ClientService;
 
 import jakarta.persistence.EntityNotFoundException;
@@ -108,5 +109,11 @@ public class ClientController {
             return ResponseEntity.status(status).body(errorBody);
         }
 
+        //Get entreprise client
+        @GetMapping("/entreprise-clients")
+         public ResponseEntity<List<EntrepriseClient>> getEntrepriseClients(HttpServletRequest request) {
+        List<EntrepriseClient> entrepriseClients = clientService.getAllEntrepriseClients(request);
+        return ResponseEntity.ok(entrepriseClients);
+    }
 
 }

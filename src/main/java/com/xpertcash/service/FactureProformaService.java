@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -27,8 +28,11 @@ import com.xpertcash.entity.FactureReelle;
 import com.xpertcash.entity.LigneFactureProforma;
 import com.xpertcash.entity.MethodeEnvoi;
 import com.xpertcash.entity.NoteFactureProForma;
+import com.xpertcash.entity.Permission;
+import com.xpertcash.entity.PermissionType;
 import com.xpertcash.entity.Produit;
 import com.xpertcash.entity.User;
+import com.xpertcash.entity.Enum.RoleType;
 import com.xpertcash.entity.Enum.StatutFactureProForma;
 import com.xpertcash.repository.ClientRepository;
 import com.xpertcash.repository.EntrepriseClientRepository;
@@ -350,9 +354,8 @@ public class FactureProformaService {
                 facture.setUtilisateurApprobateur(user);
                 facture.setDateApprobation(LocalDateTime.now());
 
-
             } else {
-                System.out.println("ℹ️ Facture déjà approuvée une fois. Appropriation directe autorisée.");
+                System.out.println("ℹ Facture déjà approuvée une fois. Appropriation directe autorisée.");
             }
 
             factProHistoriqueService.enregistrerActionHistorique(
@@ -549,6 +552,7 @@ public class FactureProformaService {
 
         return factureProformaRepository.save(facture);
     }
+   
     //Methode pour recuperer les factures pro forma dune entreprise
     public List<Map<String, Object>> getFacturesParEntrepriseParUtilisateur(Long userId) {
         User user = usersRepository.findById(userId)
@@ -560,8 +564,21 @@ public class FactureProformaService {
         }
     
         Long entrepriseId = entreprise.getId();
-        List<FactureProForma> factures = factureProformaRepository.findByEntrepriseId(entrepriseId);
-    
+        List<FactureProForma> factures;
+
+        // S’il est ADMIN ou MANAGER, ou sil a la permisson il peut voir toutes les factures de son entreprise
+        RoleType role = user.getRole().getName();
+        boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
+        boolean hasGestionFacturePermission = user.getRole().hasPermission(PermissionType.Gestion_Facture);
+
+        if (isAdminOrManager || hasGestionFacturePermission) {
+            factures = factureProformaRepository.findByEntrepriseId(entrepriseId);
+        } else {
+            factures = factureProformaRepository.findByEntrepriseIdAndUtilisateur(userId, entrepriseId);
+        }
+
+
+
         List<Map<String, Object>> factureMaps = new ArrayList<>();
     
         for (FactureProForma facture : factures) {
@@ -595,24 +612,6 @@ public class FactureProformaService {
             // Relance et notification
             factureMap.put("dateRelance", facture.getDateRelance());
             factureMap.put("notifie", facture.isNotifie());
-    
-            // Optionnel : Créateur et approbateur
-            /*
-            if (facture.getUtilisateurModificateur() != null) {
-                factureMap.put("utilisateurCreateur", facture.getUtilisateurModificateur().getNomComplet());
-            } else {
-                factureMap.put("utilisateurCreateur", null);
-            }
-    
-            if (facture.getUtilisateurApprobateur() != null) {
-                Map<String, Object> approbateurMap = new HashMap<>();
-                approbateurMap.put("nomComplet", facture.getUtilisateurApprobateur().getNomComplet());
-                approbateurMap.put("email", facture.getUtilisateurApprobateur().getEmail());
-                factureMap.put("utilisateurApprobateur", approbateurMap);
-            } else {
-                factureMap.put("utilisateurApprobateur", null);
-            }
-            */
     
             // Ajout final
             factureMaps.add(factureMap);
@@ -735,7 +734,7 @@ private String genererNumeroNotePourFacture(FactureProForma facture) {
                 .orElseThrow(() -> new RuntimeException("Utilisateur introuvable !"));
         // Vérification que l'utilisateur est le créateur de la facture
         if (!facture.getUtilisateurCreateur().getId().equals(user.getId())) {
-            throw new RuntimeException("Vous n'êtes pas autorisé à supprimer les notes de cette facture !");
+            throw new RuntimeException("Vous n'êtes pas autorisé à supprimer cette note !");
         }
         // Récupération de la note à supprimer
         NoteFactureProForma note = noteFactureProFormaRepository.findById(noteId)

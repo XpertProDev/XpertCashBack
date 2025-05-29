@@ -23,6 +23,7 @@ import com.xpertcash.entity.Categorie;
 import com.xpertcash.entity.Facture;
 import com.xpertcash.entity.FactureProduit;
 import com.xpertcash.entity.Fournisseur;
+import com.xpertcash.entity.PermissionType;
 import com.xpertcash.entity.Produit;
 import com.xpertcash.entity.Stock;
 import com.xpertcash.entity.StockHistory;
@@ -105,9 +106,15 @@ public class ProduitService {
         User admin = usersRepository.findById(adminId)
                 .orElseThrow(() -> new RuntimeException("Admin non trouvé"));
 
-        if (admin.getRole() == null || !admin.getRole().getName().equals(RoleType.ADMIN)) {
-            throw new RuntimeException("Seul un ADMIN peut ajouter des produits !");
+        //autorisation et permission
+        RoleType role = admin.getRole().getName();
+        boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
+        boolean hasPermission = admin.getRole().hasPermission(PermissionType.GERER_PRODUITS);
+
+        if (!isAdminOrManager && !hasPermission) {
+            throw new RuntimeException("Vous n'avez pas les droits pour ajouter un produit !");
         }
+
 
         List<ProduitDTO> produitsAjoutes = new ArrayList<>();
 
@@ -267,6 +274,14 @@ public class ProduitService {
     
         User user = usersRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+        //Verification et Permission
+        RoleType role = user.getRole().getName();
+        boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
+        boolean hasPermission = user.getRole().hasPermission(PermissionType.GERER_PRODUITS);
+
+        if (!isAdminOrManager && !hasPermission) {
+            throw new RuntimeException("Vous n'avez pas les droits pour ajouter du stock !");
+        }
     
         List<Produit> produits = new ArrayList<>();
         Fournisseur fournisseurEntity = null;
@@ -361,6 +376,15 @@ public class ProduitService {
 
     User user = usersRepository.findById(userId)
             .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+
+    // Vérification des permissions
+    RoleType role = user.getRole().getName();
+    boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;  
+    boolean hasPermission = user.getRole().hasPermission(PermissionType.GERER_PRODUITS);
+    if (!isAdminOrManager && !hasPermission) {
+        throw new RuntimeException("Vous n'avez pas les droits pour retirer du stock !");
+    }
+
 
     List<Produit> produits = new ArrayList<>();
 
@@ -607,8 +631,12 @@ public class ProduitService {
     User admin = usersRepository.findById(adminId)
             .orElseThrow(() -> new RuntimeException("Admin non trouvé"));
 
-    if (admin.getRole() == null || !admin.getRole().getName().equals(RoleType.ADMIN)) {
-        throw new RuntimeException("Seul un ADMIN peut modifier les produits !");
+    // Autorisation et permission
+    RoleType role = admin.getRole().getName();
+    boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
+    boolean hasPermission = admin.getRole().hasPermission(PermissionType.GERER_PRODUITS);
+    if (!isAdminOrManager && !hasPermission) {
+        throw new RuntimeException("Vous n'avez pas les droits pour modifier un produit !");
     }
 
     Produit produit = produitRepository.findById(produitId)
