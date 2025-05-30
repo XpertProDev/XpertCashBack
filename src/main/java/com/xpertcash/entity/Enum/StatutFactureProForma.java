@@ -1,4 +1,4 @@
-package com.xpertcash.entity;
+package com.xpertcash.entity.Enum;
 
 public enum StatutFactureProForma {
     BROUILLON,

@@ -43,14 +43,14 @@ public class ProduitController {
 
     // Endpoint pour Créer un produit et décider si il doit être ajouté au stock
     @PostMapping(value = "/create", consumes = { MediaType.MULTIPART_FORM_DATA_VALUE })
-public ResponseEntity<?> createProduit(
-    @RequestPart("boutiqueIds") String boutiqueIdsJson, // Liste des IDs des boutiques
-    @RequestPart("quantites") String quantitesJson, // Liste des quantités associées à chaque boutique
-    @RequestPart("produit") String produitJson, // Données du produit
-    @RequestPart("seuilAlert") String seuilAlertJson, // Données du produit
-    @RequestPart(value = "image", required = false) MultipartFile imageFile, // Fichier d'image (optionnel)
-    @RequestParam boolean addToStock, // Si le produit doit être ajouté au stock
-    @RequestHeader("Authorization") String token, // Token d'authentification
+    public ResponseEntity<?> createProduit(
+    @RequestPart("boutiqueIds") String boutiqueIdsJson,
+    @RequestPart("quantites") String quantitesJson,
+    @RequestPart("produit") String produitJson,
+    @RequestPart("seuilAlert") String seuilAlertJson,
+    @RequestPart(value = "image", required = false) MultipartFile imageFile,
+    @RequestParam boolean addToStock,
+    @RequestHeader("Authorization") String token,
     HttpServletRequest request) {
     try {
         // Vérification de l'image reçue

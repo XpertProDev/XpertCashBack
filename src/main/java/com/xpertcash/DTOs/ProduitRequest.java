@@ -5,6 +5,7 @@ package com.xpertcash.DTOs;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.xpertcash.entity.Categorie;
 import com.xpertcash.entity.Unite;
+import com.xpertcash.entity.Enum.TypeProduit;
 
 import lombok.Data;
 
@@ -22,8 +23,7 @@ public class ProduitRequest {
     private String codeBare;
     private String photo;
     private Boolean enStock;
-
-    // Nouveaux attributs pour afficher les noms
+    private TypeProduit typeProduit;
     private String nomCategorie;
     private String nomUnite;
 }

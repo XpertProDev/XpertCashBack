@@ -6,7 +6,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 import com.xpertcash.entity.Role;
-import com.xpertcash.entity.RoleType;
+import com.xpertcash.entity.Enum.RoleType;
 
 @Repository
 public interface RoleRepository extends JpaRepository<Role, Long>{

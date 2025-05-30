@@ -7,7 +7,7 @@ import java.util.stream.Collectors;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.xpertcash.DTOs.USER.UserRequest;
 import com.xpertcash.entity.FactureReelle;
-import com.xpertcash.entity.StatutPaiementFacture;
+import com.xpertcash.entity.Enum.StatutPaiementFacture;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;

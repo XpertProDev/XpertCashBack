@@ -1,4 +1,4 @@
-package com.xpertcash.entity;
+package com.xpertcash.entity.Enum;
 
 public enum RoleType {
     SUPER_ADMIN,

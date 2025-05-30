@@ -24,12 +24,13 @@ import com.xpertcash.entity.Facture;
 import com.xpertcash.entity.FactureProduit;
 import com.xpertcash.entity.Fournisseur;
 import com.xpertcash.entity.Produit;
-import com.xpertcash.entity.RoleType;
 import com.xpertcash.entity.Stock;
 import com.xpertcash.entity.StockHistory;
 import com.xpertcash.entity.StockProduitFournisseur;
 import com.xpertcash.entity.Unite;
 import com.xpertcash.entity.User;
+import com.xpertcash.entity.Enum.RoleType;
+import com.xpertcash.entity.Enum.TypeProduit;
 import com.xpertcash.repository.BoutiqueRepository;
 import com.xpertcash.repository.CategorieRepository;
 import com.xpertcash.repository.FactureRepository;
@@ -165,12 +166,13 @@ public class ProduitService {
             produit.setPrixVente(produitRequest.getPrixVente());
             produit.setPrixAchat(produitRequest.getPrixAchat());
             produit.setQuantite(quantite != null ? quantite : 0); // Utiliser la quantité pour chaque boutique
-           produit.setSeuilAlert(seuil != null ? seuil : 0);
+            produit.setSeuilAlert(seuil != null ? seuil : 0);
+            produit.setTypeProduit(produitRequest.getTypeProduit());
             produit.setCategorie(categorie);
             produit.setUniteDeMesure(unite);
-            produit.setCodeGenerique(codeGenerique); // Partage le même code
+            produit.setCodeGenerique(codeGenerique);
             produit.setCodeBare(produitRequest.getCodeBare());
-            produit.setPhoto(image); // Utiliser l'URL de l'image
+            produit.setPhoto(image);
             produit.setCreatedAt(LocalDateTime.now());
             produit.setLastUpdated(LocalDateTime.now());
             produit.setBoutique(boutique);
@@ -178,9 +180,9 @@ public class ProduitService {
             Produit savedProduit = produitRepository.save(produit);
 
             // Ajouter au stock si demandé
-            if (addToStock) {
+            if (produitRequest.getTypeProduit() == TypeProduit.PHYSIQUE && addToStock) {
                 Stock stock = new Stock();
-                stock.setStockActuel(quantite != null ? quantite : 0); // Utiliser la quantité spécifique
+                stock.setStockActuel(quantite != null ? quantite : 0);
                 stock.setStockApres(stock.getStockActuel());
                 stock.setQuantiteAjoute(0);
                 stock.setBoutique(boutique);
@@ -221,6 +223,7 @@ public class ProduitService {
         produitDTO.setEnStock(produit.getEnStock());
         produitDTO.setCreatedAt(produit.getCreatedAt());
         produitDTO.setLastUpdated(produit.getLastUpdated());
+
     
         // Assigner les IDs des entités liées (pas directement les objets)
         if (produit.getCategorie() != null) {
@@ -229,6 +232,11 @@ public class ProduitService {
         if (produit.getUniteDeMesure() != null) {
             produitDTO.setUniteId(produit.getUniteDeMesure().getId());
         }
+
+       TypeProduit type = produit.getTypeProduit();
+        produitDTO.setTypeProduit(type != null ? type.name() : null);
+        
+
     
         return produitDTO;
     }
@@ -614,6 +622,12 @@ public class ProduitService {
     if (produitRequest.getQuantite() != null) produit.setQuantite(produitRequest.getQuantite());
     if (produitRequest.getSeuilAlert() != null) produit.setSeuilAlert(produitRequest.getSeuilAlert());
     if (produitRequest.getCodeBare() != null) produit.setCodeBare(produitRequest.getCodeBare());
+
+    if (produitRequest.getTypeProduit() != null) {
+    produit.setTypeProduit(produitRequest.getTypeProduit());
+    }
+
+
    
     if (imageFile != null && !imageFile.isEmpty()) {
         // Supprimer l'ancienne image
@@ -732,6 +746,8 @@ public class ProduitService {
     produitDTO.setLastUpdated(produit.getLastUpdated());
     produitDTO.setNomCategorie(produit.getCategorie() != null ? produit.getCategorie().getNom() : null);
     produitDTO.setNomUnite(produit.getUniteDeMesure() != null ? produit.getUniteDeMesure().getNom() : null);
+    produitDTO.setTypeProduit(produit.getTypeProduit() != null ? produit.getTypeProduit().name() : null);
+
 
 
     
@@ -834,6 +850,12 @@ public class ProduitService {
         // Récupérer et affecter le nom de la catégorie et de l'unité
         produitDTO.setNomCategorie(produit.getCategorie() != null ? produit.getCategorie().getNom() : null);
         produitDTO.setNomUnite(produit.getUniteDeMesure() != null ? produit.getUniteDeMesure().getNom() : null);
+        //Type de produit
+        TypeProduit type = produit.getTypeProduit();
+        produitDTO.setTypeProduit(type != null ? type.name() : null);
+        // Assigner l'ID de la boutique
+        produitDTO.setBoutiqueId(produit.getBoutique() != null ? produit.getBoutique().getId() : null);
+
 
         return produitDTO;
     }

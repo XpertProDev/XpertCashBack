@@ -2,7 +2,7 @@ package com.xpertcash.DTOs;
 
 import java.time.LocalDateTime;
 
-import com.xpertcash.entity.RoleType;
+import com.xpertcash.entity.Enum.RoleType;
 
 import lombok.Data;
 

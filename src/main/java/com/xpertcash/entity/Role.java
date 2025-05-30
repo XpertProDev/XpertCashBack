@@ -3,6 +3,7 @@ package com.xpertcash.entity;
 import java.util.List;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.xpertcash.entity.Enum.RoleType;
 
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
