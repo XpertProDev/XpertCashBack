@@ -211,6 +211,34 @@ public class ClientService {
 
 }
 
+    //Methode pour recuperer seulement les entreprise client
+    public List<EntrepriseClient> getAllEntrepriseClients(HttpServletRequest request) {
+    // 1. Extraire le token et l'utilisateur
+    String token = request.getHeader("Authorization");
+    if (token == null || !token.startsWith("Bearer ")) {
+        throw new RuntimeException("Token JWT manquant ou mal formaté");
+    }
+
+    Long userId;
+    try {
+        userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
+    } catch (Exception e) {
+        throw new RuntimeException("Erreur lors de l'extraction de l'ID utilisateur", e);
+    }
+
+    User user = usersRepository.findById(userId)
+            .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
+
+    Entreprise entreprise = user.getEntreprise();
+    if (entreprise == null) {
+        throw new RuntimeException("Aucune entreprise associée à cet utilisateur");
+    }
+
+    // 2. Retourner uniquement les EntrepriseClient liés à cette entreprise
+    return entrepriseClientRepository.findByEntrepriseId(entreprise.getId());
+}
+
+
     
       // Méthode pour récupérer tous les clients (personnes) et entreprises sans leurs clients associés
       public List<Object> getAllClientsAndEntreprises() {

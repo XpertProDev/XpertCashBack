@@ -10,6 +10,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.xpertcash.configuration.JwtUtil;
 import com.xpertcash.entity.Boutique;
+import com.xpertcash.entity.PermissionType;
 import com.xpertcash.entity.Produit;
 import com.xpertcash.entity.Stock;
 import com.xpertcash.entity.StockHistory;
@@ -201,8 +202,13 @@ public class BoutiqueService {
         User admin = usersRepository.findById(adminId)
                 .orElseThrow(() -> new RuntimeException("Admin non trouvé"));
 
-        if (admin.getRole() == null || !admin.getRole().getName().equals(RoleType.ADMIN)) {
-            throw new RuntimeException("Seul un admin peut transférer des produits !");
+         // Verication et Permission
+        RoleType role = admin.getRole().getName();
+        boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
+        boolean hasPermission = admin.getRole().hasPermission(PermissionType.GERER_PRODUITS);
+
+        if (!isAdminOrManager && !hasPermission) {
+            throw new RuntimeException("Vous n'avez pas les droits pour effectuer les trnasferts !");
         }
 
         Boutique boutiqueSource = boutiqueRepository.findById(boutiqueSourceId)

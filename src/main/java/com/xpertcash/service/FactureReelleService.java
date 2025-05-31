@@ -23,7 +23,6 @@ import com.xpertcash.repository.LigneFactureReelleRepository;
 import com.xpertcash.repository.UsersRepository;
 
 import jakarta.servlet.http.HttpServletRequest;
-import jakarta.transaction.Transactional;
 
 @Service
 public class FactureReelleService {
@@ -47,7 +46,7 @@ public class FactureReelleService {
         FactureReelle factureReelle = new FactureReelle();
         
         // Copier les informations de la proforma
-        factureReelle.setNumeroFacture(genererNumeroFactureReel());
+        factureReelle.setNumeroFacture(genererNumeroFactureReel(factureProForma.getEntreprise()));
         factureReelle.setDateCreation(LocalDate.now());
         factureReelle.setTotalHT(factureProForma.getTotalHT());
         factureReelle.setRemise(factureProForma.getRemise());
@@ -83,7 +82,7 @@ public class FactureReelleService {
     }
 
     
-    private String genererNumeroFactureReel() {
+    private String genererNumeroFactureReel(Entreprise entreprise) {
         LocalDate currentDate = LocalDate.now();
         int year = currentDate.getYear();
         String formattedDate = currentDate.format(DateTimeFormatter.ofPattern("MM-yyyy"));
@@ -98,6 +97,17 @@ public class FactureReelleService {
             String numeroPart = parts[0].replace("FACTURE N°", "").trim();
             newIndex = Integer.parseInt(numeroPart) + 1;
         }
+
+            String prefixe = entreprise != null ? entreprise.getPrefixe() : null;
+            String suffixe = entreprise != null ? entreprise.getSuffixe() : null;
+
+    if (prefixe != null && !prefixe.isEmpty()) {
+        return String.format("FACTURE N°: %s-%03d-%s", prefixe, newIndex, formattedDate);
+    }
+
+    if (suffixe != null && !suffixe.isEmpty()) {
+        return String.format("FACTURE N°: %03d-%s-%s", newIndex, formattedDate, suffixe);
+    }
     
         return String.format("FACTURE N°%03d-%s", newIndex, formattedDate);
     }

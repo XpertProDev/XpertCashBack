@@ -130,8 +130,6 @@ public class UsersController {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Erreur : " + e.getMessage());
         }
      
-       
-       
     }
 
     // Déverrouillage du compte via le lien de déverrouillage (GET avec paramètres)

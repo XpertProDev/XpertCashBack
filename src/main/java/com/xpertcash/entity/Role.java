@@ -31,4 +31,10 @@ public class Role {
         inverseJoinColumns = @JoinColumn(name = "permission_id")
     )
     private List<Permission> permissions;
+
+    public boolean hasPermission(PermissionType permission) {
+    return this.permissions.stream()
+        .map(Permission::getType)
+        .anyMatch(p -> p == permission);
+}
 }

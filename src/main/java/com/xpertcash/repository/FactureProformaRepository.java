@@ -46,7 +46,18 @@ public interface FactureProformaRepository extends JpaRepository<FactureProForma
     List<FactureProForma> findFacturesDeLAnnee(@Param("year") int year);
 
 
-    
+    @Query("""
+    SELECT f FROM FactureProForma f
+    WHERE f.entreprise.id = :entrepriseId
+      AND (
+          f.utilisateurCreateur.id = :userId
+          OR f.utilisateurApprobateur.id = :userId
+          OR :userId IN (SELECT u.id FROM f.approbateurs u)
+      )
+""")
+List<FactureProForma> findByEntrepriseIdAndUtilisateur(@Param("userId") Long userId, @Param("entrepriseId") Long entrepriseId);
+
+
 
     
 }
