@@ -136,20 +136,20 @@ public class UsersService {
         entreprise.setNomEntreprise(nomEntreprise);
         entreprise.setIdentifiantEntreprise(identifiantUnique);
         entreprise.setCreatedAt(LocalDateTime.now());
-        entreprise.setLogo("defaultLogo/Votre.png");
-        entreprise.setAdresse("default");
-        entreprise.setSiege("default");
-        entreprise.setNina("default");
-        entreprise.setNif("default");
-        entreprise.setBanque("default");
-        entreprise.setEmail("default");
-        entreprise.setTelephone("default");
-        entreprise.setPays("default");
-        entreprise.setSecteur("default");
-        entreprise.setRccm("default");
-        entreprise.setSecteur("fournisseur");
-        entreprise.setSignataireNom("fournisseur");
-        entreprise.setSiteWeb("www.votre-entreprise.com");
+        entreprise.setLogo("");
+        entreprise.setAdresse("");
+        entreprise.setSiege("");
+        entreprise.setNina("");
+        entreprise.setNif("");
+        entreprise.setBanque("");
+        entreprise.setEmail("");
+        entreprise.setTelephone("");
+        entreprise.setPays("");
+        entreprise.setSecteur("");
+        entreprise.setRccm("");
+        entreprise.setSecteur("");
+        entreprise.setSignataireNom("");
+        entreprise.setSiteWeb("");
 
         
         entreprise = entrepriseRepository.save(entreprise);
