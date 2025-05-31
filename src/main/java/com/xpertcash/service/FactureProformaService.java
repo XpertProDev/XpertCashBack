@@ -199,7 +199,13 @@ public class FactureProformaService {
 
     // Appliquer la TVA uniquement si elle est activée
     boolean tvaActive = (appliquerTVA != null && appliquerTVA) || facture.isTva();
-    double montantTVA = tvaActive ? (montantTotalHT - remiseMontant) * 0.18 : 0;
+    Double tauxTva = entrepriseUtilisateur.getTauxTva();  // ex: 0.18 pour 18%
+    if (tauxTva == null) {
+        throw new RuntimeException("Le taux de TVA de l'entreprise n'est pas défini !");
+    }
+
+    double montantTVA = tvaActive ? (montantTotalHT - remiseMontant) * tauxTva : 0;
+
 
     // Calcul du montant total à payer
     double montantTotalAPayer = (montantTotalHT - remiseMontant) + montantTVA;

@@ -136,21 +136,22 @@ public class UsersService {
         entreprise.setNomEntreprise(nomEntreprise);
         entreprise.setIdentifiantEntreprise(identifiantUnique);
         entreprise.setCreatedAt(LocalDateTime.now());
-        entreprise.setLogo("defaultLogo/Votre.png");
-        entreprise.setAdresse("default");
-        entreprise.setSiege("Ville");
-        entreprise.setNina("default");
-        entreprise.setNif("default");
-        entreprise.setBanque("default");
-        entreprise.setEmail("default");
-        entreprise.setTelephone("default");
-        entreprise.setPays("default");
-        entreprise.setSecteur("default");
-        entreprise.setRccm("default");
-        entreprise.setSignataireNom("fournisseur");
-        entreprise.setSiteWeb("www.votre-entreprise.com");
+        entreprise.setLogo("");
+        entreprise.setAdresse("");
+        entreprise.setSiege("");
+        entreprise.setNina("");
+        entreprise.setNif("");
+        entreprise.setBanque("");
+        entreprise.setEmail("");
+        entreprise.setTelephone("");
+        entreprise.setPays("");
+        entreprise.setSecteur("");
+        entreprise.setRccm("");
+        entreprise.setSignataireNom("");
+        entreprise.setSiteWeb("");
         entreprise.setPrefixe(null);
         entreprise.setSuffixe(null);
+        entreprise.setTauxTva(null);
         
 
         
@@ -757,6 +758,9 @@ public User updateUser(Long userId, UpdateUserRequest request, MultipartFile ima
     dto.setSiteWeb(entreprise.getSiteWeb());
     dto.setSignataire(entreprise.getSignataire());
     dto.setSignataireNom(entreprise.getSignataireNom());
+    dto.setPrefixe(entreprise.getPrefixe());
+    dto.setSuffixe(entreprise.getSuffixe());
+    dto.setTauxTva(entreprise.getTauxTva());
 
     return dto;
 }

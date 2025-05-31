@@ -63,7 +63,8 @@ public class EntrepriseService {
                         entreprise.getSignataire(),
                         entreprise.getSignataireNom(),
                         entreprise.getPrefixe(),
-                        entreprise.getSuffixe()
+                        entreprise.getSuffixe(),
+                        entreprise.getTauxTva()
 
                 ))
                 .collect(Collectors.toList());
@@ -136,6 +137,11 @@ public class EntrepriseService {
      if (dto.getSuffixe() != null) {
         entreprise.setSuffixe(dto.getSuffixe());
     }
+    if (dto.getTauxTva() != null) {
+        entreprise.setTauxTva(dto.getTauxTva());
+    }
+
+    
 
     
     
