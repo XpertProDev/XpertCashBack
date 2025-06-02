@@ -20,6 +20,7 @@ public class UpdateEntrepriseDTO {
     private String signataireNom;
     private String prefixe;
     private String suffixe;
+    private Double tauxTva;
 
    
 

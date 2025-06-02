@@ -47,7 +47,6 @@ import org.springframework.web.multipart.MultipartFile;
 
 
 
-@ToString
 @Service
 public class UsersService {
 
@@ -149,9 +148,12 @@ public class UsersService {
         entreprise.setPays("");
         entreprise.setSecteur("");
         entreprise.setRccm("");
-        entreprise.setSecteur("");
         entreprise.setSignataireNom("");
         entreprise.setSiteWeb("");
+        entreprise.setPrefixe(null);
+        entreprise.setSuffixe(null);
+        entreprise.setTauxTva(null);
+        
 
         
         entreprise = entrepriseRepository.save(entreprise);
@@ -584,9 +586,9 @@ public User updateUser(Long userId, UpdateUserRequest request, MultipartFile ima
         }
 
         // Mise à jour du nom complet
-        if (request.getNomComplet() != null) {
-            user.setNomComplet(request.getNomComplet());
-        }
+//        if (request.getNomComplet() != null) {
+//            user.setNomComplet(request.getNomComplet());
+//        }
     }
 
     // Mise à jour de la photo si image présente

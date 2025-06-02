@@ -51,6 +51,9 @@ public class Entreprise {
    @Column(nullable = true)
    private String suffixe;
 
+  @Column(nullable = true)
+   private Double tauxTva;
+
     
     @Column(nullable = true)
     private String nina;

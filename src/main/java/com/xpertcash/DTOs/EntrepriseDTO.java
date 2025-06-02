@@ -27,6 +27,7 @@ public class EntrepriseDTO {
         private String signataireNom;
         private String suffixe;
         private String prefixe;
+        private Double tauxTva;
 
         public EntrepriseDTO() {
         }
@@ -34,7 +35,7 @@ public class EntrepriseDTO {
         // Constructeur personnalisé
     public EntrepriseDTO( Long id ,String nom, String adminNom, LocalDateTime createdAt, String adresse, 
           String logo, String siege, String nina, String nif, String banque, String email, String telephone, String pays,
-          String secteur, String rccm, String siteWeb, String signataire, String signataireNom, String suffixe, String prefixe ) {
+          String secteur, String rccm, String siteWeb, String signataire, String signataireNom, String suffixe, String prefixe, Double tauxTva ) {
         this.id = id;
         this.nom = nom;
         this.adminNom = adminNom;
@@ -53,6 +54,7 @@ public class EntrepriseDTO {
         this.siteWeb = siteWeb;
         this.signataire = signataire;
         this.signataireNom = signataireNom;
+        this.tauxTva = tauxTva;
 
     }
 
