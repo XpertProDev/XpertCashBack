@@ -11,6 +11,8 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -227,31 +229,56 @@ public class FactureProformaService {
     LocalDate currentDate = LocalDate.now();
     int year = currentDate.getYear();
     String formattedDate = currentDate.format(DateTimeFormatter.ofPattern("MM-yyyy"));
+
     List<FactureProForma> facturesDeLAnnee = factureProformaRepository.findFacturesDeLAnnee(year);
 
-    int newIndex = 1;
+    long newIndex = 1;
 
     if (!facturesDeLAnnee.isEmpty()) {
         String lastNumeroFacture = facturesDeLAnnee.get(0).getNumeroFacture();
-        String[] parts = lastNumeroFacture.split("-");
-        String numeroPart = parts[0].replace("N°", "").trim();
-        newIndex = Integer.parseInt(numeroPart) + 1;
+
+        Pattern pattern = Pattern.compile("(\\d+)");
+        Matcher matcher = pattern.matcher(lastNumeroFacture);
+
+        if (matcher.find()) {
+            try {
+                newIndex = Long.parseLong(matcher.group(1)) + 1;
+            } catch (NumberFormatException e) {
+                throw new RuntimeException("Impossible de parser l'index numérique dans le numéro : " + lastNumeroFacture, e);
+            }
+        } else {
+            throw new RuntimeException("Format de numéro de facture invalide : " + lastNumeroFacture);
+        }
     }
 
-    String prefixe = entreprise.getPrefixe();
-    String suffixe = entreprise.getSuffixe();
+    String indexFormatte = String.format("%03d", newIndex);
 
-    if (prefixe != null && !prefixe.isEmpty()) {
-        return String.format("N°: %s-%03d-%s", prefixe, newIndex, formattedDate);
+    String prefixe = entreprise.getPrefixe() != null ? entreprise.getPrefixe().trim() : "";
+    String suffixe = entreprise.getSuffixe() != null ? entreprise.getSuffixe().trim() : "";
+
+    StringBuilder numeroFacture = new StringBuilder();
+
+    if (!prefixe.isEmpty() && suffixe.isEmpty()) {
+        numeroFacture.append(prefixe).append("-");
+        numeroFacture.append(indexFormatte).append("-");
+        numeroFacture.append(formattedDate);
+    } else if (prefixe.isEmpty() && !suffixe.isEmpty()) {
+        numeroFacture.append(indexFormatte).append("-");
+        numeroFacture.append(formattedDate).append("-");
+        numeroFacture.append(suffixe);
+    } else if (!prefixe.isEmpty() && !suffixe.isEmpty()) {
+        // Choix : on garde uniquement prefixe ici
+        numeroFacture.append(prefixe).append("-");
+        numeroFacture.append(indexFormatte).append("-");
+        numeroFacture.append(formattedDate);
+    } else {
+        // Pas de prefixe ni suffixe
+        numeroFacture.append(indexFormatte).append("-");
+        numeroFacture.append(formattedDate);
     }
 
-    if (suffixe != null && !suffixe.isEmpty()) {
-        return String.format("N°: %03d-%s-%s", newIndex, formattedDate, suffixe);
-    }
-
-    return String.format("N°%03d-%s", newIndex, formattedDate);
+    return numeroFacture.toString();
 }
-
 
     // Méthode pour modifier une facture pro forma
     @Transactional
@@ -384,15 +411,25 @@ public class FactureProformaService {
             );
         }
 
-        if (modifications.getStatut() == StatutFactureProForma.BROUILLON) {
-            facture.setStatut(StatutFactureProForma.BROUILLON);
-            factProHistoriqueService.enregistrerActionHistorique(
-                    facture,
-                    user,
-                    "Retour au brouillon",
-                    "La facture est revenue au statut brouillon"
-            );
-        }
+      
+    if (modifications.getStatut() == StatutFactureProForma.BROUILLON
+            && facture.getStatut() != StatutFactureProForma.BROUILLON
+            && !(modifications.getNoteModification() != null
+                && (modifications.getLignesFacture() == null || modifications.getLignesFacture().isEmpty())
+                && modifications.getDescription() == null
+                && modifications.getDateRelance() == null
+                && modifications.getMethodeEnvoi() == null)) {
+
+        facture.setStatut(StatutFactureProForma.BROUILLON);
+
+        factProHistoriqueService.enregistrerActionHistorique(
+                facture,
+                user,
+                "Retour au brouillon",
+                "La facture est revenue au statut brouillon"
+        );
+    }
+
 
         /*
         // 💡 Bloc de retour automatique en brouillon (trop permissif)

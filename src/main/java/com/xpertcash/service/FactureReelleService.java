@@ -4,6 +4,8 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Optional;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -83,35 +85,50 @@ public class FactureReelleService {
 
     
     private String genererNumeroFactureReel(Entreprise entreprise) {
-        LocalDate currentDate = LocalDate.now();
-        int year = currentDate.getYear();
-        String formattedDate = currentDate.format(DateTimeFormatter.ofPattern("MM-yyyy"));
-    
-        List<FactureReelle> facturesDeLAnnee = factureReelleRepository.findFacturesDeLAnnee(year);
-        int newIndex = 1;
-    
-        if (!facturesDeLAnnee.isEmpty()) {
-            String lastNumeroFacture = facturesDeLAnnee.get(0).getNumeroFacture();
-            // Exemple : "FACTURE N°005-04-2025"
-            String[] parts = lastNumeroFacture.split("-");
-            String numeroPart = parts[0].replace("FACTURE N°", "").trim();
-            newIndex = Integer.parseInt(numeroPart) + 1;
+    LocalDate currentDate = LocalDate.now();
+    int year = currentDate.getYear();
+    String formattedDate = currentDate.format(DateTimeFormatter.ofPattern("MM-yyyy"));
+
+    List<FactureReelle> facturesDeLAnnee = factureReelleRepository.findFacturesDeLAnnee(year);
+    long newIndex = 1;
+
+    if (!facturesDeLAnnee.isEmpty()) {
+        String lastNumeroFacture = facturesDeLAnnee.get(0).getNumeroFacture();
+
+        Pattern pattern = Pattern.compile("(\\d+)");
+        Matcher matcher = pattern.matcher(lastNumeroFacture);
+
+        if (matcher.find()) {
+            try {
+                newIndex = Long.parseLong(matcher.group(1)) + 1;
+            } catch (NumberFormatException e) {
+                throw new RuntimeException("Impossible de parser l'index numérique dans le numéro : " + lastNumeroFacture, e);
+            }
+        } else {
+            throw new RuntimeException("Format de numéro de facture invalide : " + lastNumeroFacture);
         }
-
-            String prefixe = entreprise != null ? entreprise.getPrefixe() : null;
-            String suffixe = entreprise != null ? entreprise.getSuffixe() : null;
-
-    if (prefixe != null && !prefixe.isEmpty()) {
-        return String.format("FACTURE N°: %s-%03d-%s", prefixe, newIndex, formattedDate);
     }
 
-    if (suffixe != null && !suffixe.isEmpty()) {
-        return String.format("FACTURE N°: %03d-%s-%s", newIndex, formattedDate, suffixe);
+    String indexFormate = String.format("%03d", newIndex); // Gère 001, 002, ..., 1000, 1000000...
+
+    String prefixe = entreprise != null && entreprise.getPrefixe() != null ? entreprise.getPrefixe().trim() : "";
+    String suffixe = entreprise != null && entreprise.getSuffixe() != null ? entreprise.getSuffixe().trim() : "";
+
+    StringBuilder numeroFacture = new StringBuilder("FACTURE N°");
+
+    if (!prefixe.isEmpty() && suffixe.isEmpty()) {
+        numeroFacture.append(prefixe).append("-").append(indexFormate).append("-").append(formattedDate);
+    } else if (prefixe.isEmpty() && !suffixe.isEmpty()) {
+        numeroFacture.append(indexFormate).append("-").append(formattedDate).append("-").append(suffixe);
+    } else if (!prefixe.isEmpty() && !suffixe.isEmpty()) {
+        numeroFacture.append(prefixe).append("-").append(indexFormate).append("-").append(formattedDate);
+    } else {
+        numeroFacture.append(indexFormate).append("-").append(formattedDate);
     }
-    
-        return String.format("FACTURE N°%03d-%s", newIndex, formattedDate);
-    }
-    
+
+    return numeroFacture.toString();
+}
+
 
   
     // Méthode pour modifier le statut de paiement d'une facture
