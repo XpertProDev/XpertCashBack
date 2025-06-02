@@ -23,6 +23,7 @@ import io.jsonwebtoken.SignatureAlgorithm;
 import jakarta.mail.MessagingException;
 import jakarta.servlet.http.HttpServletRequest;
 
+import lombok.ToString;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -585,9 +586,9 @@ public User updateUser(Long userId, UpdateUserRequest request, MultipartFile ima
         }
 
         // Mise à jour du nom complet
-        if (request.getNomComplet() != null) {
-            user.setNomComplet(request.getNomComplet());
-        }
+//        if (request.getNomComplet() != null) {
+//            user.setNomComplet(request.getNomComplet());
+//        }
     }
 
     // Mise à jour de la photo si image présente
@@ -758,9 +759,6 @@ public User updateUser(Long userId, UpdateUserRequest request, MultipartFile ima
     dto.setSiteWeb(entreprise.getSiteWeb());
     dto.setSignataire(entreprise.getSignataire());
     dto.setSignataireNom(entreprise.getSignataireNom());
-    dto.setPrefixe(entreprise.getPrefixe());
-    dto.setSuffixe(entreprise.getSuffixe());
-    dto.setTauxTva(entreprise.getTauxTva());
 
     return dto;
 }
