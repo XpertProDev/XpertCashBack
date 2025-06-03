@@ -34,6 +34,7 @@ public class LigneFactureProforma {
     private Double montantTotal;
     private String ligneDescription;
 
+
     @PrePersist
     @PreUpdate
     public void calculerMontantTotal() {

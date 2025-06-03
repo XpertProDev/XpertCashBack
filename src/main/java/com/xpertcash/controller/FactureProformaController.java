@@ -239,7 +239,7 @@ public class FactureProformaController {
             @PathVariable Long noteId,
             @RequestBody Map<String, String> requestBody,
             HttpServletRequest request) {
-
+ 
         String nouveauContenu = requestBody.get("nouveauContenu");
 
         if (nouveauContenu == null || nouveauContenu.trim().isEmpty()) {

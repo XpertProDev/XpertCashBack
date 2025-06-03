@@ -20,7 +20,9 @@ public class LigneFactureReelle {
 
     private int quantite;
     private double prixUnitaire;
+    private String ligneDescription;
     private double montantTotal;
+   
 
     @ManyToOne
     @JoinColumn(name = "facture_reelle_id")

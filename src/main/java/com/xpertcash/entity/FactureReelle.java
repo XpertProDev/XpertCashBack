@@ -28,6 +28,7 @@ public class FactureReelle {
     private LocalDate dateCreation;
     private double totalHT;
     private double remise;
+    private Double tauxRemise;
     private boolean tva;
     private double totalFacture;
 

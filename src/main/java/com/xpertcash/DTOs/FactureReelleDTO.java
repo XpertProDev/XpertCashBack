@@ -24,6 +24,7 @@ public class FactureReelleDTO {
     private LocalDate dateCreation;
     private double totalFacture;
     private double remise;
+    private Double tauxRemise;
     private boolean tva;
     private StatutPaiementFacture statutPaiement;
     private UserRequest utilisateur;
@@ -38,6 +39,7 @@ public class FactureReelleDTO {
         this.dateCreation = facture.getDateCreation();
         this.totalFacture = facture.getTotalFacture();
         this.remise = facture.getRemise();
+        this.tauxRemise = facture.getTauxRemise();
         this.tva = facture.isTva();
         this.statutPaiement = facture.getStatutPaiement();
         this.utilisateur = (facture.getUtilisateurCreateur() != null) ? new UserRequest(facture.getUtilisateurCreateur()) : null;
