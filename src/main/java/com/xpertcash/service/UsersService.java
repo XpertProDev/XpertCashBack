@@ -759,6 +759,9 @@ public User updateUser(Long userId, UpdateUserRequest request, MultipartFile ima
     dto.setSiteWeb(entreprise.getSiteWeb());
     dto.setSignataire(entreprise.getSignataire());
     dto.setSignataireNom(entreprise.getSignataireNom());
+    dto.setTauxTva(entreprise.getTauxTva());
+    dto.setPrefixe(entreprise.getPrefixe());
+    dto.setSuffixe(entreprise.getSuffixe());
 
     return dto;
 }
