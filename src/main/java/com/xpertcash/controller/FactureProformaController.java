@@ -23,6 +23,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import com.xpertcash.configuration.JwtUtil;
+import com.xpertcash.entity.Entreprise;
 import com.xpertcash.entity.FactureProForma;
 import com.xpertcash.entity.MethodeEnvoi;
 import com.xpertcash.entity.NoteFactureProForma;
@@ -205,9 +206,15 @@ public class FactureProformaController {
                 .orElseThrow(() -> new RuntimeException("Facture non trouvée !"));
 
         // Vérification de l'appartenance à la même entreprise
-        if (!facture.getClient().getEntreprise().getId().equals(user.getEntreprise().getId())) {
+        Entreprise entrepriseDeLaFacture = facture.getEntreprise();
+        if (entrepriseDeLaFacture == null) {
+            throw new RuntimeException("Entreprise non définie pour cette facture.");
+        }
+
+        if (!entrepriseDeLaFacture.getId().equals(user.getEntreprise().getId())) {
             throw new RuntimeException("Vous n'êtes pas autorisé à accéder aux notes de cette facture.");
         }
+
 
         // Récupération et simplification des notes
         List<NoteFactureProForma> notes = noteFactureProFormaRepository.findByFacture(facture);
