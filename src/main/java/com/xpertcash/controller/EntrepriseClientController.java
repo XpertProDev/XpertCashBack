@@ -15,7 +15,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.xpertcash.entity.Client;
 import com.xpertcash.entity.EntrepriseClient;
 import com.xpertcash.service.EntrepriseClientService;
 

@@ -14,9 +14,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.PathVariable;
 
 import com.xpertcash.DTOs.FactureDTO;
-import com.xpertcash.entity.Boutique;
 import com.xpertcash.entity.Facture;
-import com.xpertcash.repository.BoutiqueRepository;
 import com.xpertcash.repository.FactureRepository;
 
 @RestController
@@ -26,8 +24,6 @@ public class facturesController {
     @Autowired
     private FactureRepository factureRepository;
 
-    @Autowired
-    private BoutiqueRepository boutiqueRepository;
 
     @GetMapping("/factures")
     public ResponseEntity<?> getAllFactures() {

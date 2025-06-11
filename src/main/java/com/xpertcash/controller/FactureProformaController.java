@@ -86,7 +86,6 @@ public class FactureProformaController {
     }
 
     
-    
     // Endpoint pour modifier une facture pro forma
     @PutMapping("/updatefacture/{factureId}")
     public ResponseEntity<FactureProForma> updateFacture(
@@ -145,7 +144,6 @@ public class FactureProformaController {
     }
 
 
-
     // Endpoint pour recuperer la liste des factures pro forma dune entreprise
     @GetMapping("/mes-factures")
     public ResponseEntity<List<Map<String, Object>>> getFacturesParEntreprise(HttpServletRequest request) {
@@ -168,7 +166,6 @@ public class FactureProformaController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
         }
     }
-    
 
     // Endpoint Get bye id
     @GetMapping("/factureProforma/{id}")
