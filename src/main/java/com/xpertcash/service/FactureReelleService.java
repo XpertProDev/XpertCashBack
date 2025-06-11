@@ -200,7 +200,7 @@ public class FactureReelleService {
             throw new RuntimeException("L'utilisateur n'est associé à aucune entreprise");
         }
 
-        List<FactureReelle> factures = factureReelleRepository.findByEntreprise(entreprise);
+        List<FactureReelle> factures = factureReelleRepository.findByEntrepriseOrderByDateCreationDesc(entreprise);
 
         return factures.stream()
                 .map(FactureReelleDTO::new)

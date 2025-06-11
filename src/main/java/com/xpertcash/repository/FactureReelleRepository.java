@@ -40,7 +40,8 @@ public interface FactureReelleRepository extends JpaRepository<FactureReelle, Lo
 
    Optional<FactureReelle> findByFactureProForma(FactureProForma factureProForma);
 
-    
+    @Query("SELECT fr FROM FactureReelle fr WHERE fr.entreprise = :entreprise ORDER BY fr.dateCreation DESC, fr.id DESC")
+    List<FactureReelle> findByEntrepriseOrderByDateCreationDesc(@Param("entreprise") Entreprise entreprise);
 
 
 

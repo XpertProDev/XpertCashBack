@@ -39,12 +39,11 @@ public interface FactureProformaRepository extends JpaRepository<FactureProForma
     @Query("SELECT f FROM FactureProForma f WHERE f.dateRelance <= :now AND f.dernierRappelEnvoye IS NULL AND f.notifie = false")
     List<FactureProForma> findFacturesAEnvoyer(@Param("now") LocalDateTime now);
 
-    @Query("SELECT f FROM FactureProForma f WHERE f.entreprise.id = :entrepriseId")
-    List<FactureProForma> findByEntrepriseId(@Param("entrepriseId") Long entrepriseId);
-
     @Query("SELECT f FROM FactureProForma f WHERE FUNCTION('YEAR', f.dateCreation) = :year ORDER BY f.numeroFacture DESC")
     List<FactureProForma> findFacturesDeLAnnee(@Param("year") int year);
 
+    @Query("SELECT f FROM FactureProForma f WHERE f.entreprise.id = :entrepriseId ORDER BY f.dateCreation DESC, f.id DESC")
+    List<FactureProForma> findByEntrepriseId(@Param("entrepriseId") Long entrepriseId);
 
     @Query("""
     SELECT f FROM FactureProForma f
@@ -54,8 +53,9 @@ public interface FactureProformaRepository extends JpaRepository<FactureProForma
           OR f.utilisateurApprobateur.id = :userId
           OR :userId IN (SELECT u.id FROM f.approbateurs u)
       )
+    ORDER BY f.dateCreation DESC, f.id DESC
 """)
-List<FactureProForma> findByEntrepriseIdAndUtilisateur(@Param("userId") Long userId, @Param("entrepriseId") Long entrepriseId);
+    List<FactureProForma> findByEntrepriseIdAndUtilisateur(@Param("userId") Long userId, @Param("entrepriseId") Long entrepriseId);
 
 
 
