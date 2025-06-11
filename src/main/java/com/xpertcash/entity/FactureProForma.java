@@ -35,10 +35,11 @@ public class FactureProForma {
 
     
      // Montants calculés
-     private double totalHT;  // Total avant taxes et remise
-     private Double remise;   // Remise en montant
-     private boolean tva;      // TVA 18% si applicable
-     private double totalFacture; // Montant final à payer
+     private double totalHT;
+     private Double remise;
+     private Double tauxRemise;
+     private boolean tva;
+     private double totalFacture;
 
      private String noteModification;
 

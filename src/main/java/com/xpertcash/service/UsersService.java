@@ -738,7 +738,6 @@ public User updateUser(Long userId, UpdateUserRequest request, MultipartFile ima
     if (entreprise == null) {
         throw new RuntimeException("Entreprise associée à l'utilisateur non trouvée");
     }
-
     // Création et retour du DTO
     EntrepriseDTO dto = new EntrepriseDTO();
     dto.setId(entreprise.getId());

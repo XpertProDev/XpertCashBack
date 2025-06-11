@@ -52,9 +52,10 @@ public class FactureReelleService {
         factureReelle.setDateCreation(LocalDate.now());
         factureReelle.setTotalHT(factureProForma.getTotalHT());
         factureReelle.setRemise(factureProForma.getRemise());
+        factureReelle.setTauxRemise(factureProForma.getTauxRemise());
         factureReelle.setDescription(factureProForma.getDescription());
 
-        factureReelle.setTva(factureProForma.isTva());
+        factureReelle.setTva(factureProForma.isTva());  
         factureReelle.setTotalFacture(factureProForma.getTotalFacture());
         factureReelle.setStatutPaiement(StatutPaiementFacture.EN_ATTENTE);
 
@@ -73,8 +74,9 @@ public class FactureReelleService {
             ligneReelle.setProduit(ligneProForma.getProduit());
             ligneReelle.setQuantite(ligneProForma.getQuantite());
             ligneReelle.setPrixUnitaire(ligneProForma.getPrixUnitaire());
+            ligneReelle.setLigneDescription(ligneProForma.getLigneDescription());
             ligneReelle.setMontantTotal(ligneProForma.getMontantTotal());
-            ligneReelle.setFactureReelle(factureReelleSauvegardee); // Utiliser la facture sauvegardée
+            ligneReelle.setFactureReelle(factureReelleSauvegardee);
             return ligneReelle;
         }).collect(Collectors.toList());
     
@@ -109,12 +111,12 @@ public class FactureReelleService {
         }
     }
 
-    String indexFormate = String.format("%03d", newIndex); // Gère 001, 002, ..., 1000, 1000000...
+    String indexFormate = String.format("%03d", newIndex);
 
     String prefixe = entreprise != null && entreprise.getPrefixe() != null ? entreprise.getPrefixe().trim() : "";
     String suffixe = entreprise != null && entreprise.getSuffixe() != null ? entreprise.getSuffixe().trim() : "";
 
-    StringBuilder numeroFacture = new StringBuilder("FACTURE N°");
+    StringBuilder numeroFacture = new StringBuilder("");
 
     if (!prefixe.isEmpty() && suffixe.isEmpty()) {
         numeroFacture.append(prefixe).append("-").append(indexFormate).append("-").append(formattedDate);
