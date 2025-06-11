@@ -19,8 +19,9 @@ import lombok.NoArgsConstructor;
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class FactureReelleDTO {
 
-     private Long id;
+    private Long id;
     private String numeroFacture;
+    private String description;
     private LocalDate dateCreation;
     private double totalFacture;
     private double remise;
@@ -32,10 +33,11 @@ public class FactureReelleDTO {
     private ClientDTO client;
     private List<LigneFactureDTO> lignesFacture;
 
-       // ✅ Constructeur qui transforme une FactureReelle en FactureReelleDTO
+    // ✅ Constructeur qui transforme une FactureReelle en FactureReelleDTO
     public FactureReelleDTO(FactureReelle facture) {
         this.id = facture.getId();
         this.numeroFacture = facture.getNumeroFacture();
+        this.description = facture.getDescription();
         this.dateCreation = facture.getDateCreation();
         this.totalFacture = facture.getTotalFacture();
         this.remise = facture.getRemise();
@@ -45,10 +47,10 @@ public class FactureReelleDTO {
         this.utilisateur = (facture.getUtilisateurCreateur() != null) ? new UserRequest(facture.getUtilisateurCreateur()) : null;
         this.entrepriseClient = (facture.getEntrepriseClient() != null) ? new EntrepriseClientDTO(facture.getEntrepriseClient()) : null;
         this.client = (facture.getClient() != null) ? new ClientDTO(facture.getClient()) : null;
-        this.lignesFacture = (facture.getLignesFacture() != null) ? 
-            facture.getLignesFacture().stream().map(LigneFactureDTO::new).collect(Collectors.toList()) : null;
+        this.lignesFacture = (facture.getLignesFacture() != null) ?
+                facture.getLignesFacture().stream().map(LigneFactureDTO::new).collect(Collectors.toList()) : null;
     }
 
-    
+
 
 }

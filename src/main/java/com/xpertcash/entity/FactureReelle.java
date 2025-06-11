@@ -19,7 +19,7 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class FactureReelle {
 
-     @Id
+    @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
@@ -34,9 +34,9 @@ public class FactureReelle {
 
     @Enumerated(EnumType.STRING)
     private StatutPaiementFacture statutPaiement;
-    
-    
-    
+
+
+
     @ManyToOne
     private User utilisateurCreateur;
 
@@ -44,11 +44,11 @@ public class FactureReelle {
     @JoinColumn(name = "client_id")
     private Client client;
 
-     @ManyToOne(fetch = FetchType.EAGER)
+    @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "entrepriseClient_id")
-     @JsonIgnoreProperties({"clients", "createdAt"})
+    @JsonIgnoreProperties({"clients", "createdAt"})
     private EntrepriseClient entrepriseClient;
-    
+
     @OneToMany(mappedBy = "factureReelle", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<LigneFactureReelle> lignesFacture;
 
@@ -57,7 +57,7 @@ public class FactureReelle {
     @JsonIgnoreProperties({"facturesProforma", "identifiantEntreprise", "utilisateurs", "adresse", "boutiques", "createdAt", "logo", "admin"})
     private Entreprise entreprise;
 
-     @JsonProperty("nomProduit")
+    @JsonProperty("nomProduit")
     public String getNomEntreprise() {
         return entreprise != null ? entreprise.getNomEntreprise() : null;
     }

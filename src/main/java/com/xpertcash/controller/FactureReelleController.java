@@ -29,29 +29,29 @@ public class FactureReelleController {
     private FactureReelleService factureReelleService;
 
     @PutMapping("/updatefacture/{id}/modifier-statut")
-    public ResponseEntity<FactureReelleDTO> modifierStatut(@PathVariable Long id, 
-        @RequestParam StatutPaiementFacture nouveauStatut, HttpServletRequest request) {
-        
+    public ResponseEntity<FactureReelleDTO> modifierStatut(@PathVariable Long id,
+                                                           @RequestParam StatutPaiementFacture nouveauStatut, HttpServletRequest request) {
+
         FactureReelleDTO factureModifiee = factureReelleService.modifierStatutPaiement(id, nouveauStatut, request);
-        
+
         return ResponseEntity.ok(factureModifiee);
     }
 
     // Endpoint pour lister tout les factures reelles
-      @GetMapping("/mes-factures-reelles")
-        public ResponseEntity<List<FactureReelleDTO>> getMesFacturesReelles(HttpServletRequest request) {
-            List<FactureReelleDTO> factures = factureReelleService.listerMesFacturesReelles(request);
-            return ResponseEntity.ok(factures);
-        }
+    @GetMapping("/mes-factures-reelles")
+    public ResponseEntity<List<FactureReelleDTO>> getMesFacturesReelles(HttpServletRequest request) {
+        List<FactureReelleDTO> factures = factureReelleService.listerMesFacturesReelles(request);
+        return ResponseEntity.ok(factures);
+    }
 
     // Endpoint pour trier les factures par mois/année
-            @GetMapping("/filtrer-facturesReelles")
-            public ResponseEntity<?> filtrerFacturesParMoisEtAnnee(
-                @RequestParam(required = false) Integer mois,
-                @RequestParam(required = false) Integer annee,
-                HttpServletRequest request) {
-            return factureReelleService.filtrerFacturesParMoisEtAnnee(mois, annee, request);
-        }
+    @GetMapping("/filtrer-facturesReelles")
+    public ResponseEntity<?> filtrerFacturesParMoisEtAnnee(
+            @RequestParam(required = false) Integer mois,
+            @RequestParam(required = false) Integer annee,
+            HttpServletRequest request) {
+        return factureReelleService.filtrerFacturesParMoisEtAnnee(mois, annee, request);
+    }
 
     // ENdpoind Get facture rell by id
     @GetMapping("/factures-reelles/{id}")
@@ -62,7 +62,6 @@ public class FactureReelleController {
         FactureReelleDTO factureDTO = factureReelleService.getFactureReelleById(id, request);
         return ResponseEntity.ok(factureDTO);
     }
-
 
 
 }
