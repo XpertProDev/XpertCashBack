@@ -5,6 +5,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -284,6 +285,37 @@ public class FactureProformaController {
         NoteFactureProForma note = factureProformaService.getNotesByFactureId(factureId, noteId, request);
         return ResponseEntity.ok(note);
     }
+
+    //Endpoint pour get facture lier a un client ou entreprise client
+   @GetMapping("/factures/client")
+    public ResponseEntity<List<Map<String, Object>>> getFacturesClient(
+            @RequestParam(required = false) Long clientId,
+            @RequestParam(required = false) Long entrepriseClientId) {
+        
+        List<FactureProForma> factures = factureProformaService.getFacturesParClient(clientId, entrepriseClientId);
+
+        List<Map<String, Object>> result = factures.stream().map(f -> {
+            Map<String, Object> map = new HashMap<>();
+            map.put("id", f.getId());
+            map.put("numeroFacture", f.getNumeroFacture());
+            map.put("dateFacture", f.getDateFacture());
+            map.put("statut", f.getStatut());
+            map.put("totalFacture", f.getTotalFacture());
+
+            if (f.getClient() != null) {
+                map.put("clientNom", f.getClient().getNomComplet());
+            }
+
+            if (f.getEntrepriseClient() != null) {
+                map.put("entrepriseClientNom", f.getEntrepriseClient().getNom());
+            }
+
+            return map;
+        }).collect(Collectors.toList());
+
+        return ResponseEntity.ok(result);
+    }
+
 
 
 }

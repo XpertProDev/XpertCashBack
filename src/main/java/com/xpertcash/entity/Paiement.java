@@ -1,5 +1,8 @@
 package com.xpertcash.entity;
 
+import java.math.BigDecimal;
+import java.time.LocalDate;
+
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -9,23 +12,23 @@ import lombok.NoArgsConstructor;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class LigneFactureReelle {
-
+public class Paiement {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne
-    private Produit produit;
+    private BigDecimal montant;
 
-    private int quantite;
-    private double prixUnitaire;
-    private String ligneDescription;
-    private double montantTotal;
+    private LocalDate datePaiement;
 
+     private String modePaiement;
 
     @ManyToOne
     @JoinColumn(name = "facture_reelle_id")
     private FactureReelle factureReelle;
+
+    @ManyToOne
+    @JoinColumn(name = "encaisse_par_id")
+    private User encaissePar;
 
 }

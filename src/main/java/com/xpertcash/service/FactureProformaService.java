@@ -3,14 +3,7 @@ package com.xpertcash.service;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -635,7 +628,21 @@ public class FactureProformaService {
             factures = factureProformaRepository.findByEntrepriseIdAndUtilisateur(userId, entrepriseId);
         }
 
+        // Tri manuel par date de création décroissante
+//        factures.sort(Comparator
+//                .comparing(FactureProForma::getDateCreation, Comparator.nullsLast(Comparator.reverseOrder()))
+//                .thenComparing(FactureProForma::getId, Comparator.reverseOrder()));
 
+        factures = factures.stream()
+                .sorted((f1, f2) -> {
+                    // Comparaison par date
+                    int dateCompare = f2.getDateCreation().compareTo(f1.getDateCreation());
+                    if (dateCompare != 0) return dateCompare;
+
+                    // Si dates égales, comparer par ID
+                    return f2.getId().compareTo(f1.getId());
+                })
+                .collect(Collectors.toList());
 
         List<Map<String, Object>> factureMaps = new ArrayList<>();
     
@@ -861,5 +868,14 @@ public class FactureProformaService {
         // Retourner la note
         return note;
     }
+
+    //Methode pour connaitre tout les facture lier a un client
+    public List<FactureProForma> getFacturesParClient(Long clientId, Long entrepriseClientId) {
+    if (clientId == null && entrepriseClientId == null) {
+        throw new RuntimeException("Veuillez spécifier un client ou une entreprise cliente.");
+    }
+
+    return factureProformaRepository.findByClientIdOrEntrepriseClientId(clientId, entrepriseClientId);
+}
 
 }

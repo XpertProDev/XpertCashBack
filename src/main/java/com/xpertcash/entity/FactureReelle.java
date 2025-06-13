@@ -1,6 +1,7 @@
 package com.xpertcash.entity;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
@@ -19,7 +20,7 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class FactureReelle {
 
-     @Id
+    @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
@@ -34,9 +35,9 @@ public class FactureReelle {
 
     @Enumerated(EnumType.STRING)
     private StatutPaiementFacture statutPaiement;
-    
-    
-    
+
+
+
     @ManyToOne
     private User utilisateurCreateur;
 
@@ -44,11 +45,11 @@ public class FactureReelle {
     @JoinColumn(name = "client_id")
     private Client client;
 
-     @ManyToOne(fetch = FetchType.EAGER)
+    @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "entrepriseClient_id")
-     @JsonIgnoreProperties({"clients", "createdAt"})
+    @JsonIgnoreProperties({"clients", "createdAt"})
     private EntrepriseClient entrepriseClient;
-    
+
     @OneToMany(mappedBy = "factureReelle", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<LigneFactureReelle> lignesFacture;
 
@@ -57,7 +58,7 @@ public class FactureReelle {
     @JsonIgnoreProperties({"facturesProforma", "identifiantEntreprise", "utilisateurs", "adresse", "boutiques", "createdAt", "logo", "admin"})
     private Entreprise entreprise;
 
-     @JsonProperty("nomProduit")
+    @JsonProperty("nomProduit")
     public String getNomEntreprise() {
         return entreprise != null ? entreprise.getNomEntreprise() : null;
     }
@@ -66,6 +67,19 @@ public class FactureReelle {
     @JoinColumn(name = "facture_proforma_id")
     @JsonIgnoreProperties({"facturesReelles"})
     private FactureProForma factureProForma;
+
+
+    @OneToMany(mappedBy = "factureReelle", cascade = CascadeType.ALL)
+    private List<Paiement> paiements = new ArrayList<>();
+
+    public List<Paiement> getPaiements() {
+        return paiements;
+    }
+
+    public void setPaiements(List<Paiement> paiements) {
+        this.paiements = paiements;
+    }
+
 
 
 }
