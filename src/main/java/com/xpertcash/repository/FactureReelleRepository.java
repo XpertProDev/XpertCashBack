@@ -12,6 +12,7 @@ import org.springframework.stereotype.Repository;
 import com.xpertcash.entity.Entreprise;
 import com.xpertcash.entity.FactureProForma;
 import com.xpertcash.entity.FactureReelle;
+import com.xpertcash.entity.Enum.StatutPaiementFacture;
 
 @Repository
 public interface FactureReelleRepository extends JpaRepository<FactureReelle, Long> {
@@ -42,6 +43,13 @@ public interface FactureReelleRepository extends JpaRepository<FactureReelle, Lo
 
     @Query("SELECT fr FROM FactureReelle fr WHERE fr.entreprise = :entreprise ORDER BY fr.dateCreation DESC, fr.id DESC")
     List<FactureReelle> findByEntrepriseOrderByDateCreationDesc(@Param("entreprise") Entreprise entreprise);
+
+
+    List<FactureReelle> findByEntrepriseIdAndStatutPaiementIn(Long entrepriseId, List<StatutPaiementFacture> statuts);
+
+    List<FactureReelle> findByEntrepriseIdAndUtilisateurCreateurIdAndStatutPaiementIn(
+        Long entrepriseId, Long utilisateurId, List<StatutPaiementFacture> statuts
+    );
 
 
 

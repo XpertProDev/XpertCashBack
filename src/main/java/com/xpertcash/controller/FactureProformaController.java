@@ -175,8 +175,6 @@ public class FactureProformaController {
         return ResponseEntity.ok(facture);
     }
     
-    
-
      //Endpoint pour recuperer les notes d'une facture pro forma
      @GetMapping("/factures/{id}/notes")
     public ResponseEntity<List<Map<String, Object>>> getNotesPourFacture(

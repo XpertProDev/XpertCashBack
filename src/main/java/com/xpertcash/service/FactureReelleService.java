@@ -21,7 +21,9 @@ import com.xpertcash.entity.FactureProForma;
 import com.xpertcash.entity.FactureReelle;
 import com.xpertcash.entity.LigneFactureReelle;
 import com.xpertcash.entity.Paiement;
+import com.xpertcash.entity.PermissionType;
 import com.xpertcash.entity.User;
+import com.xpertcash.entity.Enum.RoleType;
 import com.xpertcash.entity.Enum.StatutPaiementFacture;
 import com.xpertcash.repository.FactureReelleRepository;
 import com.xpertcash.repository.LigneFactureReelleRepository;
@@ -138,51 +140,6 @@ public class FactureReelleService {
         return numeroFacture.toString();
     }
 
-
-
-    // Méthode pour modifier le statut de paiement d'une facture
-    public FactureReelleDTO modifierStatutPaiement(Long factureId, StatutPaiementFacture nouveauStatut, HttpServletRequest request) {
-        // Vérifier la présence du token JWT et récupérer l'ID de l'utilisateur connecté
-        String token = request.getHeader("Authorization");
-        if (token == null || !token.startsWith("Bearer ")) {
-            throw new RuntimeException("Token JWT manquant ou mal formaté");
-        }
-
-        Long userId;
-        try {
-            userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
-        } catch (Exception e) {
-            throw new RuntimeException("Erreur lors de l'extraction de l'ID de l'utilisateur depuis le token", e);
-        }
-
-        // Récupérer l'utilisateur par son ID
-        User utilisateur = usersRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("Utilisateur introuvable !"));
-
-        // Récupérer la facture réelle à partir de son ID
-        FactureReelle factureReelle = factureReelleRepository.findById(factureId)
-                .orElseThrow(() -> new RuntimeException("Facture introuvable !"));
-
-        // Vérifier que l'utilisateur appartient bien à l'entreprise de la facture
-        if (!factureReelle.getEntreprise().getUtilisateurs().contains(utilisateur)) {
-            throw new RuntimeException("Vous n'avez pas l'autorisation de modifier cette facture !");
-        }
-
-        // Vérifier que le statut n'est pas déjà celui demandé
-        if (factureReelle.getStatutPaiement() == nouveauStatut) {
-            throw new RuntimeException("Le statut est déjà défini sur " + nouveauStatut);
-        }
-
-        // Mettre à jour le statut de paiement
-        factureReelle.setStatutPaiement(nouveauStatut);
-
-        // Sauvegarder la facture modifiée
-        factureReelleRepository.save(factureReelle);
-
-        // Retourner uniquement les informations essentielles via le DTO
-        return new FactureReelleDTO(factureReelle);
-    }
-
     //Methode pour lister les factures Reel
 
     public List<FactureReelleDTO> listerMesFacturesReelles(HttpServletRequest request) {
@@ -210,7 +167,14 @@ public class FactureReelleService {
         List<FactureReelle> factures = factureReelleRepository.findByEntrepriseOrderByDateCreationDesc(entreprise);
 
         return factures.stream()
-                .map(FactureReelleDTO::new)
+                .map(facture -> {
+                BigDecimal totalFacture = BigDecimal.valueOf(facture.getTotalFacture());
+                BigDecimal totalPaye = paiementRepository.sumMontantsByFactureReelle(facture.getId());
+                if (totalPaye == null) totalPaye = BigDecimal.ZERO;
+                BigDecimal montantRestant = totalFacture.subtract(totalPaye);
+                return new FactureReelleDTO(facture, montantRestant);
+            })
+
                 .collect(Collectors.toList());
     }
 
@@ -248,53 +212,81 @@ public class FactureReelleService {
             factures = factureReelleRepository.findByEntrepriseId(entrepriseId);
         }
 
-        List<FactureReelleDTO> factureDTOs = factures.stream()
-                .map(FactureReelleDTO::new)
-                .collect(Collectors.toList());
+            // 4. Mapper vers DTO et nettoyer
+    List<FactureReelleDTO> factureDTOs = factures.stream().map(facture -> {
+        BigDecimal totalFacture = BigDecimal.valueOf(facture.getTotalFacture());
+        BigDecimal totalPaye = paiementRepository.sumMontantsByFactureReelle(facture.getId());
+        if (totalPaye == null) totalPaye = BigDecimal.ZERO;
 
-        if (factureDTOs.isEmpty()) {
-            return ResponseEntity.ok("Aucune facture trouvée.");
+        BigDecimal montantRestant = totalFacture.subtract(totalPaye);
+        FactureReelleDTO dto = new FactureReelleDTO(facture, montantRestant);
+
+        // On ignior les champs inutiles
+        dto.setUtilisateur(null);
+        dto.setEntrepriseClient(null);
+        dto.setClient(null);
+        dto.setLignesFacture(null);
+
+        if (facture.getClient() != null) {
+        dto.setNomClient(facture.getClient().getNomComplet());
+        } else if (facture.getEntrepriseClient() != null) {
+            dto.setNomEntrepriseClient(facture.getEntrepriseClient().getNom());
         }
 
-        return ResponseEntity.ok(factureDTOs);
+        return dto;
+    }).collect(Collectors.toList());
+
+    if (factureDTOs.isEmpty()) {
+        return ResponseEntity.ok("Aucune facture trouvée.");
+    }
+
+    return ResponseEntity.ok(factureDTOs);
+
     }
 
     // Methode Get facture reel by id
     public FactureReelleDTO getFactureReelleById(Long factureId, HttpServletRequest request) {
-        // Extraire le token JWT
-        String token = request.getHeader("Authorization");
-        if (token == null || !token.startsWith("Bearer ")) {
-            throw new RuntimeException("Token JWT manquant ou mal formaté");
-        }
-
-        Long userId;
-        try {
-            userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
-        } catch (Exception e) {
-            throw new RuntimeException("Erreur lors de l'extraction de l'ID utilisateur", e);
-        }
-
-        // Récupérer l'utilisateur et son entreprise
-        User user = usersRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
-        Long entrepriseId = user.getEntreprise().getId();
-
-        // Récupérer la facture
-        FactureReelle facture = factureReelleRepository.findById(factureId)
-                .orElseThrow(() -> new RuntimeException("Aucune facture trouvée"));
-
-        // Vérifier que la facture appartient bien à l'entreprise de l'utilisateur
-        if (!facture.getEntreprise().getId().equals(entrepriseId)) {
-            throw new RuntimeException("Accès refusé : cette facture ne vous appartient pas !");
-        }
-
-        return new FactureReelleDTO(facture);
+    // 🔐 Extraire le token JWT
+    String token = request.getHeader("Authorization");
+    if (token == null || !token.startsWith("Bearer ")) {
+        throw new RuntimeException("Token JWT manquant ou mal formaté");
     }
+
+    Long userId;
+    try {
+        userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
+    } catch (Exception e) {
+        throw new RuntimeException("Erreur lors de l'extraction de l'ID utilisateur", e);
+    }
+
+    // 👤 Récupérer l'utilisateur et son entreprise
+    User user = usersRepository.findById(userId)
+            .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
+    Long entrepriseId = user.getEntreprise().getId();
+
+    // 📄 Récupérer la facture
+    FactureReelle facture = factureReelleRepository.findById(factureId)
+            .orElseThrow(() -> new RuntimeException("Aucune facture trouvée"));
+
+    // 🔐 Vérifier que la facture appartient bien à l'entreprise de l'utilisateur
+    if (!facture.getEntreprise().getId().equals(entrepriseId)) {
+        throw new RuntimeException("Accès refusé : cette facture ne vous appartient pas !");
+    }
+
+    // 💰 Calculer le montant restant
+    BigDecimal totalFacture = BigDecimal.valueOf(facture.getTotalFacture());
+    BigDecimal totalPaye = paiementRepository.sumMontantsByFactureReelle(factureId);
+    if (totalPaye == null) totalPaye = BigDecimal.ZERO;
+
+    BigDecimal montantRestant = totalFacture.subtract(totalPaye);
+
+    // ✅ Retourner le DTO avec montantRestant
+    return new FactureReelleDTO(facture, montantRestant);
+}
 
 
 
     // Methode pour Supprimer facturer deja generer une fois annuler
-
     public void supprimerFactureReelleLiee(FactureProForma proforma) {
         Optional<FactureReelle> factureReelleOpt = factureReelleRepository.findByFactureProForma(proforma);
         if (factureReelleOpt.isPresent()) {
@@ -364,6 +356,7 @@ public class FactureReelleService {
     return factureReelleRepository.save(facture);
 }
 
+    //Facture impayer dune facture
     public BigDecimal getMontantRestant(Long factureId) {
         FactureReelle facture = factureReelleRepository.findById(factureId)
             .orElseThrow(() -> new RuntimeException("Facture introuvable"));
@@ -375,13 +368,110 @@ public class FactureReelleService {
     }
 
     //Get les paiements d'une facture
-    public List<PaiementDTO> getPaiementsParFacture(Long factureId) {
-        FactureReelle facture = factureReelleRepository.findById(factureId)
-            .orElseThrow(() -> new RuntimeException("Facture introuvable"));
-
-        List<Paiement> paiements = paiementRepository.findByFactureReelle(facture);
-        return paiements.stream().map(PaiementDTO::new).collect(Collectors.toList());
+  public List<PaiementDTO> getPaiementsParFacture(Long factureId, HttpServletRequest request) {
+    // 1. Authentification
+    String token = request.getHeader("Authorization");
+    if (token == null || !token.startsWith("Bearer ")) {
+        throw new RuntimeException("Token JWT manquant ou mal formaté");
     }
+
+    Long userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
+
+    User user = usersRepository.findById(userId)
+        .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+
+    Entreprise entreprise = user.getEntreprise();
+    if (entreprise == null) {
+        throw new RuntimeException("Utilisateur n'est associé à aucune entreprise");
+    }
+
+    RoleType role = user.getRole().getName();
+    boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
+    boolean hasGestionFacturePermission = user.getRole().hasPermission(PermissionType.Gestion_Facture);
+
+    // 2. Vérification de la facture
+    FactureReelle facture = factureReelleRepository.findById(factureId)
+        .orElseThrow(() -> new RuntimeException("Facture introuvable"));
+
+    // 3. Vérification d'appartenance à l'entreprise
+    if (!facture.getEntreprise().getId().equals(entreprise.getId())) {
+        throw new RuntimeException("Accès interdit à une facture d'une autre entreprise");
+    }
+
+    // 4. Vérification des droits d'accès
+    boolean isCreateur = facture.getUtilisateurCreateur().getId().equals(userId);
+    if (!(isAdminOrManager || hasGestionFacturePermission || isCreateur)) {
+        throw new RuntimeException("Accès refusé : vous n'avez pas les droits pour consulter les paiements de cette facture");
+    }
+
+    // 5. Récupération et mapping
+    List<Paiement> paiements = paiementRepository.findByFactureReelle(facture);
+    return paiements.stream().map(PaiementDTO::new).collect(Collectors.toList());
+}
+
+
+    //Facture impayer all facture
+    public List<FactureReelleDTO> listerFacturesImpayees(HttpServletRequest request) {
+    // 🔐 1. Extraire l'utilisateur connecté depuis le token
+    String token = request.getHeader("Authorization");
+    if (token == null || !token.startsWith("Bearer ")) {
+        throw new RuntimeException("Token JWT manquant ou mal formaté");
+    }
+
+    Long userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
+
+    User user = usersRepository.findById(userId)
+        .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+
+    Entreprise entreprise = user.getEntreprise();
+    if (entreprise == null) {
+        throw new RuntimeException("Utilisateur n'est associé à aucune entreprise");
+    }
+
+    Long entrepriseId = entreprise.getId();
+
+    // 🔐 2. Vérification des rôles et permissions
+    RoleType role = user.getRole().getName();
+    boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
+    boolean hasGestionFacturePermission = user.getRole().hasPermission(PermissionType.Gestion_Facture);
+
+    List<FactureReelle> factures;
+
+    // 🔎 3. Sélectionner les factures impayées
+    List<StatutPaiementFacture> statutsImpayes = List.of(
+        StatutPaiementFacture.EN_ATTENTE,
+        StatutPaiementFacture.PARTIELLEMENT_PAYEE
+    );
+
+    if (isAdminOrManager || hasGestionFacturePermission) {
+        factures = factureReelleRepository.findByEntrepriseIdAndStatutPaiementIn(entrepriseId, statutsImpayes);
+    } else {
+        factures = factureReelleRepository.findByEntrepriseIdAndUtilisateurCreateurIdAndStatutPaiementIn(
+            entrepriseId, userId, statutsImpayes
+        );
+    }
+
+   // on mappe et filtrer les champs
+    return factures.stream().map(facture -> {
+        BigDecimal total = BigDecimal.valueOf(facture.getTotalFacture());
+        BigDecimal paye = paiementRepository.sumMontantsByFactureReelle(facture.getId());
+        if (paye == null) paye = BigDecimal.ZERO;
+
+        BigDecimal montantRestant = total.subtract(paye);
+
+        // DTO avec tous les champs remplis
+        FactureReelleDTO dto = new FactureReelleDTO(facture, montantRestant);
+
+        // ❌ Supprimer les champs non nécessaires pour cette route
+        dto.setUtilisateur(null);
+        dto.setEntrepriseClient(null);
+        dto.setClient(null);
+        dto.setLignesFacture(null);
+
+        return dto;
+    }).collect(Collectors.toList());
+}
+
 
 
 }
