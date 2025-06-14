@@ -1,5 +1,6 @@
 package com.xpertcash.service;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -13,15 +14,18 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
 import com.xpertcash.DTOs.FactureReelleDTO;
+import com.xpertcash.DTOs.PaiementDTO;
 import com.xpertcash.configuration.JwtUtil;
 import com.xpertcash.entity.Entreprise;
 import com.xpertcash.entity.FactureProForma;
 import com.xpertcash.entity.FactureReelle;
 import com.xpertcash.entity.LigneFactureReelle;
+import com.xpertcash.entity.Paiement;
 import com.xpertcash.entity.User;
 import com.xpertcash.entity.Enum.StatutPaiementFacture;
 import com.xpertcash.repository.FactureReelleRepository;
 import com.xpertcash.repository.LigneFactureReelleRepository;
+import com.xpertcash.repository.PaiementRepository;
 import com.xpertcash.repository.UsersRepository;
 
 import jakarta.servlet.http.HttpServletRequest;
@@ -37,6 +41,9 @@ public class FactureReelleService {
 
     @Autowired
     private UsersRepository usersRepository;
+
+    @Autowired
+    private PaiementRepository paiementRepository;
 
     @Autowired
     private JwtUtil jwtUtil;
@@ -294,7 +301,87 @@ public class FactureReelleService {
             factureReelleRepository.delete(factureReelleOpt.get());
             System.out.println("🗑️ Facture réelle supprimée suite à l'annulation.");
         } else {
-            System.out.println("ℹ️ Aucune facture réelle associée à cette facture proforma.");
+            System.out.println("Aucune facture réelle associée à cette facture proforma.");
         }
     }
+
+
+   public FactureReelle enregistrerPaiement(Long factureId, BigDecimal montant, String modePaiement, HttpServletRequest request) {
+    FactureReelle facture = factureReelleRepository.findById(factureId)
+        .orElseThrow(() -> new RuntimeException("Facture introuvable"));
+
+      // Bloquer tout paiement si facture déjà réglée
+    if (facture.getStatutPaiement() == StatutPaiementFacture.PAYEE) {
+        throw new RuntimeException("Cette facture est déjà totalement réglée.");
+    }
+
+    String token = request.getHeader("Authorization");
+    if (token == null || !token.startsWith("Bearer ")) {
+        throw new RuntimeException("Token JWT manquant ou mal formaté");
+    }
+
+    Long userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
+    User utilisateur = usersRepository.findById(userId)
+        .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
+
+    // Recalculer le total payé avant ce nouveau paiement
+    BigDecimal totalPayeAvant = paiementRepository.sumMontantsByFactureReelle(factureId);
+    if (totalPayeAvant == null) totalPayeAvant = BigDecimal.ZERO;
+
+    BigDecimal totalFacture = BigDecimal.valueOf(facture.getTotalFacture());
+
+    // Calcul du nouveau total après ajout de ce paiement
+    BigDecimal totalApresPaiement = totalPayeAvant.add(montant);
+
+    // On n'accepte pas un dépassement du montant total
+    if (totalApresPaiement.compareTo(totalFacture) > 0) {
+        BigDecimal montantRestant = totalFacture.subtract(totalPayeAvant);
+        throw new RuntimeException("Le paiement dépasse le montant total de la facture. Montant restant dû : " + montantRestant + " FCFA");
+    }
+
+    // Création du paiement
+    Paiement paiement = new Paiement();
+    paiement.setMontant(montant);
+    paiement.setDatePaiement(LocalDate.now());
+    paiement.setFactureReelle(facture);
+    paiement.setModePaiement(modePaiement);
+    paiement.setEncaissePar(utilisateur);
+
+    paiementRepository.save(paiement);
+
+    // Recalculer après paiement
+    BigDecimal totalPaye = paiementRepository.sumMontantsByFactureReelle(factureId);
+
+    // Mettre à jour le statut
+    if (totalPaye.compareTo(totalFacture) >= 0) {
+        facture.setStatutPaiement(StatutPaiementFacture.PAYEE);
+    } else if (totalPaye.compareTo(BigDecimal.ZERO) > 0) {
+        facture.setStatutPaiement(StatutPaiementFacture.PARTIELLEMENT_PAYEE);
+    } else {
+        facture.setStatutPaiement(StatutPaiementFacture.EN_ATTENTE);
+    }
+
+    return factureReelleRepository.save(facture);
+}
+
+    public BigDecimal getMontantRestant(Long factureId) {
+        FactureReelle facture = factureReelleRepository.findById(factureId)
+            .orElseThrow(() -> new RuntimeException("Facture introuvable"));
+
+        BigDecimal totalFacture = BigDecimal.valueOf(facture.getTotalFacture());
+        BigDecimal totalPaye = paiementRepository.sumMontantsByFactureReelle(factureId);
+
+        return totalFacture.subtract(totalPaye);
+    }
+
+    //Get les paiements d'une facture
+    public List<PaiementDTO> getPaiementsParFacture(Long factureId) {
+        FactureReelle facture = factureReelleRepository.findById(factureId)
+            .orElseThrow(() -> new RuntimeException("Facture introuvable"));
+
+        List<Paiement> paiements = paiementRepository.findByFactureReelle(facture);
+        return paiements.stream().map(PaiementDTO::new).collect(Collectors.toList());
+    }
+
+
 }

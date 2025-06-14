@@ -869,4 +869,13 @@ public class FactureProformaService {
         return note;
     }
 
+    //Methode pour connaitre tout les facture lier a un client
+    public List<FactureProForma> getFacturesParClient(Long clientId, Long entrepriseClientId) {
+    if (clientId == null && entrepriseClientId == null) {
+        throw new RuntimeException("Veuillez spécifier un client ou une entreprise cliente.");
+    }
+
+    return factureProformaRepository.findByClientIdOrEntrepriseClientId(clientId, entrepriseClientId);
+}
+
 }

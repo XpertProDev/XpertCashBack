@@ -1,6 +1,7 @@
 package com.xpertcash.entity;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
@@ -66,6 +67,19 @@ public class FactureReelle {
     @JoinColumn(name = "facture_proforma_id")
     @JsonIgnoreProperties({"facturesReelles"})
     private FactureProForma factureProForma;
+
+
+    @OneToMany(mappedBy = "factureReelle", cascade = CascadeType.ALL)
+    private List<Paiement> paiements = new ArrayList<>();
+
+    public List<Paiement> getPaiements() {
+        return paiements;
+    }
+
+    public void setPaiements(List<Paiement> paiements) {
+        this.paiements = paiements;
+    }
+
 
 
 }

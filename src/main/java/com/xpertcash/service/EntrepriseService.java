@@ -141,13 +141,6 @@ public class EntrepriseService {
         entreprise.setTauxTva(dto.getTauxTva());
     }
 
-    
-
-    
-    
-    
-
-
         if (logoFile != null && !logoFile.isEmpty()) {
         // Supprimer l'ancien logo s'il existe
         String oldLogoPath = entreprise.getLogo();
@@ -169,7 +162,7 @@ public class EntrepriseService {
 
 
 
-    System.out.println("📥 DTO reçu dans le controller : " + dto);
+    System.out.println("DTO reçu dans le controller : " + dto);
 
 
     entrepriseRepository.save(entreprise);

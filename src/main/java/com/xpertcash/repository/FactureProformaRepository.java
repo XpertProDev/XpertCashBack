@@ -31,7 +31,7 @@ public interface FactureProformaRepository extends JpaRepository<FactureProForma
 
     Optional<FactureProForma> findTopByDateCreationOrderByNumeroFactureDesc(LocalDate dateCreation);
 
-     // 🔍 Trouver les factures à relancer qui n'ont jamais reçu de rappel
+     // Trouver les factures à relancer qui n'ont jamais reçu de rappel
     // ou dont le dernier rappel a été envoyé avant aujourd'hui
     @Query("SELECT f FROM FactureProForma f WHERE f.dateRelance < :now AND (f.dernierRappelEnvoye IS NULL OR f.dernierRappelEnvoye < :now)")
     List<FactureProForma> findByDateRelanceBeforeAndDernierRappelEnvoyeIsNullOrDernierRappelEnvoyeBefore(@Param("now") LocalDateTime now);
@@ -54,8 +54,15 @@ public interface FactureProformaRepository extends JpaRepository<FactureProForma
           OR :userId IN (SELECT u.id FROM f.approbateurs u)
       )
     ORDER BY f.dateCreation DESC, f.id DESC
-""")
+    """)
     List<FactureProForma> findByEntrepriseIdAndUtilisateur(@Param("userId") Long userId, @Param("entrepriseId") Long entrepriseId);
+
+
+    @Query("SELECT f FROM FactureProForma f WHERE " +
+       "(:clientId IS NOT NULL AND f.client.id = :clientId) OR " +
+       "(:entrepriseClientId IS NOT NULL AND f.entrepriseClient.id = :entrepriseClientId)")
+    List<FactureProForma> findByClientIdOrEntrepriseClientId(@Param("clientId") Long clientId,
+                                                         @Param("entrepriseClientId") Long entrepriseClientId);
 
 
 
