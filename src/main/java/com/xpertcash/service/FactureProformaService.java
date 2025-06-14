@@ -1,5 +1,6 @@
 package com.xpertcash.service;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -34,6 +35,7 @@ import com.xpertcash.repository.EntrepriseClientRepository;
 import com.xpertcash.repository.FactureProformaRepository;
 import com.xpertcash.repository.FactureReelleRepository;
 import com.xpertcash.repository.NoteFactureProFormaRepository;
+import com.xpertcash.repository.PaiementRepository;
 import com.xpertcash.repository.ProduitRepository;
 import com.xpertcash.repository.UsersRepository;
 
@@ -70,6 +72,8 @@ public class FactureProformaService {
 
     @Autowired
     private NoteFactureProFormaRepository noteFactureProFormaRepository;
+    @Autowired
+    private PaiementRepository paiementRepository;
 
     @Autowired
     private JwtUtil jwtUtil;
@@ -320,6 +324,19 @@ public class FactureProformaService {
 
         // Si demande d’annulation
         if (modifications.getStatut() == StatutFactureProForma.ANNULE) {
+
+                // si paiements existants
+            Optional<FactureReelle> factureReelleOpt = factureReelleRepository.findByFactureProForma(facture);
+            if (factureReelleOpt.isPresent()) {
+                FactureReelle factureReelle = factureReelleOpt.get();
+                BigDecimal totalPaye = paiementRepository.sumMontantsByFactureReelle(factureReelle.getId());
+
+                if (totalPaye != null && totalPaye.compareTo(BigDecimal.ZERO) > 0) {
+                    throw new RuntimeException("Impossible d’annuler : des paiements ont déjà été effectués sur la facture.");
+                }
+            }
+
+
             facture.setStatut(StatutFactureProForma.ANNULE);
             facture.setDateAnnulation(LocalDateTime.now());
             facture.setUtilisateurAnnulateur(user);

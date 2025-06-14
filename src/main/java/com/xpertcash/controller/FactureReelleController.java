@@ -1,7 +1,10 @@
 package com.xpertcash.controller;
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
+
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -26,15 +29,7 @@ public class FactureReelleController {
     @Autowired
     private FactureReelleService factureReelleService;
 
-    @PutMapping("/updatefacture/{id}/modifier-statut")
-    public ResponseEntity<FactureReelleDTO> modifierStatut(@PathVariable Long id,
-                                                           @RequestParam StatutPaiementFacture nouveauStatut, HttpServletRequest request) {
-
-        FactureReelleDTO factureModifiee = factureReelleService.modifierStatutPaiement(id, nouveauStatut, request);
-
-        return ResponseEntity.ok(factureModifiee);
-    }
-
+ 
     // Endpoint pour lister tout les factures reelles
     @GetMapping("/mes-factures-reelles")
     public ResponseEntity<List<FactureReelleDTO>> getMesFacturesReelles(HttpServletRequest request) {
@@ -91,13 +86,23 @@ public class FactureReelleController {
     }
 
     @GetMapping("/factures/{id}/paiements")
-    public ResponseEntity<List<PaiementDTO>> getPaiements(@PathVariable Long id) {
+    public ResponseEntity<?> getPaiements(@PathVariable Long id, HttpServletRequest request) {
         try {
-            List<PaiementDTO> paiements = factureReelleService.getPaiementsParFacture(id);
+            List<PaiementDTO> paiements = factureReelleService.getPaiementsParFacture(id, request);
             return ResponseEntity.ok(paiements);
         } catch (RuntimeException e) {
-            return ResponseEntity.notFound().build();
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", e.getMessage()));
         }
+    }
+
+
+
+    //Get All impaye facture
+   @GetMapping("/factures/impayees")
+    public ResponseEntity<List<FactureReelleDTO>> getFacturesImpayees(
+        HttpServletRequest request) {
+        List<FactureReelleDTO> factures = factureReelleService.listerFacturesImpayees(request);
+        return ResponseEntity.ok(factures);
     }
 
 

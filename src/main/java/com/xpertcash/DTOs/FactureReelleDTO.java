@@ -1,5 +1,6 @@
 package com.xpertcash.DTOs;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -31,10 +32,13 @@ public class FactureReelleDTO {
     private UserRequest utilisateur;
     private EntrepriseClientDTO entrepriseClient;
     private ClientDTO client;
+    private BigDecimal montantRestant;
     private List<LigneFactureDTO> lignesFacture;
+    private String nomClient;
+    private String nomEntrepriseClient;
 
     // ✅ Constructeur qui transforme une FactureReelle en FactureReelleDTO
-    public FactureReelleDTO(FactureReelle facture) {
+    public FactureReelleDTO(FactureReelle facture, BigDecimal montantRestant) {
         this.id = facture.getId();
         this.numeroFacture = facture.getNumeroFacture();
         this.description = facture.getDescription();
@@ -47,10 +51,22 @@ public class FactureReelleDTO {
         this.utilisateur = (facture.getUtilisateurCreateur() != null) ? new UserRequest(facture.getUtilisateurCreateur()) : null;
         this.entrepriseClient = (facture.getEntrepriseClient() != null) ? new EntrepriseClientDTO(facture.getEntrepriseClient()) : null;
         this.client = (facture.getClient() != null) ? new ClientDTO(facture.getClient()) : null;
+        this.montantRestant = montantRestant;
         this.lignesFacture = (facture.getLignesFacture() != null) ?
                 facture.getLignesFacture().stream().map(LigneFactureDTO::new).collect(Collectors.toList()) : null;
+        
+        if (facture.getEntrepriseClient() != null) {
+            this.nomEntrepriseClient = facture.getEntrepriseClient().getNom();
+        }
+
+        if (facture.getClient() != null) {
+            this.nomClient = facture.getClient().getNomComplet();
+        }
+
     }
 
+
+    
 
 
 }
