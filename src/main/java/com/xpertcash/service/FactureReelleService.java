@@ -462,7 +462,7 @@ public class FactureReelleService {
         // DTO avec tous les champs remplis
         FactureReelleDTO dto = new FactureReelleDTO(facture, montantRestant);
 
-        // ❌ Supprimer les champs non nécessaires pour cette route
+        // Supprimer les champs non nécessaires pour cette route
         dto.setUtilisateur(null);
         dto.setEntrepriseClient(null);
         dto.setClient(null);
