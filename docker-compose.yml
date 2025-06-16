@@ -1,0 +1,34 @@
+services:
+  mysql-db:
+    image: mysql:8
+    container_name: mysql-db
+    environment:
+      MYSQL_ROOT_PASSWORD: ""           # Permet mot de passe root vide
+      MYSQL_DATABASE: xpertCash_db
+      MYSQL_ALLOW_EMPTY_PASSWORD: "yes" # Pour autoriser le mot de passe vide
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  springboot-app:
+    build: .
+    container_name: springboot-app
+    ports:
+      - "8080:8080"
+    depends_on:
+      mysql-db:
+        condition: service_healthy
+    environment:
+      MYSQL_HOST: mysql-db
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql-db:3306/xpertCash_db?createDatabaseIfNotExist=true&allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=UTC
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: ""
+
+volumes:
+  mysql-data:
