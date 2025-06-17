@@ -3,8 +3,10 @@ package com.xpertcash.service;
 
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
+import jakarta.mail.util.ByteArrayDataSource;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.List;
@@ -83,21 +85,31 @@ public class MailService {
 
         sendEmail(toEmail, subject, htmlContent);
     }
-
+    
+    //ici
     public void sendEmail(String toEmail, String subject, String htmlContent) throws MessagingException {
-        MimeMessage message = mailSender.createMimeMessage();
-        MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+    MimeMessage message = mailSender.createMimeMessage();
+    MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
 
-        helper.setFrom(from);
-        helper.setTo(toEmail);
-        helper.setSubject(subject);
-        helper.setText(htmlContent, true); 
+    helper.setFrom(from);
+    helper.setTo(toEmail);
+    helper.setSubject(subject);
+    helper.setText(htmlContent, true);
 
-        FileSystemResource logoResource = new FileSystemResource("src/main/resources/assets/logoxpertpro.png");
-        helper.addInline("logo", logoResource);
+    try {
+        InputStream logoStream = getClass().getClassLoader().getResourceAsStream("assets/logoxpertpro.png");
+        if (logoStream == null) {
+            throw new MessagingException("Logo image not found in resources.");
+        }
 
-        mailSender.send(message);
+        ByteArrayDataSource logoDataSource = new ByteArrayDataSource(logoStream, "image/png");
+        helper.addInline("logo", logoDataSource);
+    } catch (IOException e) {
+        throw new MessagingException("Error loading logo image", e);
     }
+
+    mailSender.send(message);
+}
 
 
     public void sendPasswordResetEmail(String to, String otp) throws MessagingException {
@@ -236,39 +248,42 @@ public class MailService {
     }
 
     public void sendEmailWithAttachments(
-            String toEmail,
-            String ccEmail,
-            String subject,
-            String htmlContent,
-            List<MultipartFile> attachments
-    ) throws MessagingException, IOException {
-        MimeMessage message = mailSender.createMimeMessage();
-        MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+        String toEmail,
+        String ccEmail,
+        String subject,
+        String htmlContent,
+        List<MultipartFile> attachments
+) throws MessagingException, IOException {
+    MimeMessage message = mailSender.createMimeMessage();
+    MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
 
-        helper.setFrom(from);
-        helper.setTo(toEmail.split(","));
-        if (ccEmail != null && !ccEmail.isBlank()) {
-            helper.setCc(ccEmail.split(","));
-        }
-        helper.setSubject(subject);
-        helper.setText(htmlContent, true);
-
-        // Ajout du logo
-        FileSystemResource logoResource = new FileSystemResource("src/main/resources/assets/logoxpertpro.png");
-        helper.addInline("logo", logoResource);
-
-        // Ajout des pièces jointes
-        for (MultipartFile file : attachments) {
-            if (!file.isEmpty()) {
-                helper.addAttachment(
-                        Objects.requireNonNull(file.getOriginalFilename()),
-                        new ByteArrayResource(file.getBytes()),
-                        file.getContentType()
-                );
-            }
-        }
-
-        mailSender.send(message);
+    helper.setFrom(from);
+    helper.setTo(toEmail.split(","));
+    if (ccEmail != null && !ccEmail.isBlank()) {
+        helper.setCc(ccEmail.split(","));
     }
+    helper.setSubject(subject);
+    helper.setText(htmlContent, true);
+
+    InputStream logoStream = getClass().getClassLoader().getResourceAsStream("assets/logoxpertpro.png");
+    if (logoStream != null) {
+        ByteArrayDataSource logoDataSource = new ByteArrayDataSource(logoStream, "image/png");
+        helper.addInline("logo", logoDataSource);
+    } else {
+        throw new MessagingException("Logo introuvable dans les resources.");
+    }
+
+    for (MultipartFile file : attachments) {
+        if (!file.isEmpty()) {
+            helper.addAttachment(
+                Objects.requireNonNull(file.getOriginalFilename()),
+                new ByteArrayResource(file.getBytes()),
+                file.getContentType()
+            );
+        }
+    }
+
+    mailSender.send(message);
+}
 
 }
