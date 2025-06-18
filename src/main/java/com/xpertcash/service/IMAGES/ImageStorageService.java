@@ -101,5 +101,32 @@ public class ImageStorageService {
             throw new NotFoundException("Erreur lors de l'enregistrement de l'image utilisateur : " + e.getMessage());
         }
     }
+
+    //Gestion image pour les clients
+    public String saveClientImage(MultipartFile imageClientFile) {
+        if (imageClientFile == null || imageClientFile.isEmpty()) {
+            throw new NotFoundException("Le fichier image est vide ou invalide.");
+        }
+        try {
+            Path imageRootLocation = Paths.get("src/main/resources/static/clientUpload");
+            // Vérifie si le dossier existe, sinon le crée
+            if (!Files.exists(imageRootLocation)) {
+                Files.createDirectories(imageRootLocation);
+            }
+
+            String imageName = UUID.randomUUID().toString() + "_" + imageClientFile.getOriginalFilename();
+            Path imagePath = imageRootLocation.resolve(imageName);
+            Files.copy(imageClientFile.getInputStream(), imagePath, StandardCopyOption.REPLACE_EXISTING);
+
+            String imageUrl = "/clientUpload/" + imageName;
+            System.out.println("✅ Image client sauvegardée : " + imageUrl);
+            return "/clientUpload/" + imageName;
+        } catch (IOException e) {
+            System.out.println("❌ ERREUR lors de l'enregistrement de l'image client : " + e.getMessage());
+            throw new NotFoundException("Erreur lors de l'enregistrement de l'image client : " + e.getMessage());
+        }
+    }
+    
+
 }
 

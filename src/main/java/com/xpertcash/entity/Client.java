@@ -1,9 +1,5 @@
 package com.xpertcash.entity;
-
 import java.time.LocalDateTime;
-
-import com.fasterxml.jackson.annotation.JsonBackReference;
-
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
@@ -21,7 +17,6 @@ public class Client {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-    
     private String nomComplet;
     private String adresse;
     private String poste;
@@ -29,6 +24,8 @@ public class Client {
     private String ville;
     private String telephone;
     private String email;
+    @Column(nullable = true)
+    private String photo;
     private LocalDateTime createdAt;
     
    @ManyToOne

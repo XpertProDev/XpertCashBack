@@ -21,8 +21,6 @@ public class User {
     @Column(nullable = false)
     private String personalCode;
     
-
-
     @Size(min = 2, message = "champs nom trop courte")
 
     @Column(nullable = false)
