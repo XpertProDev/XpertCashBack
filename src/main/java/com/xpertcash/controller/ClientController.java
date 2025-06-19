@@ -8,6 +8,7 @@ import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -16,7 +17,10 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 import com.xpertcash.entity.Client;
 import com.xpertcash.entity.EntrepriseClient;
@@ -85,23 +89,26 @@ public class ClientController {
         return clientService.getAllClientsAndEntreprises();
     } 
 
-    //Endpoint pour modifier un client
-    @PutMapping("/clientupdate/{id}")
-        public ResponseEntity<?> updateClient(@PathVariable("id") Long id, @RequestBody Client client) {
-            try {
-                client.setId(id);
-                Client updatedClient = clientService.updateClient(client);
-                return ResponseEntity.ok(updatedClient);
-            } catch (IllegalArgumentException e) {
-                return buildErrorResponse(HttpStatus.BAD_REQUEST, e.getMessage());
-            } catch (EntityNotFoundException e) {
-                return buildErrorResponse(HttpStatus.NOT_FOUND, e.getMessage());
-            } catch (RuntimeException e) {
-                return buildErrorResponse(HttpStatus.CONFLICT, e.getMessage());
-            } catch (Exception e) {
-                return buildErrorResponse(HttpStatus.INTERNAL_SERVER_ERROR, "Une erreur inattendue s'est produite : " + e.getMessage());
-            }
+    //Endpoint pour modifier un client 
+    @PutMapping(value ="/clientupdate/{id}",  consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<?> updateClient(@PathVariable("id") Long id,
+                                          @RequestPart("client") Client client,
+                                          @RequestPart(value = "imageClientFile", required = false) MultipartFile imageClientFile,
+                                          HttpServletRequest request) {
+        try {
+            client.setId(id);
+            Client updatedClient = clientService.updateClient(client, imageClientFile, request);
+            return ResponseEntity.ok(updatedClient);
+        } catch (IllegalArgumentException e) {
+            return buildErrorResponse(HttpStatus.BAD_REQUEST, e.getMessage());
+        } catch (EntityNotFoundException e) {
+            return buildErrorResponse(HttpStatus.NOT_FOUND, e.getMessage());
+        } catch (RuntimeException e) {
+            return buildErrorResponse(HttpStatus.CONFLICT, e.getMessage());
+        } catch (Exception e) {
+            return buildErrorResponse(HttpStatus.INTERNAL_SERVER_ERROR, "Une erreur inattendue s'est produite : " + e.getMessage());
         }
+    }
 
         private ResponseEntity<Map<String, String>> buildErrorResponse(HttpStatus status, String message) {
             Map<String, String> errorBody = new HashMap<>();

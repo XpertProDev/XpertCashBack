@@ -1,6 +1,10 @@
 package com.xpertcash.service;
 
+import java.io.IOException;
 import java.lang.reflect.Field;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -11,6 +15,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 
 import com.xpertcash.configuration.JwtUtil;
 import com.xpertcash.entity.Client;
@@ -20,9 +25,11 @@ import com.xpertcash.entity.User;
 import com.xpertcash.repository.ClientRepository;
 import com.xpertcash.repository.EntrepriseClientRepository;
 import com.xpertcash.repository.UsersRepository;
+import com.xpertcash.service.IMAGES.ImageStorageService;
 
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.transaction.Transactional;
 
 @Service
 public class ClientService {
@@ -38,6 +45,9 @@ public class ClientService {
 
     @Autowired
     private JwtUtil jwtUtil;
+
+    @Autowired
+    private ImageStorageService imageStorageService;
 
   
     public Client saveClient(Client client,  HttpServletRequest request) {
@@ -257,55 +267,76 @@ public class ClientService {
 
 
         // Méthode pour modifier un client 
-        public Client updateClient(Client client) {
-    if (client.getId() == null) {
-        throw new IllegalArgumentException("L'ID du client est obligatoire !");
-    }
-
-    Optional<Client> existingClientOpt = clientRepository.findById(client.getId());
-    if (existingClientOpt.isEmpty()) {
-        throw new EntityNotFoundException("Le client avec cet ID n'existe pas !");
-    }
-
-    Client existingClient = existingClientOpt.get();
-
-    // Vérifier unicité de l'email (hors lui-même)
-    String email = client.getEmail();
-    if (email != null && !email.isEmpty()) {
-        Optional<Client> clientWithEmail = clientRepository.findByEmail(email);
-        if (clientWithEmail.isPresent() && !clientWithEmail.get().getId().equals(client.getId())) {
-            throw new RuntimeException("Un autre client utilise déjà cet email !");
-        }
-    }
-
-    // Vérifier unicité du téléphone (hors lui-même)
-    String telephone = client.getTelephone();
-    if (telephone != null && !telephone.isEmpty()) {
-        Optional<Client> clientWithTelephone = clientRepository.findByTelephone(telephone);
-        if (clientWithTelephone.isPresent() && !clientWithTelephone.get().getId().equals(client.getId())) {
-            throw new RuntimeException("Un autre client utilise déjà ce téléphone !");
-        }
-    }
-
-    // Mise à jour des champs non nuls
-    for (Field field : Client.class.getDeclaredFields()) {
-        field.setAccessible(true);
-        try {
-            Object newValue = field.get(client);
-            if (newValue != null) {
-                field.set(existingClient, newValue);
+        @Transactional
+        public Client updateClient(Client client, MultipartFile imageClientFile, HttpServletRequest request) {
+            if (client.getId() == null) {
+                throw new IllegalArgumentException("L'ID du client est obligatoire !");
             }
-        } catch (IllegalAccessException e) {
-            e.printStackTrace();
+
+            Optional<Client> existingClientOpt = clientRepository.findById(client.getId());
+            if (existingClientOpt.isEmpty()) {
+                throw new EntityNotFoundException("Le client avec cet ID n'existe pas !");
+            }
+
+            Client existingClient = existingClientOpt.get();
+
+            // Vérifier unicité de l'email (hors lui-même)
+            String email = client.getEmail();
+            if (email != null && !email.isEmpty()) {
+                Optional<Client> clientWithEmail = clientRepository.findByEmail(email);
+                if (clientWithEmail.isPresent() && !clientWithEmail.get().getId().equals(client.getId())) {
+                    throw new RuntimeException("Un autre client utilise déjà cet email !");
+                }
+            }
+
+            // Vérifier unicité du téléphone (hors lui-même)
+            String telephone = client.getTelephone();
+            if (telephone != null && !telephone.isEmpty()) {
+                Optional<Client> clientWithTelephone = clientRepository.findByTelephone(telephone);
+                if (clientWithTelephone.isPresent() && !clientWithTelephone.get().getId().equals(client.getId())) {
+                    throw new RuntimeException("Un autre client utilise déjà ce téléphone !");
+                }
+            }
+
+
+        // Mise à jour des champs non nuls
+        for (Field field : Client.class.getDeclaredFields()) {
+            field.setAccessible(true);
+            try {
+                Object newValue = field.get(client);
+                if (newValue != null) {
+                    field.set(existingClient, newValue);
+                }
+            } catch (IllegalAccessException e) {
+                e.printStackTrace();
+            }
         }
-    }
 
-    //  Nouveau bloc : détacher l'entreprise si elle est explicitement mise à null
-    if (client.getEntrepriseClient() == null && existingClient.getEntrepriseClient() != null) {
-        existingClient.setEntrepriseClient(null);
-    }
+        //  Nouveau bloc : détacher l'entreprise si elle est explicitement mise à null
+        if (client.getEntrepriseClient() == null && existingClient.getEntrepriseClient() != null) {
+            existingClient.setEntrepriseClient(null);
+        }
 
-    return clientRepository.save(existingClient);
-}
+             // Mise à jour de la photo si image présente
+            if (imageClientFile != null && !imageClientFile.isEmpty()) {
+                String oldImagePath = existingClient.getPhoto(); // ✅ Prendre depuis l'objet actuel en base
+                if (oldImagePath != null && !oldImagePath.isBlank()) {
+                    Path oldPath = Paths.get("src/main/resources/static" + oldImagePath);
+                    try {
+                        Files.deleteIfExists(oldPath);
+                        System.out.println("🗑️ Ancienne photo profil supprimée : " + oldImagePath);
+                    } catch (IOException e) {
+                        System.out.println("⚠️ Impossible de supprimer l'ancienne photo : " + e.getMessage());
+                    }
+                }
+
+                String newImageUrl = imageStorageService.saveClientImage(imageClientFile);
+                existingClient.setPhoto(newImageUrl); 
+                System.out.println("📸 Nouvelle photo enregistrée : " + newImageUrl);
+            }
+
+
+            return clientRepository.save(existingClient);
+        }
 
 }

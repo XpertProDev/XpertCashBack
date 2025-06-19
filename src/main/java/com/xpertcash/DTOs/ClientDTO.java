@@ -3,6 +3,7 @@ package com.xpertcash.DTOs;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.xpertcash.entity.Client;
 
+import jakarta.persistence.Column;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -21,6 +22,7 @@ public class ClientDTO {
     private String pays;
     private String ville;
     private String telephone;
+    private String photo;
 
     public ClientDTO(Client client) {
         this.id = client.getId();
@@ -30,6 +32,7 @@ public class ClientDTO {
         this.email = client.getEmail();
         this.pays = client.getPays();
         this.ville = client.getVille();
+        this.photo = client.getPhoto();
         this.telephone = client.getTelephone();
 
       
