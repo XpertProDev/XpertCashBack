@@ -4,7 +4,4 @@ public enum StatutPaiementFacture {
     EN_ATTENTE,
     PARTIELLEMENT_PAYEE,
     PAYEE
-
-
-
 }
