@@ -51,6 +51,7 @@ public interface FactureReelleRepository extends JpaRepository<FactureReelle, Lo
         Long entrepriseId, Long utilisateurId, List<StatutPaiementFacture> statuts
     );
 
+    List<FactureReelle> findAllByFactureProForma(FactureProForma factureProForma);
 
 
 }

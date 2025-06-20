@@ -2,6 +2,7 @@ package com.xpertcash.service;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Optional;
@@ -24,13 +25,17 @@ import com.xpertcash.entity.Paiement;
 import com.xpertcash.entity.PermissionType;
 import com.xpertcash.entity.User;
 import com.xpertcash.entity.Enum.RoleType;
+import com.xpertcash.entity.Enum.StatutFactureProForma;
+import com.xpertcash.entity.Enum.StatutFactureReelle;
 import com.xpertcash.entity.Enum.StatutPaiementFacture;
+import com.xpertcash.repository.FactureProformaRepository;
 import com.xpertcash.repository.FactureReelleRepository;
 import com.xpertcash.repository.LigneFactureReelleRepository;
 import com.xpertcash.repository.PaiementRepository;
 import com.xpertcash.repository.UsersRepository;
 
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.transaction.Transactional;
 
 @Service
 public class FactureReelleService {
@@ -46,6 +51,11 @@ public class FactureReelleService {
 
     @Autowired
     private PaiementRepository paiementRepository;
+
+     @Autowired
+    private FactProHistoriqueService factProHistoriqueService;
+    @Autowired
+    private FactureProformaRepository factureProformaRepository;
 
     @Autowired
     private JwtUtil jwtUtil;
@@ -140,8 +150,22 @@ public class FactureReelleService {
         return numeroFacture.toString();
     }
 
-    //Methode pour lister les factures Reel
+   // Methode pour Supprimer facturer deja generer une fois annuler
+public void supprimerFactureReelleLiee(FactureProForma proforma) {
+    List<FactureReelle> facturesReelles = factureReelleRepository.findAllByFactureProForma(proforma);
+    if (facturesReelles.isEmpty()) {
+        System.out.println("Aucune facture réelle associée à cette facture proforma.");
+        return;
+    }
 
+    for (FactureReelle factureReelle : facturesReelles) {
+        factureReelleRepository.delete(factureReelle);
+        System.out.println("🗑️ Facture réelle supprimée suite à l'annulation.");
+    }
+}
+
+
+    //Methode pour lister les factures Reel
     public List<FactureReelleDTO> listerMesFacturesReelles(HttpServletRequest request) {
         // 1. Récupérer le token et extraire l'ID utilisateur
         String token = request.getHeader("Authorization");
@@ -283,19 +307,6 @@ public class FactureReelleService {
     // ✅ Retourner le DTO avec montantRestant
     return new FactureReelleDTO(facture, montantRestant);
 }
-
-
-
-    // Methode pour Supprimer facturer deja generer une fois annuler
-    public void supprimerFactureReelleLiee(FactureProForma proforma) {
-        Optional<FactureReelle> factureReelleOpt = factureReelleRepository.findByFactureProForma(proforma);
-        if (factureReelleOpt.isPresent()) {
-            factureReelleRepository.delete(factureReelleOpt.get());
-            System.out.println("🗑️ Facture réelle supprimée suite à l'annulation.");
-        } else {
-            System.out.println("Aucune facture réelle associée à cette facture proforma.");
-        }
-    }
 
 
    public FactureReelle enregistrerPaiement(Long factureId, BigDecimal montant, String modePaiement, HttpServletRequest request) {
@@ -472,6 +483,78 @@ public class FactureReelleService {
     }).collect(Collectors.toList());
 }
 
+
+
+//Modifier le statut d'une facture
+@Transactional
+public FactureProForma annulerFactureReelle(FactureReelle modifications, HttpServletRequest request) {
+    // 🔐 Extraction utilisateur depuis JWT
+    String token = request.getHeader("Authorization");
+    if (token == null || !token.startsWith("Bearer ")) {
+        throw new RuntimeException("Token JWT manquant ou mal formaté");
+    }
+
+    Long userId;
+    try {
+        userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
+    } catch (Exception e) {
+        throw new RuntimeException("Erreur lors de l'extraction de l'ID de l'utilisateur depuis le token", e);
+    }
+
+    User user = usersRepository.findById(userId)
+            .orElseThrow(() -> new RuntimeException("Utilisateur introuvable !"));
+
+    // 🔍 Récupération de la facture réelle
+    FactureReelle factureReelle = factureReelleRepository.findById(modifications.getId())
+            .orElseThrow(() -> new RuntimeException("Facture réelle introuvable !"));
+
+    FactureProForma factureProForma = factureReelle.getFactureProForma();
+
+    // 🔐 Vérification du rôle et permission
+    RoleType role = user.getRole().getName();
+    boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
+    boolean hasGestionFacturePermission = user.getRole().hasPermission(PermissionType.Gestion_Facture);
+
+    
+    if (!isAdminOrManager && !hasGestionFacturePermission) {
+        throw new RuntimeException("Accès refusé : vous n'avez pas les droits pour annuler cette facture.");
+    }
+    if (!isAdminOrManager ) {
+        throw new RuntimeException("Vous n'êtes pas autorisé à annuler cette facture.");
+    }
+
+    // 🔒 Blocage si déjà annulée
+    if (factureProForma.getStatut() == StatutFactureProForma.ANNULE) {
+        throw new RuntimeException("Cette facture est déjà annulée.");
+    }
+
+    // 🔒 Paiements associés ?
+    BigDecimal totalPaye = paiementRepository.sumMontantsByFactureReelle(factureReelle.getId());
+    if (totalPaye != null && totalPaye.compareTo(BigDecimal.ZERO) > 0) {
+        throw new RuntimeException("Impossible d’annuler : des paiements ont déjà été effectués.");
+    }
+
+    // ✅ Suppression via méthode utilitaire
+    supprimerFactureReelleLiee(factureProForma);
+
+    // ✅ Mise à jour de la proforma
+    factureProForma.setStatut(StatutFactureProForma.ANNULE);
+    factureProForma.setDateAnnulation(LocalDateTime.now());
+    factureProForma.setUtilisateurAnnulateur(user);
+    factureProForma.setDateRelance(null);
+    factureProForma.setDernierRappelEnvoye(null);
+    factureProForma.setNotifie(false);
+
+    // 📝 Historique
+    factProHistoriqueService.enregistrerActionHistorique(
+            factureProForma,
+            user,
+            "Annulation",
+            "Facture réelle supprimée et proforma annulée. Aucun paiement enregistré."
+    );
+
+    return factureProformaRepository.save(factureProForma);
+}
 
 
 }

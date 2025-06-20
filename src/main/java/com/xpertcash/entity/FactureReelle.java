@@ -1,11 +1,14 @@
 package com.xpertcash.entity;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.xpertcash.entity.Enum.StatutFactureProForma;
+import com.xpertcash.entity.Enum.StatutFactureReelle;
 import com.xpertcash.entity.Enum.StatutPaiementFacture;
 
 import jakarta.persistence.*;
@@ -32,9 +35,19 @@ public class FactureReelle {
     private Double tauxRemise;
     private boolean tva;
     private double totalFacture;
+     private LocalDateTime dateAnnulation;
+
+
 
     @Enumerated(EnumType.STRING)
     private StatutPaiementFacture statutPaiement;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "statut", length = 20)
+    // Statut de la facture réelle par defaut ya pas de statut
+    private StatutFactureReelle statut = StatutFactureReelle.VALIDE;
+
+    
 
 
 
@@ -52,6 +65,10 @@ public class FactureReelle {
 
     @OneToMany(mappedBy = "factureReelle", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<LigneFactureReelle> lignesFacture;
+
+      @ManyToOne
+    @JsonIgnoreProperties({"personalCode", "phone", "photo", "createdAt", "activationCode", "activatedLien", "enabledLien", "lastActivity", "locked", "pays", "role"})
+    private User utilisateurAnnulateur;
 
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "entreprise_id")

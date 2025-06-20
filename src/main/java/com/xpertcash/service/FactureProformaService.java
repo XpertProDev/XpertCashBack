@@ -324,7 +324,7 @@ public class FactureProformaService {
             }
         }
 
-        // Si demande d’annulation
+        // Si demande d’annulation 
         if (modifications.getStatut() == StatutFactureProForma.ANNULE) {
 
                 // si paiements existants
