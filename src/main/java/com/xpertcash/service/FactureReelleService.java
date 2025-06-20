@@ -504,13 +504,12 @@ public FactureProForma annulerFactureReelle(FactureReelle modifications, HttpSer
     User user = usersRepository.findById(userId)
             .orElseThrow(() -> new RuntimeException("Utilisateur introuvable !"));
 
-    // 🔍 Récupération de la facture réelle
     FactureReelle factureReelle = factureReelleRepository.findById(modifications.getId())
             .orElseThrow(() -> new RuntimeException("Facture réelle introuvable !"));
 
     FactureProForma factureProForma = factureReelle.getFactureProForma();
 
-    // 🔐 Vérification du rôle et permission
+    // érification du rôle et permission
     RoleType role = user.getRole().getName();
     boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
     boolean hasGestionFacturePermission = user.getRole().hasPermission(PermissionType.Gestion_Facture);
