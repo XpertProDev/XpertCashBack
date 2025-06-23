@@ -36,8 +36,8 @@ public class ClientController {
     @Autowired
     private ClientService clientService;
 
-  
-        @PostMapping("/clients")
+
+    @PostMapping("/clients")
     public ResponseEntity<?> createClient(@RequestBody Client client, HttpServletRequest request) {
         Map<String, String> response = new HashMap<>();
         try {
@@ -54,7 +54,7 @@ public class ClientController {
         }
     }
 
-    
+
 
     @GetMapping("/clients/{id}")
     public Optional<Client> getClientById(@PathVariable Long id) {
@@ -68,10 +68,10 @@ public class ClientController {
             return ResponseEntity.ok(clients);
         } catch (RuntimeException e) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                                 .body(Collections.singletonMap("error", e.getMessage()));
+                    .body(Collections.singletonMap("error", e.getMessage()));
         }
     }
-    
+
 
     @GetMapping("/clients/entreprise/{entrepriseId}")
     public List<Client> getClientsByEntreprise(@PathVariable Long entrepriseId) {
@@ -87,7 +87,7 @@ public class ClientController {
     @GetMapping("/clients-and-entreprises")
     public List<Object> getAllClientsAndEntreprises() {
         return clientService.getAllClientsAndEntreprises();
-    } 
+    }
 
     //Endpoint pour modifier un client 
     @PutMapping(value ="/clientupdate/{id}",  consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -110,15 +110,15 @@ public class ClientController {
         }
     }
 
-        private ResponseEntity<Map<String, String>> buildErrorResponse(HttpStatus status, String message) {
-            Map<String, String> errorBody = new HashMap<>();
-            errorBody.put("message", message);
-            return ResponseEntity.status(status).body(errorBody);
-        }
+    private ResponseEntity<Map<String, String>> buildErrorResponse(HttpStatus status, String message) {
+        Map<String, String> errorBody = new HashMap<>();
+        errorBody.put("message", message);
+        return ResponseEntity.status(status).body(errorBody);
+    }
 
-        //Get entreprise client
-        @GetMapping("/entreprise-clients")
-         public ResponseEntity<List<EntrepriseClient>> getEntrepriseClients(HttpServletRequest request) {
+    //Get entreprise client
+    @GetMapping("/entreprise-clients")
+    public ResponseEntity<List<EntrepriseClient>> getEntrepriseClients(HttpServletRequest request) {
         List<EntrepriseClient> entrepriseClients = clientService.getAllEntrepriseClients(request);
         return ResponseEntity.ok(entrepriseClients);
     }

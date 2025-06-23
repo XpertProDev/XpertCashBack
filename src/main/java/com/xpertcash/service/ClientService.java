@@ -49,70 +49,70 @@ public class ClientService {
     @Autowired
     private ImageStorageService imageStorageService;
 
-  
+
     public Client saveClient(Client client,  HttpServletRequest request) {
         if (client.getNomComplet() == null || client.getNomComplet().trim().isEmpty()) {
             throw new RuntimeException("Le nom du client est obligatoire !");
         }
 
-               // Vérifier la présence du token JWT et récupérer l'ID de l'utilisateur connecté
-    String token = request.getHeader("Authorization");
-    if (token == null || !token.startsWith("Bearer ")) {
-        throw new RuntimeException("Token JWT manquant ou mal formaté");
-    }
+        // Vérifier la présence du token JWT et récupérer l'ID de l'utilisateur connecté
+        String token = request.getHeader("Authorization");
+        if (token == null || !token.startsWith("Bearer ")) {
+            throw new RuntimeException("Token JWT manquant ou mal formaté");
+        }
 
-    Long userId = null;
-    try {
-        userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
-    } catch (Exception e) {
-        throw new RuntimeException("Erreur lors de l'extraction de l'ID de l'utilisateur depuis le token", e);
-    }
+        Long userId = null;
+        try {
+            userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
+        } catch (Exception e) {
+            throw new RuntimeException("Erreur lors de l'extraction de l'ID de l'utilisateur depuis le token", e);
+        }
 
-    // Récupérer l'utilisateur par son ID
-    User user = usersRepository.findById(userId)
-            .orElseThrow(() -> new RuntimeException("Utilisateur introuvable !"));
+        // Récupérer l'utilisateur par son ID
+        User user = usersRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("Utilisateur introuvable !"));
 
-    // Vérifier que l'utilisateur a une entreprise associée (entreprise créatrice de la facture)
-    Entreprise entrepriseUtilisateur = user.getEntreprise();
-    if (entrepriseUtilisateur == null) {
-        throw new RuntimeException("L'utilisateur n'a pas d'entreprise associée.");
-    }
+        // Vérifier que l'utilisateur a une entreprise associée (entreprise créatrice de la facture)
+        Entreprise entrepriseUtilisateur = user.getEntreprise();
+        if (entrepriseUtilisateur == null) {
+            throw new RuntimeException("L'utilisateur n'a pas d'entreprise associée.");
+        }
 
-    client.setEntreprise(entrepriseUtilisateur);
-    
+        client.setEntreprise(entrepriseUtilisateur);
+
         checkClientExists(client);
 
         LocalDateTime now = LocalDateTime.now();
         client.setCreatedAt(now);
-    
+
         if (client.getEntrepriseClient() != null) {
             checkEntrepriseExists(client.getEntrepriseClient());
-    
+
             if (client.getEntrepriseClient().getId() != null) {
                 associateExistingEntreprise(client);
             } else {
                 saveNewEntreprise(client);
             }
         }
-    
+
         return clientRepository.save(client);
     }
-    
+
     private void checkClientExists(Client client) {
         String email = client.getEmail();
         String telephone = client.getTelephone();
-    
+
         Optional<Client> existingByEmail = Optional.empty();
         Optional<Client> existingByTelephone = Optional.empty();
-    
+
         if (email != null && !email.isEmpty()) {
             existingByEmail = clientRepository.findByEmail(email);
         }
-    
+
         if (telephone != null && !telephone.isEmpty()) {
             existingByTelephone = clientRepository.findByTelephone(telephone);
         }
-    
+
         if (existingByEmail.isPresent() && existingByTelephone.isPresent()) {
             throw new RuntimeException("Un client avec cet email et ce téléphone existe déjà !");
         } else if (existingByEmail.isPresent()) {
@@ -120,25 +120,25 @@ public class ClientService {
         } else if (existingByTelephone.isPresent()) {
             throw new RuntimeException("Un client avec ce téléphone existe déjà !");
         }
-    } 
-    
+    }
+
     private void checkEntrepriseExists(EntrepriseClient entrepriseClient) {
         String email = entrepriseClient.getEmail();
         String telephone = entrepriseClient.getTelephone();
-    
+
         Optional<EntrepriseClient> existingByEmail = Optional.empty();
         Optional<EntrepriseClient> existingByTelephone = Optional.empty();
-    
+
         // Vérifier si l'email est renseigné et existe déjà
         if (email != null && !email.isEmpty()) {
             existingByEmail = entrepriseClientRepository.findByEmail(email);
         }
-    
+
         // Vérifier si le téléphone est renseigné et existe déjà
         if (telephone != null && !telephone.isEmpty()) {
             existingByTelephone = entrepriseClientRepository.findByTelephone(telephone);
         }
-    
+
         // Construire un message d'erreur précis
         if (existingByEmail.isPresent() && existingByTelephone.isPresent()) {
             throw new RuntimeException("Une entreprise avec cet email et ce téléphone existe déjà !");
@@ -148,8 +148,8 @@ public class ClientService {
             throw new RuntimeException("Une entreprise avec ce téléphone existe déjà !");
         }
     }
-    
-  
+
+
     private void associateExistingEntreprise(Client client) {
         Optional<EntrepriseClient> existingEntrepriseById = entrepriseClientRepository.findById(client.getEntrepriseClient().getId());
         if (existingEntrepriseById.isPresent()) {
@@ -158,7 +158,7 @@ public class ClientService {
             throw new IllegalArgumentException("L'entreprise avec cet ID n'existe pas.");
         }
     }
-    
+
     private void saveNewEntreprise(Client client) {
         if (client.getEntrepriseClient() != null) {
             client.getEntrepriseClient().setCreatedAt(client.getCreatedAt());
@@ -166,9 +166,9 @@ public class ClientService {
             client.setEntrepriseClient(savedEntreprise);
         }
     }
-    
-    
-    
+
+
+
 
     public Optional<Client> getClientById(Long id) {
         return clientRepository.findById(id);
@@ -184,74 +184,74 @@ public class ClientService {
 
 
     public List<Client> getAllClients(HttpServletRequest request) {
-    // 1. Extraire l'utilisateur à partir du token
-    String token = request.getHeader("Authorization");
-    if (token == null || !token.startsWith("Bearer ")) {
-        throw new RuntimeException("Token JWT manquant ou mal formaté");
+        // 1. Extraire l'utilisateur à partir du token
+        String token = request.getHeader("Authorization");
+        if (token == null || !token.startsWith("Bearer ")) {
+            throw new RuntimeException("Token JWT manquant ou mal formaté");
+        }
+
+        Long userId;
+        try {
+            userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
+        } catch (Exception e) {
+            throw new RuntimeException("Erreur lors de l'extraction de l'ID utilisateur", e);
+        }
+
+        User user = usersRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
+
+        Entreprise entreprise = user.getEntreprise();
+        if (entreprise == null) {
+            throw new RuntimeException("Aucune entreprise associée à cet utilisateur");
+        }
+
+        // 2. Récupérer tous les clients
+        List<Client> allClients = clientRepository.findAll();
+
+        // 3. Filtrer : client lié à entreprise OU entrepriseClient liée à l'entreprise
+        return allClients.stream()
+                .filter(c ->
+                        (c.getEntreprise() != null && c.getEntreprise().getId().equals(entreprise.getId())) ||
+                                (c.getEntrepriseClient() != null &&
+                                        c.getEntrepriseClient().getEntreprise() != null &&
+                                        c.getEntrepriseClient().getEntreprise().getId().equals(entreprise.getId()))
+                )
+                .collect(Collectors.toList());
+
+
     }
-
-    Long userId;
-    try {
-        userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
-    } catch (Exception e) {
-        throw new RuntimeException("Erreur lors de l'extraction de l'ID utilisateur", e);
-    }
-
-    User user = usersRepository.findById(userId)
-            .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
-
-    Entreprise entreprise = user.getEntreprise();
-    if (entreprise == null) {
-        throw new RuntimeException("Aucune entreprise associée à cet utilisateur");
-    }
-
-    // 2. Récupérer tous les clients
-    List<Client> allClients = clientRepository.findAll();
-
-    // 3. Filtrer : client lié à entreprise OU entrepriseClient liée à l'entreprise
-    return allClients.stream()
-            .filter(c ->
-                (c.getEntreprise() != null && c.getEntreprise().getId().equals(entreprise.getId())) ||
-                (c.getEntrepriseClient() != null && 
-                 c.getEntrepriseClient().getEntreprise() != null &&
-                 c.getEntrepriseClient().getEntreprise().getId().equals(entreprise.getId()))
-            )
-            .collect(Collectors.toList());
-
-
-}
 
     //Methode pour recuperer seulement les entreprise client
     public List<EntrepriseClient> getAllEntrepriseClients(HttpServletRequest request) {
-    // 1. Extraire le token et l'utilisateur
-    String token = request.getHeader("Authorization");
-    if (token == null || !token.startsWith("Bearer ")) {
-        throw new RuntimeException("Token JWT manquant ou mal formaté");
+        // 1. Extraire le token et l'utilisateur
+        String token = request.getHeader("Authorization");
+        if (token == null || !token.startsWith("Bearer ")) {
+            throw new RuntimeException("Token JWT manquant ou mal formaté");
+        }
+
+        Long userId;
+        try {
+            userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
+        } catch (Exception e) {
+            throw new RuntimeException("Erreur lors de l'extraction de l'ID utilisateur", e);
+        }
+
+        User user = usersRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
+
+        Entreprise entreprise = user.getEntreprise();
+        if (entreprise == null) {
+            throw new RuntimeException("Aucune entreprise associée à cet utilisateur");
+        }
+
+        // 2. Retourner uniquement les EntrepriseClient liés à cette entreprise
+        return entrepriseClientRepository.findByEntrepriseId(entreprise.getId());
     }
 
-    Long userId;
-    try {
-        userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
-    } catch (Exception e) {
-        throw new RuntimeException("Erreur lors de l'extraction de l'ID utilisateur", e);
-    }
-
-    User user = usersRepository.findById(userId)
-            .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
-
-    Entreprise entreprise = user.getEntreprise();
-    if (entreprise == null) {
-        throw new RuntimeException("Aucune entreprise associée à cet utilisateur");
-    }
-
-    // 2. Retourner uniquement les EntrepriseClient liés à cette entreprise
-    return entrepriseClientRepository.findByEntrepriseId(entreprise.getId());
-}
 
 
-    
-      // Méthode pour récupérer tous les clients (personnes) et entreprises sans leurs clients associés
-      public List<Object> getAllClientsAndEntreprises() {
+    // Méthode pour récupérer tous les clients (personnes) et entreprises sans leurs clients associés
+    public List<Object> getAllClientsAndEntreprises() {
         List<Object> clientsAndEntreprises = new ArrayList<>();
 
         // 1. Récupérer tous les clients (personnes)
@@ -266,37 +266,37 @@ public class ClientService {
     }
 
 
-        // Méthode pour modifier un client 
-        @Transactional
-        public Client updateClient(Client client, MultipartFile imageClientFile, HttpServletRequest request) {
-            if (client.getId() == null) {
-                throw new IllegalArgumentException("L'ID du client est obligatoire !");
-            }
+    // Méthode pour modifier un client
+    @Transactional
+    public Client updateClient(Client client, MultipartFile imageClientFile, HttpServletRequest request) {
+        if (client.getId() == null) {
+            throw new IllegalArgumentException("L'ID du client est obligatoire !");
+        }
 
-            Optional<Client> existingClientOpt = clientRepository.findById(client.getId());
-            if (existingClientOpt.isEmpty()) {
-                throw new EntityNotFoundException("Le client avec cet ID n'existe pas !");
-            }
+        Optional<Client> existingClientOpt = clientRepository.findById(client.getId());
+        if (existingClientOpt.isEmpty()) {
+            throw new EntityNotFoundException("Le client avec cet ID n'existe pas !");
+        }
 
-            Client existingClient = existingClientOpt.get();
+        Client existingClient = existingClientOpt.get();
 
-            // Vérifier unicité de l'email (hors lui-même)
-            String email = client.getEmail();
-            if (email != null && !email.isEmpty()) {
-                Optional<Client> clientWithEmail = clientRepository.findByEmail(email);
-                if (clientWithEmail.isPresent() && !clientWithEmail.get().getId().equals(client.getId())) {
-                    throw new RuntimeException("Un autre client utilise déjà cet email !");
-                }
+        // Vérifier unicité de l'email (hors lui-même)
+        String email = client.getEmail();
+        if (email != null && !email.isEmpty()) {
+            Optional<Client> clientWithEmail = clientRepository.findByEmail(email);
+            if (clientWithEmail.isPresent() && !clientWithEmail.get().getId().equals(client.getId())) {
+                throw new RuntimeException("Un autre client utilise déjà cet email !");
             }
+        }
 
-            // Vérifier unicité du téléphone (hors lui-même)
-            String telephone = client.getTelephone();
-            if (telephone != null && !telephone.isEmpty()) {
-                Optional<Client> clientWithTelephone = clientRepository.findByTelephone(telephone);
-                if (clientWithTelephone.isPresent() && !clientWithTelephone.get().getId().equals(client.getId())) {
-                    throw new RuntimeException("Un autre client utilise déjà ce téléphone !");
-                }
+        // Vérifier unicité du téléphone (hors lui-même)
+        String telephone = client.getTelephone();
+        if (telephone != null && !telephone.isEmpty()) {
+            Optional<Client> clientWithTelephone = clientRepository.findByTelephone(telephone);
+            if (clientWithTelephone.isPresent() && !clientWithTelephone.get().getId().equals(client.getId())) {
+                throw new RuntimeException("Un autre client utilise déjà ce téléphone !");
             }
+        }
 
 
         // Mise à jour des champs non nuls
@@ -317,26 +317,26 @@ public class ClientService {
             existingClient.setEntrepriseClient(null);
         }
 
-             // Mise à jour de la photo si image présente
-            if (imageClientFile != null && !imageClientFile.isEmpty()) {
-                String oldImagePath = existingClient.getPhoto(); // ✅ Prendre depuis l'objet actuel en base
-                if (oldImagePath != null && !oldImagePath.isBlank()) {
-                    Path oldPath = Paths.get("src/main/resources/static" + oldImagePath);
-                    try {
-                        Files.deleteIfExists(oldPath);
-                        System.out.println("🗑️ Ancienne photo profil supprimée : " + oldImagePath);
-                    } catch (IOException e) {
-                        System.out.println("⚠️ Impossible de supprimer l'ancienne photo : " + e.getMessage());
-                    }
+        // Mise à jour de la photo si image présente
+        if (imageClientFile != null && !imageClientFile.isEmpty()) {
+            String oldImagePath = existingClient.getPhoto(); // ✅ Prendre depuis l'objet actuel en base
+            if (oldImagePath != null && !oldImagePath.isBlank()) {
+                Path oldPath = Paths.get("src/main/resources/static" + oldImagePath);
+                try {
+                    Files.deleteIfExists(oldPath);
+                    System.out.println("🗑️ Ancienne photo profil supprimée : " + oldImagePath);
+                } catch (IOException e) {
+                    System.out.println("⚠️ Impossible de supprimer l'ancienne photo : " + e.getMessage());
                 }
-
-                String newImageUrl = imageStorageService.saveClientImage(imageClientFile);
-                existingClient.setPhoto(newImageUrl); 
-                System.out.println("📸 Nouvelle photo enregistrée : " + newImageUrl);
             }
 
-
-            return clientRepository.save(existingClient);
+            String newImageUrl = imageStorageService.saveClientImage(imageClientFile);
+            existingClient.setPhoto(newImageUrl);
+            System.out.println("📸 Nouvelle photo enregistrée : " + newImageUrl);
         }
+
+
+        return clientRepository.save(existingClient);
+    }
 
 }
