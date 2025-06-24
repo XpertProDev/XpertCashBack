@@ -11,6 +11,7 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Data
@@ -26,6 +27,7 @@ public class UserRequest {
     private String siege;
     private String email;
     private RoleType roleType;
+    private LocalDateTime createdAt;
 
     @Pattern(regexp = "^\\+?[0-9]{8,15}$", message = "Le téléphone doit être au format valide")
     private String phone;
@@ -38,7 +40,7 @@ public class UserRequest {
     private String personalCode;
     private String photo;
     private boolean userActivated;
-    private Boolean adminActivated;  // Null pour les admins, sinon l'état d'activation de l'admin
+    private Boolean adminActivated;
 
     // Constructeur principal
     public UserRequest(User user, Entreprise entreprise, List<BoutiqueResponse> boutiques, boolean userActivated, Boolean adminActivated) {
@@ -48,6 +50,7 @@ public class UserRequest {
         this.siege = entreprise.getSiege();
         this.email = user.getEmail();
         this.roleType = user.getRole().getName();
+        this.createdAt = user.getCreatedAt();
         this.phone = user.getPhone();
         this.pays = user.getPays();
         this.adresseEntreprise = entreprise.getAdresse();
@@ -65,6 +68,7 @@ public class UserRequest {
     this.nomComplet = user.getNomComplet();
     this.email = user.getEmail();
     this.roleType = user.getRole().getName();
+    this.createdAt = user.getCreatedAt();
     this.phone = user.getPhone();
     this.photo = user.getPhoto();
     this.userActivated = user.isEnabledLien();
