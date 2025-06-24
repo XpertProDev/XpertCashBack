@@ -139,7 +139,7 @@ public class UsersService {
         entreprise.setCreatedAt(LocalDateTime.now());
         entreprise.setLogo("");
         entreprise.setAdresse("");
-        entreprise.setSiege("");
+        entreprise.setSiege("Ville");
         entreprise.setNina("");
         entreprise.setNif("");
         entreprise.setBanque("");
@@ -148,7 +148,7 @@ public class UsersService {
         entreprise.setPays("");
         entreprise.setSecteur("");
         entreprise.setRccm("");
-        entreprise.setSignataireNom("");
+        entreprise.setSignataireNom("Fournisseur");
         entreprise.setSiteWeb("");
         entreprise.setPrefixe(null);
         entreprise.setSuffixe(null);

@@ -29,7 +29,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import com.fasterxml.jackson.core.type.TypeReference;
 
 
-@CrossOrigin(origins = "http://localhost:4200")
+@CrossOrigin(origins = "*")
 @RestController
 @RequestMapping("/api/auth")
 public class ProduitController {
@@ -323,5 +323,7 @@ public class ProduitController {
                 return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
             }
         }
+
+        //
        
 } 
