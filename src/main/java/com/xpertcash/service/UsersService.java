@@ -616,27 +616,26 @@ public User updateUser(Long userId, UpdateUserRequest request, MultipartFile ima
                 .collect(Collectors.toList());
 
         return new UserRequest(
-            user.getId(),
-            user.getNomComplet(),
-            entreprise.getNomEntreprise(),
-            entreprise.getSiege(),
-            user.getEmail(),
-            user.getRole().getName(),
-            user.getCreatedAt(),
-            user.getPhone(),
-            user.getPays(),
-            entreprise.getAdresse(),
-            entreprise.getLogo(),
-            entreprise.getId(),
-            boutiqueResponses,
-            user.getPersonalCode(),
-            user.getPhoto(),
-            user.isActivatedLien(), 
-            user.getRole().getName() == RoleType.ADMIN ? user.isActivatedLien() : null
+                user.getId(),
+                user.getNomComplet(),
+                entreprise.getNomEntreprise(),
+                entreprise.getSiege(),
+                user.getEmail(),
+                user.getRole().getName(),
+                user.getCreatedAt(),
+                user.getPhone(),
+                user.getPays(),
+                entreprise.getAdresse(),
+                entreprise.getLogo(),
+                entreprise.getId(),
+                boutiqueResponses,
+                user.getPersonalCode(),
+                user.getPhoto(),
+                user.isActivatedLien(), 
+                entreprise.getAdmin().isActivatedLien(), // AdminActivated doit refléter l'état du vrai admin
+                entreprise.getAdmin().getCreatedAt()     // Date de création du vrai admin
+            );
 
-    
-
-        );
     }
 
     // Pour la récupération de tous les utilisateurs d'une entreprise

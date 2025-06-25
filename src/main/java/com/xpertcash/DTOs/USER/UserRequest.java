@@ -41,27 +41,34 @@ public class UserRequest {
     private String photo;
     private boolean userActivated;
     private Boolean adminActivated;
+    private LocalDateTime adminCreatedAt;
+
 
     // Constructeur principal
-    public UserRequest(User user, Entreprise entreprise, List<BoutiqueResponse> boutiques, boolean userActivated, Boolean adminActivated) {
-        this.id = user.getId();
-        this.nomComplet = user.getNomComplet();
-        this.nomEntreprise = entreprise.getNomEntreprise();
-        this.siege = entreprise.getSiege();
-        this.email = user.getEmail();
-        this.roleType = user.getRole().getName();
-        this.createdAt = user.getCreatedAt();
-        this.phone = user.getPhone();
-        this.pays = user.getPays();
-        this.adresseEntreprise = entreprise.getAdresse();
-        this.logoEntreprise = entreprise.getLogo();
-        this.entrepriseId = entreprise.getId();
-        this.boutiques = boutiques;
-        this.personalCode = user.getPersonalCode();
-        this.photo = user.getPhoto();
-        this.userActivated = userActivated;
-        this.adminActivated = adminActivated;
+   public UserRequest(User user, Entreprise entreprise, List<BoutiqueResponse> boutiques) {
+    this.id = user.getId();
+    this.nomComplet = user.getNomComplet();
+    this.nomEntreprise = entreprise.getNomEntreprise();
+    this.siege = entreprise.getSiege();
+    this.email = user.getEmail();
+    this.roleType = user.getRole().getName();
+    this.createdAt = user.getCreatedAt();
+    this.phone = user.getPhone();
+    this.pays = user.getPays();
+    this.adresseEntreprise = entreprise.getAdresse();
+    this.logoEntreprise = entreprise.getLogo();
+    this.entrepriseId = entreprise.getId();
+    this.boutiques = boutiques;
+    this.personalCode = user.getPersonalCode();
+    this.photo = user.getPhoto();
+    this.userActivated = user.isEnabledLien();
+
+    // Admin data directement récupérée
+    if (user.getEntreprise() != null && user.getEntreprise().getAdmin() != null) {
+        this.adminActivated = user.getEntreprise().getAdmin().isActivatedLien();
+        this.adminCreatedAt = user.getEntreprise().getAdmin().getCreatedAt();
     }
+}
 
     public UserRequest(User user) {
     this.id = user.getId();
@@ -72,6 +79,9 @@ public class UserRequest {
     this.phone = user.getPhone();
     this.photo = user.getPhoto();
     this.userActivated = user.isEnabledLien();
+
+    this.adminActivated = user.getEntreprise().getAdmin().isActivatedLien();
+    this.adminCreatedAt = user.getEntreprise().getAdmin().getCreatedAt();
 }
 
     // Getters & Setters (génère-les si tu utilises Lombok sinon à la main)
