@@ -3,6 +3,7 @@ package com.xpertcash.controller.PASSWORD;
 import java.util.Collections;
 import java.util.Map;
 
+import com.xpertcash.entity.PASSWORD.PasswordResetToken;
 import org.eclipse.angus.mail.util.MailConnectException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -29,26 +30,43 @@ public class AuthControllerPassword {
                 passwordService.generateResetToken(email);
                 return ResponseEntity.ok(Collections.singletonMap("message", "Un code de vérification a été envoyé à votre email."));
             } catch (Exception e) {
-                throw new RuntimeException("Une erreur est survenue lors de la demande de réinitialisation du mot de passe.");
+                // Affiche le vrai message d'erreur côté client pour debug
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Collections.singletonMap("error", "Erreur : " + e.getMessage()));
             }
         }
+
         
 
 
         // Étape 2 : Modifier le mot de passe
-    @PostMapping("/reset-password")
-    public ResponseEntity<?> resetPassword(@RequestBody Map<String, String> request) {
-        try {
-            String email = request.get("email");
-            String token = request.get("token");
-            String newPassword = request.get("newPassword");
+        @PostMapping("/reset-password")
+        public ResponseEntity<?> resetPassword(@RequestBody Map<String, String> request) {
+            try {
+                String token = request.get("token");
+                String newPassword = request.get("newPassword");
 
-            passwordService.resetPassword(email, token, newPassword);
-            return ResponseEntity.ok(Collections.singletonMap("message", "Mot de passe changé avec succès."));
+                passwordService.resetPassword(token, newPassword);
+                return ResponseEntity.ok(Collections.singletonMap("message", "Mot de passe changé avec succès."));
+            } catch (RuntimeException e) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                        .body(Collections.singletonMap("error", e.getMessage()));
+            }
+        }
+
+    @PostMapping("/validate-otp")
+    public ResponseEntity<?> validateOtp(@RequestBody Map<String, String> request) {
+        String email = request.get("email");
+        String code = request.get("code");
+
+        try {
+            PasswordResetToken token = passwordService.validateOtp(email, code);
+            return ResponseEntity.ok(Collections.singletonMap("token", token.getToken()));
         } catch (RuntimeException e) {
-            String errorMessage = e.getMessage();
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Collections.singletonMap("error", e.getMessage()));
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Collections.singletonMap("error", e.getMessage()));
         }
     }
+
 
 }

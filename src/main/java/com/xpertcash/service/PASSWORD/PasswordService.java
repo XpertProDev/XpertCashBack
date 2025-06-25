@@ -19,13 +19,13 @@ import jakarta.transaction.Transactional;
 @Service
 public class PasswordService {
 
-     @Autowired
-     private UsersRepository usersRepository;
+    @Autowired
+    private UsersRepository usersRepository;
 
     @Autowired
     private PasswordResetTokenRepository passwordResetTokenRepository;
 
-   @Autowired
+    @Autowired
     private MailService mailService;
 
     @Autowired
@@ -36,69 +36,77 @@ public class PasswordService {
         return String.format("%06d", new Random().nextInt(1000000));
     }
 
-
-        // Étape 1 : Générer et envoyer le code de réinitialisation
-        @Transactional
-        public void generateResetToken(String email) {
+    // Étape 1 : Générer et envoyer le code de réinitialisation
+@Transactional
+public void generateResetToken(String email) {
     User user = usersRepository.findByEmail(email)
             .orElseThrow(() -> new RuntimeException("Aucun compte associé à cet email."));
 
-    // Générer un nouveau code OTP
     String otp = generateOTP();
     LocalDateTime expirationDate = LocalDateTime.now().plusMinutes(10);
 
-    // Vérifier si un token existe déjà pour cet email
-    PasswordResetToken resetToken = passwordResetTokenRepository.findByEmail(email)
+    // Vérifier si un token existe déjà pour cet utilisateur
+    PasswordResetToken resetToken = passwordResetTokenRepository.findByUser(user)
             .orElse(new PasswordResetToken());
 
     // Mettre à jour ou créer un nouveau token
-    resetToken.setEmail(email);
+    resetToken.setUser(user);
     resetToken.setToken(otp);
     resetToken.setExpirationDate(expirationDate);
 
-    // Sauvegarde du token mis à jour
     passwordResetTokenRepository.save(resetToken);
 
-    // Envoyer l'email
-    sendResetEmail(email, otp);
+    // Envoyer l'email à partir de l'utilisateur
+    sendResetEmail(user, otp);
+}
+
+    // Envoi de l'email avec le code OTP
+private void sendResetEmail(User user, String otp) {
+    try {
+        mailService.sendPasswordResetEmail(user.getEmail(), otp);
+    } catch (MessagingException e) {
+        throw new RuntimeException("Erreur lors de l'envoi de l'email de réinitialisation", e);
+    }
 }
 
 
-        // Envoi de l'email avec le code OTP
-        private void sendResetEmail(String email, String otp) {
-                try {
-                    mailService.sendPasswordResetEmail(email, otp);
-                } catch (MessagingException e) {
-                    throw new RuntimeException("Erreur lors de l'envoi de l'email de réinitialisation", e);
-                }
-        }       
-
-
-
-
-    // Étape : Réinitialiser le mot de passe
+    // Étape 2 : Réinitialiser le mot de passe
     @Transactional
-    public void resetPassword(String email, String token, String newPassword) {
-        // Récupérer le token pour vérifier si il est valide
-        PasswordResetToken resetToken = passwordResetTokenRepository.findByEmailAndToken(email, token)
-                .orElseThrow(() -> new RuntimeException("Code invalide ou expiré."));
-    
-        // Vérifier si le token a expiré
+public void resetPassword(String token, String newPassword) {
+    PasswordResetToken resetToken = passwordResetTokenRepository.findByToken(token)
+            .orElseThrow(() -> new RuntimeException("Code invalide ou expiré."));
+
+    if (resetToken.getExpirationDate().isBefore(LocalDateTime.now())) {
+        throw new RuntimeException("Le code de vérification a expiré.");
+    }
+
+    User user = resetToken.getUser();
+    if (user == null) {
+        throw new RuntimeException("Utilisateur non trouvé.");
+    }
+
+    user.setPassword(passwordEncoder.encode(newPassword));
+    usersRepository.save(user);
+
+    passwordResetTokenRepository.deleteByUser(user);
+}
+
+    public PasswordResetToken validateOtp(String email, String code) {
+        User user = usersRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("Aucun compte associé à cet email."));
+
+        PasswordResetToken resetToken = passwordResetTokenRepository.findByUser(user)
+                .orElseThrow(() -> new RuntimeException("Aucun code de réinitialisation trouvé."));
+
         if (resetToken.getExpirationDate().isBefore(LocalDateTime.now())) {
             throw new RuntimeException("Le code de vérification a expiré.");
         }
-    
-        // Récupérer l'utilisateur
-        User user = usersRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé."));
-    
-        // Changer le mot de passe de l'utilisateur
-        user.setPassword(passwordEncoder.encode(newPassword));
-        usersRepository.save(user);
-    
-        // Supprimer le token après utilisation pour empêcher son usage multiple
-        passwordResetTokenRepository.deleteByEmail(email);
+
+        if (!resetToken.getToken().equals(code)) {
+            throw new RuntimeException("Code invalide.");
+        }
+
+        return resetToken;
     }
-    
 
 }

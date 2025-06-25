@@ -622,6 +622,7 @@ public User updateUser(Long userId, UpdateUserRequest request, MultipartFile ima
             entreprise.getSiege(),
             user.getEmail(),
             user.getRole().getName(),
+            user.getCreatedAt(),
             user.getPhone(),
             user.getPays(),
             entreprise.getAdresse(),
@@ -632,6 +633,7 @@ public User updateUser(Long userId, UpdateUserRequest request, MultipartFile ima
             user.getPhoto(),
             user.isActivatedLien(), 
             user.getRole().getName() == RoleType.ADMIN ? user.isActivatedLien() : null
+
     
 
         );
