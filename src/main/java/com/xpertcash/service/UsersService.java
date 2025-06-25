@@ -139,7 +139,7 @@ public class UsersService {
         entreprise.setCreatedAt(LocalDateTime.now());
         entreprise.setLogo("");
         entreprise.setAdresse("");
-        entreprise.setSiege("");
+        entreprise.setSiege("Ville");
         entreprise.setNina("");
         entreprise.setNif("");
         entreprise.setBanque("");
@@ -148,7 +148,7 @@ public class UsersService {
         entreprise.setPays("");
         entreprise.setSecteur("");
         entreprise.setRccm("");
-        entreprise.setSignataireNom("");
+        entreprise.setSignataireNom("Fournisseur");
         entreprise.setSiteWeb("");
         entreprise.setPrefixe(null);
         entreprise.setSuffixe(null);
@@ -220,81 +220,62 @@ public class UsersService {
         }
     }
 
-    // Connexion : vérifie l'état du compte et retourne un token JWT
+   // Connexion : permet la connexion même si le compte n'est pas activé
     public String login(String email, String password) {
-        // Récupérer l'utilisateur par son email
         User user = usersRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
-    
+                .orElseThrow(() -> new RuntimeException("Email ou mot de passe incorrect"));
+
         // Vérification du mot de passe
         if (!passwordEncoder.matches(password, user.getPassword())) {
-            throw new RuntimeException("Mot de passe incorrect.");
+            throw new RuntimeException("Email ou mot de passe incorrect");
         }
-    
+
         // Vérification si le compte est verrouillé
         if (user.isLocked()) {
             throw new RuntimeException("Votre compte est verrouillé pour inactivité.");
         }
-    
+
         // Récupérer l'admin associé à l'entreprise de l'utilisateur
         User admin = user.getEntreprise().getAdmin();
-    
+
         // Vérifier si l'utilisateur est ADMIN
         boolean isAdmin = user.getRole().getName().equals(RoleType.ADMIN);
-    
+
         // Vérifier si le compte a été créé il y a moins de 24h
         LocalDateTime expirationDate = user.getCreatedAt().plusHours(24);
         boolean within24Hours = LocalDateTime.now().isBefore(expirationDate);
-    
-        // **Cas 1 : ADMIN**
-        if (isAdmin) {
-            if (!user.isActivatedLien() && !within24Hours) {
-                throw new RuntimeException("Votre compte administrateur n'est pas activé et la période de connexion temporaire est expirée.");
-            }
-        } else {
-            // **Cas 2 : EMPLOYÉ**
-            boolean adminWithin24Hours = LocalDateTime.now().isBefore(admin.getCreatedAt().plusHours(24));
-            if (!admin.isEnabledLien() && !adminWithin24Hours) {
-                throw new RuntimeException("Votre compte est désactivé car votre administrateur n'a pas activé son compte.");
-            }
-    
-            // Vérifier si le compte de l'admin est désactivé après 24 heures
-            if (!admin.isEnabledLien()) {
-                throw new RuntimeException("Votre compte est désactivé car votre administrateur est désactivé.");
-            }
-        }
-    
-        // Vérification si le compte de l'admin est désactivé après 24 heures
-        if (!isAdmin && !admin.isEnabledLien() && !LocalDateTime.now().isBefore(admin.getCreatedAt().plusHours(24))) {
-            throw new RuntimeException("Votre compte est désactivé car votre administrateur n'a pas activé son compte.");
-        }
-    
-        // Vérifier si le compte utilisateur est activé
-        if (!user.isEnabledLien()) {
-            throw new RuntimeException("Votre compte est suspendu. Veuillez contacter l'administrateur.");
-        }
-    
-        // Si tout est OK, mise à jour de la dernière activité
+
+        //  on ne BLOQUE plus la connexion même si les comptes ne sont pas activés
+        // Les statuts seront renvoyés au front dans le token
+
         user.setLastActivity(LocalDateTime.now());
         usersRepository.save(user);
-    
-        // Générer et retourner le JWT
-        return generateToken(user);
+
+        return generateToken(user, admin, within24Hours);
     }
-    
-    // Génèration du token
-    private String generateToken(User user) {
-        long expirationTime = 1000 * 60 * 60 * 24; // 24 heures
+
+    // Génération du token avec infos supplémentaires
+    private String generateToken(User user, User admin, boolean within24Hours) {
+        long expirationTime = 1000 * 60 * 60 * 24;
         Date now = new Date();
         Date expirationDate = new Date(now.getTime() + expirationTime);
 
-        // Générer le token JWT
+        boolean isAdmin = user.getRole().getName().equals(RoleType.ADMIN);
+
+        // Statuts à envoyer dans le token
+        boolean userActivated = user.isEnabledLien();
+        boolean adminActivated = admin.isEnabledLien();
+        boolean userActivationPossible = isAdmin ? (user.isActivatedLien() || within24Hours) : true;
+
         return Jwts.builder()
-                .setSubject(String.valueOf(user.getId()))  // L'ID de l'utilisateur comme "subject"
-                .claim("role", user.getRole().getName())  // Ajouter le rôle de l'utilisateur dans le claim
-                .setIssuedAt(now)  // Date de création du token
-                .setExpiration(expirationDate)  // Date d'expiration du token
-                .signWith(SignatureAlgorithm.HS256, jwtConfig.getSecretKey())  // Utilisation de la clé secrète de JwtConfig pour signer
+                .setSubject(String.valueOf(user.getId()))
+                .claim("role", user.getRole().getName())
+                .claim("userActivated", userActivated)
+                .claim("adminActivated", adminActivated)
+                .claim("userActivationPossible", userActivationPossible)
+                .setIssuedAt(now)
+                .setExpiration(expirationDate)
+                .signWith(SignatureAlgorithm.HS256, jwtConfig.getSecretKey())
                 .compact();
     }
 
@@ -648,7 +629,11 @@ public User updateUser(Long userId, UpdateUserRequest request, MultipartFile ima
             entreprise.getId(),
             boutiqueResponses,
             user.getPersonalCode(),
-            user.getPhoto()
+            user.getPhoto(),
+            user.isActivatedLien(), 
+            user.getRole().getName() == RoleType.ADMIN ? user.isActivatedLien() : null
+    
+
         );
     }
 

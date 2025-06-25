@@ -16,6 +16,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import com.xpertcash.DTOs.FactureReelleDTO;
 import com.xpertcash.DTOs.PaiementDTO;
+import com.xpertcash.entity.FactureProForma;
+import com.xpertcash.entity.FactureReelle;
 import com.xpertcash.entity.Enum.StatutPaiementFacture;
 import com.xpertcash.service.FactureReelleService;
 
@@ -104,6 +106,21 @@ public class FactureReelleController {
         List<FactureReelleDTO> factures = factureReelleService.listerFacturesImpayees(request);
         return ResponseEntity.ok(factures);
     }
+
+    // Endpoint pour annuler une facture réelle
+    @PutMapping("/cancelFacture/{factureId}")
+    public ResponseEntity<FactureProForma> annulerFactureReelle(
+            @PathVariable Long factureId,
+            @RequestBody FactureReelle modifications,
+            HttpServletRequest request) {
+
+        // Assigner l'ID reçu dans l'URL à l'objet modifications (pour éviter qu'il soit null)
+        modifications.setId(factureId);
+
+        FactureProForma factureAnnulee = factureReelleService.annulerFactureReelle(modifications, request);
+        return ResponseEntity.ok(factureAnnulee);
+    }
+
 
 
 
