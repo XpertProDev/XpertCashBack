@@ -5,8 +5,10 @@ import lombok.Data;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Random;
+import java.util.Set;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
@@ -90,6 +92,9 @@ public class Entreprise {
     @OneToMany(mappedBy = "entreprise", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     @JsonIgnoreProperties({"entreprise"})
     private List<FactureProForma> facturesProforma = new ArrayList<>();
+
+    @ManyToMany(fetch = FetchType.EAGER)
+    private Set<AppModule> modulesActifs = new HashSet<>();
 
 
 

@@ -183,17 +183,13 @@ public ResponseEntity<?> getFournisseurById(@PathVariable Long id, HttpServletRe
     @PutMapping(value = "/updateFournisseur/{id}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
 public ResponseEntity<?> updateFournisseur(
         @PathVariable Long id,
-        @RequestPart("updatedFournisseur") String updatedFournisseurJson,
+        @RequestPart("updatedFournisseur") Fournisseur updatedFournisseur,
         @RequestPart(value = "imageFournisseurFile", required = false) MultipartFile imageFournisseurFile,
         HttpServletRequest request) {
 
     Map<String, Object> response = new HashMap<>();
 
     try {
-        // Désérialiser le JSON manuellement
-        ObjectMapper objectMapper = new ObjectMapper();
-        Fournisseur updatedFournisseur = objectMapper.readValue(updatedFournisseurJson, Fournisseur.class);
-
         Fournisseur updated = fournisseurService.updateFournisseur(id, updatedFournisseur, imageFournisseurFile, request);
 
         response.put("message", "Fournisseur mis à jour avec succès");
@@ -202,10 +198,12 @@ public ResponseEntity<?> updateFournisseur(
 
     } catch (RuntimeException e) {
         response.put("message", "Erreur : " + e.getMessage());
+        e.printStackTrace(); // Optionnel pour debug
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
 
     } catch (Exception e) {
         response.put("message", "Une erreur interne est survenue.");
+        e.printStackTrace(); // Pour afficher la vraie erreur serveur dans les logs
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
     }
 }
