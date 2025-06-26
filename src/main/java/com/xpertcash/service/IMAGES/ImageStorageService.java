@@ -127,6 +127,29 @@ public class ImageStorageService {
         }
     }
     
+    //Gestion image pour fournisseurs
+    public String saveFournisseurImage(MultipartFile imageFournisseurFile) {
+        if (imageFournisseurFile == null || imageFournisseurFile.isEmpty())
+            throw new NotFoundException("Le fichier image est vide ou invalide.");
+            try {
+            Path imageRootLocation = Paths.get("src/main/resources/static/fournisseurUpload");
+            // Vérifie si le dossier existe, sinon le crée
+            if (!Files.exists(imageRootLocation)) {
+                Files.createDirectories(imageRootLocation);
+            }
+            String imageName = UUID.randomUUID().toString() + "_" + imageFournisseurFile.getOriginalFilename();
+            Path imagePath = imageRootLocation.resolve(imageName);
+            Files.copy(imageFournisseurFile.getInputStream(), imagePath, StandardCopyOption.REPLACE_EXISTING);
+            String imageUrl = "/fournisseurUpload/" + imageName;
+            System.out.println("✅ Image fournisseur sauvegardée : " + imageUrl);
+            return "/fournisseurUpload/" + imageName;
+        } catch (IOException e) {
+            System.out.println("❌ ERREUR lors de l'enregistrement de l'image fournisseur : " + e.getMessage());
+            throw new NotFoundException("Erreur lors de l'enregistrement de l'image fournisseur : " + e.getMessage());
+        }
+
+    }
+
 
 }
 

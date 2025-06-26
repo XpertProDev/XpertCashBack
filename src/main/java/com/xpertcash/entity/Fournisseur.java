@@ -19,12 +19,14 @@ public class Fournisseur {
     
     private String nomComplet;
     private String nomSociete;
-    private String adresse;
+    private String description;
     private String pays;
-    private String ville;
-    private String telephone;
+    private String telephone; 
     private String email;
+    private String ville;
+    private String adresse;
     private LocalDateTime createdAt;
+    private String photo;
 
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "entreprise_id")

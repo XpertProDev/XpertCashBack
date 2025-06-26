@@ -15,9 +15,12 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.xpertcash.DTOs.FournisseurDTO;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.xpertcash.DTOs.FOURNISSEUR.FournisseurDTO;
+import com.xpertcash.DTOs.FOURNISSEUR.FournisseurResponseDTO;
 import com.xpertcash.configuration.JwtUtil;
 import com.xpertcash.entity.Facture;
 import com.xpertcash.entity.Fournisseur;
@@ -28,6 +31,10 @@ import com.xpertcash.repository.StockProduitFournisseurRepository;
 import com.xpertcash.repository.UsersRepository;
 import com.xpertcash.service.FournisseurService;
 import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.http.MediaType;
+import org.springframework.web.multipart.MultipartFile;
+
+
 
 @RestController
 @RequestMapping("/api/auth")
@@ -50,33 +57,62 @@ public class FournisseurController {
     @Autowired
     private UsersRepository usersRepository;
 
-    @PostMapping("/save-fournisseurs")
+    // Create fournisseur
+  @PostMapping(value = "/save-fournisseurs", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<?> saveFournisseur(
-            @RequestBody FournisseurDTO fournisseurDTO,
+            @RequestPart("fournisseur") String fournisseurJson,
+            @RequestPart(value = "imageFournisseurFile", required = false) MultipartFile imageFournisseurFile,
             HttpServletRequest request) {
 
         Map<String, Object> response = new HashMap<>();
 
         try {
+            // Convertir JSON vers DTO d'entrée
+            ObjectMapper objectMapper = new ObjectMapper();
+            FournisseurDTO fournisseurDTO = objectMapper.readValue(fournisseurJson, FournisseurDTO.class);
+
             // Mapping DTO vers entité
             Fournisseur fournisseur = new Fournisseur();
             fournisseur.setNomComplet(fournisseurDTO.getNomComplet());
+            fournisseur.setNomSociete(fournisseurDTO.getNomSociete());
             fournisseur.setEmail(fournisseurDTO.getEmail());
             fournisseur.setTelephone(fournisseurDTO.getTelephone());
             fournisseur.setAdresse(fournisseurDTO.getAdresse());
             fournisseur.setPays(fournisseurDTO.getPays());
             fournisseur.setVille(fournisseurDTO.getVille());
+            fournisseur.setDescription(fournisseurDTO.getDescription());
 
+            // Sauvegarde
+            Fournisseur savedFournisseur = fournisseurService.saveFournisseur(fournisseur, imageFournisseurFile, request);
 
-            // Appel au service
-            Fournisseur savedFournisseur = fournisseurService.saveFournisseur(fournisseur, request);
+            // Construction du DTO de réponse
+            FournisseurResponseDTO responseDTO = new FournisseurResponseDTO();
+            responseDTO.setId(savedFournisseur.getId());
+            responseDTO.setNomComplet(savedFournisseur.getNomComplet());
+            responseDTO.setNomSociete(savedFournisseur.getNomSociete());
+            responseDTO.setEmail(savedFournisseur.getEmail());
+            responseDTO.setTelephone(savedFournisseur.getTelephone());
+            responseDTO.setAdresse(savedFournisseur.getAdresse());
+            responseDTO.setPays(savedFournisseur.getPays());
+            responseDTO.setVille(savedFournisseur.getVille());
+            responseDTO.setDescription(savedFournisseur.getDescription());
+            responseDTO.setPhoto(savedFournisseur.getPhoto());
+            if (savedFournisseur.getEntreprise() != null) {
+                responseDTO.setEntrepriseId(savedFournisseur.getEntreprise().getId());
+                responseDTO.setEntrepriseNom(savedFournisseur.getEntreprise().getNomEntreprise());
+            }
+
+            // Réponse propre
             response.put("message", "Fournisseur enregistré avec succès !");
-            response.put("fournisseur", savedFournisseur);
+            response.put("fournisseur", responseDTO);
             return ResponseEntity.ok(response);
 
         } catch (RuntimeException e) {
             response.put("error", e.getMessage());
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+        } catch (Exception e) {
+            response.put("error", "Erreur lors du traitement : " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
         }
     }
 
@@ -90,12 +126,15 @@ public class FournisseurController {
             map.put("id", fournisseur.getId());
             map.put("nomComplet", fournisseur.getNomComplet());
             map.put("nomSociete", fournisseur.getNomSociete());
+            map.put("description", fournisseur.getDescription());
             map.put("adresse", fournisseur.getAdresse());
             map.put("pays", fournisseur.getPays());
             map.put("ville", fournisseur.getVille());
             map.put("telephone", fournisseur.getTelephone());
             map.put("email", fournisseur.getEmail());
             map.put("createdAt", fournisseur.getCreatedAt());
+            map.put("photo", fournisseur.getPhoto());
+
             return map;
         }).collect(Collectors.toList());
 
@@ -105,24 +144,56 @@ public class FournisseurController {
       
     //Get fournisseur by id
     @GetMapping("/getFournisseur/{id}")
-         public ResponseEntity<Fournisseur> getFournisseurById(@PathVariable Long id, HttpServletRequest request) {
-         Fournisseur fournisseur = fournisseurService.getFournisseurById(id, request);
-                return ResponseEntity.ok(fournisseur);
+public ResponseEntity<?> getFournisseurById(@PathVariable Long id, HttpServletRequest request) {
+
+    try {
+        Fournisseur fournisseur = fournisseurService.getFournisseurById(id, request);
+
+        FournisseurResponseDTO responseDTO = new FournisseurResponseDTO();
+        responseDTO.setId(fournisseur.getId());
+        responseDTO.setNomComplet(fournisseur.getNomComplet());
+        responseDTO.setNomSociete(fournisseur.getNomSociete());
+        responseDTO.setEmail(fournisseur.getEmail());
+        responseDTO.setTelephone(fournisseur.getTelephone());
+        responseDTO.setAdresse(fournisseur.getAdresse());
+        responseDTO.setPays(fournisseur.getPays());
+        responseDTO.setVille(fournisseur.getVille());
+        responseDTO.setDescription(fournisseur.getDescription());
+        responseDTO.setPhoto(fournisseur.getPhoto());
+
+        if (fournisseur.getEntreprise() != null) {
+            responseDTO.setEntrepriseId(fournisseur.getEntreprise().getId());
+            responseDTO.setEntrepriseNom(fournisseur.getEntreprise().getNomEntreprise());
+        }
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("fournisseur", responseDTO);
+
+        return ResponseEntity.ok(response);
+
+    } catch (RuntimeException e) {
+        Map<String, Object> errorResponse = new HashMap<>();
+        errorResponse.put("error", e.getMessage());
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
     }
+}
+
 
     //Update fournisseur
-      @PutMapping("/updateFournisseur/{id}")
-        public ResponseEntity<Map<String, Object>> updateFournisseur(
-        @PathVariable Long id,
-        @RequestBody Fournisseur updatedFournisseur,
-        HttpServletRequest request) {
+    @PutMapping(value = "/updateFournisseur/{id}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<?> updateFournisseur(
+            @PathVariable Long id,
+            @RequestPart("updatedFournisseur") Fournisseur updatedFournisseur,
+            @RequestPart(value = "imageFournisseurFile", required = false) MultipartFile imageFournisseurFile,
+            HttpServletRequest request) {
 
         Map<String, Object> response = new HashMap<>();
 
         try {
-            Fournisseur updated = fournisseurService.updateFournisseur(id, updatedFournisseur, request);
+            Fournisseur updated = fournisseurService.updateFournisseur(id, updatedFournisseur, imageFournisseurFile, request);
 
             response.put("message", "Fournisseur mis à jour avec succès");
+            response.put("fournisseur", updated);
             return ResponseEntity.ok(response);
 
         } catch (RuntimeException e) {
@@ -134,7 +205,6 @@ public class FournisseurController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
         }
     }
-
 
 
      @GetMapping("/quantite-par-fournisseur/{produitId}")
@@ -207,8 +277,6 @@ public class FournisseurController {
 
         return ResponseEntity.ok(factureDTOs);
     }
-
-
 
 
 

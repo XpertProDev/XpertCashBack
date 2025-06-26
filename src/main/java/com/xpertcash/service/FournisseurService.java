@@ -1,5 +1,10 @@
 package com.xpertcash.service;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -7,9 +12,8 @@ import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 
-import com.xpertcash.DTOs.EntrepriseDTO;
-import com.xpertcash.DTOs.FournisseurDTO;
 import com.xpertcash.configuration.JwtUtil;
 import com.xpertcash.entity.Entreprise;
 import com.xpertcash.entity.Fournisseur;
@@ -17,6 +21,7 @@ import com.xpertcash.entity.User;
 import com.xpertcash.repository.FournisseurRepository;
 import com.xpertcash.repository.StockProduitFournisseurRepository;
 import com.xpertcash.repository.UsersRepository;
+import com.xpertcash.service.IMAGES.ImageStorageService;
 
 import jakarta.servlet.http.HttpServletRequest;
 
@@ -34,13 +39,16 @@ public class FournisseurService {
     @Autowired
     private StockProduitFournisseurRepository stockProduitFournisseurRepository;
 
+     @Autowired
+    private ImageStorageService imageStorageService;
+
     
 
     @Autowired
     private JwtUtil jwtUtil;
 
     // Save a new fournisseur
-    public Fournisseur saveFournisseur(Fournisseur fournisseur, HttpServletRequest request) {
+   public Fournisseur saveFournisseur(Fournisseur fournisseur, MultipartFile imageFournisseurFile, HttpServletRequest request) {
         if (fournisseur.getNomComplet() == null || fournisseur.getNomComplet().trim().isEmpty()) {
             throw new RuntimeException("Le nom du fournisseur est obligatoire !");
         }
@@ -73,6 +81,13 @@ public class FournisseurService {
 
 
         checkFournisseurExists(fournisseur);
+
+        // Gestion de l'image si présente
+        if (imageFournisseurFile != null && !imageFournisseurFile.isEmpty()) {
+            String imageUrl = imageStorageService.saveFournisseurImage(imageFournisseurFile);
+            fournisseur.setPhoto(imageUrl);
+            System.out.println("📸 Photo du fournisseur enregistrée : " + imageUrl);
+        }
 
         return fournisseurRepository.save(fournisseur);
     }
@@ -165,7 +180,7 @@ public class FournisseurService {
 
 
     // Update fournisseur
-   public Fournisseur updateFournisseur(Long id, Fournisseur updatedData, HttpServletRequest request) {
+   public Fournisseur updateFournisseur(Long id, Fournisseur updatedData,MultipartFile imageFournisseurFile, HttpServletRequest request) {
     // 1. Extraire le token JWT
     String token = request.getHeader("Authorization");
     if (token == null || !token.startsWith("Bearer ")) {
@@ -200,11 +215,30 @@ public class FournisseurService {
     // 4. Mettre à jour les champs
     existingFournisseur.setNomComplet(updatedData.getNomComplet());
     existingFournisseur.setNomSociete(updatedData.getNomSociete());
-    existingFournisseur.setAdresse(updatedData.getAdresse());
+    existingFournisseur.setDescription(updatedData.getDescription());
     existingFournisseur.setPays(updatedData.getPays());
-    existingFournisseur.setVille(updatedData.getVille());
     existingFournisseur.setTelephone(updatedData.getTelephone());
     existingFournisseur.setEmail(updatedData.getEmail());
+    existingFournisseur.setVille(updatedData.getVille());
+    existingFournisseur.setAdresse(updatedData.getAdresse());
+
+     // Mise à jour de la photo si image présente
+        if (imageFournisseurFile != null && !imageFournisseurFile.isEmpty()) {
+            String oldImagePath = existingFournisseur.getPhoto(); // ✅ Prendre depuis l'objet actuel en base
+            if (oldImagePath != null && !oldImagePath.isBlank()) {
+                Path oldPath = Paths.get("src/main/resources/static" + oldImagePath);
+                try {
+                    Files.deleteIfExists(oldPath);
+                    System.out.println("🗑️ Ancienne photo profil supprimée : " + oldImagePath);
+                } catch (IOException e) {
+                    System.out.println("⚠️ Impossible de supprimer l'ancienne photo : " + e.getMessage());
+                }
+            }
+
+            String newImageUrl = imageStorageService.saveClientImage(imageFournisseurFile);
+            existingFournisseur.setPhoto(newImageUrl);
+            System.out.println("📸 Nouvelle photo enregistrée : " + newImageUrl);
+        }
 
     
     // Enregistrer les modifications et retourner l'entité mise à jour
