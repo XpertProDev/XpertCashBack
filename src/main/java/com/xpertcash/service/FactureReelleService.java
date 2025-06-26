@@ -33,6 +33,7 @@ import com.xpertcash.repository.FactureReelleRepository;
 import com.xpertcash.repository.LigneFactureReelleRepository;
 import com.xpertcash.repository.PaiementRepository;
 import com.xpertcash.repository.UsersRepository;
+import com.xpertcash.service.Module.ModuleActivationService;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.transaction.Transactional;
@@ -59,6 +60,9 @@ public class FactureReelleService {
 
     @Autowired
     private JwtUtil jwtUtil;
+
+    @Autowired
+    private ModuleActivationService moduleActivationService;
 
 
 
@@ -187,6 +191,14 @@ public void supprimerFactureReelleLiee(FactureProForma proforma) {
         if (entreprise == null) {
             throw new RuntimeException("L'utilisateur n'est associé à aucune entreprise");
         }
+
+        // 🔐 Vérification si le module "Facture Reelle" est actif pour cette entreprise
+        if (!moduleActivationService.isModuleActifPourEntreprise(entreprise, "FACTURE_REELLE")) {
+            throw new RuntimeException("Ce module n'est pas activé pour votre entreprise.");
+        }
+
+
+        // Si module actif, on continue
 
         List<FactureReelle> factures = factureReelleRepository.findByEntrepriseOrderByDateCreationDesc(entreprise);
 

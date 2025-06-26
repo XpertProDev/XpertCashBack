@@ -15,6 +15,7 @@ import com.xpertcash.repository.EntrepriseRepository;
 import com.xpertcash.repository.PermissionRepository;
 import com.xpertcash.repository.RoleRepository;
 import com.xpertcash.repository.UsersRepository;
+import com.xpertcash.repository.Module.ModuleRepository;
 import com.xpertcash.service.IMAGES.ImageStorageService;
 
 import io.jsonwebtoken.JwtException;
@@ -36,10 +37,12 @@ import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Random;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.springframework.transaction.annotation.Transactional;
@@ -76,6 +79,9 @@ public class UsersService {
 
      @Autowired
     private ImageStorageService imageStorageService;
+
+    @Autowired
+    private ModuleRepository moduleRepository;
 
 
 
@@ -153,6 +159,11 @@ public class UsersService {
         entreprise.setPrefixe(null);
         entreprise.setSuffixe(null);
         entreprise.setTauxTva(null);
+
+        // Affecter les modules actifs par défaut
+        Set<AppModule> modulesParDefaut = new HashSet<>(moduleRepository.findByActifParDefautTrue());
+        entreprise.setModulesActifs(modulesParDefaut);
+
         
 
         
