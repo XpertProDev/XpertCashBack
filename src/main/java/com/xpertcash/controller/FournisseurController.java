@@ -181,30 +181,34 @@ public ResponseEntity<?> getFournisseurById(@PathVariable Long id, HttpServletRe
 
     //Update fournisseur
     @PutMapping(value = "/updateFournisseur/{id}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ResponseEntity<?> updateFournisseur(
-            @PathVariable Long id,
-            @RequestPart("updatedFournisseur") Fournisseur updatedFournisseur,
-            @RequestPart(value = "imageFournisseurFile", required = false) MultipartFile imageFournisseurFile,
-            HttpServletRequest request) {
+public ResponseEntity<?> updateFournisseur(
+        @PathVariable Long id,
+        @RequestPart("updatedFournisseur") String updatedFournisseurJson,
+        @RequestPart(value = "imageFournisseurFile", required = false) MultipartFile imageFournisseurFile,
+        HttpServletRequest request) {
 
-        Map<String, Object> response = new HashMap<>();
+    Map<String, Object> response = new HashMap<>();
 
-        try {
-            Fournisseur updated = fournisseurService.updateFournisseur(id, updatedFournisseur, imageFournisseurFile, request);
+    try {
+        // Désérialiser le JSON manuellement
+        ObjectMapper objectMapper = new ObjectMapper();
+        Fournisseur updatedFournisseur = objectMapper.readValue(updatedFournisseurJson, Fournisseur.class);
 
-            response.put("message", "Fournisseur mis à jour avec succès");
-            response.put("fournisseur", updated);
-            return ResponseEntity.ok(response);
+        Fournisseur updated = fournisseurService.updateFournisseur(id, updatedFournisseur, imageFournisseurFile, request);
 
-        } catch (RuntimeException e) {
-            response.put("message", "Erreur : " + e.getMessage());
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+        response.put("message", "Fournisseur mis à jour avec succès");
+        response.put("fournisseur", updated);
+        return ResponseEntity.ok(response);
 
-        } catch (Exception e) {
-            response.put("message", "Une erreur interne est survenue.");
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
-        }
+    } catch (RuntimeException e) {
+        response.put("message", "Erreur : " + e.getMessage());
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+
+    } catch (Exception e) {
+        response.put("message", "Une erreur interne est survenue.");
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
     }
+}
 
 
      @GetMapping("/quantite-par-fournisseur/{produitId}")

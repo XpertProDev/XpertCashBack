@@ -212,7 +212,31 @@ public class FournisseurService {
         throw new RuntimeException("Ce fournisseur n'appartient pas à votre entreprise.");
     }
 
-    // 4. Mettre à jour les champs
+
+    // 4. Vérifications des doublons
+
+    // Vérifier email unique dans l'entreprise (hors du fournisseur qu'on modifie)
+    if (updatedData.getEmail() != null && !updatedData.getEmail().isBlank()) {
+        boolean emailExiste = fournisseurRepository.existsByEntrepriseIdAndEmailAndIdNot(
+                entrepriseUtilisateur.getId(), updatedData.getEmail(), existingFournisseur.getId());
+        if (emailExiste) {
+            throw new RuntimeException("Un autre fournisseur avec cet email existe déjà dans votre entreprise.");
+        }
+    }
+
+        // Vérifier téléphone unique par pays dans l'entreprise (hors du fournisseur qu'on modifie)
+    if (updatedData.getTelephone() != null && !updatedData.getTelephone().isBlank()
+            && updatedData.getPays() != null && !updatedData.getPays().isBlank()) {
+
+        boolean telephoneExiste = fournisseurRepository.existsByEntrepriseIdAndPaysAndTelephoneAndIdNot(
+                entrepriseUtilisateur.getId(), updatedData.getPays(), updatedData.getTelephone(), existingFournisseur.getId());
+
+        if (telephoneExiste) {
+            throw new RuntimeException("Un autre fournisseur avec ce numéro existe déjà dans ce pays au sein de votre entreprise.");
+        }
+    }
+
+    // 5. Mettre à jour les champs
     existingFournisseur.setNomComplet(updatedData.getNomComplet());
     existingFournisseur.setNomSociete(updatedData.getNomSociete());
     existingFournisseur.setDescription(updatedData.getDescription());
@@ -235,7 +259,7 @@ public class FournisseurService {
                 }
             }
 
-            String newImageUrl = imageStorageService.saveClientImage(imageFournisseurFile);
+            String newImageUrl = imageStorageService.saveFournisseurImage(imageFournisseurFile);
             existingFournisseur.setPhoto(newImageUrl);
             System.out.println("📸 Nouvelle photo enregistrée : " + newImageUrl);
         }
