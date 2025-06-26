@@ -90,7 +90,7 @@ public class ClientController {
     }
 
     //Endpoint pour modifier un client 
-    @PutMapping(value ="/clientupdate/{id}",  consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PutMapping(value ="/clientupdate/{id}",  consumes = MediaType.MULTIPART_FORM_DATA_VALUE) 
     public ResponseEntity<?> updateClient(@PathVariable("id") Long id,
                                           @RequestPart("client") Client client,
                                           @RequestPart(value = "imageClientFile", required = false) MultipartFile imageClientFile,
