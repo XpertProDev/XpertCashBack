@@ -19,6 +19,10 @@ public interface FournisseurRepository extends JpaRepository<Fournisseur, Long>{
     List<Fournisseur> findByEntreprise(Entreprise entreprise);
     Optional<Fournisseur> findByNomComplet(String nomComplet);
 
+    boolean existsByEntrepriseIdAndEmailAndIdNot(Long entrepriseId, String email, Long id);
+    boolean existsByEntrepriseIdAndPaysAndTelephoneAndIdNot(Long entrepriseId, String pays, String telephone, Long id);
+
+
 
 
 }
