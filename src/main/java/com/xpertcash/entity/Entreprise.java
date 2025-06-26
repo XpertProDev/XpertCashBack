@@ -12,6 +12,7 @@ import java.util.Set;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.xpertcash.entity.Module.AppModule;
 
 @Entity
 @Data

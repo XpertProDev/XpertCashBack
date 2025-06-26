@@ -1,4 +1,6 @@
-package com.xpertcash.entity;
+package com.xpertcash.entity.Module;
+
+import java.math.BigDecimal;
 
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
@@ -18,14 +20,19 @@ public class AppModule {
     private String nom;
     private boolean actifParDefaut;
     private boolean payant;
+    @Column(nullable = true)
+    private BigDecimal prix;
+
 
   
 
-     public AppModule(String code,String nom, boolean actifParDefaut, boolean payant) {
+     public AppModule(String code,String nom, boolean actifParDefaut, boolean payant, BigDecimal prix) {
         this.code = code;
         this.nom = nom;
         this.actifParDefaut = actifParDefaut;
         this.payant = payant;
+        this.prix = prix;
+
     }
 
     // Getters and Setters
