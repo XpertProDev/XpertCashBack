@@ -17,6 +17,7 @@ import com.xpertcash.entity.Module.AppModule;
 import com.xpertcash.repository.EntrepriseRepository;
 import com.xpertcash.repository.UsersRepository;
 import com.xpertcash.repository.Module.ModuleRepository;
+import com.xpertcash.service.MailService;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.transaction.Transactional;
@@ -37,6 +38,9 @@ public class ModuleActivationService {
 
     @Autowired
     private ModulePaiementService modulePaiementService;
+
+    @Autowired
+    private MailService mailService;
 
     //Methode reetulisable
         public boolean isModuleActifPourEntreprise(Entreprise entreprise, String codeModule) {
@@ -59,58 +63,102 @@ public class ModuleActivationService {
 
 
     //Activation d'un module pour une entreprise
- @Transactional
-public void activerModuleAvecPaiement(Long userId, String nomModule, String numeroCarte, String cvc, String dateExpiration) {
+    @Transactional
+    public void activerModuleAvecPaiement(Long userId,
+                                        String nomModule,
+                                        String numeroCarte,
+                                        String cvc,
+                                        String dateExpiration,
+                                        String nomProprietaire,
+                                        String prenomProprietaire,
+                                        String adresse,
+                                        String ville) {
 
-    // 1. Vérifier l'utilisateur
-    User user = usersRepository.findById(userId)
-            .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+        // 1. Vérification utilisateur et entreprise
+        User user = usersRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
 
-    Entreprise entreprise = user.getEntreprise();
-    if (entreprise == null) {
-        throw new RuntimeException("Utilisateur non associé à une entreprise");
-    }
-
-    RoleType role = user.getRole().getName();
-    if (role != RoleType.ADMIN && role != RoleType.MANAGER) {
-        throw new RuntimeException("Seuls les ADMIN ou MANAGER peuvent activer les modules.");
-    }
-
-    // 2. Récupérer le module
-    AppModule module = moduleRepository.findByNom(nomModule)
-            .orElseThrow(() -> new RuntimeException("Module '" + nomModule + "' introuvable"));
-
-    // 3. Déjà actif ?
-    if (entreprise.getModulesActifs().contains(module)) {
-        throw new RuntimeException("Ce module est déjà activé pour cette entreprise.");
-    }
-
-    // 4. Si payant, vérifier et procéder au paiement
-    if (module.isPayant()) {
-
-        BigDecimal montant = module.getPrix();
-        if (montant == null || montant.compareTo(BigDecimal.ZERO) <= 0) {
-            throw new RuntimeException("Prix du module invalide");
+        Entreprise entreprise = user.getEntreprise();
+        if (entreprise == null) {
+            throw new RuntimeException("Utilisateur non associé à une entreprise");
         }
 
-        // Vérification stricte des infos de carte
-        if (numeroCarte == null || numeroCarte.isBlank() ||
-            cvc == null || cvc.isBlank() ||
-            dateExpiration == null || dateExpiration.isBlank()) {
-            throw new RuntimeException("Les informations de carte bancaire sont requises pour ce module payant.");
+        RoleType role = user.getRole().getName();
+        if (role != RoleType.ADMIN && role != RoleType.MANAGER) {
+            throw new RuntimeException("Seuls les ADMIN ou MANAGER peuvent activer les modules.");
         }
 
-        boolean paiementReussi = modulePaiementService.effectuerPaiement(numeroCarte, cvc, dateExpiration, montant);
+        // 2. Récupération du module
+        AppModule module = moduleRepository.findByNom(nomModule)
+                .orElseThrow(() -> new RuntimeException("Module '" + nomModule + "' introuvable"));
 
-        if (!paiementReussi) {
-            throw new RuntimeException("Échec du paiement. Activation annulée.");
+        if (entreprise.getModulesActifs().contains(module)) {
+            throw new RuntimeException("Ce module est déjà activé pour cette entreprise.");
         }
+        String referenceTransaction = null;
+
+        // 3. Si payant, vérifier les infos et procéder au paiement
+        if (module.isPayant()) {
+
+            BigDecimal montant = module.getPrix();
+            if (montant == null || montant.compareTo(BigDecimal.ZERO) <= 0) {
+                throw new RuntimeException("Prix du module invalide");
+            }
+
+            // Vérification stricte des infos de carte et propriétaire
+            if (numeroCarte == null || numeroCarte.isBlank() ||
+                cvc == null || cvc.isBlank() ||
+                dateExpiration == null || dateExpiration.isBlank() ||
+                nomProprietaire == null || nomProprietaire.isBlank() ||
+                prenomProprietaire == null || prenomProprietaire.isBlank() ||
+                adresse == null || adresse.isBlank() ||
+                ville == null || ville.isBlank()) {
+                throw new RuntimeException("Toutes les informations de paiement et du propriétaire sont requises.");
+            }
+
+            // Simulation du paiement
+            boolean paiementReussi = modulePaiementService.effectuerPaiement(
+                    numeroCarte,
+                    cvc,
+                    dateExpiration,
+                    montant,
+                    entreprise,
+                    module,
+                    nomProprietaire,
+                    prenomProprietaire,
+                    adresse,
+                    ville
+            );
+
+            if (!paiementReussi) {
+                throw new RuntimeException("Échec du paiement. Activation annulée.");
+            }
+
+            // Optionnel : Enregistrer les détails du paiement pour la facture
+            modulePaiementService.enregistrerFacturePaiement(entreprise, module, montant, nomProprietaire, prenomProprietaire, adresse, ville);
+        }
+
+        // 4. Activation du module
+        entreprise.getModulesActifs().add(module);
+        entrepriseRepository.save(entreprise);
+
+        // 5. Envoi de l'email de confirmation avec facture
+    try {
+        mailService.sendConfirmationActivationEmail(
+                user.getEmail(),
+                module.getNom(),
+                module.getPrix(),
+                "XOF",
+                nomProprietaire,
+                prenomProprietaire,
+                adresse,
+                ville,
+                referenceTransaction != null ? referenceTransaction : "N/A"
+        );
+    } catch (Exception e) {
+        System.err.println("Échec d'envoi de l'email de confirmation : " + e.getMessage());
     }
-
-    // 5. Activer le module
-    entreprise.getModulesActifs().add(module);
-    entrepriseRepository.save(entreprise);
-}
+    }
 
 
 

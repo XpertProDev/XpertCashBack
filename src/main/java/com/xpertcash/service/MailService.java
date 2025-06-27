@@ -7,6 +7,7 @@ import jakarta.mail.util.ByteArrayDataSource;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.math.BigDecimal;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.List;
@@ -285,5 +286,37 @@ public class MailService {
 
     mailSender.send(message);
 }
+
+
+    //mail pour notifier apres achat de module
+
+    public void sendConfirmationActivationEmail(String to, String nomModule, BigDecimal montant, String devise, String nomProprietaire, String prenomProprietaire, String adresse, String ville, String referenceTransaction) throws MessagingException {
+    
+    String subject = "Confirmation d'activation de module - " + nomModule;
+
+    String htmlContent = """
+        <html>
+            <body style="font-family: Arial, sans-serif; background-color: #f4f4f4; padding: 20px;">
+                <div style="max-width: 600px; margin: auto; background: white; padding: 20px; border-radius: 10px;">
+                    <h2 style="color: #4CAF50;">Activation réussie du module : %s</h2>
+                    <p>Bonjour,</p>
+                    <p>Votre module <strong>%s</strong> a été activé avec succès.</p>
+                    <h3>Détails de la facture :</h3>
+                    <ul>
+                        <li><strong>Montant :</strong> %s %s</li>
+                        <li><strong>Nom du propriétaire :</strong> %s %s</li>
+                        <li><strong>Adresse :</strong> %s, %s</li>
+                        <li><strong>Référence transaction :</strong> %s</li>
+                    </ul>
+                    <p>Merci pour votre confiance.</p>
+                    <p style="font-size: 12px; color: #555;">L'équipe XpertCash</p>
+                </div>
+            </body>
+        </html>
+    """.formatted(nomModule, nomModule, montant, devise, nomProprietaire, prenomProprietaire, adresse, ville, referenceTransaction);
+
+    sendEmail(to, subject, htmlContent);
+}
+
 
 }

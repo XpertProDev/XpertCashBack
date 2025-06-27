@@ -10,4 +10,8 @@ public class ActivationDemande {
     private String numeroCarte;
     private String cvc;
     private String dateExpiration;
+    private String nomProprietaire;
+    private String prenomProprietaire;
+    private String adresse;
+    private String ville;
 }
