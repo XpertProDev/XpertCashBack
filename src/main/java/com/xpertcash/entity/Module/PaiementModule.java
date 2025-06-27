@@ -25,10 +25,11 @@ public class PaiementModule {
 
     private BigDecimal montant;
 
-    private String devise = "XOF";  // Ou EUR, USD, selon ton contexte
+    private String devise = "XOF";
 
     private String nomProprietaire;
     private String prenomProprietaire;
+    private String emailProprietaireCarte;
     private String adresse;
     private String ville;
 

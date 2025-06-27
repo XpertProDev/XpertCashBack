@@ -71,6 +71,7 @@ public class ModuleActivationService {
                                         String dateExpiration,
                                         String nomProprietaire,
                                         String prenomProprietaire,
+                                        String emailProprietaireCarte,
                                         String adresse,
                                         String ville) {
 
@@ -95,29 +96,30 @@ public class ModuleActivationService {
         if (entreprise.getModulesActifs().contains(module)) {
             throw new RuntimeException("Ce module est déjà activé pour cette entreprise.");
         }
+
         String referenceTransaction = null;
 
         // 3. Si payant, vérifier les infos et procéder au paiement
         if (module.isPayant()) {
-
             BigDecimal montant = module.getPrix();
             if (montant == null || montant.compareTo(BigDecimal.ZERO) <= 0) {
                 throw new RuntimeException("Prix du module invalide");
             }
 
-            // Vérification stricte des infos de carte et propriétaire
+            // Vérification stricte des infos
             if (numeroCarte == null || numeroCarte.isBlank() ||
                 cvc == null || cvc.isBlank() ||
                 dateExpiration == null || dateExpiration.isBlank() ||
                 nomProprietaire == null || nomProprietaire.isBlank() ||
                 prenomProprietaire == null || prenomProprietaire.isBlank() ||
+                emailProprietaireCarte == null || emailProprietaireCarte.isBlank() ||
                 adresse == null || adresse.isBlank() ||
                 ville == null || ville.isBlank()) {
                 throw new RuntimeException("Toutes les informations de paiement et du propriétaire sont requises.");
             }
 
-            // Simulation du paiement
-            boolean paiementReussi = modulePaiementService.effectuerPaiement(
+            // Paiement simulé
+                boolean paiementReussi = modulePaiementService.effectuerPaiement(
                     numeroCarte,
                     cvc,
                     dateExpiration,
@@ -126,26 +128,39 @@ public class ModuleActivationService {
                     module,
                     nomProprietaire,
                     prenomProprietaire,
+                    emailProprietaireCarte,
                     adresse,
                     ville
-            );
+                );
 
             if (!paiementReussi) {
                 throw new RuntimeException("Échec du paiement. Activation annulée.");
             }
 
-            // Optionnel : Enregistrer les détails du paiement pour la facture
-            modulePaiementService.enregistrerFacturePaiement(entreprise, module, montant, nomProprietaire, prenomProprietaire, adresse, ville);
-        }
+            // Génération de la facture et récupération de la référence
+            referenceTransaction = modulePaiementService.enregistrerFacturePaiement(
+            entreprise,
+            module,
+            montant,
+            nomProprietaire,
+            prenomProprietaire,
+            emailProprietaireCarte,
+            adresse,
+            ville
+        );
 
+        }
         // 4. Activation du module
         entreprise.getModulesActifs().add(module);
         entrepriseRepository.save(entreprise);
+        
+        System.out.println("Envoi de l'email à : " + emailProprietaireCarte);
+
 
         // 5. Envoi de l'email de confirmation avec facture
     try {
         mailService.sendConfirmationActivationEmail(
-                user.getEmail(),
+               emailProprietaireCarte,
                 module.getNom(),
                 module.getPrix(),
                 "XOF",
@@ -153,7 +168,9 @@ public class ModuleActivationService {
                 prenomProprietaire,
                 adresse,
                 ville,
-                referenceTransaction != null ? referenceTransaction : "N/A"
+                referenceTransaction,
+                entreprise.getNomEntreprise()
+                
         );
     } catch (Exception e) {
         System.err.println("Échec d'envoi de l'email de confirmation : " + e.getMessage());

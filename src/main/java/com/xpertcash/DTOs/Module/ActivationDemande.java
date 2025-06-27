@@ -12,6 +12,7 @@ public class ActivationDemande {
     private String dateExpiration;
     private String nomProprietaire;
     private String prenomProprietaire;
+    private String  emailProprietaireCarte;
     private String adresse;
     private String ville;
 }

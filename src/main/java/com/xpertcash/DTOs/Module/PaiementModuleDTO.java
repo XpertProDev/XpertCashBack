@@ -14,6 +14,7 @@ public class PaiementModuleDTO {
     private String devise;
     private String nomProprietaire;
     private String prenomProprietaire;
+    private String  emailProprietaireCarte;
     private String adresse;
     private String ville;
     private String datePaiement;
@@ -27,6 +28,7 @@ public class PaiementModuleDTO {
         this.devise = paiement.getDevise();
         this.nomProprietaire = paiement.getNomProprietaire();
         this.prenomProprietaire = paiement.getPrenomProprietaire();
+        this.emailProprietaireCarte = paiement.getEmailProprietaireCarte();
         this.adresse = paiement.getAdresse();
         this.ville = paiement.getVille();
         this.datePaiement = paiement.getDatePaiement().toString();

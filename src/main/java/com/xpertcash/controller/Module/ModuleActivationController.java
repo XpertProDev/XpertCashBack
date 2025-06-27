@@ -5,7 +5,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -14,7 +13,6 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.xpertcash.DTOs.Module.ActivationDemande;
@@ -24,7 +22,6 @@ import com.xpertcash.configuration.JwtUtil;
 import com.xpertcash.entity.Entreprise;
 import com.xpertcash.entity.User;
 import com.xpertcash.entity.Enum.RoleType;
-import com.xpertcash.entity.Module.AppModule;
 import com.xpertcash.entity.Module.PaiementModule;
 import com.xpertcash.repository.UsersRepository;
 import com.xpertcash.repository.Module.PaiementModuleRepository;
@@ -84,6 +81,7 @@ public class ModuleActivationController {
                 demande.getDateExpiration(),
                 demande.getNomProprietaire(),
                 demande.getPrenomProprietaire(),
+                demande.getEmailProprietaireCarte(),
                 demande.getAdresse(),
                 demande.getVille()
         );
@@ -185,6 +183,7 @@ public class ModuleActivationController {
             paiementData.put("devise", paiement.getDevise());
             paiementData.put("nomProprietaire", paiement.getNomProprietaire());
             paiementData.put("prenomProprietaire", paiement.getPrenomProprietaire());
+            paiementData.put("emailProprietaireCarte", paiement.getEmailProprietaireCarte());
             paiementData.put("datePaiement", paiement.getDatePaiement());
             paiementData.put("entrepriseNom", paiement.getEntreprise().getNomEntreprise());
             paiementData.put("referenceTransaction", paiement.getReferenceTransaction());
