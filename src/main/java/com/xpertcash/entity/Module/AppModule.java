@@ -16,8 +16,9 @@ public class AppModule {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-    private String code; // nom technique unique (ex: "CLIENT", "FACTURE", "FACTURE_REELLE")
+    private String code;
     private String nom;
+    private String description;
     private boolean actifParDefaut;
     private boolean payant;
     @Column(nullable = true)

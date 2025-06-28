@@ -1,5 +1,7 @@
 package com.xpertcash.composant;
 import java.math.BigDecimal;
+import java.util.List;
+import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.CommandLineRunner;
@@ -7,6 +9,7 @@ import org.springframework.stereotype.Component;
 
 import com.xpertcash.entity.Module.AppModule;
 import com.xpertcash.repository.Module.ModuleRepository;
+import com.xpertcash.service.Module.ModuleActivationService;
 
 
 
@@ -17,99 +20,54 @@ public class ModuleDataInitializer implements CommandLineRunner {
     @Autowired
     private ModuleRepository moduleRepository;
 
+    @Autowired
+    private ModuleActivationService moduleActivationService;
+
     @Override
     public void run(String... args) {
 
-        // Vente
-        if (!moduleRepository.existsByCode("VENTE")) {
-            AppModule vente = new AppModule();
-            vente.setCode("VENTE");
-            vente.setNom("Gestion des Ventes");
-            vente.setActifParDefaut(true);
-            vente.setPayant(false);
-            moduleRepository.save(vente);
-        }
+        // Définition des modules
+        List<AppModule> modules = List.of(
+            creerModule("VENTE", "Gestion des Ventes","le POS sert a vendre", true, false, null),
+            creerModule("CLIENT", "Gestion des Clients","", true, false, null),
+            creerModule("ENTREPRISE_CLIENT", "Gestion des Entreprises Client","", true, false, null),
+            creerModule("USER", "Gestion des Employés","", true, false, null),
+            creerModule("BOUTIQUE", "Gestion des Boutiques","", true, false, null),
+            creerModule("PRODUIT", "Gestion des Produits","", true, false, null),
+            creerModule("FACTURE", "Gestion des Factures","", true, false, null),
+            creerModule("FACTURE_PROFORMA", "Gestion des Factures Proforma","", true, false, null),
+            creerModule("FACTURE_REELLE", "Gestion des Factures Réelles","", false, true, new BigDecimal("30000")),
+            creerModule("STOCK", "Gestion des Stock","", false, true, new BigDecimal("10000"))
 
-        // Gestion des clients
-        if (!moduleRepository.existsByCode("CLIENT")) {
-            AppModule client = new AppModule();
-            client.setCode("CLIENT");
-            client.setNom("Gestion des Clients");
-            client.setActifParDefaut(true);
-            client.setPayant(false);
-            moduleRepository.save(client);
-        }
+        );
 
-        // Entreprise client
-        if (!moduleRepository.existsByCode("ENTREPRISE_CLIENT")) {
-            AppModule entrepriseClient = new AppModule();
-            entrepriseClient.setCode("ENTREPRISE_CLIENT");
-            entrepriseClient.setNom("Gestion des Entreprises Client");
-            entrepriseClient.setActifParDefaut(true);
-            entrepriseClient.setPayant(false);
-            moduleRepository.save(entrepriseClient);
-        }
+        for (AppModule module : modules) {
+            Optional<AppModule> moduleExistantOpt = moduleRepository.findByCode(module.getCode());
 
-        // Gestion des utilisateurs
-        if (!moduleRepository.existsByCode("USER")) {
-            AppModule user = new AppModule();
-            user.setCode("USER");
-            user.setNom("Gestion des Employés");
-            user.setActifParDefaut(true);
-            user.setPayant(false);
-            moduleRepository.save(user);
-        }
+            if (moduleExistantOpt.isEmpty()) {
+                AppModule savedModule = moduleRepository.save(module);
 
-        // Gestion des boutiques
-        if (!moduleRepository.existsByCode("BOUTIQUE")) {
-            AppModule boutique = new AppModule();
-            boutique.setCode("BOUTIQUE");
-            boutique.setNom("Gestion des Boutiques");
-            boutique.setActifParDefaut(true);
-            boutique.setPayant(false);
-            moduleRepository.save(boutique);
-        }
-
-        // Gestion des produits
-        if (!moduleRepository.existsByCode("PRODUIT")) {
-            AppModule produit = new AppModule();
-            produit.setCode("PRODUIT");
-            produit.setNom("Gestion des Produits");
-            produit.setActifParDefaut(true);
-            produit.setPayant(false);
-            moduleRepository.save(produit);
-        }
-
-        // Gestion des factures
-        if (!moduleRepository.existsByCode("FACTURE")) {
-            AppModule facture = new AppModule();
-            facture.setCode("FACTURE");
-            facture.setNom("Gestion des Factures");
-            facture.setActifParDefaut(true);
-            facture.setPayant(false);
-            moduleRepository.save(facture);
-        }
-
-        // Factures Proforma
-        if (!moduleRepository.existsByCode("FACTURE_PROFORMA")) {
-            AppModule proforma = new AppModule();
-            proforma.setCode("FACTURE_PROFORMA");
-            proforma.setNom("Gestion des Factures Proforma");
-            proforma.setActifParDefaut(true);
-            proforma.setPayant(false);
-            moduleRepository.save(proforma);
-        }
-
-        // Factures Réelles
-        if (!moduleRepository.existsByCode("FACTURE_REELLE")) {
-            AppModule reel = new AppModule();
-            reel.setCode("FACTURE_REELLE");
-            reel.setNom("Gestion des Factures Réelles");
-            reel.setActifParDefaut(false);
-            reel.setPayant(true);
-            reel.setPrix(new BigDecimal("30000"));
-            moduleRepository.save(reel);
+                // Si c'est un module payant, on active automatiquement l'essai pour les entreprises existantes
+                if (savedModule.isPayant()) {
+                    moduleActivationService.activerEssaiPourToutesLesEntreprises(savedModule);
+                }
+            }
         }
     }
+
+    private AppModule creerModule(String code, String nom,String description, boolean actifParDefaut, boolean payant, BigDecimal prix) {
+        AppModule module = new AppModule();
+        module.setCode(code);
+        module.setNom(nom);
+        module.setDescription(description);
+        module.setActifParDefaut(actifParDefaut);
+        module.setPayant(payant);
+        module.setPrix(prix);
+        return module;
+    }
 }
+
+
+//exemple de new ligne dans la liste des modules comme payant
+//creerModule("CRM", "Module CRM Premium", false, true, new BigDecimal("45000"))
 

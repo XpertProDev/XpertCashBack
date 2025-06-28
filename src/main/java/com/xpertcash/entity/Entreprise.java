@@ -97,6 +97,10 @@ public class Entreprise {
     @ManyToMany(fetch = FetchType.EAGER)
     private Set<AppModule> modulesActifs = new HashSet<>();
 
+    @Column(name = "date_fin_essai_modules_payants")
+    private LocalDateTime dateFinEssaiModulesPayants;
+
+
 
 
     // Générer un identifiant unique

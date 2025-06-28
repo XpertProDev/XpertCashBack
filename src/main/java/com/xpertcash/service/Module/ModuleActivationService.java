@@ -1,7 +1,13 @@
 package com.xpertcash.service.Module;
 
 import java.math.BigDecimal;
+import java.time.Duration;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -14,8 +20,10 @@ import com.xpertcash.entity.Entreprise;
 import com.xpertcash.entity.User;
 import com.xpertcash.entity.Enum.RoleType;
 import com.xpertcash.entity.Module.AppModule;
+import com.xpertcash.entity.Module.EntrepriseModuleEssai;
 import com.xpertcash.repository.EntrepriseRepository;
 import com.xpertcash.repository.UsersRepository;
+import com.xpertcash.repository.Module.EntrepriseModuleEssaiRepository;
 import com.xpertcash.repository.Module.ModuleRepository;
 import com.xpertcash.service.MailService;
 
@@ -42,11 +50,81 @@ public class ModuleActivationService {
     @Autowired
     private MailService mailService;
 
+    @Autowired
+    private EntrepriseModuleEssaiRepository entrepriseModuleEssaiRepository;
+
     //Methode reetulisable
         public boolean isModuleActifPourEntreprise(Entreprise entreprise, String codeModule) {
-        return entreprise.getModulesActifs().stream()
-                .anyMatch(module -> codeModule.equalsIgnoreCase(module.getCode()));
+        Optional<AppModule> moduleOpt = moduleRepository.findByCode(codeModule);
+        if (moduleOpt.isEmpty()) return false;
+
+        AppModule module = moduleOpt.get();
+
+        boolean moduleAchete = entreprise.getModulesActifs().contains(module);
+
+        if (!module.isPayant()) {
+            return moduleAchete;
         }
+
+        // Pour les modules payants : vérification essai individuel
+        Optional<EntrepriseModuleEssai> essaiOpt = entrepriseModuleEssaiRepository.findByEntrepriseAndModule(entreprise, module);
+
+        boolean essaiValide = essaiOpt.isPresent() &&
+                            essaiOpt.get().getDateFinEssai() != null &&
+                            essaiOpt.get().getDateFinEssai().isAfter(LocalDateTime.now());
+
+        return moduleAchete || essaiValide;
+    }
+
+    //Module de verification reutilisable
+    public void verifierAccesModulePourEntreprise(Entreprise entreprise, String codeModule) {
+
+        if (isModuleActifPourEntreprise(entreprise, codeModule)) {
+            return; // Tout est ok, accès autorisé
+        }
+
+        Map<String, String> tempsRestantParModule = consulterTempsRestantEssaiParModule(entreprise);
+        String tempsRestant = tempsRestantParModule.getOrDefault(codeModule, "Période d'essai terminée");
+
+        if ("Période d'essai terminée".equals(tempsRestant)) {
+            throw new RuntimeException("Ce module n'est pas activé pour votre entreprise. Veuillez l'acheter pour continuer.");
+        } else {
+            throw new RuntimeException("Ce module n'est pas activé pour votre entreprise. Temps d'essai restant : " + tempsRestant);
+        }
+    }
+
+
+
+
+
+
+    // Initialiser les essais pour les modules payants
+    public void initialiserEssaisModulesPayants(Entreprise entreprise) {
+
+    List<AppModule> modulesPayants = moduleRepository.findByPayantTrue();
+    LocalDateTime now = LocalDateTime.now();
+
+    List<EntrepriseModuleEssai> essais = new ArrayList<>();
+
+    for (AppModule module : modulesPayants) {
+        
+        // Évite les doublons si un essai existe déjà
+        if (entrepriseModuleEssaiRepository.existsByEntrepriseAndModule(entreprise, module)) {
+            continue; 
+        }
+
+        EntrepriseModuleEssai essai = new EntrepriseModuleEssai();
+        essai.setEntreprise(entreprise);
+        essai.setModule(module);
+        essai.setDateDebutEssai(now);
+        essai.setDateFinEssai(now.plusDays(1));
+        essais.add(essai);
+    }
+
+    if (!essais.isEmpty()) {
+        entrepriseModuleEssaiRepository.saveAll(essais);
+    }
+}
 
     //Definir prix des modules
     @Transactional
@@ -58,6 +136,31 @@ public class ModuleActivationService {
         module.setPrix(nouveauPrix);
         moduleRepository.save(module);
     }
+
+
+    //Consulter le temps restant de la période d'essai pour les modules payants
+   public Map<String, String> consulterTempsRestantEssaiParModule(Entreprise entreprise) {
+    List<EntrepriseModuleEssai> essais = entrepriseModuleEssaiRepository.findByEntreprise(entreprise);
+
+    Map<String, String> tempsRestantParModule = new HashMap<>();
+
+    LocalDateTime maintenant = LocalDateTime.now();
+
+    for (EntrepriseModuleEssai essai : essais) {
+        if (essai.getDateFinEssai() == null || essai.getDateFinEssai().isBefore(maintenant)) {
+            tempsRestantParModule.put(essai.getModule().getCode(), "Période d'essai terminée");
+        } else {
+            Duration dureeRestante = Duration.between(maintenant, essai.getDateFinEssai());
+            long heures = dureeRestante.toHours();
+            long minutes = dureeRestante.toMinutes() % 60;
+            tempsRestantParModule.put(essai.getModule().getCode(),
+                String.format("%d heures et %d minutes restantes", heures, minutes));
+        }
+    }
+
+    return tempsRestantParModule;
+}
+
 
 
 
@@ -85,8 +188,8 @@ public class ModuleActivationService {
         }
 
         RoleType role = user.getRole().getName();
-        if (role != RoleType.ADMIN && role != RoleType.MANAGER) {
-            throw new RuntimeException("Seuls les ADMIN ou MANAGER peuvent activer les modules.");
+        if (role != RoleType.ADMIN) {
+            throw new RuntimeException("Seuls l'ADMIN peuvent activer les modules.");
         }
 
         // 2. Récupération du module
@@ -182,8 +285,7 @@ public class ModuleActivationService {
 
 
    //Lister tout les modules actifs ou non actifs pour une entreprise que par son admin ou manager
- 
-   public List<ModuleDTO> listerModulesEntreprise(HttpServletRequest request) {
+ public List<ModuleDTO> listerModulesEntreprise(HttpServletRequest request) {
 
     String token = request.getHeader("Authorization");
     if (token == null || !token.startsWith("Bearer ")) {
@@ -205,22 +307,45 @@ public class ModuleActivationService {
     }
 
     Entreprise entreprise = user.getEntreprise();
-    Set<AppModule> modulesActifs = entreprise.getModulesActifs();
 
-    // Récupérer tous les modules existants
     List<AppModule> tousModules = moduleRepository.findAll();
 
-    // Construction de la réponse
     List<ModuleDTO> modules = tousModules.stream()
             .map(module -> {
-                boolean actif = modulesActifs.contains(module);
-                return new ModuleDTO(module.getId(), module.getNom(), module.getCode(), module.isPayant(), actif, module.getPrix());
+
+                boolean actifReel = isModuleActifPourEntreprise(entreprise, module.getCode());  // prend en compte essai + achat
+            System.out.println("Module " + module.getCode() + " actif pour entreprise : " + actifReel);
+                return new ModuleDTO(
+                    module.getId(),
+                    module.getNom(),
+                    module.getCode(),
+                    module.getDescription(),
+                    module.isPayant(),
+                    actifReel,
+                    module.getPrix()
+                );
             })
             .collect(Collectors.toList());
 
     return modules;
 }
 
-  
+// Activation automatique de l'essai pour entreprises existantes
+public void activerEssaiPourToutesLesEntreprises(AppModule module) {
+    List<Entreprise> entreprises = entrepriseRepository.findAll();
+    LocalDateTime now = LocalDateTime.now();
+
+    List<EntrepriseModuleEssai> essais = entreprises.stream().map(entreprise -> {
+        EntrepriseModuleEssai essai = new EntrepriseModuleEssai();
+        essai.setEntreprise(entreprise);
+        essai.setModule(module);
+        essai.setDateDebutEssai(now);
+        essai.setDateFinEssai(now.plusDays(1));
+        return essai;
+    }).toList();
+
+    entrepriseModuleEssaiRepository.saveAll(essais);
+}
+
 }
 //* Si le module est payant, tu peux gérer ici la vérification du paiement.
