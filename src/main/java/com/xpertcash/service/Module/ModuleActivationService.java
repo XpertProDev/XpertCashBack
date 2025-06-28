@@ -53,28 +53,31 @@ public class ModuleActivationService {
     @Autowired
     private EntrepriseModuleEssaiRepository entrepriseModuleEssaiRepository;
 
-    //Methode reetulisable
-        public boolean isModuleActifPourEntreprise(Entreprise entreprise, String codeModule) {
-        Optional<AppModule> moduleOpt = moduleRepository.findByCode(codeModule);
-        if (moduleOpt.isEmpty()) return false;
+    // Méthode réutilisable
+public boolean isModuleActifPourEntreprise(Entreprise entreprise, String codeModule) {
+    
+    Optional<AppModule> moduleOpt = moduleRepository.findByCode(codeModule);
+    if (moduleOpt.isEmpty()) return false;
 
-        AppModule module = moduleOpt.get();
+    AppModule module = moduleOpt.get();
 
-        boolean moduleAchete = entreprise.getModulesActifs().contains(module);
+    Set<AppModule> modulesAchetes = entreprise.getModulesActifs();
 
-        if (!module.isPayant()) {
-            return moduleAchete;
-        }
+    boolean moduleAchete = modulesAchetes.contains(module);
 
-        // Pour les modules payants : vérification essai individuel
-        Optional<EntrepriseModuleEssai> essaiOpt = entrepriseModuleEssaiRepository.findByEntrepriseAndModule(entreprise, module);
-
-        boolean essaiValide = essaiOpt.isPresent() &&
-                            essaiOpt.get().getDateFinEssai() != null &&
-                            essaiOpt.get().getDateFinEssai().isAfter(LocalDateTime.now());
-
-        return moduleAchete || essaiValide;
+    if (!module.isPayant()) {
+        return moduleAchete;
     }
+
+    // Pour les modules payants : vérification essai individuel
+    Optional<EntrepriseModuleEssai> essaiOpt = entrepriseModuleEssaiRepository.findByEntrepriseAndModule(entreprise, module);
+
+    boolean essaiValide = essaiOpt.isPresent() &&
+                          essaiOpt.get().getDateFinEssai() != null &&
+                          essaiOpt.get().getDateFinEssai().isAfter(LocalDateTime.now());
+
+    return moduleAchete || essaiValide;
+}
 
     //Module de verification reutilisable
     public void verifierAccesModulePourEntreprise(Entreprise entreprise, String codeModule) {
@@ -94,6 +97,11 @@ public class ModuleActivationService {
     }
 
 
+    // Liste centralisée des sous-modules à masquer
+    private static final List<String> SOUS_MODULES_MASQUES = List.of(
+        "FACTURE_PROFORMA",
+        "FACTURE_REELLE"
+    );
 
 
 
@@ -139,22 +147,33 @@ public class ModuleActivationService {
 
 
     //Consulter le temps restant de la période d'essai pour les modules payants
-   public Map<String, String> consulterTempsRestantEssaiParModule(Entreprise entreprise) {
+    public Map<String, String> consulterTempsRestantEssaiParModule(Entreprise entreprise) {
     List<EntrepriseModuleEssai> essais = entrepriseModuleEssaiRepository.findByEntreprise(entreprise);
 
     Map<String, String> tempsRestantParModule = new HashMap<>();
-
     LocalDateTime maintenant = LocalDateTime.now();
 
     for (EntrepriseModuleEssai essai : essais) {
         if (essai.getDateFinEssai() == null || essai.getDateFinEssai().isBefore(maintenant)) {
-            tempsRestantParModule.put(essai.getModule().getCode(), "Période d'essai terminée");
+            tempsRestantParModule.put(essai.getModule().getCode(), "Terminé");
         } else {
             Duration dureeRestante = Duration.between(maintenant, essai.getDateFinEssai());
-            long heures = dureeRestante.toHours();
+
+            long jours = dureeRestante.toDays();
+            long heures = dureeRestante.toHours() % 24;
             long minutes = dureeRestante.toMinutes() % 60;
-            tempsRestantParModule.put(essai.getModule().getCode(),
-                String.format("%d heures et %d minutes restantes", heures, minutes));
+
+            String temps;
+
+            if (jours > 0) {
+                temps = String.format("%dj %dh", jours, heures);
+            } else if (heures > 0) {
+                temps = String.format("%dh%02d", heures, minutes);
+            } else {
+                temps = String.format("%dmin", minutes);
+            }
+
+            tempsRestantParModule.put(essai.getModule().getCode(), temps);
         }
     }
 
@@ -285,7 +304,7 @@ public class ModuleActivationService {
 
 
    //Lister tout les modules actifs ou non actifs pour une entreprise que par son admin ou manager
- public List<ModuleDTO> listerModulesEntreprise(HttpServletRequest request) {
+    public List<ModuleDTO> listerModulesEntreprise(HttpServletRequest request) {
 
     String token = request.getHeader("Authorization");
     if (token == null || !token.startsWith("Bearer ")) {
@@ -307,22 +326,34 @@ public class ModuleActivationService {
     }
 
     Entreprise entreprise = user.getEntreprise();
-
     List<AppModule> tousModules = moduleRepository.findAll();
 
+    // 👉 Récupération globale des temps restants par module
+    Map<String, String> tempsRestantParModule = consulterTempsRestantEssaiParModule(entreprise);
+
+    // 👉 Transformation de la liste avec filtrage des sous-modules et ajout du temps d'essai
     List<ModuleDTO> modules = tousModules.stream()
+            .filter(module -> !SOUS_MODULES_MASQUES.contains(module.getCode()))
             .map(module -> {
 
-                boolean actifReel = isModuleActifPourEntreprise(entreprise, module.getCode());  // prend en compte essai + achat
-            System.out.println("Module " + module.getCode() + " actif pour entreprise : " + actifReel);
+                boolean actifReel = isModuleActifPourEntreprise(entreprise, module.getCode());
+
+                String tempsRestant = null;
+                
+                // Affichage du temps restant uniquement si le module est payant et non encore acheté
+                if (module.isPayant() && !entreprise.getModulesActifs().contains(module)) {
+                    tempsRestant = tempsRestantParModule.get(module.getCode());
+                }
+
                 return new ModuleDTO(
-                    module.getId(),
-                    module.getNom(),
-                    module.getCode(),
-                    module.getDescription(),
-                    module.isPayant(),
-                    actifReel,
-                    module.getPrix()
+                        module.getId(),
+                        module.getNom(),
+                        module.getCode(),
+                        module.getDescription(),
+                        module.isPayant(),
+                        actifReel,
+                        module.getPrix(),
+                        tempsRestant
                 );
             })
             .collect(Collectors.toList());

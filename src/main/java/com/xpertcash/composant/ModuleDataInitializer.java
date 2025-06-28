@@ -26,19 +26,19 @@ public class ModuleDataInitializer implements CommandLineRunner {
     @Override
     public void run(String... args) {
 
-        // Définition des modules
         List<AppModule> modules = List.of(
-            creerModule("VENTE", "Gestion des Ventes","le POS sert a vendre", true, false, null),
-            creerModule("CLIENT", "Gestion des Clients","", true, false, null),
-            creerModule("ENTREPRISE_CLIENT", "Gestion des Entreprises Client","", true, false, null),
-            creerModule("USER", "Gestion des Employés","", true, false, null),
-            creerModule("BOUTIQUE", "Gestion des Boutiques","", true, false, null),
-            creerModule("PRODUIT", "Gestion des Produits","", true, false, null),
-            creerModule("FACTURE", "Gestion des Factures","", true, false, null),
-            creerModule("FACTURE_PROFORMA", "Gestion des Factures Proforma","", true, false, null),
-            creerModule("FACTURE_REELLE", "Gestion des Factures Réelles","", false, true, new BigDecimal("30000")),
-            creerModule("STOCK", "Gestion des Stock","", false, true, new BigDecimal("10000"))
+            creerModule("VENTE", "Gestion des Ventes", "Le POS sert à vendre", true, false, null),
+            creerModule("CLIENT", "Gestion des Clients", "", true, false, null),
+            creerModule("ENTREPRISE_CLIENT", "Gestion des Entreprises Client", "", true, false, null),
+            creerModule("USER", "Gestion des Employés", "", true, false, null),
+            creerModule("BOUTIQUE", "Gestion des Boutiques", "", true, false, null),
+            creerModule("PRODUIT", "Gestion des Produits", "", true, false, null),
+            creerModule("STOCK", "Gestion des Stocks", "Gestion des stocks", true, false, null),
 
+            creerModule("GESTION_FACTURATION", "Gestion de Facturation", "Gestion centralisée des factures", false, true, new BigDecimal("10000")),
+            // Sous-modules structurels
+            creerModule("FACTURE_PROFORMA", "Factures Proforma", "Création de devis/factures proforma", false, false, null),
+            creerModule("FACTURE_REELLE", "Factures Réelles", "Émission de factures définitives", false, false, null)
         );
 
         for (AppModule module : modules) {
@@ -47,7 +47,7 @@ public class ModuleDataInitializer implements CommandLineRunner {
             if (moduleExistantOpt.isEmpty()) {
                 AppModule savedModule = moduleRepository.save(module);
 
-                // Si c'est un module payant, on active automatiquement l'essai pour les entreprises existantes
+                // Activation d'essai uniquement sur les modules payants (ici uniquement GESTION_FACTURATION)
                 if (savedModule.isPayant()) {
                     moduleActivationService.activerEssaiPourToutesLesEntreprises(savedModule);
                 }
@@ -55,7 +55,7 @@ public class ModuleDataInitializer implements CommandLineRunner {
         }
     }
 
-    private AppModule creerModule(String code, String nom,String description, boolean actifParDefaut, boolean payant, BigDecimal prix) {
+    private AppModule creerModule(String code, String nom, String description, boolean actifParDefaut, boolean payant, BigDecimal prix) {
         AppModule module = new AppModule();
         module.setCode(code);
         module.setNom(nom);

@@ -193,7 +193,7 @@ public void supprimerFactureReelleLiee(FactureProForma proforma) {
             throw new RuntimeException("L'utilisateur n'est associé à aucune entreprise");
         }
 
-     moduleActivationService.verifierAccesModulePourEntreprise(entreprise, "FACTURE_REELLE");
+        moduleActivationService.verifierAccesModulePourEntreprise(entreprise, "GESTION_FACTURATION");
 
         List<FactureReelle> factures = factureReelleRepository.findByEntrepriseOrderByDateCreationDesc(entreprise);
 

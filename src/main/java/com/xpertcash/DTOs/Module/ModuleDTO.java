@@ -14,9 +14,10 @@ public class ModuleDTO {
     private boolean payant;
     private boolean actif;
     private BigDecimal prix;
+    private String tempsRestantEssai;
 
 
-    public ModuleDTO(Long id, String nom, String code,String description, boolean payant, boolean actif, BigDecimal prix) {
+    public ModuleDTO(Long id, String nom, String code,String description, boolean payant, boolean actif, BigDecimal prix, String tempsRestantEssai) {
         this.id = id;
         this.nom = nom;
         this.code = code;
@@ -24,6 +25,7 @@ public class ModuleDTO {
         this.payant = payant;
         this.actif = actif;
         this.prix = prix;
+        this.tempsRestantEssai = tempsRestantEssai;
     }
 
     // Getters et setters
