@@ -1,4 +1,5 @@
 package com.xpertcash.controller;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -171,6 +172,30 @@ public class BoutiqueController {
         boutiqueService.transfererProduits(request, boutiqueSourceId, boutiqueDestinationId, produitId, quantite);
         return ResponseEntity.ok("Transfert de produits effectué avec succès.");
     }
+
+    //Endpoint pour copier
+    @PostMapping("/copier-produits")
+    public ResponseEntity<String> copierProduits(
+            HttpServletRequest request,
+            @RequestBody Map<String, Object> detailsCopie) {
+
+        Long boutiqueSourceId = Long.valueOf(detailsCopie.get("boutiqueSourceId").toString());
+        Long boutiqueDestinationId = Long.valueOf(detailsCopie.get("boutiqueDestinationId").toString());
+
+        boolean toutCopier = Boolean.parseBoolean(detailsCopie.get("toutCopier").toString());
+
+        List<Long> listeProduitIds = new ArrayList<>();
+        if (!toutCopier && detailsCopie.containsKey("produitIds")) {
+            List<Object> ids = (List<Object>) detailsCopie.get("produitIds");
+            for (Object id : ids) {
+                listeProduitIds.add(Long.valueOf(id.toString()));
+            }
+        }
+
+        boutiqueService.copierProduits(request, boutiqueSourceId, boutiqueDestinationId, listeProduitIds, toutCopier);
+        return ResponseEntity.ok("Copie de produits effectuée avec succès.");
+    }
+
 
     @GetMapping("/boutique/{id}/produits")
     public ResponseEntity<List<Produit>> getProduitsParBoutique(
