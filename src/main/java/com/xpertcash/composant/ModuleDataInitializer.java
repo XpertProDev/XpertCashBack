@@ -1,13 +1,17 @@
 package com.xpertcash.composant;
 import java.math.BigDecimal;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
 
+import com.xpertcash.entity.Entreprise;
 import com.xpertcash.entity.Module.AppModule;
+import com.xpertcash.repository.EntrepriseRepository;
 import com.xpertcash.repository.Module.ModuleRepository;
 import com.xpertcash.service.Module.ModuleActivationService;
 
@@ -22,6 +26,9 @@ public class ModuleDataInitializer implements CommandLineRunner {
 
     @Autowired
     private ModuleActivationService moduleActivationService;
+
+    @Autowired
+    private EntrepriseRepository entrepriseRepository;
 
     @Override
     public void run(String... args) {
@@ -41,17 +48,48 @@ public class ModuleDataInitializer implements CommandLineRunner {
             creerModule("FACTURE_REELLE", "Factures Réelles", "Émission de factures définitives", false, false, null)
         );
 
+        // Création des modules s'ils n'existent pas
         for (AppModule module : modules) {
             Optional<AppModule> moduleExistantOpt = moduleRepository.findByCode(module.getCode());
 
             if (moduleExistantOpt.isEmpty()) {
                 AppModule savedModule = moduleRepository.save(module);
 
-                // Activation d'essai uniquement sur les modules payants (ici uniquement GESTION_FACTURATION)
-                if (savedModule.isPayant()) {
-                    moduleActivationService.activerEssaiPourToutesLesEntreprises(savedModule);
+               if (savedModule.isPayant()) {
+                List<Entreprise> entreprises = entrepriseRepository.findAll();
+                for (Entreprise entreprise : entreprises) {
+                    moduleActivationService.activerEssaiPourEntreprise(entreprise, savedModule);
                 }
             }
+
+            }
+        }
+
+        // Mise à jour des entreprises existantes
+        List<Entreprise> entreprises = entrepriseRepository.findAll();
+
+        Set<AppModule> modulesParDefaut = new HashSet<>(moduleRepository.findByActifParDefautTrue());
+        AppModule moduleFacturation = moduleRepository.findByCode("GESTION_FACTURATION")
+            .orElseThrow(() -> new RuntimeException("Module GESTION_FACTURATION introuvable"));
+
+        for (Entreprise entreprise : entreprises) {
+
+            // Ajouter les modules par défaut s'ils manquent
+            if (entreprise.getModulesActifs() == null) {
+                entreprise.setModulesActifs(new HashSet<>());
+            }
+
+            if (!entreprise.getModulesActifs().containsAll(modulesParDefaut)) {
+                entreprise.getModulesActifs().addAll(modulesParDefaut);
+            }
+
+            // Activation essai module payant s'il manque
+            boolean dejaEssai = moduleActivationService.dejaEssaiPourEntreprise(entreprise, moduleFacturation);
+            if (!dejaEssai) {
+                moduleActivationService.activerEssaiPourEntreprise(entreprise, moduleFacturation);
+            }
+
+            entrepriseRepository.save(entreprise);
         }
     }
 

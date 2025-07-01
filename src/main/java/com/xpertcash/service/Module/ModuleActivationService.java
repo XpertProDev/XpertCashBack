@@ -362,20 +362,25 @@ public boolean isModuleActifPourEntreprise(Entreprise entreprise, String codeMod
 }
 
 // Activation automatique de l'essai pour entreprises existantes
-public void activerEssaiPourToutesLesEntreprises(AppModule module) {
-    List<Entreprise> entreprises = entrepriseRepository.findAll();
+    public void activerEssaiPourEntreprise(Entreprise entreprise, AppModule module) {
+    if (dejaEssaiPourEntreprise(entreprise, module)) {
+        return; // Si l'essai existe déjà, on ne fait rien
+    }
+
     LocalDateTime now = LocalDateTime.now();
 
-    List<EntrepriseModuleEssai> essais = entreprises.stream().map(entreprise -> {
-        EntrepriseModuleEssai essai = new EntrepriseModuleEssai();
-        essai.setEntreprise(entreprise);
-        essai.setModule(module);
-        essai.setDateDebutEssai(now);
-        essai.setDateFinEssai(now.plusDays(1));
-        return essai;
-    }).toList();
+    EntrepriseModuleEssai essai = new EntrepriseModuleEssai();
+    essai.setEntreprise(entreprise);
+    essai.setModule(module);
+    essai.setDateDebutEssai(now);
+    essai.setDateFinEssai(now.plusDays(1));
 
-    entrepriseModuleEssaiRepository.saveAll(essais);
+    entrepriseModuleEssaiRepository.save(essai);
+}
+
+
+public boolean dejaEssaiPourEntreprise(Entreprise entreprise, AppModule module) {
+    return entrepriseModuleEssaiRepository.findByEntrepriseAndModule(entreprise, module).isPresent();
 }
 
 }
