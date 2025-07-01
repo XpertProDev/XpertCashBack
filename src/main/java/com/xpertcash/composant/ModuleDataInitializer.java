@@ -1,9 +1,11 @@
 package com.xpertcash.composant;
+import java.math.BigDecimal;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
 
-import com.xpertcash.entity.AppModule;
+import com.xpertcash.entity.Module.AppModule;
 import com.xpertcash.repository.Module.ModuleRepository;
 
 
@@ -105,6 +107,7 @@ public class ModuleDataInitializer implements CommandLineRunner {
             reel.setNom("Gestion des Factures Réelles");
             reel.setActifParDefaut(false);
             reel.setPayant(true);
+            reel.setPrix(new BigDecimal("30000"));
             moduleRepository.save(reel);
         }
     }

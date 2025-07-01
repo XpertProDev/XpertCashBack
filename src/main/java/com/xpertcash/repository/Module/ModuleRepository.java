@@ -6,7 +6,7 @@ import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
-import com.xpertcash.entity.AppModule;
+import com.xpertcash.entity.Module.AppModule;
 
 @Repository
 public interface ModuleRepository extends JpaRepository<AppModule, Long> {

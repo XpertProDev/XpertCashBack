@@ -7,6 +7,7 @@ import jakarta.mail.util.ByteArrayDataSource;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.math.BigDecimal;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.List;
@@ -62,12 +63,7 @@ public class MailService {
         sendEmail(to, subject, message);
     }
     
-    
-    
-    
 
-
-    
 
     public void sendUnlockLinkEmail(String to, String code) throws MessagingException {
         String baseUrl = "http://localhost:8080";
@@ -285,5 +281,96 @@ public class MailService {
 
     mailSender.send(message);
 }
+
+
+       // Méthode pour notifier apres achat de module
+        public void sendConfirmationActivationEmail(String to,
+                                            String nomModule,
+                                            BigDecimal montant,
+                                            String devise,
+                                            String nomProprietaire,
+                                            String prenomProprietaire,
+                                            String adresse,
+                                            String ville,
+                                            String referenceTransaction,
+                                            String nomEntreprise) throws MessagingException {
+
+    String subject = "Confirmation d'activation du module : " + nomModule;
+    String htmlContent = generatePaymentConfirmationEmail(nomModule, montant, devise, nomProprietaire, prenomProprietaire, adresse, ville, referenceTransaction, nomEntreprise);
+
+    sendEmail(to, subject, htmlContent);
+}
+
+
+    //mail pour notifier apres achat de module
+   private String generatePaymentConfirmationEmail(String nomModule,
+                                                BigDecimal montant,
+                                                String devise,
+                                                String nomProprietaire,
+                                                String prenomProprietaire,
+                                                String adresse,
+                                                String ville,
+                                                String referenceTransaction,
+                                                String nomEntreprise) {
+return """
+        <html>
+            <body style="font-family: Arial, sans-serif; background-color: #f4f4f4; padding: 20px;">
+                <div style="max-width: 600px; margin: auto; background: white; padding: 17px; border-radius: 10px; text-align: center;">
+                    
+                    <img src="cid:logo" alt="Logo" style="width: 100px; margin-bottom: -20px;">
+                    
+                    <h2 style="color: #028313; margin-top: -7px; font-size: 12px;">Confirmation de votre paiement</h2> 
+                    
+                    <p><strong>Bonjour %s %s</strong>,</p>
+                    <p style="font-size: 10px">
+                        Nous vous confirmons la réception de votre paiement pour l'activation du module <strong>%s</strong> 
+                        destiné à l'entreprise <strong>%s</strong>. Voici le récapitulatif de votre transaction :
+                    </p>
+
+                    <table style="width: 100%%; border-collapse: collapse; margin: 20px 0;">
+                        <tr style="background-color: #f2f2f2;">
+                            <th style="border: 1px solid #ddd; padding: 8px; text-align: left; font-size: 10px">Description</th>
+                            <th style="border: 1px solid #ddd; padding: 8px; text-align: right; font-size: 10px">Montant</th>
+                        </tr>
+                        <tr>
+                            <td style="border: 1px solid #ddd; padding: 8px; font-size: 10px">Activation du module : %s</td>
+                            <td style="border: 1px solid #ddd; padding: 8px; text-align: right; font-size: 9px">%s %s</td>
+                        </tr>
+                        <tr>
+                            <td style="border: 1px solid #ddd; padding: 8px; font-size: 10px"><strong>Total</strong></td>
+                            <td style="border: 1px solid #ddd; padding: 8px; text-align: right; font-size: 9px"><strong>%s %s</strong></td>
+                        </tr>
+                    </table>
+
+                    <h4 style="text-align: left; font-size: 10px">Coordonnées du titulaire de la carte :</h4>
+                    <p style="text-align: left; font-size: 10px;">
+                        <strong>%s %s</strong><br>
+                        %s, %s
+                    </p>
+
+                    <p style="text-align: left; font-size: 10px;">
+                        <strong>Référence de transaction :</strong> %s
+                    </p>
+
+                    <p style="font-size: 10px; color: #555; margin-top: 30px;">
+                        Si vous avez des questions, notre équipe reste à votre disposition.
+                    </p>
+                    
+                    <p style="font-size: 9px; color: #777;">
+                        L'équipe XpertCash
+                    </p>
+                </div>
+            </body>
+        </html>
+    """.formatted(
+            prenomProprietaire, nomProprietaire,
+            nomModule, nomEntreprise,
+            nomModule, montant, devise,
+            montant, devise,
+            prenomProprietaire, nomProprietaire, adresse, ville,
+            referenceTransaction
+    );
+}
+
 
 }
