@@ -171,7 +171,7 @@ public class UsersService {
         entreprise.setModulesActifs(modulesParDefaut);
 
         // Date fin d'essai globale
-        entreprise.setDateFinEssaiModulesPayants(LocalDateTime.now().plusDays(1));
+        entreprise.setDateFinEssaiModulesPayants(LocalDateTime.now().plusDays(2));
 
         // Sauvegarde entreprise (obligatoire pour générer ID)
         entreprise = entrepriseRepository.save(entreprise);

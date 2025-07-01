@@ -69,28 +69,29 @@ public class ModuleDataInitializer implements CommandLineRunner {
         List<Entreprise> entreprises = entrepriseRepository.findAll();
 
         Set<AppModule> modulesParDefaut = new HashSet<>(moduleRepository.findByActifParDefautTrue());
-        AppModule moduleFacturation = moduleRepository.findByCode("GESTION_FACTURATION")
-            .orElseThrow(() -> new RuntimeException("Module GESTION_FACTURATION introuvable"));
+        List<AppModule> modulesPayants = moduleRepository.findByPayantTrue();
 
         for (Entreprise entreprise : entreprises) {
 
-            // Ajouter les modules par défaut s'ils manquent
+            // Initialiser la liste des modules actifs si nécessaire
             if (entreprise.getModulesActifs() == null) {
                 entreprise.setModulesActifs(new HashSet<>());
             }
 
-            if (!entreprise.getModulesActifs().containsAll(modulesParDefaut)) {
-                entreprise.getModulesActifs().addAll(modulesParDefaut);
-            }
+            // Ajouter les modules par défaut s'ils ne sont pas déjà présents
+            entreprise.getModulesActifs().addAll(modulesParDefaut);
 
-            // Activation essai module payant s'il manque
-            boolean dejaEssai = moduleActivationService.dejaEssaiPourEntreprise(entreprise, moduleFacturation);
-            if (!dejaEssai) {
-                moduleActivationService.activerEssaiPourEntreprise(entreprise, moduleFacturation);
+            // Activation des essais pour tous les modules payants manquants
+            for (AppModule modulePayant : modulesPayants) {
+                if (!moduleActivationService.dejaEssaiPourEntreprise(entreprise, modulePayant)) {
+                    moduleActivationService.activerEssaiPourEntreprise(entreprise, modulePayant);
+                }
             }
 
             entrepriseRepository.save(entreprise);
         }
+
+   
     }
 
     private AppModule creerModule(String code, String nom, String description, boolean actifParDefaut, boolean payant, BigDecimal prix) {
@@ -105,7 +106,4 @@ public class ModuleDataInitializer implements CommandLineRunner {
     }
 }
 
-
-//exemple de new ligne dans la liste des modules comme payant
-//creerModule("CRM", "Module CRM Premium", false, true, new BigDecimal("45000"))
 
