@@ -166,7 +166,7 @@ public class UsersService {
         entreprise.setSuffixe(null);
         entreprise.setTauxTva(null);
 
-       // Affecter les modules actifs par défaut
+            // Affecter les modules actifs par défaut
         Set<AppModule> modulesParDefaut = new HashSet<>(moduleRepository.findByActifParDefautTrue());
         entreprise.setModulesActifs(modulesParDefaut);
 
@@ -178,10 +178,6 @@ public class UsersService {
 
         // Initialiser essais par module (saveAll optimisé)
         moduleActivationService.initialiserEssaisModulesPayants(entreprise);
-
-
-        
-
         
         entreprise = entrepriseRepository.save(entreprise);
 
