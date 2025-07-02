@@ -28,6 +28,8 @@ public class UserRequest {
     private String email;
     private RoleType roleType;
     private LocalDateTime createdAt;
+    private Long boutiqueId;
+
 
     @Pattern(regexp = "^\\+?[0-9]{8,15}$", message = "Le téléphone doit être au format valide")
     private String phone;
@@ -63,6 +65,7 @@ public class UserRequest {
     this.photo = user.getPhoto();
     this.userActivated = user.isEnabledLien();
 
+
     // Admin data directement récupérée
     if (user.getEntreprise() != null && user.getEntreprise().getAdmin() != null) {
         this.adminActivated = user.getEntreprise().getAdmin().isActivatedLien();
@@ -82,7 +85,10 @@ public class UserRequest {
 
     this.adminActivated = user.getEntreprise().getAdmin().isActivatedLien();
     this.adminCreatedAt = user.getEntreprise().getAdmin().getCreatedAt();
+
+
 }
+
 
     // Getters & Setters (génère-les si tu utilises Lombok sinon à la main)
 }

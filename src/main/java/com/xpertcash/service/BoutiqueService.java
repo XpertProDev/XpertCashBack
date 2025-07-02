@@ -17,6 +17,7 @@ import com.xpertcash.entity.StockHistory;
 import com.xpertcash.entity.Transfert;
 import com.xpertcash.entity.User;
 import com.xpertcash.entity.Enum.RoleType;
+import com.xpertcash.exceptions.BusinessException;
 import com.xpertcash.repository.BoutiqueRepository;
 import com.xpertcash.repository.ProduitRepository;
 import com.xpertcash.repository.StockHistoryRepository;
@@ -372,6 +373,7 @@ public void copierProduits(HttpServletRequest request, Long boutiqueSourceId, Lo
         nouveauProduit.setCodeBare(produit.getCodeBare());
         nouveauProduit.setPhoto(produit.getPhoto());
         nouveauProduit.setCategorie(produit.getCategorie());
+        nouveauProduit.setDescription(produit.getDescription());
         nouveauProduit.setUniteDeMesure(produit.getUniteDeMesure());
         nouveauProduit.setCreatedAt(LocalDateTime.now());
         nouveauProduit.setLastUpdated(LocalDateTime.now());
@@ -493,4 +495,42 @@ public void copierProduits(HttpServletRequest request, Long boutiqueSourceId, Lo
         return boutiqueRepository.save(boutique);
     }
     
+    //Methode pour recuperer les vendeur de la boutique
+    public List<User> getVendeursByBoutique(Long boutiqueId, HttpServletRequest request) {
+
+    // Sécurisation : récupérer le token
+    String token = request.getHeader("Authorization");
+    if (token == null || !token.startsWith("Bearer ")) {
+        throw new RuntimeException("Token JWT manquant ou mal formaté");
+    }
+    token = token.replace("Bearer ", "");
+
+    // Extraire l'ID de l'admin depuis le token
+    Long adminId = jwtUtil.extractUserId(token);
+
+    // Vérifier que l'utilisateur est un admin
+    User admin = usersRepository.findById(adminId)
+            .orElseThrow(() -> new RuntimeException("Admin non trouvé"));
+
+    if (admin.getRole() == null || !admin.getRole().getName().equals(RoleType.ADMIN)) {
+        throw new RuntimeException("Seul un ADMIN peut consulter cette liste !");
+    }
+
+    // Vérifier que la boutique appartient à l'entreprise de l'admin
+    Boutique boutique = boutiqueRepository.findById(boutiqueId)
+            .orElseThrow(() -> new BusinessException("Boutique introuvable."));
+
+    if (!boutique.getEntreprise().getId().equals(admin.getEntreprise().getId())) {
+        throw new BusinessException("Cette boutique ne vous appartient pas.");
+    }
+
+    List<User> vendeurs = usersRepository.findByBoutiqueIdAndRole_Name(boutiqueId, RoleType.VENDEUR);
+
+    if (vendeurs.isEmpty()) {
+        throw new BusinessException("Aucun vendeur n'est assigné à cette boutique pour le moment.");
+    }
+
+    return vendeurs;
+}
+
 }

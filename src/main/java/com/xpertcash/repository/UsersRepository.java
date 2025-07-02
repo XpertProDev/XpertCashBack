@@ -1,7 +1,10 @@
 package com.xpertcash.repository;
 
+import com.xpertcash.entity.Boutique;
 import com.xpertcash.entity.Entreprise;
 import com.xpertcash.entity.User;
+import com.xpertcash.entity.Enum.RoleType;
+
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
@@ -29,5 +32,9 @@ public interface UsersRepository extends JpaRepository<User, Long> {
     List<User> findByEntrepriseIdAndIdNot(Long entrepriseId, Long adminId);
 
     boolean existsByPersonalCode(String personalCode);
+   List<User> findByBoutiqueIdAndRole_Name(Long boutiqueId, RoleType roleName);
+
+
+
 }
 

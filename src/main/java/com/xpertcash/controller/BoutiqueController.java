@@ -20,6 +20,7 @@ import com.xpertcash.DTOs.TransfertDTO;
 import com.xpertcash.entity.Boutique;
 import com.xpertcash.entity.Produit;
 import com.xpertcash.entity.Transfert;
+import com.xpertcash.entity.User;
 import com.xpertcash.service.BoutiqueService;
 import com.xpertcash.repository.TransfertRepository;
 
@@ -270,5 +271,17 @@ public class BoutiqueController {
             return ResponseEntity.badRequest().body(response);
         }
     }
+
+    //Endpoint pour lister vendeur dune boutique spécifique
+
+        @GetMapping("/{boutiqueId}/vendeurs")
+    public ResponseEntity<List<User>> getVendeursByBoutique(
+            @PathVariable Long boutiqueId,
+            HttpServletRequest request
+    ) {
+        List<User> vendeurs = boutiqueService.getVendeursByBoutique(boutiqueId, request);
+        return ResponseEntity.ok(vendeurs);
+    }
+
 
 }

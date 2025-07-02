@@ -98,7 +98,7 @@ public class UsersService {
         this.passwordEncoder = passwordEncoder;
     }
 
-    // Inscription : génère le code PIN, enregistre l'utilisateur et envoie le lien d'activation
+  
     @Transactional
     public User registerUsers(String nomComplet, String email, String password, String phone, String pays, String nomEntreprise, String nomBoutique) {
         // Vérification des données déjà existantes
@@ -427,6 +427,17 @@ public class UsersService {
                         isUnique = !usersRepository.existsByPersonalCode(personalCode);  // Vérifier si le code PIN existe déjà dans la base de données
                     } while (!isUnique);
 
+                // Vérifier que l'ID de la boutique est présent s'il s'agit d'un vendeur
+                    Boutique boutique = null;
+                    if (userRequest.getBoutiqueId() != null) {
+                        boutique = boutiqueRepository.findById(userRequest.getBoutiqueId())
+                                .orElseThrow(() -> new BusinessException("Boutique introuvable."));
+
+                        // Vérifier que la boutique appartient à l'entreprise de l'admin
+                        if (!boutique.getEntreprise().getId().equals(admin.getEntreprise().getId())) {
+                            throw new BusinessException("La boutique sélectionnée n'appartient pas à votre entreprise.");
+                        }
+                    }
 
                 // Créer un nouvel utilisateur avec l'activation dépendante de l'admin
                 User newUser = new User();
@@ -441,6 +452,8 @@ public class UsersService {
                 newUser.setPersonalCode(personalCode);
                 newUser.setRole(role);
                 newUser.setPhoto("defaultProfile/profil.png");
+                newUser.setBoutique(boutique);
+
 
                 // Enregistrer l'utilisateur
                 User savedUser = usersRepository.save(newUser);
@@ -543,7 +556,7 @@ public class UsersService {
 
     // Pour la modification de utilisateur
    @Transactional
-public User updateUser(Long userId, UpdateUserRequest request, MultipartFile imageUserFile) {
+    public User updateUser(Long userId, UpdateUserRequest request, MultipartFile imageUserFile) {
     User user = usersRepository.findById(userId)
             .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
 
@@ -618,48 +631,29 @@ public User updateUser(Long userId, UpdateUserRequest request, MultipartFile ima
     return user;
 }
 
-    public UserRequest getInfo(Long userId) {
-        User user = usersRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+   public UserRequest getInfo(Long userId) {
+    User user = usersRepository.findById(userId)
+            .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
 
-        Entreprise entreprise = user.getEntreprise();
+    Entreprise entreprise = user.getEntreprise();
 
-        List<BoutiqueResponse> boutiqueResponses = user.getEntreprise()
-                .getBoutiques()
-                .stream()
-                .map(b -> new BoutiqueResponse(
-                        b.getId(), b.
-                        getNomBoutique(),
-                        b.getAdresse(),
-                        b.getTelephone(),
-                        b.getEmail(),
-                        b.getCreatedAt(),
-                        b.isActif())
-                        )
-                .collect(Collectors.toList());
+    List<BoutiqueResponse> boutiqueResponses = entreprise
+            .getBoutiques()
+            .stream()
+            .map(b -> new BoutiqueResponse(
+                    b.getId(),
+                    b.getNomBoutique(),
+                    b.getAdresse(),
+                    b.getTelephone(),
+                    b.getEmail(),
+                    b.getCreatedAt(),
+                    b.isActif())
+            )
+            .collect(Collectors.toList());
 
-        return new UserRequest(
-                user.getId(),
-                user.getNomComplet(),
-                entreprise.getNomEntreprise(),
-                entreprise.getSiege(),
-                user.getEmail(),
-                user.getRole().getName(),
-                user.getCreatedAt(),
-                user.getPhone(),
-                user.getPays(),
-                entreprise.getAdresse(),
-                entreprise.getLogo(),
-                entreprise.getId(),
-                boutiqueResponses,
-                user.getPersonalCode(),
-                user.getPhoto(),
-                user.isActivatedLien(), 
-                entreprise.getAdmin().isActivatedLien(), // AdminActivated doit refléter l'état du vrai admin
-                entreprise.getAdmin().getCreatedAt()     // Date de création du vrai admin
-            );
+    return new UserRequest(user, entreprise, boutiqueResponses);
 
-    }
+}
 
     // Pour la récupération de tous les utilisateurs d'une entreprise
     public List<User> getAllUsersOfEntreprise(Long entrepriseId) {

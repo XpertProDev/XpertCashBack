@@ -75,4 +75,9 @@ public class User {
     @JoinColumn(name = "role_id", nullable = false)
     private Role role;
 
+    @ManyToOne
+    @JoinColumn(name = "boutique_id")
+    private Boutique boutique;
+
+
 }
