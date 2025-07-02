@@ -42,7 +42,7 @@ public class ModulePaiementService {
         paiement.setMontant(montant);
         paiement.setNomProprietaire(nom);
         paiement.setPrenomProprietaire(prenom);
-        paiement.setEmailProprietaireCarte(email); // Si tu veux stocker l'email, sinon tu peux l'enlever
+        paiement.setEmailProprietaireCarte(email);
         paiement.setAdresse(adresse);
         paiement.setVille(ville);
         paiement.setDatePaiement(LocalDateTime.now());

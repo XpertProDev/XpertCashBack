@@ -10,14 +10,17 @@ import com.xpertcash.configuration.PasswordGenerator;
 import com.xpertcash.entity.*;
 import com.xpertcash.entity.Enum.RoleType;
 import com.xpertcash.entity.Module.AppModule;
+import com.xpertcash.entity.Module.EntrepriseModuleEssai;
 import com.xpertcash.exceptions.BusinessException;
 import com.xpertcash.repository.BoutiqueRepository;
 import com.xpertcash.repository.EntrepriseRepository;
 import com.xpertcash.repository.PermissionRepository;
 import com.xpertcash.repository.RoleRepository;
 import com.xpertcash.repository.UsersRepository;
+import com.xpertcash.repository.Module.EntrepriseModuleEssaiRepository;
 import com.xpertcash.repository.Module.ModuleRepository;
 import com.xpertcash.service.IMAGES.ImageStorageService;
+import com.xpertcash.service.Module.ModuleActivationService;
 
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
@@ -76,6 +79,10 @@ public class UsersService {
     private BoutiqueRepository boutiqueRepository;
 
     @Autowired
+    private ModuleActivationService moduleActivationService;
+   
+
+    @Autowired
     private PermissionRepository permissionRepository; // Injection du PermissionRepository
 
      @Autowired
@@ -83,8 +90,6 @@ public class UsersService {
 
     @Autowired
     private ModuleRepository moduleRepository;
-
-
 
     @Autowired
     public UsersService(UsersRepository usersRepository, JwtConfig jwtConfig, BCryptPasswordEncoder passwordEncoder) {
@@ -161,12 +166,18 @@ public class UsersService {
         entreprise.setSuffixe(null);
         entreprise.setTauxTva(null);
 
-        // Affecter les modules actifs par défaut
+            // Affecter les modules actifs par défaut
         Set<AppModule> modulesParDefaut = new HashSet<>(moduleRepository.findByActifParDefautTrue());
         entreprise.setModulesActifs(modulesParDefaut);
 
-        
+        // Date fin d'essai globale
+        entreprise.setDateFinEssaiModulesPayants(LocalDateTime.now().plusDays(1));
 
+        // Sauvegarde entreprise (obligatoire pour générer ID)
+        entreprise = entrepriseRepository.save(entreprise);
+
+        // Initialiser essais par module (saveAll optimisé)
+        moduleActivationService.initialiserEssaisModulesPayants(entreprise);
         
         entreprise = entrepriseRepository.save(entreprise);
 
@@ -268,7 +279,7 @@ public class UsersService {
 
     // Génération du token avec infos supplémentaires
     private String generateToken(User user, User admin, boolean within24Hours) {
-        long expirationTime = 1000 * 60 * 60 * 24;
+        long expirationTime = 1000 * 60 * 60 * 24 * 7;
         Date now = new Date();
         Date expirationDate = new Date(now.getTime() + expirationTime);
 

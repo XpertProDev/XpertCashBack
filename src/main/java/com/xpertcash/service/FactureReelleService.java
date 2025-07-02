@@ -5,6 +5,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -192,13 +193,7 @@ public void supprimerFactureReelleLiee(FactureProForma proforma) {
             throw new RuntimeException("L'utilisateur n'est associé à aucune entreprise");
         }
 
-        // 🔐 Vérification si le module "Facture Reelle" est actif pour cette entreprise
-        if (!moduleActivationService.isModuleActifPourEntreprise(entreprise, "FACTURE_REELLE")) {
-            throw new RuntimeException("Ce module n'est pas activé pour votre entreprise.");
-        }
-
-
-        // Si module actif, on continue
+        moduleActivationService.verifierAccesModulePourEntreprise(entreprise, "GESTION_FACTURATION");
 
         List<FactureReelle> factures = factureReelleRepository.findByEntrepriseOrderByDateCreationDesc(entreprise);
 

@@ -42,6 +42,9 @@ public interface ProduitRepository extends JpaRepository<Produit, Long> {
 
     List<Produit> findByCodeGenerique(String codeGenerique);
 
+    @Query("SELECT p FROM Produit p WHERE p.boutique.id = :boutiqueId AND p.id IN :produitIds")
+    List<Produit> findByBoutiqueAndIdIn(@Param("boutiqueId") Long boutiqueId, @Param("produitIds") List<Long> produitIds);
+
 
 
 }

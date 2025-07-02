@@ -38,6 +38,7 @@ import com.xpertcash.repository.NoteFactureProFormaRepository;
 import com.xpertcash.repository.PaiementRepository;
 import com.xpertcash.repository.ProduitRepository;
 import com.xpertcash.repository.UsersRepository;
+import com.xpertcash.service.Module.ModuleActivationService;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.transaction.Transactional;
@@ -77,6 +78,9 @@ public class FactureProformaService {
 
     @Autowired
     private JwtUtil jwtUtil;
+
+    @Autowired
+    private ModuleActivationService moduleActivationService;
     
     // Methode pour creer une facture pro forma
     public FactureProForma ajouterFacture(FactureProForma facture, Double remisePourcentage, Boolean appliquerTVA, HttpServletRequest request) {
@@ -106,6 +110,9 @@ public class FactureProformaService {
     if (entrepriseUtilisateur == null) {
         throw new RuntimeException("L'utilisateur n'a pas d'entreprise associée.");
     }
+
+    // 🔒 Vérification d'accès au module Gestion Facturation
+    moduleActivationService.verifierAccesModulePourEntreprise(entrepriseUtilisateur, "GESTION_FACTURATION");
 
     facture.setEntreprise(entrepriseUtilisateur);
 

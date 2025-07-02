@@ -1,12 +1,19 @@
 package com.xpertcash.composant;
 import java.math.BigDecimal;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
 
+import com.xpertcash.entity.Entreprise;
 import com.xpertcash.entity.Module.AppModule;
+import com.xpertcash.repository.EntrepriseRepository;
 import com.xpertcash.repository.Module.ModuleRepository;
+import com.xpertcash.service.Module.ModuleActivationService;
 
 
 
@@ -17,99 +24,88 @@ public class ModuleDataInitializer implements CommandLineRunner {
     @Autowired
     private ModuleRepository moduleRepository;
 
+    @Autowired
+    private ModuleActivationService moduleActivationService;
+
+    @Autowired
+    private EntrepriseRepository entrepriseRepository;
+
     @Override
     public void run(String... args) {
 
-        // Vente
-        if (!moduleRepository.existsByCode("VENTE")) {
-            AppModule vente = new AppModule();
-            vente.setCode("VENTE");
-            vente.setNom("Gestion des Ventes");
-            vente.setActifParDefaut(true);
-            vente.setPayant(false);
-            moduleRepository.save(vente);
+        List<AppModule> modules = List.of(
+            creerModule("VENTE", "Gestion des Ventes", "Le POS sert à vendre", true, false, null),
+            creerModule("CLIENT", "Gestion des Clients", "", true, false, null),
+            creerModule("ENTREPRISE_CLIENT", "Gestion des Entreprises Client", "", true, false, null),
+            creerModule("USER", "Gestion des Employés", "", true, false, null),
+            creerModule("BOUTIQUE", "Gestion des Boutiques", "", true, false, null),
+            creerModule("PRODUIT", "Gestion des Produits", "", true, false, null),
+            creerModule("STOCK", "Gestion des Stocks", "Gestion des stocks", true, false, null),
+
+            creerModule("GESTION_FACTURATION", "Gestion de Facturation", "Gestion centralisée des factures", false, true, new BigDecimal("10000")),
+            // Sous-modules structurels
+            creerModule("FACTURE_PROFORMA", "Factures Proforma", "Création de devis/factures proforma", false, false, null),
+            creerModule("FACTURE_REELLE", "Factures Réelles", "Émission de factures définitives", false, false, null)
+        );
+
+        // Création des modules s'ils n'existent pas
+        for (AppModule module : modules) {
+            Optional<AppModule> moduleExistantOpt = moduleRepository.findByCode(module.getCode());
+
+            if (moduleExistantOpt.isEmpty()) {
+                AppModule savedModule = moduleRepository.save(module);
+
+               if (savedModule.isPayant()) {
+                List<Entreprise> entreprises = entrepriseRepository.findAll();
+                for (Entreprise entreprise : entreprises) {
+                    moduleActivationService.activerEssaiPourEntreprise(entreprise, savedModule);
+                }
+            }
+
+            }
         }
 
-        // Gestion des clients
-        if (!moduleRepository.existsByCode("CLIENT")) {
-            AppModule client = new AppModule();
-            client.setCode("CLIENT");
-            client.setNom("Gestion des Clients");
-            client.setActifParDefaut(true);
-            client.setPayant(false);
-            moduleRepository.save(client);
-        }
+        // Mise à jour des entreprises existantes
+        List<Entreprise> entreprises = entrepriseRepository.findAll();
 
-        // Entreprise client
-        if (!moduleRepository.existsByCode("ENTREPRISE_CLIENT")) {
-            AppModule entrepriseClient = new AppModule();
-            entrepriseClient.setCode("ENTREPRISE_CLIENT");
-            entrepriseClient.setNom("Gestion des Entreprises Client");
-            entrepriseClient.setActifParDefaut(true);
-            entrepriseClient.setPayant(false);
-            moduleRepository.save(entrepriseClient);
-        }
+        Set<AppModule> modulesParDefaut = new HashSet<>(moduleRepository.findByActifParDefautTrue());
+        AppModule moduleFacturation = moduleRepository.findByCode("GESTION_FACTURATION")
+            .orElseThrow(() -> new RuntimeException("Module GESTION_FACTURATION introuvable"));
 
-        // Gestion des utilisateurs
-        if (!moduleRepository.existsByCode("USER")) {
-            AppModule user = new AppModule();
-            user.setCode("USER");
-            user.setNom("Gestion des Employés");
-            user.setActifParDefaut(true);
-            user.setPayant(false);
-            moduleRepository.save(user);
-        }
+        for (Entreprise entreprise : entreprises) {
 
-        // Gestion des boutiques
-        if (!moduleRepository.existsByCode("BOUTIQUE")) {
-            AppModule boutique = new AppModule();
-            boutique.setCode("BOUTIQUE");
-            boutique.setNom("Gestion des Boutiques");
-            boutique.setActifParDefaut(true);
-            boutique.setPayant(false);
-            moduleRepository.save(boutique);
-        }
+            // Ajouter les modules par défaut s'ils manquent
+            if (entreprise.getModulesActifs() == null) {
+                entreprise.setModulesActifs(new HashSet<>());
+            }
 
-        // Gestion des produits
-        if (!moduleRepository.existsByCode("PRODUIT")) {
-            AppModule produit = new AppModule();
-            produit.setCode("PRODUIT");
-            produit.setNom("Gestion des Produits");
-            produit.setActifParDefaut(true);
-            produit.setPayant(false);
-            moduleRepository.save(produit);
-        }
+            if (!entreprise.getModulesActifs().containsAll(modulesParDefaut)) {
+                entreprise.getModulesActifs().addAll(modulesParDefaut);
+            }
 
-        // Gestion des factures
-        if (!moduleRepository.existsByCode("FACTURE")) {
-            AppModule facture = new AppModule();
-            facture.setCode("FACTURE");
-            facture.setNom("Gestion des Factures");
-            facture.setActifParDefaut(true);
-            facture.setPayant(false);
-            moduleRepository.save(facture);
-        }
+            // Activation essai module payant s'il manque
+            boolean dejaEssai = moduleActivationService.dejaEssaiPourEntreprise(entreprise, moduleFacturation);
+            if (!dejaEssai) {
+                moduleActivationService.activerEssaiPourEntreprise(entreprise, moduleFacturation);
+            }
 
-        // Factures Proforma
-        if (!moduleRepository.existsByCode("FACTURE_PROFORMA")) {
-            AppModule proforma = new AppModule();
-            proforma.setCode("FACTURE_PROFORMA");
-            proforma.setNom("Gestion des Factures Proforma");
-            proforma.setActifParDefaut(true);
-            proforma.setPayant(false);
-            moduleRepository.save(proforma);
-        }
-
-        // Factures Réelles
-        if (!moduleRepository.existsByCode("FACTURE_REELLE")) {
-            AppModule reel = new AppModule();
-            reel.setCode("FACTURE_REELLE");
-            reel.setNom("Gestion des Factures Réelles");
-            reel.setActifParDefaut(false);
-            reel.setPayant(true);
-            reel.setPrix(new BigDecimal("30000"));
-            moduleRepository.save(reel);
+            entrepriseRepository.save(entreprise);
         }
     }
+
+    private AppModule creerModule(String code, String nom, String description, boolean actifParDefaut, boolean payant, BigDecimal prix) {
+        AppModule module = new AppModule();
+        module.setCode(code);
+        module.setNom(nom);
+        module.setDescription(description);
+        module.setActifParDefaut(actifParDefaut);
+        module.setPayant(payant);
+        module.setPrix(prix);
+        return module;
+    }
 }
+
+
+//exemple de new ligne dans la liste des modules comme payant
+//creerModule("CRM", "Module CRM Premium", false, true, new BigDecimal("45000"))
 

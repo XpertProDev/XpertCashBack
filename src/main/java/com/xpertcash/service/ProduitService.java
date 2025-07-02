@@ -963,6 +963,7 @@ public class ProduitService {
         dto.setCodeGenerique(produit.getCodeGenerique());
         dto.setDescription(produit.getDescription());
         dto.setPhoto(produit.getPhoto());
+        dto.setTypeProduit(produit.getTypeProduit() != null ? produit.getTypeProduit().name() : null);
         dto.setEnStock(produit.getEnStock());
         dto.setCreatedAt(produit.getCreatedAt());
         dto.setLastUpdated(produit.getLastUpdated());

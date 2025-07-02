@@ -8,6 +8,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -44,9 +45,31 @@ public class ModuleActivationController {
     @Autowired
     private PaiementModuleRepository paiementModuleRepository;
     
+    //Endpoint pour consulter le temps restant de la période d'essai pour les modules payants
+@GetMapping("/entreprise/temps-essai/modules")
+public ResponseEntity<?> consulterTempsEssaiModules(HttpServletRequest request) {
+    String token = request.getHeader("Authorization");
+    if (token == null || !token.startsWith("Bearer ")) {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Token JWT manquant ou mal formaté");
+    }
 
-    //Definir prix des modules
-    
+    Long userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
+    User utilisateur = usersRepository.findById(userId)
+        .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
+
+    Entreprise entreprise = utilisateur.getEntreprise();
+    if (entreprise == null) {
+        return ResponseEntity.badRequest().body("L'utilisateur n'est associé à aucune entreprise");
+    }
+
+    Map<String, String> result = moduleActivationService.consulterTempsRestantEssaiParModule(entreprise);
+
+    return ResponseEntity.ok(result);
+}
+
+
+
+    //Definir prix des modules seul Super Admin
    @PostMapping("/modules/prix")
     public ResponseEntity<String> changerPrixModule(
             @RequestBody Map<String, Object> body,

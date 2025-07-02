@@ -99,7 +99,7 @@ public class ProduitController {
         return ResponseEntity.status(HttpStatus.CONFLICT).body(errorResponse);
 
     } catch (Exception e) {
-        // Gestion des autres erreurs
+        // Gestion des autres erreurs 
         e.printStackTrace();
         Map<String, String> errorResponse = new HashMap<>();
         errorResponse.put("error", "Une erreur est survenue : " + e.getMessage());
