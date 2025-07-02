@@ -303,115 +303,114 @@ public class BoutiqueService {
 
     //Copie
     @Transactional
-public void copierProduits(HttpServletRequest request, Long boutiqueSourceId, Long boutiqueDestinationId, List<Long> listeProduitIds, boolean toutCopier) {
-    
-    String token = request.getHeader("Authorization");
-    if (token == null || !token.startsWith("Bearer ")) {
-        throw new RuntimeException("Token JWT manquant ou mal formaté");
-    }
-
-    Long adminId = jwtUtil.extractUserId(token.substring(7));
-    User admin = usersRepository.findById(adminId)
-            .orElseThrow(() -> new RuntimeException("Admin non trouvé"));
-
-    RoleType role = admin.getRole().getName();
-    boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
-    boolean hasPermission = admin.getRole().hasPermission(PermissionType.GERER_PRODUITS);
-
-    if (!isAdminOrManager && !hasPermission) {
-        throw new RuntimeException("Vous n'avez pas les droits pour copier des produits !");
-    }
-
-    Boutique boutiqueSource = boutiqueRepository.findById(boutiqueSourceId)
-            .orElseThrow(() -> new RuntimeException("Boutique source non trouvée"));
-    Boutique boutiqueDestination = boutiqueRepository.findById(boutiqueDestinationId)
-            .orElseThrow(() -> new RuntimeException("Boutique destination non trouvée"));
-
-    if (!boutiqueSource.isActif()) {
-        throw new RuntimeException("La boutique source est désactivée !");
-    }
-    if (!boutiqueDestination.isActif()) {
-        throw new RuntimeException("La boutique destination est désactivée !");
-    }
-
-    if (!boutiqueSource.getEntreprise().equals(admin.getEntreprise()) ||
-        !boutiqueDestination.getEntreprise().equals(admin.getEntreprise())) {
-        throw new RuntimeException("Les boutiques doivent appartenir à la même entreprise !");
-    }
-
-    List<Produit> produitsACopier;
-
-    if (toutCopier) {
-        produitsACopier = produitRepository.findByBoutique(boutiqueSource);
-    } else {
-        if (listeProduitIds == null || listeProduitIds.isEmpty()) {
-            throw new RuntimeException("Liste de produits vide !");
-        }
-        produitsACopier = produitRepository.findByBoutiqueAndIdIn(boutiqueSourceId, listeProduitIds);
-    }
-
-    if (produitsACopier == null || produitsACopier.isEmpty()) {
-        throw new RuntimeException("Aucun produit à copier depuis la boutique source !");
-    }
-
-    int compteurProduitsCopies = 0;
-
-    for (Produit produit : produitsACopier) {
-
-        Optional<Produit> produitDestinationOpt = produitRepository.findByBoutiqueAndCodeGenerique(boutiqueDestination.getId(), produit.getCodeGenerique());
-
-        if (produitDestinationOpt.isPresent()) {
-            continue;
+    public int copierProduits(HttpServletRequest request, Long boutiqueSourceId, Long boutiqueDestinationId, List<Long> listeProduitIds, boolean toutCopier) {
+        String token = request.getHeader("Authorization");
+        if (token == null || !token.startsWith("Bearer ")) {
+            throw new RuntimeException("Token JWT manquant ou mal formaté");
         }
 
-        Produit nouveauProduit = new Produit();
-        nouveauProduit.setNom(produit.getNom());
-        nouveauProduit.setPrixVente(produit.getPrixVente());
-        nouveauProduit.setPrixAchat(produit.getPrixAchat());
-        nouveauProduit.setQuantite(0);
-        nouveauProduit.setCodeGenerique(produit.getCodeGenerique());
-        nouveauProduit.setCodeBare(produit.getCodeBare());
-        nouveauProduit.setPhoto(produit.getPhoto());
-        nouveauProduit.setCategorie(produit.getCategorie());
-        nouveauProduit.setDescription(produit.getDescription());
-        nouveauProduit.setUniteDeMesure(produit.getUniteDeMesure());
-        nouveauProduit.setCreatedAt(LocalDateTime.now());
-        nouveauProduit.setLastUpdated(LocalDateTime.now());
-        nouveauProduit.setEnStock(false);
-        nouveauProduit.setBoutique(boutiqueDestination);
+        Long adminId = jwtUtil.extractUserId(token.substring(7));
+        User admin = usersRepository.findById(adminId)
+                .orElseThrow(() -> new RuntimeException("Admin non trouvé"));
 
-        produitRepository.save(nouveauProduit);
+        RoleType role = admin.getRole().getName();
+        boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
+        boolean hasPermission = admin.getRole().hasPermission(PermissionType.GERER_PRODUITS);
 
-        Stock stockSource = stockRepository.findByProduit(produit);
-        
-        Stock stockDestination = new Stock();
-        stockDestination.setProduit(nouveauProduit);
+        if (!isAdminOrManager && !hasPermission) {
+            throw new RuntimeException("Vous n'avez pas les droits pour copier des produits !");
+        }
 
-        if (stockSource != null) {
-            stockDestination.setStockActuel(stockSource.getStockActuel());
-            stockDestination.setQuantiteAjoute(stockSource.getStockActuel());
-            stockDestination.setStockApres(stockSource.getStockActuel());
-            nouveauProduit.setQuantite(stockSource.getStockActuel());
-            nouveauProduit.setEnStock(stockSource.getStockActuel() > 0);
+        Boutique boutiqueSource = boutiqueRepository.findById(boutiqueSourceId)
+                .orElseThrow(() -> new RuntimeException("Boutique source non trouvée"));
+        Boutique boutiqueDestination = boutiqueRepository.findById(boutiqueDestinationId)
+                .orElseThrow(() -> new RuntimeException("Boutique destination non trouvée"));
+
+        if (!boutiqueSource.isActif()) {
+            throw new RuntimeException("La boutique source est désactivée !");
+        }
+        if (!boutiqueDestination.isActif()) {
+            throw new RuntimeException("La boutique destination est désactivée !");
+        }
+
+        if (!boutiqueSource.getEntreprise().equals(admin.getEntreprise()) ||
+                !boutiqueDestination.getEntreprise().equals(admin.getEntreprise())) {
+            throw new RuntimeException("Les boutiques doivent appartenir à la même entreprise !");
+        }
+
+        List<Produit> produitsACopier;
+
+        if (toutCopier) {
+            produitsACopier = produitRepository.findByBoutique(boutiqueSource);
         } else {
-            stockDestination.setStockActuel(0);
-            stockDestination.setQuantiteAjoute(0);
-            stockDestination.setStockApres(0);
+            if (listeProduitIds == null || listeProduitIds.isEmpty()) {
+                throw new RuntimeException("Liste de produits vide !");
+            }
+            produitsACopier = produitRepository.findByBoutiqueAndIdIn(boutiqueSourceId, listeProduitIds);
         }
 
-        stockDestination.setLastUpdated(LocalDateTime.now());
+        if (produitsACopier == null || produitsACopier.isEmpty()) {
+            throw new RuntimeException("Aucun produit à copier depuis la boutique source !");
+        }
 
-        produitRepository.save(nouveauProduit);
-        stockRepository.save(stockDestination);
+        int compteurProduitsCopies = 0;
 
-        compteurProduitsCopies++;
+        for (Produit produit : produitsACopier) {
+            Optional<Produit> produitDestinationOpt = produitRepository.findByBoutiqueAndCodeGenerique(boutiqueDestination.getId(), produit.getCodeGenerique());
+
+            if (produitDestinationOpt.isPresent()) {
+                continue;
+            }
+
+            Produit nouveauProduit = new Produit();
+            nouveauProduit.setNom(produit.getNom());
+            nouveauProduit.setPrixVente(produit.getPrixVente());
+            nouveauProduit.setPrixAchat(produit.getPrixAchat());
+            nouveauProduit.setQuantite(0);
+            nouveauProduit.setDescription(produit.getDescription());
+            nouveauProduit.setCodeGenerique(produit.getCodeGenerique());
+            nouveauProduit.setCodeBare(produit.getCodeBare());
+            nouveauProduit.setPhoto(produit.getPhoto());
+            nouveauProduit.setCategorie(produit.getCategorie());
+            nouveauProduit.setUniteDeMesure(produit.getUniteDeMesure());
+            nouveauProduit.setCreatedAt(LocalDateTime.now());
+            nouveauProduit.setLastUpdated(LocalDateTime.now());
+            nouveauProduit.setEnStock(false);
+            nouveauProduit.setBoutique(boutiqueDestination);
+
+            produitRepository.save(nouveauProduit);
+
+            Stock stockSource = stockRepository.findByProduit(produit);
+
+            Stock stockDestination = new Stock();
+            stockDestination.setProduit(nouveauProduit);
+
+            if (stockSource != null) {
+                stockDestination.setStockActuel(stockSource.getStockActuel());
+                stockDestination.setQuantiteAjoute(stockSource.getStockActuel());
+                stockDestination.setStockApres(stockSource.getStockActuel());
+                nouveauProduit.setQuantite(stockSource.getStockActuel());
+                nouveauProduit.setEnStock(stockSource.getStockActuel() > 0);
+            } else {
+                stockDestination.setStockActuel(0);
+                stockDestination.setQuantiteAjoute(0);
+                stockDestination.setStockApres(0);
+            }
+
+            stockDestination.setLastUpdated(LocalDateTime.now());
+
+            produitRepository.save(nouveauProduit);
+            stockRepository.save(stockDestination);
+
+            compteurProduitsCopies++;
+        }
+
+        if (compteurProduitsCopies == 0) {
+            throw new RuntimeException("Aucun produit n'a été copié : les produits sélectionner existent déjà dans la boutique destination.");
+        }
+
+        return compteurProduitsCopies;
     }
-
-    if (compteurProduitsCopies == 0) {
-        throw new RuntimeException("Aucun produit n'a été copié : tous les produits existent déjà dans la boutique destination.");
-    }
-}
-
 
     public List<Produit> getProduitsParBoutique(HttpServletRequest request, Long boutiqueId) {
         // Vérifier la présence du token JWT dans l'entête de la requête

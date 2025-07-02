@@ -176,13 +176,12 @@ public class BoutiqueController {
 
     //Endpoint pour copier
     @PostMapping("/copier-produits")
-    public ResponseEntity<String> copierProduits(
+    public ResponseEntity<Map<String, Object>> copierProduits(
             HttpServletRequest request,
             @RequestBody Map<String, Object> detailsCopie) {
 
         Long boutiqueSourceId = Long.valueOf(detailsCopie.get("boutiqueSourceId").toString());
         Long boutiqueDestinationId = Long.valueOf(detailsCopie.get("boutiqueDestinationId").toString());
-
         boolean toutCopier = Boolean.parseBoolean(detailsCopie.get("toutCopier").toString());
 
         List<Long> listeProduitIds = new ArrayList<>();
@@ -193,8 +192,27 @@ public class BoutiqueController {
             }
         }
 
-        boutiqueService.copierProduits(request, boutiqueSourceId, boutiqueDestinationId, listeProduitIds, toutCopier);
-        return ResponseEntity.ok("Copie de produits effectuée avec succès.");
+        try {
+            // Appel unique au service
+            int produitsCopies = boutiqueService.copierProduits(
+                    request,
+                    boutiqueSourceId,
+                    boutiqueDestinationId,
+                    listeProduitIds,
+                    toutCopier
+            );
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            response.put("message", produitsCopies + " produit(s) copié(s) avec succès.");
+            return ResponseEntity.ok(response);
+
+        } catch (RuntimeException e) {
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", false);
+            response.put("message", e.getMessage());
+            return ResponseEntity.ok(response);
+        }
     }
 
 
