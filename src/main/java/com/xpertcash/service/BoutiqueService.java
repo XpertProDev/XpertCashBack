@@ -369,7 +369,7 @@ public class BoutiqueService {
             nouveauProduit.setUniteDeMesure(produit.getUniteDeMesure());
             nouveauProduit.setCreatedAt(LocalDateTime.now());
             nouveauProduit.setLastUpdated(LocalDateTime.now());
-            nouveauProduit.setEnStock(false);
+            nouveauProduit.setEnStock(true);
             nouveauProduit.setBoutique(boutiqueDestination);
 
             produitRepository.save(nouveauProduit);

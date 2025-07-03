@@ -12,8 +12,7 @@ public class PaiementModuleDTO {
       private Long id;
     private BigDecimal montant;
     private String devise;
-    private String nomProprietaire;
-    private String prenomProprietaire;
+    private String nomCompletProprietaire;
     private String  emailProprietaireCarte;
     private String adresse;
     private String ville;
@@ -26,8 +25,7 @@ public class PaiementModuleDTO {
         this.id = paiement.getId();
         this.montant = paiement.getMontant();
         this.devise = paiement.getDevise();
-        this.nomProprietaire = paiement.getNomProprietaire();
-        this.prenomProprietaire = paiement.getPrenomProprietaire();
+        this.nomCompletProprietaire = paiement.getNomCompletProprietaire();
         this.emailProprietaireCarte = paiement.getEmailProprietaireCarte();
         this.adresse = paiement.getAdresse();
         this.ville = paiement.getVille();
