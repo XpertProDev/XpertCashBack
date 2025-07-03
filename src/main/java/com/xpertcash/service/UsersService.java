@@ -446,12 +446,13 @@ public class UsersService {
                 newUser.setNomComplet(userRequest.getNomComplet());
                 newUser.setPays(userRequest.getPays());
                 newUser.setPhone(userRequest.getPhone());
-                newUser.setEnabledLien(admin.isActivatedLien());
+                newUser.setActivatedLien(admin.isActivatedLien());
+                newUser.setEnabledLien(true);
                 newUser.setCreatedAt(LocalDateTime.now());
                 newUser.setEntreprise(admin.getEntreprise());
                 newUser.setPersonalCode(personalCode);
                 newUser.setRole(role);
-                newUser.setPhoto("defaultProfile/profil.png");
+                newUser.setPhoto(null);
                 newUser.setBoutique(boutique);
 
 

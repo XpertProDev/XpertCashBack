@@ -792,7 +792,6 @@ public class ProduitService {
             throw new RuntimeException("Impossible de supprimer le produit car il est encore en stock !");
         }
     
-        // Supprimer aussi son stock (au cas où il y en aurait encore)
         Stock stock = stockRepository.findByProduit(produit);
         if (stock != null) {
             stockRepository.delete(stock);
