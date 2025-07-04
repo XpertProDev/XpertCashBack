@@ -99,6 +99,7 @@ public ResponseEntity<?> consulterTempsEssaiModules(HttpServletRequest request) 
         moduleActivationService.activerModuleAvecPaiement(
                 userId,
                 demande.getNomModule(),
+                demande.getDureeMois(),
                 demande.getNumeroCarte(),
                 demande.getCvc(),
                 demande.getDateExpiration(),
@@ -215,6 +216,8 @@ public ResponseEntity<?> consulterTempsEssaiModules(HttpServletRequest request) 
 
         return ResponseEntity.ok(regroupement.values());
     }
+
+
 
 
 }

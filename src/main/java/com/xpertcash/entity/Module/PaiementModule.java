@@ -22,11 +22,8 @@ public class PaiementModule {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-
     private BigDecimal montant;
-
     private String devise = "XOF";
-
     private String nomCompletProprietaire;
     private String emailProprietaireCarte;
     private String pays;
