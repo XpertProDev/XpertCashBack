@@ -27,12 +27,11 @@ public class PaiementModule {
 
     private String devise = "XOF";
 
-    private String nomProprietaire;
-    private String prenomProprietaire;
+    private String nomCompletProprietaire;
     private String emailProprietaireCarte;
+    private String pays;
     private String adresse;
     private String ville;
-
     private LocalDateTime datePaiement;
 
     @ManyToOne

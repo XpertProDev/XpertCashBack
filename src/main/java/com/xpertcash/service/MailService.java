@@ -288,15 +288,15 @@ public class MailService {
                                             String nomModule,
                                             BigDecimal montant,
                                             String devise,
-                                            String nomProprietaire,
-                                            String prenomProprietaire,
+                                            String nomCompletProprietaire,
+                                            String pays,
                                             String adresse,
                                             String ville,
                                             String referenceTransaction,
                                             String nomEntreprise) throws MessagingException {
 
     String subject = "Confirmation d'activation du module : " + nomModule;
-    String htmlContent = generatePaymentConfirmationEmail(nomModule, montant, devise, nomProprietaire, prenomProprietaire, adresse, ville, referenceTransaction, nomEntreprise);
+    String htmlContent = generatePaymentConfirmationEmail(nomModule, montant, devise, nomCompletProprietaire,pays, adresse, ville, referenceTransaction, nomEntreprise);
 
     sendEmail(to, subject, htmlContent);
 }
@@ -306,8 +306,8 @@ public class MailService {
    private String generatePaymentConfirmationEmail(String nomModule,
                                                 BigDecimal montant,
                                                 String devise,
-                                                String nomProprietaire,
-                                                String prenomProprietaire,
+                                                String nomCompletProprietaire,
+                                                String pays,
                                                 String adresse,
                                                 String ville,
                                                 String referenceTransaction,
@@ -321,10 +321,10 @@ return """
                     
                     <h2 style="color: #028313; margin-top: -7px; font-size: 12px;">Confirmation de votre paiement</h2> 
                     
-                    <p><strong>Bonjour %s %s</strong>,</p>
+                    <p><span>Bonjour %s</span>,</p>
                     <p style="font-size: 10px">
-                        Nous vous confirmons la réception de votre paiement pour l'activation du module <strong>%s</strong> 
-                        destiné à l'entreprise <strong>%s</strong>. Voici le récapitulatif de votre transaction :
+                        Nous vous confirmons la réception de votre paiement pour l'activation du module <span>%s</span> 
+                        destiné à l'entreprise <span>%s</span>. Voici le récapitulatif de votre transaction :
                     </p>
 
                     <table style="width: 100%%; border-collapse: collapse; margin: 20px 0;">
@@ -337,37 +337,39 @@ return """
                             <td style="border: 1px solid #ddd; padding: 8px; text-align: right; font-size: 9px">%s %s</td>
                         </tr>
                         <tr>
-                            <td style="border: 1px solid #ddd; padding: 8px; font-size: 10px"><strong>Total</strong></td>
-                            <td style="border: 1px solid #ddd; padding: 8px; text-align: right; font-size: 9px"><strong>%s %s</strong></td>
+                            <td style="border: 1px solid #ddd; padding: 8px; font-size: 10px"><span>Total</span></td>
+                            <td style="border: 1px solid #ddd; padding: 8px; text-align: right; font-size: 9px"><span>%s %s</span></td>
                         </tr>
                     </table>
 
                     <h4 style="text-align: left; font-size: 10px">Coordonnées du titulaire de la carte :</h4>
                     <p style="text-align: left; font-size: 10px;">
-                        <strong>%s %s</strong><br>
+                        <span>%s %s</span><br>
                         %s, %s
                     </p>
 
                     <p style="text-align: left; font-size: 10px;">
-                        <strong>Référence de transaction :</strong> %s
+                        <span>Référence de transaction :</span> %s
                     </p>
 
-                    <p style="font-size: 10px; color: #555; margin-top: 30px;">
+                    <p style="font-size: 9px; color: #555; margin-top: 30px;">
                         Si vous avez des questions, notre équipe reste à votre disposition.
                     </p>
                     
-                    <p style="font-size: 9px; color: #777;">
+                    <p style="font-size: 8px; color: #777;">
                         L'équipe XpertCash
                     </p>
                 </div>
             </body>
         </html>
     """.formatted(
-            prenomProprietaire, nomProprietaire,
-            nomModule, nomEntreprise,
-            nomModule, montant, devise,
+            nomCompletProprietaire, nomModule,
+            nomEntreprise,
+            nomModule,
             montant, devise,
-            prenomProprietaire, nomProprietaire, adresse, ville,
+            montant, devise,
+            nomCompletProprietaire, pays,
+            adresse, ville,
             referenceTransaction
     );
 }

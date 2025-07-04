@@ -24,9 +24,9 @@ public class ModulePaiementService {
      */
     public boolean effectuerPaiement(String numeroCarte, String cvc, String dateExpiration,
                                      BigDecimal montant, Entreprise entreprise, AppModule module,
-                                     String nom, String prenom,String email, String adresse, String ville) {
+                                     String nomCompletProprietaire, String email, String pays, String adresse, String ville) {
 
-        System.out.println("Paiement simulé de " + montant + " par " + prenom + " " + nom);
+        System.out.println("Paiement simulé de " + montant + " par " + nomCompletProprietaire);
 
         // Ici, tu pourrais ajouter des vérifications factices ou logs supplémentaires si nécessaire
         return true;
@@ -36,13 +36,13 @@ public class ModulePaiementService {
      * Historise le paiement et retourne la référence de transaction
      */
     public String enregistrerFacturePaiement(Entreprise entreprise, AppModule module, BigDecimal montant,
-                                             String nom, String prenom,String email, String adresse, String ville) {
+                                             String nomCompletProprietaire, String email,String pays, String adresse, String ville) {
 
         PaiementModule paiement = new PaiementModule();
         paiement.setMontant(montant);
-        paiement.setNomProprietaire(nom);
-        paiement.setPrenomProprietaire(prenom);
+        paiement.setNomCompletProprietaire(nomCompletProprietaire);
         paiement.setEmailProprietaireCarte(email);
+        paiement.setPays(pays);
         paiement.setAdresse(adresse);
         paiement.setVille(ville);
         paiement.setDatePaiement(LocalDateTime.now());
@@ -54,7 +54,7 @@ public class ModulePaiementService {
 
         paiementModuleRepository.save(paiement);
 
-        System.out.println("Facture générée pour : " + nom + " " + prenom + ", " + adresse + ", " + ville);
+        System.out.println("Facture générée pour : " + nomCompletProprietaire + " , "+ pays + ", " + adresse + ", " + ville);
         System.out.println("Référence de transaction : " + referenceTransaction);
 
         return referenceTransaction;

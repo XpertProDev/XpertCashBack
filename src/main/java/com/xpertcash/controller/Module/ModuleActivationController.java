@@ -102,9 +102,9 @@ public ResponseEntity<?> consulterTempsEssaiModules(HttpServletRequest request) 
                 demande.getNumeroCarte(),
                 demande.getCvc(),
                 demande.getDateExpiration(),
-                demande.getNomProprietaire(),
-                demande.getPrenomProprietaire(),
+                demande.getNomCompletProprietaire(),
                 demande.getEmailProprietaireCarte(),
+                demande.getPays(),
                 demande.getAdresse(),
                 demande.getVille()
         );
@@ -204,8 +204,7 @@ public ResponseEntity<?> consulterTempsEssaiModules(HttpServletRequest request) 
             Map<String, Object> paiementData = new HashMap<>();
             paiementData.put("montant", paiement.getMontant());
             paiementData.put("devise", paiement.getDevise());
-            paiementData.put("nomProprietaire", paiement.getNomProprietaire());
-            paiementData.put("prenomProprietaire", paiement.getPrenomProprietaire());
+            paiementData.put("nomCompletProprietaire", paiement.getNomCompletProprietaire());
             paiementData.put("emailProprietaireCarte", paiement.getEmailProprietaireCarte());
             paiementData.put("datePaiement", paiement.getDatePaiement());
             paiementData.put("entrepriseNom", paiement.getEntreprise().getNomEntreprise());

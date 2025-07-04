@@ -191,9 +191,9 @@ public boolean isModuleActifPourEntreprise(Entreprise entreprise, String codeMod
                                         String numeroCarte,
                                         String cvc,
                                         String dateExpiration,
-                                        String nomProprietaire,
-                                        String prenomProprietaire,
+                                        String nomCompletProprietaire,
                                         String emailProprietaireCarte,
+                                        String pays,
                                         String adresse,
                                         String ville) {
 
@@ -232,8 +232,7 @@ public boolean isModuleActifPourEntreprise(Entreprise entreprise, String codeMod
             if (numeroCarte == null || numeroCarte.isBlank() ||
                 cvc == null || cvc.isBlank() ||
                 dateExpiration == null || dateExpiration.isBlank() ||
-                nomProprietaire == null || nomProprietaire.isBlank() ||
-                prenomProprietaire == null || prenomProprietaire.isBlank() ||
+                nomCompletProprietaire == null || nomCompletProprietaire.isBlank() ||
                 emailProprietaireCarte == null || emailProprietaireCarte.isBlank() ||
                 adresse == null || adresse.isBlank() ||
                 ville == null || ville.isBlank()) {
@@ -248,9 +247,9 @@ public boolean isModuleActifPourEntreprise(Entreprise entreprise, String codeMod
                     montant,
                     entreprise,
                     module,
-                    nomProprietaire,
-                    prenomProprietaire,
+                    nomCompletProprietaire,
                     emailProprietaireCarte,
+                    pays,
                     adresse,
                     ville
                 );
@@ -264,9 +263,9 @@ public boolean isModuleActifPourEntreprise(Entreprise entreprise, String codeMod
             entreprise,
             module,
             montant,
-            nomProprietaire,
-            prenomProprietaire,
+            nomCompletProprietaire,
             emailProprietaireCarte,
+            pays,
             adresse,
             ville
         );
@@ -282,16 +281,16 @@ public boolean isModuleActifPourEntreprise(Entreprise entreprise, String codeMod
         // 5. Envoi de l'email de confirmation avec facture
     try {
         mailService.sendConfirmationActivationEmail(
-               emailProprietaireCarte,
-                module.getNom(),
-                module.getPrix(),
-                "XOF",
-                nomProprietaire,
-                prenomProprietaire,
-                adresse,
-                ville,
-                referenceTransaction,
-                entreprise.getNomEntreprise()
+            emailProprietaireCarte,
+            module.getNom(),
+            module.getPrix(),
+            "XOF",
+            nomCompletProprietaire,
+            pays,
+            adresse,
+            ville,
+            referenceTransaction,
+            entreprise.getNomEntreprise()
                 
         );
     } catch (Exception e) {
