@@ -10,6 +10,7 @@ import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.stream.Collectors;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -20,6 +21,7 @@ import com.xpertcash.DTOs.StockHistoryDTO;
 import com.xpertcash.configuration.JwtUtil;
 import com.xpertcash.entity.Boutique;
 import com.xpertcash.entity.Categorie;
+import com.xpertcash.entity.Entreprise;
 import com.xpertcash.entity.Facture;
 import com.xpertcash.entity.FactureProduit;
 import com.xpertcash.entity.Fournisseur;
@@ -43,12 +45,15 @@ import com.xpertcash.repository.StockRepository;
 import com.xpertcash.repository.UniteRepository;
 import com.xpertcash.repository.UsersRepository;
 import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.transaction.annotation.Transactional;
+
 
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.io.IOException;
 import com.xpertcash.service.IMAGES.ImageStorageService;
+
 
 
 
@@ -608,8 +613,6 @@ public class ProduitService {
     return stockRepository.findAll();
 }
  
-
-
     
    // Update Produit
     public ProduitDTO updateProduct(Long produitId, ProduitRequest produitRequest, MultipartFile imageFile, boolean addToStock, HttpServletRequest request)
@@ -783,23 +786,50 @@ public class ProduitService {
     return produitDTO;
 }
 
-    //Methoce Supprime le produit s’il n'est pas en stock
-    public void deleteProduit(Long produitId) {
+    // Méthode pour "supprimer" (mettre dans la corbeille) le produit s'il n'est pas en stock
+   @Transactional
+    public void corbeille(Long produitId, HttpServletRequest request) {
+        // 1. Vérification du produit
         Produit produit = produitRepository.findById(produitId)
                 .orElseThrow(() -> new RuntimeException("Produit non trouvé"));
-    
+
+        // 2. Vérification du token JWT
+        String authHeader = request.getHeader("Authorization");
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            throw new RuntimeException("Token JWT manquant ou mal formaté");
+        }
+        
+        String token = authHeader.substring(7);
+        Long userId = jwtUtil.extractUserId(token);
+        
+        // 3. Vérification de l'utilisateur
+        User user = usersRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+
+        // 4. Vérification des permissions
+        RoleType role = user.getRole().getName();
+        boolean isAuthorized = (role == RoleType.ADMIN || role == RoleType.MANAGER) 
+                            && user.getRole().hasPermission(PermissionType.GERER_PRODUITS);
+        
+        if (!isAuthorized) {
+            throw new RuntimeException("Action non autorisée : permissions insuffisantes");
+        }
+
+        // 5. Validation métier
         if (produit.getEnStock()) {
-            throw new RuntimeException("Impossible de supprimer le produit car il est encore en stock !");
+            throw new RuntimeException("Impossible de supprimer : produit toujours en stock");
         }
-    
-        Stock stock = stockRepository.findByProduit(produit);
-        if (stock != null) {
-            stockRepository.delete(stock);
-        }
-    
-        produitRepository.delete(produit);
-        System.out.println("✅ Produit supprimé avec succès !");
+
+        // 6. Marquage comme supprimé
+        produit.setDeleted(true);
+        produit.setDeletedAt(LocalDateTime.now());
+        produit.setDeletedBy(userId);
+        produitRepository.save(produit);
+        
     }
+
+
+
 
     //Methoce Supprimer uniquement le stock
     public void deleteStock(Long produitId) {
@@ -821,72 +851,193 @@ public class ProduitService {
         }
     }
 
-    //Lister Produit par boutique
+    // Méthode pour restaurer un ou plusieurs produit depuis la corbeille
+    @Transactional
+    public void restaurerProduitsDansBoutique(Long boutiqueId, List<Long> produitIds, HttpServletRequest request) {
+
+        // Vérifications habituelles (token, user, permissions)
+        String authHeader = request.getHeader("Authorization");
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            throw new RuntimeException("Token JWT manquant ou mal formaté");
+        }
+        String token = authHeader.substring(7);
+        Long userId = jwtUtil.extractUserId(token);
+
+        User user = usersRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+
+        RoleType role = user.getRole().getName();
+        boolean isAuthorized = (role == RoleType.ADMIN || role == RoleType.MANAGER) 
+                            && user.getRole().hasPermission(PermissionType.GERER_PRODUITS);
+
+        if (!isAuthorized) {
+            throw new RuntimeException("Action non autorisée : permissions insuffisantes");
+        }
+
+        // Vérification boutique
+        Boutique boutique = boutiqueRepository.findById(boutiqueId)
+                .orElseThrow(() -> new RuntimeException("Boutique non trouvée"));
+
+        for (Long produitId : produitIds) {
+            Produit produit = produitRepository.findById(produitId)
+                    .orElseThrow(() -> new RuntimeException("Produit non trouvé : ID " + produitId));
+
+            // Vérifier que le produit appartient bien à la boutique
+            if (!produit.getBoutique().getId().equals(boutiqueId)) {
+                throw new RuntimeException("Le produit ID " + produitId + " n'appartient pas à la boutique ID " + boutiqueId);
+            }
+
+            if (!produit.getDeleted()) {
+                throw new RuntimeException("Le produit ID " + produitId + " n'est pas dans la corbeille");
+            }
+
+            produit.setDeleted(false);
+            produit.setDeletedAt(null);
+            produit.setDeletedBy(null);
+
+            produitRepository.save(produit);
+        }
+    }
+
+    //Methode pour vide Corbeille dune boutique
+    @Transactional
+public void viderCorbeille(Long boutiqueId, HttpServletRequest request) {
+
+    // Vérification token & user & permissions
+    String authHeader = request.getHeader("Authorization");
+    if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+        throw new RuntimeException("Token JWT manquant ou mal formaté");
+    }
+    String token = authHeader.substring(7);
+    Long userId = jwtUtil.extractUserId(token);
+
+    User user = usersRepository.findById(userId)
+            .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+
+    RoleType role = user.getRole().getName();
+    boolean isAuthorized = (role == RoleType.ADMIN || role == RoleType.MANAGER) 
+                        && user.getRole().hasPermission(PermissionType.GERER_PRODUITS);
+
+    if (!isAuthorized) {
+        throw new RuntimeException("Action non autorisée : permissions insuffisantes");
+    }
+
+    // Vérifier que la boutique existe
+    Boutique boutique = boutiqueRepository.findById(boutiqueId)
+            .orElseThrow(() -> new RuntimeException("Boutique non trouvée"));
+
+    // Récupérer tous les produits supprimés dans la boutique
+    List<Produit> produitsSupprimes = produitRepository.findByBoutiqueIdAndDeletedTrue(boutiqueId);
+
+    // Suppression définitive
+    produitRepository.deleteAll(produitsSupprimes);
+}
+
+    
+    // Méthode programmée pour vider la corbeille automatiquement
+   
+    // Lister Produit par boutique (excluant les produits dans la corbeille)
     public List<ProduitDTO> getProduitsParStock(Long boutiqueId) {
         // Vérifier si la boutique existe et est active
         Boutique boutique = boutiqueRepository.findById(boutiqueId)
                 .orElseThrow(() -> new RuntimeException("Boutique non trouvée"));
-    
+
         if (!boutique.isActif()) {
             throw new RuntimeException("Cette boutique est désactivée, ses produits ne sont pas accessibles !");
         }
-    
-        // Récupérer les produits enStock = false
-        List<Produit> produitsEnStockFalse = produitRepository.findByBoutiqueIdAndEnStockFalse(boutiqueId);
-    
-        // Récupérer les produits enStock = true
-        List<Produit> produitsEnStockTrue = produitRepository.findByBoutiqueIdAndEnStockTrue(boutiqueId);
-    
+
+        // Récupérer les produits non supprimés (deleted = false ou null) et enStock = false
+        List<Produit> produitsEnStockFalse = produitRepository.findByBoutiqueIdAndEnStockFalseAndDeletedFalseOrDeletedIsNull(boutiqueId);
+
+        // Récupérer les produits non supprimés (deleted = false ou null) et enStock = true
+        List<Produit> produitsEnStockTrue = produitRepository.findByBoutiqueIdAndEnStockTrueAndDeletedFalseOrDeletedIsNull(boutiqueId);
+
         // Mapper les entités Produit en ProduitDTO
         List<ProduitDTO> produitsDTO = new ArrayList<>();
-    
+
         // Ajouter les produits enStock = false au DTO
         for (Produit produit : produitsEnStockFalse) {
             produitsDTO.add(convertToProduitDTO(produit));
         }
-    
+
         // Ajouter les produits enStock = true au DTO
         for (Produit produit : produitsEnStockTrue) {
             produitsDTO.add(convertToProduitDTO(produit));
         }
-    
+
         return produitsDTO;
     }
-    
-    // Méthode pour convertir un Produit en ProduitDTO
-    private ProduitDTO convertToProduitDTO(Produit produit) {
-        ProduitDTO produitDTO = new ProduitDTO();
-        produitDTO.setId(produit.getId());
-        produitDTO.setNom(produit.getNom());
-        produitDTO.setPrixVente(produit.getPrixVente());
-        produitDTO.setDescription(produit.getDescription());
-        produitDTO.setCodeGenerique(produit.getCodeGenerique());
-        produitDTO.setPrixAchat(produit.getPrixAchat());
-        produitDTO.setQuantite(produit.getQuantite());
-        produitDTO.setSeuilAlert(produit.getSeuilAlert());
-        produitDTO.setCategorieId(produit.getCategorie() != null ? produit.getCategorie().getId() : null);
-        produitDTO.setUniteId(produit.getUniteDeMesure() != null ? produit.getUniteDeMesure().getId() : null);
-        produitDTO.setCodeBare(produit.getCodeBare());
-        produitDTO.setPhoto(produit.getPhoto());
-        produitDTO.setEnStock(produit.getEnStock());
+        // Méthode pour convertir un Produit en ProduitDTO
+        private ProduitDTO convertToProduitDTO(Produit produit) {
+            ProduitDTO produitDTO = new ProduitDTO();
+            produitDTO.setId(produit.getId());
+            produitDTO.setNom(produit.getNom());
+            produitDTO.setPrixVente(produit.getPrixVente());
+            produitDTO.setDescription(produit.getDescription());
+            produitDTO.setCodeGenerique(produit.getCodeGenerique());
+            produitDTO.setPrixAchat(produit.getPrixAchat());
+            produitDTO.setQuantite(produit.getQuantite());
+            produitDTO.setSeuilAlert(produit.getSeuilAlert());
+            produitDTO.setCategorieId(produit.getCategorie() != null ? produit.getCategorie().getId() : null);
+            produitDTO.setUniteId(produit.getUniteDeMesure() != null ? produit.getUniteDeMesure().getId() : null);
+            produitDTO.setCodeBare(produit.getCodeBare());
+            produitDTO.setPhoto(produit.getPhoto());
+            produitDTO.setEnStock(produit.getEnStock());
 
-        produitDTO.setCreatedAt(produit.getCreatedAt());
-        produitDTO.setLastUpdated(produit.getLastUpdated());
-
-
-        // Récupérer et affecter le nom de la catégorie et de l'unité
-        produitDTO.setNomCategorie(produit.getCategorie() != null ? produit.getCategorie().getNom() : null);
-        produitDTO.setNomUnite(produit.getUniteDeMesure() != null ? produit.getUniteDeMesure().getNom() : null);
-        //Type de produit
-        TypeProduit type = produit.getTypeProduit();
-        produitDTO.setTypeProduit(type != null ? type.name() : null);
-        // Assigner l'ID de la boutique
-        produitDTO.setBoutiqueId(produit.getBoutique() != null ? produit.getBoutique().getId() : null);
+            produitDTO.setCreatedAt(produit.getCreatedAt());
+            produitDTO.setLastUpdated(produit.getLastUpdated());
 
 
-        return produitDTO;
+            // Récupérer et affecter le nom de la catégorie et de l'unité
+            produitDTO.setNomCategorie(produit.getCategorie() != null ? produit.getCategorie().getNom() : null);
+            produitDTO.setNomUnite(produit.getUniteDeMesure() != null ? produit.getUniteDeMesure().getNom() : null);
+            //Type de produit
+            TypeProduit type = produit.getTypeProduit();
+            produitDTO.setTypeProduit(type != null ? type.name() : null);
+            // Assigner l'ID de la boutique
+            produitDTO.setBoutiqueId(produit.getBoutique() != null ? produit.getBoutique().getId() : null);
+
+
+            return produitDTO;
+        }
+
+    // Méthode pour lister les produits dans la corbeille
+@Transactional(readOnly = true)
+public List<ProduitDTO> getProduitsDansCorbeille(Long boutiqueId, HttpServletRequest request) {
+
+    // 1. Vérification du token JWT
+    String authHeader = request.getHeader("Authorization");
+    if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+        throw new RuntimeException("Token JWT manquant ou mal formaté");
     }
 
+    String token = authHeader.substring(7);
+    Long userId = jwtUtil.extractUserId(token);
+
+    // 2. Vérification de l'utilisateur
+    User user = usersRepository.findById(userId)
+            .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+
+    // 3. Vérification des permissions
+    RoleType role = user.getRole().getName();
+    boolean isAuthorized = (role == RoleType.ADMIN || role == RoleType.MANAGER) 
+                        && user.getRole().hasPermission(PermissionType.GERER_PRODUITS);
+
+    if (!isAuthorized) {
+        throw new RuntimeException("Action non autorisée : permissions insuffisantes");
+    }
+
+    // 4. Vérification de la boutique
+    Boutique boutique = boutiqueRepository.findById(boutiqueId)
+            .orElseThrow(() -> new RuntimeException("Boutique non trouvée"));
+
+    // 5. Récupération des produits supprimés
+    List<Produit> produitsSupprimes = produitRepository.findByBoutiqueIdAndDeletedTrue(boutiqueId);
+
+    return produitsSupprimes.stream()
+            .map(this::convertToProduitDTO)
+            .collect(Collectors.toList());
+}
 
 
     //Methode Total des Produit:

@@ -22,6 +22,7 @@ import com.xpertcash.DTOs.RetirerStockRequest;
 import com.xpertcash.DTOs.StockHistoryDTO;
 import com.xpertcash.entity.Facture;
 import com.xpertcash.entity.Stock;
+import com.xpertcash.entity.User;
 import com.xpertcash.exceptions.DuplicateProductException;
 import com.xpertcash.service.ProduitService;
 import com.xpertcash.service.IMAGES.ImageStorageService;
@@ -134,16 +135,100 @@ public class ProduitController {
     }
     
         //Endpoint pour Supprime le produit s’il n'est pas en stock
-        @DeleteMapping("/deleteProduit/{produitId}")
-        public ResponseEntity<String> deleteProduit(@PathVariable Long produitId) {
+        @DeleteMapping("/corbeille/{produitId}")
+        public ResponseEntity<Map<String, Object>> deleteProduit(
+                @PathVariable Long produitId,
+                HttpServletRequest request) {  // Recevoir la requête complète
+            
+            Map<String, Object> response = new HashMap<>();
+            
             try {
-                produitService.deleteProduit(produitId);
-                return ResponseEntity.ok("Produit supprimé avec succès !");
+                produitService.corbeille(produitId, request);  // Passer la requête
+                
+                response.put("status", "success");
+                response.put("message", "Produit déplacé dans la corbeille");
+                return ResponseEntity.ok(response);
+                
             } catch (RuntimeException e) {
-                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
+                response.put("status", "error");
+                response.put("message", e.getMessage());
+                return ResponseEntity.badRequest().body(response);
             }
         }
 
+        //Endpoint pour lister produits en corbeille
+        @GetMapping("/corbeille/{boutiqueId}")
+        public ResponseEntity<?> getProduitsDansCorbeille(
+                @PathVariable Long boutiqueId,
+                HttpServletRequest request) {
+
+            try {
+                List<ProduitDTO> produits = produitService.getProduitsDansCorbeille(boutiqueId, request);
+
+                if (produits.isEmpty()) {
+                    Map<String, Object> response = new HashMap<>();
+                    response.put("status", "info");
+                    response.put("message", "La corbeille est vide pour cette boutique.");
+                    return ResponseEntity.ok(response);
+                }
+
+                return ResponseEntity.ok(produits);
+
+            } catch (RuntimeException e) {
+                Map<String, Object> response = new HashMap<>();
+                response.put("status", "error");
+                response.put("message", e.getMessage());
+                return ResponseEntity.badRequest().body(response);
+            }
+        }
+
+        //Endpoint restaure corbeille
+        @PostMapping("/corbeille/restaurer/{boutiqueId}")
+        public ResponseEntity<Map<String, Object>> restaurerProduitsDansBoutique(
+                @PathVariable Long boutiqueId,
+                @RequestBody List<Long> produitIds,
+                HttpServletRequest request) {
+
+            Map<String, Object> response = new HashMap<>();
+
+            try {
+                produitService.restaurerProduitsDansBoutique(boutiqueId, produitIds, request);
+
+                response.put("status", "success");
+                response.put("message", produitIds.size() + " produit(s) restauré(s) avec succès");
+                return ResponseEntity.ok(response);
+
+            } catch (RuntimeException e) {
+                response.put("status", "error");
+                response.put("message", e.getMessage());
+                return ResponseEntity.badRequest().body(response);
+            }
+        }
+
+        //Endpoint pour vide la corbeille
+        @DeleteMapping("/corbeille/vider/{boutiqueId}")
+        public ResponseEntity<Map<String, Object>> viderCorbeille(
+                @PathVariable Long boutiqueId,
+                HttpServletRequest request) {
+
+            Map<String, Object> response = new HashMap<>();
+
+            try {
+                produitService.viderCorbeille(boutiqueId, request);
+
+                response.put("status", "success");
+                response.put("message", "Corbeille vidée avec succès");
+                return ResponseEntity.ok(response);
+
+            } catch (RuntimeException e) {
+                response.put("status", "error");
+                response.put("message", e.getMessage());
+                return ResponseEntity.badRequest().body(response);
+            }
+        }
+
+
+        
         //Endpoint pour Supprimer uniquement le stock
         @DeleteMapping("/deleteStock/{produitId}")
         public ResponseEntity<String> deleteStock(@PathVariable Long produitId) {

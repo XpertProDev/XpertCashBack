@@ -34,6 +34,11 @@ public class Produit {
 
     private LocalDateTime createdAt;
     private LocalDateTime lastUpdated;
+    private Boolean deleted = false;
+    private LocalDateTime deletedAt;
+
+    @Column(name = "deleted_by")
+    private Long deletedBy;
 
     @Enumerated(EnumType.STRING)
     private TypeProduit typeProduit;
