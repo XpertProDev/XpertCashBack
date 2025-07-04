@@ -247,121 +247,136 @@ public boolean isModuleActifPourEntreprise(Entreprise entreprise, String codeMod
 
     //Activation d'un module pour une entreprise
     @Transactional
-    public void activerModuleAvecPaiement(Long userId,
-                                        String nomModule,
-                                        int dureeMois,
-                                        String numeroCarte,
-                                        String cvc,
-                                        String dateExpiration,
-                                        String nomCompletProprietaire,
-                                        String emailProprietaireCarte,
-                                        String pays,
-                                        String adresse,
-                                        String ville) {
+public void activerModuleAvecPaiement(Long userId,
+                                      String nomModule,
+                                      int dureeMois,
+                                      String numeroCarte,
+                                      String cvc,
+                                      String dateExpiration,
+                                      String nomCompletProprietaire,
+                                      String emailProprietaireCarte,
+                                      String pays,
+                                      String adresse,
+                                      String ville) {
 
-        User user = usersRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+    User user = usersRepository.findById(userId)
+            .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
 
-        Entreprise entreprise = user.getEntreprise();
-        if (entreprise == null) {
-            throw new RuntimeException("Utilisateur non associé à une entreprise");
-        }
-
-        RoleType role = user.getRole().getName();
-        if (role != RoleType.ADMIN) {
-            throw new RuntimeException("Seuls l'ADMIN peuvent activer les modules.");
-        }
-
-        AppModule module = moduleRepository.findByNom(nomModule)
-                .orElseThrow(() -> new RuntimeException("Module '" + nomModule + "' introuvable"));
-
-        if (entreprise.getModulesActifs().contains(module)) {
-            throw new RuntimeException("Ce module est déjà activé pour cette entreprise.");
-        }
-
-        String referenceTransaction = null;
-        BigDecimal montant = BigDecimal.ZERO;
-        BigDecimal prixUnitaire = BigDecimal.ZERO;  // <--- Déclaré ici, accessible partout
-
-        if (module.isPayant()) {
-            prixUnitaire = module.getPrix();
-            if (prixUnitaire == null || prixUnitaire.compareTo(BigDecimal.ZERO) <= 0) {
-                throw new RuntimeException("Prix du module invalide");
-            }
-
-            montant = prixUnitaire.multiply(BigDecimal.valueOf(dureeMois));
-
-            if (numeroCarte == null || numeroCarte.isBlank() ||
-                cvc == null || cvc.isBlank() ||
-                dateExpiration == null || dateExpiration.isBlank() ||
-                nomCompletProprietaire == null || nomCompletProprietaire.isBlank() ||
-                emailProprietaireCarte == null || emailProprietaireCarte.isBlank() ||
-                adresse == null || adresse.isBlank() ||
-                ville == null || ville.isBlank()) {
-                throw new RuntimeException("Toutes les informations de paiement et du propriétaire sont requises.");
-            }
-
-            boolean paiementReussi = modulePaiementService.effectuerPaiement(
-                numeroCarte,
-                cvc,
-                dateExpiration,
-                montant,
-                entreprise,
-                module,
-                nomCompletProprietaire,
-                emailProprietaireCarte,
-                pays,
-                adresse,
-                ville
-            );
-
-            if (!paiementReussi) {
-                throw new RuntimeException("Échec du paiement. Activation annulée.");
-            }
-
-            referenceTransaction = modulePaiementService.enregistrerFacturePaiement(
-                entreprise,
-                module,
-                montant,
-                nomCompletProprietaire,
-                emailProprietaireCarte,
-                pays,
-                adresse,
-                ville
-            );
-        }
-
-        EntrepriseModuleAbonnement abonnement = new EntrepriseModuleAbonnement();
-        abonnement.setEntreprise(entreprise);
-        abonnement.setModule(module);
-        abonnement.setDateDebut(LocalDateTime.now());
-        abonnement.setDateFin(LocalDateTime.now().plusMonths(dureeMois));
-        abonnement.setActif(true);
-
-        entrepriseModuleAbonnementRepository.save(abonnement);
-
-        entreprise.getModulesActifs().add(module);
-        entrepriseRepository.save(entreprise);
-
-        try {
-            mailService.sendConfirmationActivationEmail(
-                emailProprietaireCarte,
-                module.getNom(),
-                prixUnitaire,
-                montant,
-                "XOF",
-                nomCompletProprietaire,
-                pays,
-                adresse,
-                ville,
-                referenceTransaction,
-                entreprise.getNomEntreprise(),
-                dureeMois
-            );
-        } catch (Exception e) {
-            System.err.println("Échec d'envoi de l'email de confirmation : " + e.getMessage());
-        }
+    Entreprise entreprise = user.getEntreprise();
+    if (entreprise == null) {
+        throw new RuntimeException("Utilisateur non associé à une entreprise");
     }
+
+    RoleType role = user.getRole().getName();
+    if (role != RoleType.ADMIN) {
+        throw new RuntimeException("Seuls l'ADMIN peuvent activer les modules.");
+    }
+
+    AppModule module = moduleRepository.findByNom(nomModule)
+            .orElseThrow(() -> new RuntimeException("Module '" + nomModule + "' introuvable"));
+
+    if (entreprise.getModulesActifs().contains(module)) {
+        throw new RuntimeException("Ce module est déjà activé pour cette entreprise.");
+    }
+
+    String referenceTransaction = null;
+    BigDecimal montant = BigDecimal.ZERO;
+    BigDecimal prixUnitaire = BigDecimal.ZERO;
+
+    if (module.isPayant()) {
+        prixUnitaire = module.getPrix();
+        if (prixUnitaire == null || prixUnitaire.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new RuntimeException("Prix du module invalide");
+        }
+
+        montant = prixUnitaire.multiply(BigDecimal.valueOf(dureeMois));
+
+        if (numeroCarte == null || numeroCarte.isBlank() ||
+            cvc == null || cvc.isBlank() ||
+            dateExpiration == null || dateExpiration.isBlank() ||
+            nomCompletProprietaire == null || nomCompletProprietaire.isBlank() ||
+            emailProprietaireCarte == null || emailProprietaireCarte.isBlank() ||
+            adresse == null || adresse.isBlank() ||
+            ville == null || ville.isBlank()) {
+            throw new RuntimeException("Toutes les informations de paiement et du propriétaire sont requises.");
+        }
+
+        boolean paiementReussi = modulePaiementService.effectuerPaiement(
+            numeroCarte,
+            cvc,
+            dateExpiration,
+            montant,
+            entreprise,
+            module,
+            nomCompletProprietaire,
+            emailProprietaireCarte,
+            pays,
+            adresse,
+            ville
+        );
+
+        if (!paiementReussi) {
+            throw new RuntimeException("Échec du paiement. Activation annulée.");
+        }
+
+        referenceTransaction = modulePaiementService.enregistrerFacturePaiement(
+            entreprise,
+            module,
+            montant,
+            nomCompletProprietaire,
+            emailProprietaireCarte,
+            pays,
+            adresse,
+            ville
+        );
+    }
+
+    // Vérifier si un abonnement inactif existe déjà
+    Optional<EntrepriseModuleAbonnement> abonnementInactifOpt = entrepriseModuleAbonnementRepository
+            .findTopByEntrepriseAndModuleOrderByDateFinDesc(entreprise, module);
+
+    if (abonnementInactifOpt.isPresent() && !abonnementInactifOpt.get().isActif()) {
+
+        EntrepriseModuleAbonnement ancienAbonnement = abonnementInactifOpt.get();
+        ancienAbonnement.setActif(true);
+        ancienAbonnement.setDateDebut(LocalDateTime.now());
+        ancienAbonnement.setDateFin(LocalDateTime.now().plusMonths(dureeMois));
+
+        entrepriseModuleAbonnementRepository.save(ancienAbonnement);
+
+    } else {
+        EntrepriseModuleAbonnement nouvelAbonnement = new EntrepriseModuleAbonnement();
+        nouvelAbonnement.setEntreprise(entreprise);
+        nouvelAbonnement.setModule(module);
+        nouvelAbonnement.setDateDebut(LocalDateTime.now());
+        nouvelAbonnement.setDateFin(LocalDateTime.now().plusMonths(dureeMois));
+        nouvelAbonnement.setActif(true);
+
+        entrepriseModuleAbonnementRepository.save(nouvelAbonnement);
+    }
+
+    entreprise.getModulesActifs().add(module);
+    entrepriseRepository.save(entreprise);
+
+    try {
+        mailService.sendConfirmationActivationEmail(
+            emailProprietaireCarte,
+            module.getNom(),
+            prixUnitaire,
+            montant,
+            "XOF",
+            nomCompletProprietaire,
+            pays,
+            adresse,
+            ville,
+            referenceTransaction,
+            entreprise.getNomEntreprise(),
+            dureeMois
+        );
+    } catch (Exception e) {
+        System.err.println("Échec d'envoi de l'email de confirmation : " + e.getMessage());
+    }
+}
 
 
 

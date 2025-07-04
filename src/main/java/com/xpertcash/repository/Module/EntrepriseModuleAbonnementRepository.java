@@ -28,8 +28,9 @@ public interface EntrepriseModuleAbonnementRepository extends JpaRepository<Entr
     Optional<EntrepriseModuleAbonnement> findByEntrepriseAndModuleAndActifTrue(Entreprise entreprise, AppModule module);
 
 
+    Optional<EntrepriseModuleAbonnement> findTopByEntrepriseAndModuleOrderByDateFinDesc(Entreprise entreprise, AppModule module);
 
-List<EntrepriseModuleAbonnement> findByActifTrueAndDateFinBefore(LocalDateTime date);
+    List<EntrepriseModuleAbonnement> findByActifTrueAndDateFinBefore(LocalDateTime date);
 
 
 
