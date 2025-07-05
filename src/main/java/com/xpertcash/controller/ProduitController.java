@@ -228,7 +228,6 @@ public class ProduitController {
         }
 
 
-        
         //Endpoint pour Supprimer uniquement le stock
         @DeleteMapping("/deleteStock/{produitId}")
         public ResponseEntity<String> deleteStock(@PathVariable Long produitId) {
@@ -240,11 +239,20 @@ public class ProduitController {
             }
         }
 
-        //Lister les produit
+     // Lister les produits par boutique
         @GetMapping("/produits/{boutiqueId}/stock")
-        public ResponseEntity<?> getProduitsParStock(@PathVariable Long boutiqueId) {
+        public ResponseEntity<?> getProduitsParStock(@PathVariable Long boutiqueId, HttpServletRequest request) {
             try {
-                List<ProduitDTO> produitsDTO = produitService.getProduitsParStock(boutiqueId);
+                // Supposons que l'ID utilisateur est injecté via le middleware de sécurité (ex : JWT)
+                Long userId = (Long) request.getAttribute("userId");
+
+                if (userId == null) {
+                    Map<String, String> errorResponse = new HashMap<>();
+                    errorResponse.put("error", "Utilisateur non authentifié.");
+                    return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(errorResponse);
+                }
+
+                List<ProduitDTO> produitsDTO = produitService.getProduitsParStock(boutiqueId, userId);
                 return ResponseEntity.ok(produitsDTO);
 
             } catch (RuntimeException e) {
@@ -260,6 +268,7 @@ public class ProduitController {
                 return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
             }
         }
+
 
 
 

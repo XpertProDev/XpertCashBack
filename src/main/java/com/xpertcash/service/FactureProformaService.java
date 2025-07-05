@@ -640,7 +640,7 @@ public class FactureProformaService {
             throw new RuntimeException("Utilisateur n'est associé à aucune entreprise");
         }
     
-        Long entrepriseId = entreprise.getId();
+        Long entrepriseId = entreprise.getId(); 
         List<FactureProForma> factures;
 
         // S’il est ADMIN ou MANAGER, ou sil a la permisson il peut voir toutes les factures de son entreprise

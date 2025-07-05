@@ -148,7 +148,7 @@ public class ProduitService {
         // Pour chaque boutique et sa quantité spécifique
         for (int i = 0; i < boutiqueIds.size(); i++) {
             Long boutiqueId = boutiqueIds.get(i);
-            Integer quantite = quantites.get(i); // Quantité spécifique à cette boutique
+            Integer quantite = quantites.get(i);
             Integer seuil = seuilAlert.get(i);
 
             Boutique boutique = boutiqueRepository.findById(boutiqueId)
@@ -177,7 +177,7 @@ public class ProduitService {
             produit.setDescription(produitRequest.getDescription());
             produit.setPrixVente(produitRequest.getPrixVente());
             produit.setPrixAchat(produitRequest.getPrixAchat());
-            produit.setQuantite(quantite != null ? quantite : 0); // Utiliser la quantité pour chaque boutique
+            produit.setQuantite(quantite != null ? quantite : 0);
             produit.setSeuilAlert(seuil != null ? seuil : 0);
             produit.setTypeProduit(produitRequest.getTypeProduit());
             produit.setCategorie(categorie);
@@ -263,8 +263,6 @@ public class ProduitService {
         return code;
     }
      
-    
-
     //Methode pour ajuster la quantiter du produit en stock
     public Facture ajouterStock(Long boutiqueId, Map<Long, Integer> produitsQuantites, String description, String codeFournisseur, Long fournisseurId, HttpServletRequest request) {
 
@@ -471,7 +469,6 @@ public class ProduitService {
             return 0; // en cas d'erreur de parsing
         }
     }
-
 
 
     // Méthode pour enregistrer une facture
@@ -828,9 +825,6 @@ public class ProduitService {
         
     }
 
-
-
-
     //Methoce Supprimer uniquement le stock
     public void deleteStock(Long produitId) {
         Produit produit = produitRepository.findById(produitId)
@@ -901,7 +895,7 @@ public class ProduitService {
 
     //Methode pour vide Corbeille dune boutique
     @Transactional
-public void viderCorbeille(Long boutiqueId, HttpServletRequest request) {
+    public void viderCorbeille(Long boutiqueId, HttpServletRequest request) {
 
     // Vérification token & user & permissions
     String authHeader = request.getHeader("Authorization");
@@ -932,38 +926,57 @@ public void viderCorbeille(Long boutiqueId, HttpServletRequest request) {
     // Suppression définitive
     produitRepository.deleteAll(produitsSupprimes);
 }
+    
     // Lister Produit par boutique (excluant les produits dans la corbeille)
-    public List<ProduitDTO> getProduitsParStock(Long boutiqueId) {
-        // Vérifier si la boutique existe et est active
-        Boutique boutique = boutiqueRepository.findById(boutiqueId)
-                .orElseThrow(() -> new RuntimeException("Boutique non trouvée"));
+public List<ProduitDTO> getProduitsParStock(Long boutiqueId, Long userId) {
+    User user = usersRepository.findById(userId)
+            .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
 
-        if (!boutique.isActif()) {
-            throw new RuntimeException("Cette boutique est désactivée, ses produits ne sont pas accessibles !");
-        }
+    Boutique boutique = boutiqueRepository.findById(boutiqueId)
+        .orElseThrow(() -> new RuntimeException("Boutique non trouvée"));
 
-        // Récupérer les produits non supprimés (deleted = false ou null) et enStock = false
-        List<Produit> produitsEnStockFalse = produitRepository.findByBoutiqueIdAndEnStockFalseAndDeletedFalseOrDeletedIsNull(boutiqueId);
-
-        // Récupérer les produits non supprimés (deleted = false ou null) et enStock = true
-        List<Produit> produitsEnStockTrue = produitRepository.findByBoutiqueIdAndEnStockTrueAndDeletedFalseOrDeletedIsNull(boutiqueId);
-
-        // Mapper les entités Produit en ProduitDTO
-        List<ProduitDTO> produitsDTO = new ArrayList<>();
-
-        // Ajouter les produits enStock = false au DTO
-        for (Produit produit : produitsEnStockFalse) {
-            produitsDTO.add(convertToProduitDTO(produit));
-        }
-
-        // Ajouter les produits enStock = true au DTO
-        for (Produit produit : produitsEnStockTrue) {
-            produitsDTO.add(convertToProduitDTO(produit));
-        }
-
-        return produitsDTO;
+    if (!boutique.isActif()) {
+        throw new RuntimeException("Cette boutique est désactivée, ses produits ne sont pas accessibles !");
     }
-        
+
+    // Vérification que la boutique appartient à l'entreprise de l'utilisateur
+    if (!boutique.getEntreprise().getId().equals(user.getEntreprise().getId())) {
+        throw new RuntimeException("Accès interdit : cette boutique n'appartient pas à votre entreprise.");
+    }
+
+    // Vérifier rôle et permissions
+    RoleType role = user.getRole().getName();
+    boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
+    boolean hasGestionFacturePermission = user.getRole().hasPermission(PermissionType.Gestion_Facture);
+
+    // Si Admin, Manager ou permission spécifique, accès aux produits de la boutique de leur entreprise
+    if (isAdminOrManager || hasGestionFacturePermission) {
+        return recupererProduitsDTO(boutiqueId);
+    }
+
+    // Si utilisateur standard, accès uniquement à la boutique de leur entreprise (déjà vérifié)
+    return recupererProduitsDTO(boutiqueId);
+}
+
+/**
+ * Récupère et mappe les produits d'une boutique
+ */
+private List<ProduitDTO> recupererProduitsDTO(Long boutiqueId) {
+    List<ProduitDTO> produitsDTO = new ArrayList<>();
+
+    List<Produit> produitsEnStockFalse = produitRepository.findByBoutiqueIdAndEnStockFalseAndDeletedFalseOrDeletedIsNull(boutiqueId);
+    for (Produit produit : produitsEnStockFalse) {
+        produitsDTO.add(convertToProduitDTO(produit));
+    }
+
+    List<Produit> produitsEnStockTrue = produitRepository.findByBoutiqueIdAndEnStockTrueAndDeletedFalseOrDeletedIsNull(boutiqueId);
+    for (Produit produit : produitsEnStockTrue) {
+        produitsDTO.add(convertToProduitDTO(produit));
+    }
+
+    return produitsDTO;
+}
+
     // Méthode pour convertir un Produit en ProduitDTO
         private ProduitDTO convertToProduitDTO(Produit produit) {
             ProduitDTO produitDTO = new ProduitDTO();
@@ -999,8 +1012,8 @@ public void viderCorbeille(Long boutiqueId, HttpServletRequest request) {
         }
 
     // Méthode pour lister les produits dans la corbeille
-@Transactional(readOnly = true)
-public List<ProduitDTO> getProduitsDansCorbeille(Long boutiqueId, HttpServletRequest request) {
+    @Transactional(readOnly = true)
+    public List<ProduitDTO> getProduitsDansCorbeille(Long boutiqueId, HttpServletRequest request) {
 
     // 1. Vérification du token JWT
     String authHeader = request.getHeader("Authorization");
@@ -1035,7 +1048,6 @@ public List<ProduitDTO> getProduitsDansCorbeille(Long boutiqueId, HttpServletReq
             .map(this::convertToProduitDTO)
             .collect(Collectors.toList());
 }
-
 
     //Methode Total des Produit:
     public Map<String, Integer> getTotalQuantitesParStock(Long boutiqueId) {
@@ -1120,45 +1132,45 @@ public List<ProduitDTO> getProduitsDansCorbeille(Long boutiqueId, HttpServletReq
         return dto;
     }
     
-        // Méthode pour récupérer tous les produits de toutes les boutiques d'une entreprise
-        public List<ProduitDTO> getProduitsParEntreprise(Long entrepriseId) {
-            // Récupérer tous les produits de l'entreprise
-            List<Produit> produits = produitRepository.findByEntrepriseId(entrepriseId);
-        
-            // Regrouper les produits par codeGenerique
-            Map<String, ProduitDTO> produitsUniques = new HashMap<>();
-        
-            for (Produit produit : produits) {
-                if (produit.getBoutique() != null && produit.getBoutique().isActif()) {
-                    String codeGenerique = produit.getCodeGenerique();
-        
-                    // Vérifier si ce produit unique existe déjà dans la map
-                    if (!produitsUniques.containsKey(codeGenerique)) {
-                        ProduitDTO produitDTO = convertToProduitDTO(produit);
-                        produitDTO.setBoutiques(new ArrayList<>()); // Initialiser la liste des boutiques
-                        produitDTO.setQuantite(0); // Initialiser la quantité totale à 0
-                        produitsUniques.put(codeGenerique, produitDTO);
-                    }
-        
-                    // Ajouter la boutique et sa quantité
-                    Boutique boutique = produit.getBoutique();
-                    Map<String, Object> boutiqueInfo = new HashMap<>();
-                    boutiqueInfo.put("nom", boutique.getNomBoutique());
-                    boutiqueInfo.put("id", boutique.getId());
-                    boutiqueInfo.put("quantite", produit.getQuantite());
-        
-                    produitsUniques.get(codeGenerique).getBoutiques().add(boutiqueInfo);
-        
-                    // Additionner la quantité totale
-                    produitsUniques.get(codeGenerique).setQuantite(
-                        produitsUniques.get(codeGenerique).getQuantite() + produit.getQuantite()
-                    );
+    // Méthode pour récupérer tous les produits de toutes les boutiques d'une entreprise
+    public List<ProduitDTO> getProduitsParEntreprise(Long entrepriseId) {
+        // Récupérer tous les produits de l'entreprise
+        List<Produit> produits = produitRepository.findByEntrepriseId(entrepriseId);
+    
+        // Regrouper les produits par codeGenerique
+        Map<String, ProduitDTO> produitsUniques = new HashMap<>();
+    
+        for (Produit produit : produits) {
+            if (produit.getBoutique() != null && produit.getBoutique().isActif()) {
+                String codeGenerique = produit.getCodeGenerique();
+    
+                // Vérifier si ce produit unique existe déjà dans la map
+                if (!produitsUniques.containsKey(codeGenerique)) {
+                    ProduitDTO produitDTO = convertToProduitDTO(produit);
+                    produitDTO.setBoutiques(new ArrayList<>()); // Initialiser la liste des boutiques
+                    produitDTO.setQuantite(0); // Initialiser la quantité totale à 0
+                    produitsUniques.put(codeGenerique, produitDTO);
                 }
+    
+                // Ajouter la boutique et sa quantité
+                Boutique boutique = produit.getBoutique();
+                Map<String, Object> boutiqueInfo = new HashMap<>();
+                boutiqueInfo.put("nom", boutique.getNomBoutique());
+                boutiqueInfo.put("id", boutique.getId());
+                boutiqueInfo.put("quantite", produit.getQuantite());
+    
+                produitsUniques.get(codeGenerique).getBoutiques().add(boutiqueInfo);
+    
+                // Additionner la quantité totale
+                produitsUniques.get(codeGenerique).setQuantite(
+                    produitsUniques.get(codeGenerique).getQuantite() + produit.getQuantite()
+                );
             }
-        
-            return new ArrayList<>(produitsUniques.values());
         }
-        
+    
+        return new ArrayList<>(produitsUniques.values());
+    }
+    
 
     
 

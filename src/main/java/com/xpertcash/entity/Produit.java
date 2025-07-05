@@ -27,7 +27,7 @@ public class Produit {
     private Integer seuilAlert;
     private String description;
     @Column(nullable = false)
-    private String codeGenerique; // Conserver le code générique unique par boutique
+    private String codeGenerique;
     private String codeBare;
     private String photo;
     private Boolean enStock = false;
