@@ -932,10 +932,6 @@ public void viderCorbeille(Long boutiqueId, HttpServletRequest request) {
     // Suppression définitive
     produitRepository.deleteAll(produitsSupprimes);
 }
-
-    
-    // Méthode programmée pour vider la corbeille automatiquement
-   
     // Lister Produit par boutique (excluant les produits dans la corbeille)
     public List<ProduitDTO> getProduitsParStock(Long boutiqueId) {
         // Vérifier si la boutique existe et est active
@@ -967,7 +963,8 @@ public void viderCorbeille(Long boutiqueId, HttpServletRequest request) {
 
         return produitsDTO;
     }
-        // Méthode pour convertir un Produit en ProduitDTO
+        
+    // Méthode pour convertir un Produit en ProduitDTO
         private ProduitDTO convertToProduitDTO(Produit produit) {
             ProduitDTO produitDTO = new ProduitDTO();
             produitDTO.setId(produit.getId());
