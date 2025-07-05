@@ -189,7 +189,7 @@ public boolean isModuleActifPourEntreprise(Entreprise entreprise, String codeMod
         essai.setEntreprise(entreprise);
         essai.setModule(module);
         essai.setDateDebutEssai(now);
-        essai.setDateFinEssai(now.plusDays(1));
+        essai.setDateFinEssai(now.plusDays(30));
         essais.add(essai);
     }
 
@@ -450,7 +450,7 @@ public void activerModuleAvecPaiement(Long userId,
     essai.setEntreprise(entreprise);
     essai.setModule(module);
     essai.setDateDebutEssai(now);
-    essai.setDateFinEssai(now.plusDays(2));
+    essai.setDateFinEssai(now.plusDays(30));
 
     entrepriseModuleEssaiRepository.save(essai);
 }

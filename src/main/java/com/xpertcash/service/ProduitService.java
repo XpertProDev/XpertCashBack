@@ -817,7 +817,7 @@ public class ProduitService {
 
         // 5. Validation métier
         if (produit.getEnStock()) {
-            throw new RuntimeException("Impossible de supprimer : produit toujours en stock");
+            throw new RuntimeException("⚠️ Impossible de supprimer le produit en stock");
         }
 
         // 6. Marquage comme supprimé

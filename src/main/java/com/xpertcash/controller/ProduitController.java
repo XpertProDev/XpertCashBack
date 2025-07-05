@@ -138,12 +138,12 @@ public class ProduitController {
         @DeleteMapping("/corbeille/{produitId}")
         public ResponseEntity<Map<String, Object>> deleteProduit(
                 @PathVariable Long produitId,
-                HttpServletRequest request) {  // Recevoir la requête complète
+                HttpServletRequest request) { 
             
             Map<String, Object> response = new HashMap<>();
             
             try {
-                produitService.corbeille(produitId, request);  // Passer la requête
+                produitService.corbeille(produitId, request);
                 
                 response.put("status", "success");
                 response.put("message", "Produit déplacé dans la corbeille");
