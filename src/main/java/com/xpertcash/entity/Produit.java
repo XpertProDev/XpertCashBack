@@ -27,13 +27,18 @@ public class Produit {
     private Integer seuilAlert;
     private String description;
     @Column(nullable = false)
-    private String codeGenerique; // Conserver le code générique unique par boutique
+    private String codeGenerique;
     private String codeBare;
     private String photo;
     private Boolean enStock = false;
 
     private LocalDateTime createdAt;
     private LocalDateTime lastUpdated;
+    private Boolean deleted = false;
+    private LocalDateTime deletedAt;
+
+    @Column(name = "deleted_by")
+    private Long deletedBy;
 
     @Enumerated(EnumType.STRING)
     private TypeProduit typeProduit;

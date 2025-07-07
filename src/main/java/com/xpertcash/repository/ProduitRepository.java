@@ -1,4 +1,5 @@
 package com.xpertcash.repository;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -44,6 +45,20 @@ public interface ProduitRepository extends JpaRepository<Produit, Long> {
 
     @Query("SELECT p FROM Produit p WHERE p.boutique.id = :boutiqueId AND p.id IN :produitIds")
     List<Produit> findByBoutiqueAndIdIn(@Param("boutiqueId") Long boutiqueId, @Param("produitIds") List<Long> produitIds);
+
+    List<Produit> findByDeletedTrueAndDeletedAtBefore(LocalDateTime date);
+
+    // Pour les produits non supprimés et enStock = false
+    List<Produit> findByBoutiqueIdAndEnStockFalseAndDeletedFalseOrDeletedIsNull(Long boutiqueId);
+    
+    // Pour les produits non supprimés et enStock = true
+    List<Produit> findByBoutiqueIdAndEnStockTrueAndDeletedFalseOrDeletedIsNull(Long boutiqueId);
+
+    List<Produit> findByBoutiqueIdAndDeletedTrue(Long boutiqueId);
+
+    
+
+    
 
 
 

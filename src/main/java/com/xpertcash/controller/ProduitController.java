@@ -22,6 +22,7 @@ import com.xpertcash.DTOs.RetirerStockRequest;
 import com.xpertcash.DTOs.StockHistoryDTO;
 import com.xpertcash.entity.Facture;
 import com.xpertcash.entity.Stock;
+import com.xpertcash.entity.User;
 import com.xpertcash.exceptions.DuplicateProductException;
 import com.xpertcash.service.ProduitService;
 import com.xpertcash.service.IMAGES.ImageStorageService;
@@ -134,15 +135,98 @@ public class ProduitController {
     }
     
         //Endpoint pour Supprime le produit s’il n'est pas en stock
-        @DeleteMapping("/deleteProduit/{produitId}")
-        public ResponseEntity<String> deleteProduit(@PathVariable Long produitId) {
+        @DeleteMapping("/corbeille/{produitId}")
+        public ResponseEntity<Map<String, Object>> deleteProduit(
+                @PathVariable Long produitId,
+                HttpServletRequest request) { 
+            
+            Map<String, Object> response = new HashMap<>();
+            
             try {
-                produitService.deleteProduit(produitId);
-                return ResponseEntity.ok("Produit supprimé avec succès !");
+                produitService.corbeille(produitId, request);
+                
+                response.put("status", "success");
+                response.put("message", "Produit déplacé dans la corbeille");
+                return ResponseEntity.ok(response);
+                
             } catch (RuntimeException e) {
-                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
+                response.put("status", "error");
+                response.put("message", e.getMessage());
+                return ResponseEntity.badRequest().body(response);
             }
         }
+
+        //Endpoint pour lister produits en corbeille
+        @GetMapping("/corbeille/{boutiqueId}")
+        public ResponseEntity<?> getProduitsDansCorbeille(
+                @PathVariable Long boutiqueId,
+                HttpServletRequest request) {
+
+            try {
+                List<ProduitDTO> produits = produitService.getProduitsDansCorbeille(boutiqueId, request);
+
+                if (produits.isEmpty()) {
+                    Map<String, Object> response = new HashMap<>();
+                    response.put("status", "info");
+                    response.put("message", "La corbeille est vide pour cette boutique.");
+                    return ResponseEntity.ok(response);
+                }
+
+                return ResponseEntity.ok(produits);
+
+            } catch (RuntimeException e) {
+                Map<String, Object> response = new HashMap<>();
+                response.put("status", "error");
+                response.put("message", e.getMessage());
+                return ResponseEntity.badRequest().body(response);
+            }
+        }
+
+        //Endpoint restaure corbeille
+        @PostMapping("/corbeille/restaurer/{boutiqueId}")
+        public ResponseEntity<Map<String, Object>> restaurerProduitsDansBoutique(
+                @PathVariable Long boutiqueId,
+                @RequestBody List<Long> produitIds,
+                HttpServletRequest request) {
+
+            Map<String, Object> response = new HashMap<>();
+
+            try {
+                produitService.restaurerProduitsDansBoutique(boutiqueId, produitIds, request);
+
+                response.put("status", "success");
+                response.put("message", produitIds.size() + " produit(s) restauré(s) avec succès");
+                return ResponseEntity.ok(response);
+
+            } catch (RuntimeException e) {
+                response.put("status", "error");
+                response.put("message", e.getMessage());
+                return ResponseEntity.badRequest().body(response);
+            }
+        }
+
+        //Endpoint pour vide la corbeille
+        @DeleteMapping("/corbeille/vider/{boutiqueId}")
+        public ResponseEntity<Map<String, Object>> viderCorbeille(
+                @PathVariable Long boutiqueId,
+                HttpServletRequest request) {
+
+            Map<String, Object> response = new HashMap<>();
+
+            try {
+                produitService.viderCorbeille(boutiqueId, request);
+
+                response.put("status", "success");
+                response.put("message", "Corbeille vidée avec succès");
+                return ResponseEntity.ok(response);
+
+            } catch (RuntimeException e) {
+                response.put("status", "error");
+                response.put("message", e.getMessage());
+                return ResponseEntity.badRequest().body(response);
+            }
+        }
+
 
         //Endpoint pour Supprimer uniquement le stock
         @DeleteMapping("/deleteStock/{produitId}")
@@ -155,11 +239,20 @@ public class ProduitController {
             }
         }
 
-        //Lister les produit
+     // Lister les produits par boutique
         @GetMapping("/produits/{boutiqueId}/stock")
-        public ResponseEntity<?> getProduitsParStock(@PathVariable Long boutiqueId) {
+        public ResponseEntity<?> getProduitsParStock(@PathVariable Long boutiqueId, HttpServletRequest request) {
             try {
-                List<ProduitDTO> produitsDTO = produitService.getProduitsParStock(boutiqueId);
+                // Supposons que l'ID utilisateur est injecté via le middleware de sécurité (ex : JWT)
+                Long userId = (Long) request.getAttribute("userId");
+
+                if (userId == null) {
+                    Map<String, String> errorResponse = new HashMap<>();
+                    errorResponse.put("error", "Utilisateur non authentifié.");
+                    return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(errorResponse);
+                }
+
+                List<ProduitDTO> produitsDTO = produitService.getProduitsParStock(boutiqueId, userId);
                 return ResponseEntity.ok(produitsDTO);
 
             } catch (RuntimeException e) {
@@ -175,6 +268,7 @@ public class ProduitController {
                 return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
             }
         }
+
 
 
 
@@ -195,10 +289,11 @@ public class ProduitController {
 
         //Get Produit by id
         @GetMapping("/produits/{produitId}")
-        public ResponseEntity<ProduitDTO> getProduitById(@PathVariable("produitId") Long produitId) {
-            ProduitDTO produitDTO = produitService.getProduitById(produitId);
+        public ResponseEntity<ProduitDTO> getProduitById(@PathVariable("produitId") Long produitId, HttpServletRequest request) {
+            ProduitDTO produitDTO = produitService.getProduitById(produitId, request);
             return ResponseEntity.ok(produitDTO);
-        } 
+        }
+
         
 
         //Endpoint pour ajuster la quantiter du produit en stock
@@ -233,18 +328,11 @@ public class ProduitController {
         
             // Endpoint Stock Historique
             @GetMapping("/stockhistorique/{produitId}")
-            public ResponseEntity<?> getStockHistory(@PathVariable Long produitId) {
-                try {
-                    List<StockHistoryDTO> stockHistoryDTOs = produitService.getStockHistory(produitId);
-                    return ResponseEntity.ok(stockHistoryDTOs);
-                } catch (NoSuchElementException e) {
-                    return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                            .body(Collections.singletonMap("message", "Produit non trouvé avec l'ID : " + produitId));
-                } catch (RuntimeException e) {
-                    return ResponseEntity.status(HttpStatus.OK)
-                            .body(Collections.singletonMap("message", e.getMessage()));
-                }
+                    public ResponseEntity<List<StockHistoryDTO>> getStockHistory(@PathVariable Long produitId, HttpServletRequest request) {
+                List<StockHistoryDTO> history = produitService.getStockHistory(produitId, request);
+                return ResponseEntity.ok(history);
             }
+            
 
             // Endpoint pour récupérer l'historique général des mouvements de stock
             @GetMapping("/stockhistorique")

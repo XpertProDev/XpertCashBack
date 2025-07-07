@@ -8,10 +8,14 @@ import jakarta.mail.util.ByteArrayDataSource;
 import java.io.IOException;
 import java.io.InputStream;
 import java.math.BigDecimal;
+import java.text.DecimalFormat;
+import java.text.NumberFormat;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
+import java.util.function.Function;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -131,7 +135,7 @@ public class MailService {
                                 Activer mon compte
                             </a>
                             <p style="font-size: 12px; color: #555; margin-top: 30px;">Si vous n'avez pas effectué cette demande, veuillez ignorer cet e-mail.</p>
-                            <p style="font-size: 10px; color: #777;">L'équipe XpertCash</p>
+                            <p style="font-size: 10px; color: #777;">L'équipe Tchakeda</p>
                         </div>
                     </body>
             </html>
@@ -159,7 +163,7 @@ public class MailService {
                 <a href="http://localhost:8080/login" style="display: inline-block; padding: 12px 20px; background-color: #007bff; color: white; text-decoration: none; border-radius: 5px; font-weight: bold; margin-top: 10px;">
                     Se connecter
                 </a>
-                <p style="font-size: 10px; color: #777;">L'équipe XpertCash</p>
+                <p style="font-size: 10px; color: #777;">L'équipe Tchakeda</p>
             </div>
         </body>
         </html>
@@ -213,7 +217,7 @@ public class MailService {
                         </h3>
                         <p>Ce code est valable pendant <strong>10 minutes</strong>.</p>
                         <p style="font-size: 12px; color: #555; margin-top: 30px;">Si vous n'avez pas effectué cette demande, veuillez ignorer cet e-mail.</p>
-                       <p style="font-size: 10px; color: #777;">L'équipe XpertCash</p>
+                       <p style="font-size: 10px; color: #777;">L'équipe Tchakeda</p>
                     </div>
                 </body>
             </html>
@@ -236,7 +240,7 @@ public class MailService {
                     <p>La date de relance prévue était : <strong>%s</strong>.</p>
                     <p>Veuillez effectuer la relance.</p>
                     <p style="font-size: 12px; color: #555; margin-top: 30px;">Si vous n'avez pas effectué cette demande, veuillez ignorer cet e-mail.</p>
-                    <p style="font-size: 10px; color: #777; margin-top: 30px;">L'équipe XpertCash</p>
+                    <p style="font-size: 10px; color: #777; margin-top: 30px;">L'équipe Tchakeda</p>
                 </div>
             </body>
             </html>
@@ -317,17 +321,30 @@ public class MailService {
 
 
     //mail pour notifier apres achat de module
-    private String generatePaymentConfirmationEmail(String nomModule,
-                                                BigDecimal prixUnitaire,
-                                                BigDecimal montantTotal,
-                                                String devise,
-                                                String nomCompletProprietaire,
-                                                String pays,
-                                                String adresse,
-                                                String ville,
-                                                String referenceTransaction,
-                                                String nomEntreprise,
-                                                int dureeMois) {
+   private String generatePaymentConfirmationEmail(String nomModule,
+                                            BigDecimal prixUnitaire,
+                                            BigDecimal montantTotal,
+                                            String devise,
+                                            String nomCompletProprietaire,
+                                            String pays,
+                                            String adresse,
+                                            String ville,
+                                            String referenceTransaction,
+                                            String nomEntreprise,
+                                            int dureeMois) {
+    // Fonction pour formater les nombres avec séparateur de milliers et sans décimales inutiles
+    Function<BigDecimal, String> formatMontant = (montant) -> {
+        DecimalFormat formatter = (DecimalFormat) NumberFormat.getInstance(Locale.FRENCH);
+        formatter.applyPattern("#,##0.##");
+        return formatter.format(montant)
+                     .replace(",", " ")
+                     .replace(".00", "")
+                     .replace(",00", ""); // Double sécurité pour les différents locales
+    };
+
+    String prixFormate = formatMontant.apply(prixUnitaire);
+    String totalFormate = formatMontant.apply(montantTotal);
+
     return """
     <html>
         <body style="font-family: Arial, sans-serif; background-color: #f4f4f4; padding: 20px;">
@@ -346,18 +363,22 @@ public class MailService {
                 <table style="width: 100%%; border-collapse: collapse; margin: 20px 0;">
                     <tr style="background-color: #f2f2f2;">
                         <th style="border: 1px solid #ddd; padding: 8px; text-align: left; font-size: 10px">Description</th>
+                        <th style="border: 1px solid #ddd; padding: 8px; text-align: center; font-size: 10px">Durée</th>
                         <th style="border: 1px solid #ddd; padding: 8px; text-align: right; font-size: 10px">Montant</th>
                     </tr>
                     <tr>
-                        <td style="border: 1px solid #ddd; padding: 8px; font-size: 10px">Prix unitaire du module : %s</td>
+                        <td style="border: 1px solid #ddd; padding: 8px; font-size: 10px">Prix unitaire du module</td>
+                        <td style="border: 1px solid #ddd; padding: 8px; text-align: center; font-size: 9px">-</td>
                         <td style="border: 1px solid #ddd; padding: 8px; text-align: right; font-size: 9px">%s %s</td>
                     </tr>
                     <tr>
-                        <td style="border: 1px solid #ddd; padding: 8px; font-size: 10px">Durée de l'abonnement</td>
-                        <td style="border: 1px solid #ddd; padding: 8px; text-align: right; font-size: 9px">%s mois</td>
+                        <td style="border: 1px solid #ddd; padding: 8px; font-size: 10px">Abonnement</td>
+                        <td style="border: 1px solid #ddd; padding: 8px; text-align: center; font-size: 9px">%s mois</td>
+                        <td style="border: 1px solid #ddd; padding: 8px; text-align: right; font-size: 9px">-</td>
                     </tr>
                     <tr>
                         <td style="border: 1px solid #ddd; padding: 8px; font-size: 10px"><strong>Total</strong></td>
+                        <td style="border: 1px solid #ddd; padding: 8px; text-align: center; font-size: 9px">-</td>
                         <td style="border: 1px solid #ddd; padding: 8px; text-align: right; font-size: 9px"><strong>%s %s</strong></td>
                     </tr>
                 </table>
@@ -377,7 +398,7 @@ public class MailService {
                 </p>
                 
                 <p style="font-size: 8px; color: #777;">
-                    L'équipe XpertCash
+                    L'équipe Tchakeda
                 </p>
             </div>
         </body>
@@ -386,16 +407,16 @@ public class MailService {
         nomCompletProprietaire,
         nomModule,
         nomEntreprise,
-        prixUnitaire.toPlainString(),
-        prixUnitaire.toPlainString(), devise,
+        prixFormate,
+        devise,
         String.valueOf(dureeMois),
-        montantTotal.toPlainString(), devise,
+        totalFormate, 
+        devise,
         nomCompletProprietaire,
         pays, adresse,
         ville,
         referenceTransaction
     );
 }
-
 
 }

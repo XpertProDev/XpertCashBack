@@ -22,5 +22,6 @@ public class ProduitFactureDTO {
         this.prixUnitair = produit.getPrixVente();
         this.quantite = quantite;
         this.total = this.prixUnitair * this.quantite;
+        
     }
 }
