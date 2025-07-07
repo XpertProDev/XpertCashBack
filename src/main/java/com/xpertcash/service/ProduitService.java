@@ -525,52 +525,76 @@ public class ProduitService {
 }
 
      //Methode liste Historique sur Stock
-        public List<StockHistoryDTO> getStockHistory(Long produitId) {
-        // Vérifier si le produit existe
-        Produit produit = produitRepository.findById(produitId)
-                .orElseThrow(() -> new NoSuchElementException("Produit non trouvé avec l'ID : " + produitId));
-
-        // Vérifier si un stock est associé au produit
-        Stock stock = stockRepository.findByProduit(produit);
-        if (stock == null) {
-            throw new RuntimeException("Stock introuvable pour ce produit");
-        }
-
-        // Récupérer l'historique des stocks
-        List<StockHistory> stockHistories = stockHistoryRepository.findByStock(stock);
-
-        // Vérifier si l'historique est vide
-        if (stockHistories.isEmpty()) {
-            throw new RuntimeException("Aucun historique de stock trouvé pour ce produit");
-        }
-
-        // Mapper en DTO
-        return stockHistories.stream()
-                .map(stockHistory -> {
-                    StockHistoryDTO dto = new StockHistoryDTO();
-                    dto.setId(stockHistory.getId());
-                    dto.setAction(stockHistory.getAction());
-                    dto.setQuantite(stockHistory.getQuantite());
-                    dto.setStockAvant(stockHistory.getStockAvant());
-                    dto.setStockApres(stockHistory.getStockApres());
-                    dto.setDescription(stockHistory.getDescription());
-                    dto.setCreatedAt(stockHistory.getCreatedAt());
-
-                    User user = stockHistory.getUser();
-                    if (user != null) {
-                        dto.setNomComplet(user.getNomComplet());
-                        dto.setPhone(user.getPhone());
-                        if (user.getRole() != null) {
-                            dto.setRole(user.getRole().getName());
-                        }
-                    }
-                    
-                    
-                    
-                    return dto;
-                })
-                .collect(Collectors.toList());
+     public List<StockHistoryDTO> getStockHistory(Long produitId, HttpServletRequest request) {
+    
+    // Récupérer le token JWT depuis l'en-tête
+    String token = request.getHeader("Authorization");
+    if (token == null || !token.startsWith("Bearer ")) {
+        throw new RuntimeException("Token JWT manquant ou mal formaté");
     }
+
+    token = token.replace("Bearer ", "");
+    Long userId;
+    try {
+        userId = jwtUtil.extractUserId(token);
+    } catch (Exception e) {
+        throw new RuntimeException("Erreur lors de l'extraction de l'ID depuis le token", e);
+    }
+
+    User user = usersRepository.findById(userId)
+            .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+
+    // Vérifier si le produit existe
+    Produit produit = produitRepository.findById(produitId)
+            .orElseThrow(() -> new NoSuchElementException("Produit non trouvé avec l'ID : " + produitId));
+
+    // Vérifier que le produit appartient à l'entreprise du user
+    if (produit.getBoutique() == null || produit.getBoutique().getEntreprise() == null) {
+        throw new RuntimeException("Produit ou boutique non rattaché à une entreprise !");
+    }
+
+    if (!produit.getBoutique().getEntreprise().getId().equals(user.getEntreprise().getId())) {
+        throw new RuntimeException("Accès interdit : ce produit n'appartient pas à votre entreprise !");
+    }
+
+    // Vérifier si un stock est associé au produit
+    Stock stock = stockRepository.findByProduit(produit);
+    if (stock == null) {
+        throw new RuntimeException("Stock introuvable pour ce produit");
+    }
+
+    // Récupérer l'historique des stocks
+    List<StockHistory> stockHistories = stockHistoryRepository.findByStock(stock);
+
+    if (stockHistories.isEmpty()) {
+        throw new RuntimeException("Aucun historique de stock trouvé pour ce produit");
+    }
+
+    // Mapper en DTO
+    return stockHistories.stream()
+            .map(stockHistory -> {
+                StockHistoryDTO dto = new StockHistoryDTO();
+                dto.setId(stockHistory.getId());
+                dto.setAction(stockHistory.getAction());
+                dto.setQuantite(stockHistory.getQuantite());
+                dto.setStockAvant(stockHistory.getStockAvant());
+                dto.setStockApres(stockHistory.getStockApres());
+                dto.setDescription(stockHistory.getDescription());
+                dto.setCreatedAt(stockHistory.getCreatedAt());
+
+                User historiqueUser = stockHistory.getUser();
+                if (historiqueUser != null) {
+                    dto.setNomComplet(historiqueUser.getNomComplet());
+                    dto.setPhone(historiqueUser.getPhone());
+                    if (historiqueUser.getRole() != null) {
+                        dto.setRole(historiqueUser.getRole().getName());
+                    }
+                }
+
+                return dto;
+            })
+            .collect(Collectors.toList());
+}
 
 
     // Récupérer tous les mouvements de stock
@@ -928,40 +952,40 @@ public class ProduitService {
 }
     
     // Lister Produit par boutique (excluant les produits dans la corbeille)
-public List<ProduitDTO> getProduitsParStock(Long boutiqueId, Long userId) {
-    User user = usersRepository.findById(userId)
-            .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+    public List<ProduitDTO> getProduitsParStock(Long boutiqueId, Long userId) {
+        User user = usersRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
 
-    Boutique boutique = boutiqueRepository.findById(boutiqueId)
-        .orElseThrow(() -> new RuntimeException("Boutique non trouvée"));
+        Boutique boutique = boutiqueRepository.findById(boutiqueId)
+            .orElseThrow(() -> new RuntimeException("Boutique non trouvée"));
 
-    if (!boutique.isActif()) {
-        throw new RuntimeException("Cette boutique est désactivée, ses produits ne sont pas accessibles !");
-    }
+        if (!boutique.isActif()) {
+            throw new RuntimeException("Cette boutique est désactivée, ses produits ne sont pas accessibles !");
+        }
 
-    // Vérification que la boutique appartient à l'entreprise de l'utilisateur
-    if (!boutique.getEntreprise().getId().equals(user.getEntreprise().getId())) {
-        throw new RuntimeException("Accès interdit : cette boutique n'appartient pas à votre entreprise.");
-    }
+        // Vérification que la boutique appartient à l'entreprise de l'utilisateur
+        if (!boutique.getEntreprise().getId().equals(user.getEntreprise().getId())) {
+            throw new RuntimeException("Accès interdit : cette boutique n'appartient pas à votre entreprise.");
+        }
 
-    // Vérifier rôle et permissions
-    RoleType role = user.getRole().getName();
-    boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
-    boolean hasGestionFacturePermission = user.getRole().hasPermission(PermissionType.Gestion_Facture);
+        // Vérifier rôle et permissions
+        RoleType role = user.getRole().getName();
+        boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
+        boolean hasGestionFacturePermission = user.getRole().hasPermission(PermissionType.Gestion_Facture);
 
-    // Si Admin, Manager ou permission spécifique, accès aux produits de la boutique de leur entreprise
-    if (isAdminOrManager || hasGestionFacturePermission) {
+        // Si Admin, Manager ou permission spécifique, accès aux produits de la boutique de leur entreprise
+        if (isAdminOrManager || hasGestionFacturePermission) {
+            return recupererProduitsDTO(boutiqueId);
+        }
+
+        // Si utilisateur standard, accès uniquement à la boutique de leur entreprise (déjà vérifié)
         return recupererProduitsDTO(boutiqueId);
     }
 
-    // Si utilisateur standard, accès uniquement à la boutique de leur entreprise (déjà vérifié)
-    return recupererProduitsDTO(boutiqueId);
-}
-
-/**
- * Récupère et mappe les produits d'une boutique
- */
-private List<ProduitDTO> recupererProduitsDTO(Long boutiqueId) {
+    /**
+     * Récupère et mappe les produits d'une boutique
+     */
+    private List<ProduitDTO> recupererProduitsDTO(Long boutiqueId) {
     List<ProduitDTO> produitsDTO = new ArrayList<>();
 
     List<Produit> produitsEnStockFalse = produitRepository.findByBoutiqueIdAndEnStockFalseAndDeletedFalseOrDeletedIsNull(boutiqueId);
@@ -1069,44 +1093,77 @@ private List<ProduitDTO> recupererProduitsDTO(Long boutiqueId) {
     }
 
     //Methode pour reuperer un produit par son id
-    public ProduitDTO getProduitById(Long id) {
-        Produit produit = produitRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Produit avec ID " + id + " non trouvé"));
-    
-        ProduitDTO dto = mapToProduitDTO(produit);
-    
-        // Liste pour stocker les infos des boutiques
-        List<Map<String, Object>> boutiquesInfo = new ArrayList<>();
-        
-        // Récupérer tous les produits ayant le même codeGenerique
-        List<Produit> produitsMemeCode = produitRepository.findByCodeGenerique(produit.getCodeGenerique());
-    
-        // Variable pour accumuler la quantité totale
-        int totalQuantite = 0;
-    
-        // Boucle pour traiter chaque produit avec le même codeGenerique
-        for (Produit p : produitsMemeCode) {
-            if (p.getBoutique() != null && p.getBoutique().isActif()) {
-                Map<String, Object> boutiqueData = new HashMap<>();
-                boutiqueData.put("id", p.getBoutique().getId());
-                boutiqueData.put("nom", p.getBoutique().getNomBoutique());
-                boutiqueData.put("quantite", p.getQuantite()); // Quantité pour cette boutique
-    
-                // Ajouter cette boutique à la liste
-                boutiquesInfo.add(boutiqueData);
-    
-                // Ajouter la quantité de ce produit à la quantité totale
-                totalQuantite += p.getQuantite();
-            }
-        }
-    
-        // Définir la quantité totale dans le DTO
-        dto.setQuantite(totalQuantite);  // Mettre à jour la quantité totale
-        dto.setBoutiques(boutiquesInfo); // Ajouter la liste des boutiques
-    
-        return dto;
+   public ProduitDTO getProduitById(Long id, HttpServletRequest request) {
+    // Vérification de l'autorisation de l'admin
+    String token = request.getHeader("Authorization");
+    if (token == null || !token.startsWith("Bearer ")) {
+        throw new RuntimeException("Token JWT manquant ou mal formaté");
     }
-    
+
+    token = token.replace("Bearer ", "");
+    Long adminId;
+    try {
+        adminId = jwtUtil.extractUserId(token);
+    } catch (Exception e) {
+        throw new RuntimeException("Erreur lors de l'extraction de l'ID de l'admin depuis le token", e);
+    }
+
+    User admin = usersRepository.findById(adminId)
+            .orElseThrow(() -> new RuntimeException("Admin non trouvé"));
+
+    // Autorisation et permission
+    RoleType role = admin.getRole().getName();
+    boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
+    boolean hasPermission = admin.getRole().hasPermission(PermissionType.GERER_PRODUITS);
+    if (!isAdminOrManager && !hasPermission) {
+        throw new RuntimeException("Vous n'avez pas les droits pour consulter ce produit !");
+    }
+
+    Produit produit = produitRepository.findById(id)
+            .orElseThrow(() -> new RuntimeException("Produit non trouvé"));
+
+    // Vérification que le produit appartient à l'entreprise de l'utilisateur
+    if (produit.getBoutique() == null || produit.getBoutique().getEntreprise() == null) {
+        throw new RuntimeException("Produit ou boutique non rattaché à une entreprise !");
+    }
+
+    if (!produit.getBoutique().getEntreprise().getId().equals(admin.getEntreprise().getId())) {
+        throw new RuntimeException("Accès interdit : ce produit n'appartient pas à votre entreprise !");
+    }
+
+    ProduitDTO dto = mapToProduitDTO(produit);
+
+    // Liste pour stocker les infos des boutiques
+    List<Map<String, Object>> boutiquesInfo = new ArrayList<>();
+
+    // Récupérer tous les produits ayant le même codeGenerique
+    List<Produit> produitsMemeCode = produitRepository.findByCodeGenerique(produit.getCodeGenerique());
+
+    int totalQuantite = 0;
+
+    // Boucle pour traiter chaque produit avec le même codeGenerique
+    for (Produit p : produitsMemeCode) {
+        if (p.getBoutique() != null 
+                && p.getBoutique().isActif()
+                && p.getBoutique().getEntreprise().getId().equals(admin.getEntreprise().getId())) {
+
+            Map<String, Object> boutiqueData = new HashMap<>();
+            boutiqueData.put("id", p.getBoutique().getId());
+            boutiqueData.put("nom", p.getBoutique().getNomBoutique());
+            boutiqueData.put("quantite", p.getQuantite());
+
+            boutiquesInfo.add(boutiqueData);
+
+            totalQuantite += p.getQuantite();
+        }
+    }
+
+    dto.setQuantite(totalQuantite);
+    dto.setBoutiques(boutiquesInfo);
+
+    return dto;
+}
+
 
     private ProduitDTO mapToProduitDTO(Produit produit) {
         ProduitDTO dto = new ProduitDTO();

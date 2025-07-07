@@ -196,11 +196,13 @@ public class UsersController {
     }
 
     //Endpoint Get user by id
-    @GetMapping("/user/{userId}")
-    public ResponseEntity<User> getUserById(@PathVariable Long userId) {
-        User user = usersService.getUserById(userId);
-        return ResponseEntity.ok(user);
-    }
+        @GetMapping("/user/{userId}")
+        public ResponseEntity<User> getUserById(@PathVariable Long userId, HttpServletRequest request) {
+            User user = usersService.getUserById(userId, request);
+            return ResponseEntity.ok(user);
+        }
+
+
 
     // Endpoint pour suspendre ou réactiver un utilisateur
     @PutMapping("/suspendre/{userId}")

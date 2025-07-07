@@ -668,10 +668,49 @@ public class UsersService {
     }
 
     //Get user by id
-    public User getUserById(Long userId) {
-        return usersRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+   public User getUserById(Long userId, HttpServletRequest request) {
+
+    // Extraction du token JWT
+    String token = request.getHeader("Authorization");
+    if (token == null || !token.startsWith("Bearer ")) {
+        throw new RuntimeException("Token JWT manquant ou mal formaté");
     }
+
+    token = token.replace("Bearer ", "");
+    Long connectedUserId;
+    try {
+        connectedUserId = jwtUtil.extractUserId(token);
+    } catch (Exception e) {
+        throw new RuntimeException("Erreur lors de l'extraction de l'ID utilisateur depuis le token", e);
+    }
+
+    // Récupération du user connecté
+    User connectedUser = usersRepository.findById(connectedUserId)
+            .orElseThrow(() -> new RuntimeException("Utilisateur connecté introuvable"));
+
+    // Récupération du user ciblé
+    User targetUser = usersRepository.findById(userId)
+            .orElseThrow(() -> new RuntimeException("Utilisateur demandé introuvable"));
+    // Vérification si le targetUser a la permission GERER_UTILISATEURS
+    boolean hasGestionUtilisateurPermission = targetUser.getRole() != null &&
+            targetUser.getRole().hasPermission(PermissionType.GERER_UTILISATEURS);
+
+    // Vérification des droits
+    RoleType role = connectedUser.getRole().getName();
+    boolean isAdminOrManager = (role == RoleType.ADMIN || role == RoleType.MANAGER)
+
+            && connectedUser.getEntreprise() != null
+            && targetUser.getEntreprise() != null
+            && connectedUser.getEntreprise().getId().equals(targetUser.getEntreprise().getId());
+
+    boolean isSelf = connectedUserId.equals(userId);
+
+    if (!isAdminOrManager && !isSelf && !hasGestionUtilisateurPermission) {
+        throw new RuntimeException("Accès interdit : vous ne pouvez consulter que vos propres informations !");
+    }
+
+    return targetUser;
+}
 
 
     // Méthode pour suspendre ou réactiver un utilisateur

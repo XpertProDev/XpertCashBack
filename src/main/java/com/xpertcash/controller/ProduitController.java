@@ -289,10 +289,11 @@ public class ProduitController {
 
         //Get Produit by id
         @GetMapping("/produits/{produitId}")
-        public ResponseEntity<ProduitDTO> getProduitById(@PathVariable("produitId") Long produitId) {
-            ProduitDTO produitDTO = produitService.getProduitById(produitId);
+        public ResponseEntity<ProduitDTO> getProduitById(@PathVariable("produitId") Long produitId, HttpServletRequest request) {
+            ProduitDTO produitDTO = produitService.getProduitById(produitId, request);
             return ResponseEntity.ok(produitDTO);
-        } 
+        }
+
         
 
         //Endpoint pour ajuster la quantiter du produit en stock
@@ -327,18 +328,11 @@ public class ProduitController {
         
             // Endpoint Stock Historique
             @GetMapping("/stockhistorique/{produitId}")
-            public ResponseEntity<?> getStockHistory(@PathVariable Long produitId) {
-                try {
-                    List<StockHistoryDTO> stockHistoryDTOs = produitService.getStockHistory(produitId);
-                    return ResponseEntity.ok(stockHistoryDTOs);
-                } catch (NoSuchElementException e) {
-                    return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                            .body(Collections.singletonMap("message", "Produit non trouvé avec l'ID : " + produitId));
-                } catch (RuntimeException e) {
-                    return ResponseEntity.status(HttpStatus.OK)
-                            .body(Collections.singletonMap("message", e.getMessage()));
-                }
+                    public ResponseEntity<List<StockHistoryDTO>> getStockHistory(@PathVariable Long produitId, HttpServletRequest request) {
+                List<StockHistoryDTO> history = produitService.getStockHistory(produitId, request);
+                return ResponseEntity.ok(history);
             }
+            
 
             // Endpoint pour récupérer l'historique général des mouvements de stock
             @GetMapping("/stockhistorique")
