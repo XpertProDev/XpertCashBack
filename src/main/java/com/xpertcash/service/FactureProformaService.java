@@ -375,6 +375,9 @@ public class FactureProformaService {
 
         // 💡 Génération de facture réelle si passage à VALIDE
         if (modifications.getStatut() == StatutFactureProForma.VALIDE && facture.getStatut() != StatutFactureProForma.VALIDE) {
+            // On récupère et enregistre le validateur
+            facture.setUtilisateurValidateur(user);
+            
             FactureReelle factureReelle = factureReelleService.genererFactureReelle(facture);
             System.out.println("✅ Facture Réelle générée avec succès : " + factureReelle.getNumeroFacture());
 
@@ -518,7 +521,7 @@ public class FactureProformaService {
         // 📩 Passage au statut ENVOYÉ
         if (modifications.getStatut() == StatutFactureProForma.ENVOYE) {
             if (modifications.getMethodeEnvoi() == null) {
-                throw new IllegalArgumentException("Veuillez spécifier la méthode d’envoi : PHYSIQUE ou EMAIL.");
+                throw new IllegalArgumentException("Veuillez spécifier la méthode d’envoi : PHYSIQUE, EMAIL ou AUTRE.");
             }
 
             facture.setStatut(StatutFactureProForma.ENVOYE);
@@ -537,12 +540,18 @@ public class FactureProformaService {
                 log.info("📨 La facture {} est marquée ENVOYÉE par EMAIL. Le front doit appeler le service d'envoi de mail.", facture.getNumeroFacture());
             }
 
-            factProHistoriqueService.enregistrerActionHistorique(
+            String details = "Facture envoyée au client via " + facture.getMethodeEnvoi();
+
+                            if (facture.getDateRelance() != null) {
+                    details += " | Date de relance prévue : " + facture.getDateRelance();
+                }
+
+                factProHistoriqueService.enregistrerActionHistorique(
                     facture,
                     user,
                     "Envoi",
-                    "Facture envoyée au client via " + facture.getMethodeEnvoi()
-            );
+                    details
+                );
         }
 
         // 🧾 Mise à jour des lignes de facture

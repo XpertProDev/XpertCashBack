@@ -82,8 +82,7 @@ public class FactureReelleService {
         factureReelle.setTva(factureProForma.isTva());
         factureReelle.setTotalFacture(factureProForma.getTotalFacture());
         factureReelle.setStatutPaiement(StatutPaiementFacture.EN_ATTENTE);
-
-        factureReelle.setUtilisateurCreateur(factureProForma.getUtilisateurModificateur());
+        factureReelle.setUtilisateurCreateur(factureProForma.getUtilisateurValidateur());
         factureReelle.setClient(factureProForma.getClient());
         factureReelle.setEntrepriseClient(factureProForma.getEntrepriseClient());
         factureReelle.setEntreprise(factureProForma.getEntreprise());

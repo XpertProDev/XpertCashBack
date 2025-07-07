@@ -43,7 +43,17 @@ public class FactProHistoriqueService {
 
 
 
+public void enregistrerActionHistorique(FactureProForma facture, User user, String action, String details) {
+    FactProHistoriqueAction historique = new FactProHistoriqueAction();
+    historique.setFacture(facture);
+    historique.setUtilisateur(user);
+    historique.setAction(action);
+    historique.setDateAction(LocalDateTime.now());
+    historique.setMontantFacture(BigDecimal.valueOf(facture.getTotalHT()));
+    historique.setDetails(details);
 
+     factProHistoriqueActionRepository.save(historique);
+}
 
 
   public Map<String, Object> getHistoriqueFacture(Long factureId, HttpServletRequest request) {
@@ -75,6 +85,7 @@ public class FactProHistoriqueService {
     historique.put("dateCreation", facture.getDateCreation());
     historique.put("description", facture.getDescription());
     historique.put("statut", facture.getStatut());
+    historique.put("dateRelance", facture.getDateRelance());
 
 
     
@@ -112,19 +123,6 @@ public class FactProHistoriqueService {
     return historique;
 }
 
-
-
-public void enregistrerActionHistorique(FactureProForma facture, User user, String action, String details) {
-    FactProHistoriqueAction historique = new FactProHistoriqueAction();
-    historique.setFacture(facture);
-    historique.setUtilisateur(user);
-    historique.setAction(action);
-    historique.setDateAction(LocalDateTime.now());
-    historique.setMontantFacture(BigDecimal.valueOf(facture.getTotalHT()));
-    historique.setDetails(details);
-
-     factProHistoriqueActionRepository.save(historique);
-}
 
 
 
