@@ -24,9 +24,7 @@ public class AppModule {
     @Column(nullable = true)
     private BigDecimal prix;
 
-
   
-
      public AppModule(String code,String nom, boolean actifParDefaut, boolean payant, BigDecimal prix) {
         this.code = code;
         this.nom = nom;
@@ -35,6 +33,4 @@ public class AppModule {
         this.prix = prix;
 
     }
-
-    // Getters and Setters
 }

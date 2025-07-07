@@ -12,6 +12,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import com.xpertcash.DTOs.Module.ModuleDTO;
@@ -20,9 +21,11 @@ import com.xpertcash.entity.Entreprise;
 import com.xpertcash.entity.User;
 import com.xpertcash.entity.Enum.RoleType;
 import com.xpertcash.entity.Module.AppModule;
+import com.xpertcash.entity.Module.EntrepriseModuleAbonnement;
 import com.xpertcash.entity.Module.EntrepriseModuleEssai;
 import com.xpertcash.repository.EntrepriseRepository;
 import com.xpertcash.repository.UsersRepository;
+import com.xpertcash.repository.Module.EntrepriseModuleAbonnementRepository;
 import com.xpertcash.repository.Module.EntrepriseModuleEssaiRepository;
 import com.xpertcash.repository.Module.ModuleRepository;
 import com.xpertcash.service.MailService;
@@ -53,23 +56,47 @@ public class ModuleActivationService {
     @Autowired
     private EntrepriseModuleEssaiRepository entrepriseModuleEssaiRepository;
 
+    @Autowired
+    private EntrepriseModuleAbonnementRepository entrepriseModuleAbonnementRepository;
+
     // Méthode réutilisable
 public boolean isModuleActifPourEntreprise(Entreprise entreprise, String codeModule) {
-    
+
     Optional<AppModule> moduleOpt = moduleRepository.findByCode(codeModule);
     if (moduleOpt.isEmpty()) return false;
 
     AppModule module = moduleOpt.get();
 
     Set<AppModule> modulesAchetes = entreprise.getModulesActifs();
-
     boolean moduleAchete = modulesAchetes.contains(module);
 
     if (!module.isPayant()) {
         return moduleAchete;
     }
 
-    // Pour les modules payants : vérification essai individuel
+    // Cas module payant : vérifie abonnement actif
+    Optional<EntrepriseModuleAbonnement> abonnementOpt = entrepriseModuleAbonnementRepository
+            .findByEntrepriseAndModuleAndActifTrue(entreprise, module);
+
+    boolean abonnementValide = abonnementOpt.isPresent() &&
+            abonnementOpt.get().getDateFin() != null &&
+            abonnementOpt.get().getDateFin().isAfter(LocalDateTime.now());
+
+    // Si le module est acheté mais que l'abonnement est expiré, on le désactive du Set
+    if (moduleAchete && !abonnementValide) {
+        entreprise.getModulesActifs().remove(module);
+        entrepriseRepository.save(entreprise);
+
+        // On désactive aussi l'abonnement
+        abonnementOpt.ifPresent(abonnement -> {
+            abonnement.setActif(false);
+            entrepriseModuleAbonnementRepository.save(abonnement);
+        });
+
+        moduleAchete = false;
+    }
+
+    // Vérification essai individuel
     Optional<EntrepriseModuleEssai> essaiOpt = entrepriseModuleEssaiRepository.findByEntrepriseAndModule(entreprise, module);
 
     boolean essaiValide = essaiOpt.isPresent() &&
@@ -79,6 +106,7 @@ public boolean isModuleActifPourEntreprise(Entreprise entreprise, String codeMod
     return moduleAchete || essaiValide;
 }
 
+ 
     //Module de verification reutilisable
     public void verifierAccesModulePourEntreprise(Entreprise entreprise, String codeModule) {
 
@@ -95,6 +123,42 @@ public boolean isModuleActifPourEntreprise(Entreprise entreprise, String codeMod
             throw new RuntimeException("Ce module n'est pas activé pour votre entreprise. Temps d'essai restant : " + tempsRestant);
         }
     }
+
+    // Vérifie tous les abonnements expirés et désactive proprement tous les jours à minuit
+
+    @Scheduled(cron = "0 0 0 * * ?")
+    @Transactional
+    public void synchroniserAbonnementsExpirés() {
+
+        // Récupérer tous les abonnements dont la date de fin est dépassée ET qui sont encore marqués actifs
+        List<EntrepriseModuleAbonnement> abonnementsExpirés = entrepriseModuleAbonnementRepository
+                .findByActifTrueAndDateFinBefore(LocalDateTime.now());
+
+        System.out.println("Nombre d'abonnements expirés détectés : " + abonnementsExpirés.size());
+
+        for (EntrepriseModuleAbonnement abo : abonnementsExpirés) {
+
+            abo.setActif(false);  // Désactivation de l'abonnement
+            entrepriseModuleAbonnementRepository.save(abo);
+
+            Entreprise entreprise = abo.getEntreprise();
+            AppModule module = abo.getModule();
+
+            if (entreprise.getModulesActifs().contains(module)) {
+                entreprise.getModulesActifs().remove(module);  // Retrait du module actif
+                entrepriseRepository.save(entreprise);
+
+                System.out.println("Module '" + module.getNom() + "' retiré de l'entreprise '" 
+                    + entreprise.getNomEntreprise() + "' (ID entreprise : " + entreprise.getId() + ")");
+            } else {
+                System.out.println("Module '" + module.getNom() + "' déjà non actif pour l'entreprise '" 
+                    + entreprise.getNomEntreprise() + "'");
+            }
+        }
+
+        System.out.println("Synchronisation des abonnements expirés terminée.");
+    }
+
 
 
     // Liste centralisée des sous-modules à masquer
@@ -181,13 +245,11 @@ public boolean isModuleActifPourEntreprise(Entreprise entreprise, String codeMod
 }
 
 
-
-
-
     //Activation d'un module pour une entreprise
     @Transactional
     public void activerModuleAvecPaiement(Long userId,
                                         String nomModule,
+                                        int dureeMois,
                                         String numeroCarte,
                                         String cvc,
                                         String dateExpiration,
@@ -197,7 +259,6 @@ public boolean isModuleActifPourEntreprise(Entreprise entreprise, String codeMod
                                         String adresse,
                                         String ville) {
 
-        // 1. Vérification utilisateur et entreprise
         User user = usersRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
 
@@ -211,7 +272,6 @@ public boolean isModuleActifPourEntreprise(Entreprise entreprise, String codeMod
             throw new RuntimeException("Seuls l'ADMIN peuvent activer les modules.");
         }
 
-        // 2. Récupération du module
         AppModule module = moduleRepository.findByNom(nomModule)
                 .orElseThrow(() -> new RuntimeException("Module '" + nomModule + "' introuvable"));
 
@@ -220,15 +280,17 @@ public boolean isModuleActifPourEntreprise(Entreprise entreprise, String codeMod
         }
 
         String referenceTransaction = null;
+        BigDecimal montant = BigDecimal.ZERO;
+        BigDecimal prixUnitaire = BigDecimal.ZERO;  // <--- Déclaré ici, accessible partout
 
-        // 3. Si payant, vérifier les infos et procéder au paiement
         if (module.isPayant()) {
-            BigDecimal montant = module.getPrix();
-            if (montant == null || montant.compareTo(BigDecimal.ZERO) <= 0) {
+            prixUnitaire = module.getPrix();
+            if (prixUnitaire == null || prixUnitaire.compareTo(BigDecimal.ZERO) <= 0) {
                 throw new RuntimeException("Prix du module invalide");
             }
 
-            // Vérification stricte des infos
+            montant = prixUnitaire.multiply(BigDecimal.valueOf(dureeMois));
+
             if (numeroCarte == null || numeroCarte.isBlank() ||
                 cvc == null || cvc.isBlank() ||
                 dateExpiration == null || dateExpiration.isBlank() ||
@@ -239,66 +301,67 @@ public boolean isModuleActifPourEntreprise(Entreprise entreprise, String codeMod
                 throw new RuntimeException("Toutes les informations de paiement et du propriétaire sont requises.");
             }
 
-            // Paiement simulé
-                boolean paiementReussi = modulePaiementService.effectuerPaiement(
-                    numeroCarte,
-                    cvc,
-                    dateExpiration,
-                    montant,
-                    entreprise,
-                    module,
-                    nomCompletProprietaire,
-                    emailProprietaireCarte,
-                    pays,
-                    adresse,
-                    ville
-                );
+            boolean paiementReussi = modulePaiementService.effectuerPaiement(
+                numeroCarte,
+                cvc,
+                dateExpiration,
+                montant,
+                entreprise,
+                module,
+                nomCompletProprietaire,
+                emailProprietaireCarte,
+                pays,
+                adresse,
+                ville
+            );
 
             if (!paiementReussi) {
                 throw new RuntimeException("Échec du paiement. Activation annulée.");
             }
 
-            // Génération de la facture et récupération de la référence
             referenceTransaction = modulePaiementService.enregistrerFacturePaiement(
-            entreprise,
-            module,
-            montant,
-            nomCompletProprietaire,
-            emailProprietaireCarte,
-            pays,
-            adresse,
-            ville
-        );
-
+                entreprise,
+                module,
+                montant,
+                nomCompletProprietaire,
+                emailProprietaireCarte,
+                pays,
+                adresse,
+                ville
+            );
         }
-        // 4. Activation du module
+
+        EntrepriseModuleAbonnement abonnement = new EntrepriseModuleAbonnement();
+        abonnement.setEntreprise(entreprise);
+        abonnement.setModule(module);
+        abonnement.setDateDebut(LocalDateTime.now());
+        abonnement.setDateFin(LocalDateTime.now().plusMonths(dureeMois));
+        abonnement.setActif(true);
+
+        entrepriseModuleAbonnementRepository.save(abonnement);
+
         entreprise.getModulesActifs().add(module);
         entrepriseRepository.save(entreprise);
-        
-        System.out.println("Envoi de l'email à : " + emailProprietaireCarte);
 
-
-        // 5. Envoi de l'email de confirmation avec facture
-    try {
-        mailService.sendConfirmationActivationEmail(
-            emailProprietaireCarte,
-            module.getNom(),
-            module.getPrix(),
-            "XOF",
-            nomCompletProprietaire,
-            pays,
-            adresse,
-            ville,
-            referenceTransaction,
-            entreprise.getNomEntreprise()
-                
-        );
-    } catch (Exception e) {
-        System.err.println("Échec d'envoi de l'email de confirmation : " + e.getMessage());
+        try {
+            mailService.sendConfirmationActivationEmail(
+                emailProprietaireCarte,
+                module.getNom(),
+                prixUnitaire,
+                montant,
+                "XOF",
+                nomCompletProprietaire,
+                pays,
+                adresse,
+                ville,
+                referenceTransaction,
+                entreprise.getNomEntreprise(),
+                dureeMois
+            );
+        } catch (Exception e) {
+            System.err.println("Échec d'envoi de l'email de confirmation : " + e.getMessage());
+        }
     }
-    }
-
-
 
 
 
@@ -383,4 +446,3 @@ public boolean dejaEssaiPourEntreprise(Entreprise entreprise, AppModule module) 
 }
 
 }
-//* Si le module est payant, tu peux gérer ici la vérification du paiement.

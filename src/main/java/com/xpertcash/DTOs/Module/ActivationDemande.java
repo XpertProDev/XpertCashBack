@@ -7,6 +7,7 @@ import lombok.Setter;
 @Setter
 public class ActivationDemande {
     private String nomModule;
+    private int dureeMois;
     private String numeroCarte;
     private String cvc;
     private String dateExpiration;

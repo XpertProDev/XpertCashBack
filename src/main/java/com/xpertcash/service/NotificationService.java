@@ -14,6 +14,8 @@ import com.xpertcash.entity.User;
 import com.xpertcash.repository.FactureProformaRepository;
 import com.xpertcash.repository.UsersRepository;
 
+import jakarta.transaction.Transactional;
+
 @Service
 public class NotificationService {
 
@@ -29,6 +31,7 @@ public class NotificationService {
       // tâche planifiée : Vérifie tous les jours à 08h00 quelles factures doivent être relancées
       @Scheduled(cron = "0 0 8 * * ?")
       //@Scheduled(cron = "0 * * * * ?")  // Tâche planifiée toutes les minutes mode Dev
+      @Transactional
       public void verifierFacturesAEnvoyer() {
         LocalDateTime maintenant = LocalDateTime.now().withSecond(0).withNano(0);
     
