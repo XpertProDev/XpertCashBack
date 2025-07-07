@@ -45,6 +45,9 @@ public class FactureProForma {
 
      private String noteModification;
 
+     @Transient
+    private String justification;
+
      
 
 
