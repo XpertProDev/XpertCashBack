@@ -85,6 +85,11 @@ public class FactureReelle {
     @JsonIgnoreProperties({"facturesReelles"})
     private FactureProForma factureProForma;
 
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "utilisateur_validateur_id")
+    @JsonIgnoreProperties({"personalCode", "phone", "photo", "createdAt", "activationCode", "activatedLien", "enabledLien", "lastActivity", "locked", "pays", "role"})
+    private User utilisateurValidateur;
+
 
     @OneToMany(mappedBy = "factureReelle", cascade = CascadeType.ALL)
     private List<Paiement> paiements = new ArrayList<>();

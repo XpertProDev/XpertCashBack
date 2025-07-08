@@ -542,13 +542,15 @@ public class FactureProformaService {
 
             String details = "Facture envoyée au client via " + facture.getMethodeEnvoi();
               if (facture.getMethodeEnvoi() == MethodeEnvoi.AUTRE) {
-                    details += " | Justification : " + modifications.getJustification();
+                    details += " : " + modifications.getJustification();
                 }
 
+                        /*
                             if (facture.getDateRelance() != null) {
-                    details += " | Date de relance prévue : " + facture.getDateRelance();
-                }
+                            details += " | Date de relance prévue : " + facture.getDateRelance();
+                        }
 
+                        */
                 factProHistoriqueService.enregistrerActionHistorique(
                     facture,
                     user,

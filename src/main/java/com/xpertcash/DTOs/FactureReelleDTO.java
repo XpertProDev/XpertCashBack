@@ -21,9 +21,14 @@ import lombok.NoArgsConstructor;
 public class FactureReelleDTO {
 
     private Long id;
+    
     private String numeroFacture;
     private String description;
     private LocalDate dateCreation;
+    private String utilisateurCreateur;
+    private String utilisateurValidateur;
+
+
     private double totalFacture;
     private double remise;
     private Double tauxRemise;
@@ -35,7 +40,7 @@ public class FactureReelleDTO {
     private BigDecimal montantRestant;
     private List<LigneFactureDTO> lignesFacture;
     private String nomClient;
-    private String nomEntrepriseClient;
+    private String nomEntrepriseClient; 
 
     // ✅ Constructeur qui transforme une FactureReelle en FactureReelleDTO
     public FactureReelleDTO(FactureReelle facture, BigDecimal montantRestant) {
@@ -43,6 +48,8 @@ public class FactureReelleDTO {
         this.numeroFacture = facture.getNumeroFacture();
         this.description = facture.getDescription();
         this.dateCreation = facture.getDateCreation();
+        this.utilisateurCreateur = (facture.getUtilisateurCreateur() != null) ? facture.getUtilisateurCreateur().getNomComplet() : null;
+        this.utilisateurValidateur = (facture.getUtilisateurValidateur() != null) ? facture.getUtilisateurValidateur().getNomComplet() : null;
         this.totalFacture = facture.getTotalFacture();
         this.remise = facture.getRemise();
         this.tauxRemise = facture.getTauxRemise();
