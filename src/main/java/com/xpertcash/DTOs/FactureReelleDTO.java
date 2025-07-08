@@ -25,6 +25,7 @@ public class FactureReelleDTO {
     private String numeroFacture;
     private String description;
     private LocalDate dateCreation;
+    private LocalDate dateCreationPro;
     private String utilisateurCreateur;
     private String utilisateurValidateur;
 
@@ -34,7 +35,7 @@ public class FactureReelleDTO {
     private Double tauxRemise;
     private boolean tva;
     private StatutPaiementFacture statutPaiement;
-    private UserRequest utilisateur;
+    // private UserRequest utilisateur;
     private EntrepriseClientDTO entrepriseClient;
     private ClientDTO client;
     private BigDecimal montantRestant;
@@ -48,6 +49,7 @@ public class FactureReelleDTO {
         this.numeroFacture = facture.getNumeroFacture();
         this.description = facture.getDescription();
         this.dateCreation = facture.getDateCreation();
+        this.dateCreationPro = facture.getDateCreationPro();
         this.utilisateurCreateur = (facture.getUtilisateurCreateur() != null) ? facture.getUtilisateurCreateur().getNomComplet() : null;
         this.utilisateurValidateur = (facture.getUtilisateurValidateur() != null) ? facture.getUtilisateurValidateur().getNomComplet() : null;
         this.totalFacture = facture.getTotalFacture();
@@ -55,7 +57,7 @@ public class FactureReelleDTO {
         this.tauxRemise = facture.getTauxRemise();
         this.tva = facture.isTva();
         this.statutPaiement = facture.getStatutPaiement();
-        this.utilisateur = (facture.getUtilisateurCreateur() != null) ? new UserRequest(facture.getUtilisateurCreateur()) : null;
+        /*this.utilisateur = (facture.getUtilisateurCreateur() != null) ? new UserRequest(facture.getUtilisateurCreateur()) : null;*/
         this.entrepriseClient = (facture.getEntrepriseClient() != null) ? new EntrepriseClientDTO(facture.getEntrepriseClient()) : null;
         this.client = (facture.getClient() != null) ? new ClientDTO(facture.getClient()) : null;
         this.montantRestant = montantRestant;
