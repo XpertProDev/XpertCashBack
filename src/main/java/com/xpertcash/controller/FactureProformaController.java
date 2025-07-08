@@ -126,7 +126,8 @@ public class FactureProformaController {
 
             // Validation du statut
             if (facture.getStatut() != StatutFactureProForma.ENVOYE ||
-                    facture.getMethodeEnvoi() != MethodeEnvoi.EMAIL) {
+                    facture.getMethodeEnvoi() != MethodeEnvoi.EMAIL ||
+                    facture.getMethodeEnvoi() != MethodeEnvoi.AUTRE) {
                 logger.error("Statut/Méthode invalide");
                 return ResponseEntity.badRequest().body("Statut/Méthode invalide");
             }

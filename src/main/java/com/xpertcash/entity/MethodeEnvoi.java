@@ -2,5 +2,6 @@ package com.xpertcash.entity;
 
 public enum MethodeEnvoi {
     PHYSIQUE,
-    EMAIL
+    EMAIL,
+    AUTRE
 }
