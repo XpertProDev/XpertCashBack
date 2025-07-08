@@ -541,6 +541,9 @@ public class FactureProformaService {
             }
 
             String details = "Facture envoyée au client via " + facture.getMethodeEnvoi();
+              if (facture.getMethodeEnvoi() == MethodeEnvoi.AUTRE) {
+                    details += " | Justification : " + modifications.getJustification();
+                }
 
                             if (facture.getDateRelance() != null) {
                     details += " | Date de relance prévue : " + facture.getDateRelance();
