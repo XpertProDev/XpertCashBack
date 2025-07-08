@@ -4,15 +4,11 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
-
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.xpertcash.entity.Enum.StatutFactureProForma;
 import com.xpertcash.entity.Enum.StatutFactureReelle;
 import com.xpertcash.entity.Enum.StatutPaiementFacture;
-
 import jakarta.persistence.*;
-import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -30,6 +26,7 @@ public class FactureReelle {
     private String numeroFacture;
     private String description;
     private LocalDate dateCreation;
+    private LocalDate dateCreationPro;
     private double totalHT;
     private double remise;
     private Double tauxRemise;

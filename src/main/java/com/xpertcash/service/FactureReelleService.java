@@ -74,6 +74,7 @@ public class FactureReelleService {
         // Copier les informations de la proforma
         factureReelle.setNumeroFacture(genererNumeroFactureReel(factureProForma.getEntreprise()));
         factureReelle.setDateCreation(LocalDate.now());
+        factureReelle.setDateCreationPro(factureProForma.getDateCreation());
         factureReelle.setTotalHT(factureProForma.getTotalHT());
         factureReelle.setRemise(factureProForma.getRemise());
         factureReelle.setTauxRemise(factureProForma.getTauxRemise());
@@ -253,7 +254,7 @@ public void supprimerFactureReelleLiee(FactureProForma proforma) {
         FactureReelleDTO dto = new FactureReelleDTO(facture, montantRestant);
 
         // On ignior les champs inutiles
-        dto.setUtilisateur(null);
+        // dto.setUtilisateur(null);
         dto.setEntrepriseClient(null);
         dto.setClient(null);
         dto.setLignesFacture(null);
@@ -481,7 +482,7 @@ public void supprimerFactureReelleLiee(FactureProForma proforma) {
         FactureReelleDTO dto = new FactureReelleDTO(facture, montantRestant);
 
         // Supprimer les champs non nécessaires pour cette route
-        dto.setUtilisateur(null);
+        // dto.setUtilisateur(null);
         dto.setEntrepriseClient(null);
         dto.setClient(null);
         dto.setLignesFacture(null);
