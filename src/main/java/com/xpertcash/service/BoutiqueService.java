@@ -193,113 +193,120 @@ public class BoutiqueService {
 
     //Methode pour Transfert
     @Transactional
-    public void transfererProduits(HttpServletRequest request, Long boutiqueSourceId, Long boutiqueDestinationId, Long produitId, int quantite) {
-        String token = request.getHeader("Authorization");
-        if (token == null || !token.startsWith("Bearer ")) {
-            throw new RuntimeException("Token JWT manquant ou mal formaté");
-        }
+public void transfererProduits(HttpServletRequest request, Long boutiqueSourceId, Long boutiqueDestinationId, Long produitId, int quantite) {
 
-        Long adminId = jwtUtil.extractUserId(token.substring(7));
-        User admin = usersRepository.findById(adminId)
-                .orElseThrow(() -> new RuntimeException("Admin non trouvé"));
-
-         // Verication et Permission
-        RoleType role = admin.getRole().getName();
-        boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
-        boolean hasPermission = admin.getRole().hasPermission(PermissionType.GERER_PRODUITS);
-
-        if (!isAdminOrManager && !hasPermission) {
-            throw new RuntimeException("Vous n'avez pas les droits pour effectuer les trnasferts !");
-        }
-
-        Boutique boutiqueSource = boutiqueRepository.findById(boutiqueSourceId)
-                .orElseThrow(() -> new RuntimeException("Boutique source non trouvée"));
-        Boutique boutiqueDestination = boutiqueRepository.findById(boutiqueDestinationId)
-                .orElseThrow(() -> new RuntimeException("Boutique destination non trouvée"));
-
-        if (!boutiqueSource.isActif() || !boutiqueDestination.isActif()) {
-            throw new RuntimeException("L'une des boutiques est désactivée !");
-        }
-
-        if (!boutiqueSource.getEntreprise().equals(admin.getEntreprise()) ||
-            !boutiqueDestination.getEntreprise().equals(admin.getEntreprise())) {
-            throw new RuntimeException("Les boutiques doivent appartenir à l'entreprise de l'admin !");
-        }
-
-        Produit produit = produitRepository.findByBoutiqueAndId(boutiqueSourceId, produitId)
-                .orElseThrow(() -> new RuntimeException("Produit non trouvé dans la boutique source"));
-
-        if (produit.getQuantite() < quantite) {
-            throw new RuntimeException("Quantité insuffisante dans la boutique source !");
-        }
-
-        produit.setQuantite(produit.getQuantite() - quantite);
-        produitRepository.save(produit);
-
-        Optional<Produit> produitDestinationOpt = produitRepository.findByBoutiqueAndCodeGenerique(boutiqueDestination.getId(), produit.getCodeGenerique());
-
-        Produit produitDestination;
-        if (produitDestinationOpt.isPresent()) {
-            produitDestination = produitDestinationOpt.get();
-            produitDestination.setQuantite(produitDestination.getQuantite() + quantite);
-        } else {
-            produitDestination = new Produit();
-            produitDestination.setNom(produit.getNom());
-            produitDestination.setPrixVente(produit.getPrixVente());
-            produitDestination.setPrixAchat(produit.getPrixAchat());
-            produitDestination.setQuantite(quantite);
-            produitDestination.setCodeGenerique(produit.getCodeGenerique());
-            produitDestination.setCodeBare(produit.getCodeBare());
-            produitDestination.setPhoto(produit.getPhoto());
-            produitDestination.setCategorie(produit.getCategorie());
-            produitDestination.setUniteDeMesure(produit.getUniteDeMesure());
-            produitDestination.setCreatedAt(produit.getCreatedAt());
-            produitDestination.setLastUpdated(produit.getLastUpdated());
-            produitDestination.setBoutique(boutiqueDestination);
-        }
-
-        produitDestination.setEnStock(true); // 🔥 Important
-        produitRepository.save(produitDestination);
-
-        // 🔧 Stock
-        Stock stock = stockRepository.findByProduit(produitDestination);
-        if (stock == null) {
-            stock = new Stock();
-            stock.setProduit(produitDestination);
-            stock.setStockActuel(produitDestination.getQuantite());
-            stock.setQuantiteAjoute(quantite);
-            stock.setStockApres(produitDestination.getQuantite());
-            stock.setLastUpdated(LocalDateTime.now());
-        } else {
-            int stockAvant = stock.getStockActuel();
-            int stockApres = stockAvant + quantite;
-            stock.setStockActuel(stockApres);
-            stock.setQuantiteAjoute(quantite);
-            stock.setStockApres(stockApres);
-            stock.setLastUpdated(LocalDateTime.now());
-        }
-        stockRepository.save(stock);
-
-        // 📝 Historique
-        StockHistory history = new StockHistory();
-        history.setAction("Transfert depuis boutique " + boutiqueSource.getNomBoutique());
-        history.setQuantite(quantite);
-        history.setStockAvant(stock.getStockApres() - quantite);
-        history.setStockApres(stock.getStockApres());
-        history.setDescription("Transfert automatique via fonctionnalité de transfert");
-        history.setCreatedAt(LocalDateTime.now());
-        history.setStock(stock);
-        history.setUser(admin);
-        stockHistoryRepository.save(history);
-
-        // 🔄 Transfert
-        Transfert transfert = new Transfert();
-        transfert.setProduit(produit);
-        transfert.setBoutiqueSource(boutiqueSource);
-        transfert.setBoutiqueDestination(boutiqueDestination);
-        transfert.setQuantite(quantite);
-        transfertRepository.save(transfert);
+    // 🔐 Vérification JWT
+    String token = request.getHeader("Authorization");
+    if (token == null || !token.startsWith("Bearer ")) {
+        throw new RuntimeException("Token JWT manquant ou mal formaté");
     }
+
+    Long adminId = jwtUtil.extractUserId(token.substring(7));
+    User admin = usersRepository.findById(adminId)
+            .orElseThrow(() -> new RuntimeException("Admin non trouvé"));
+
+    // 🔑 Vérification des droits
+    RoleType role = admin.getRole().getName();
+    boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
+    boolean hasPermission = admin.getRole().hasPermission(PermissionType.GERER_PRODUITS);
+
+    if (!isAdminOrManager && !hasPermission) {
+        throw new RuntimeException("Vous n'avez pas les droits pour effectuer les transferts !");
+    }
+
+    // ✅ Vérification des boutiques
+    Boutique boutiqueSource = boutiqueRepository.findById(boutiqueSourceId)
+            .orElseThrow(() -> new RuntimeException("Boutique source non trouvée"));
+    Boutique boutiqueDestination = boutiqueRepository.findById(boutiqueDestinationId)
+            .orElseThrow(() -> new RuntimeException("Boutique destination non trouvée"));
+
+    if (!boutiqueSource.isActif() || !boutiqueDestination.isActif()) {
+        throw new RuntimeException("L'une des boutiques est désactivée !");
+    }
+
+    if (!boutiqueSource.getEntreprise().equals(admin.getEntreprise()) ||
+        !boutiqueDestination.getEntreprise().equals(admin.getEntreprise())) {
+        throw new RuntimeException("Les boutiques doivent appartenir à l'entreprise de l'utilisateur !");
+    }
+
+    // 🔍 Vérification du produit source
+    Produit produit = produitRepository.findByBoutiqueAndId(boutiqueSourceId, produitId)
+            .orElseThrow(() -> new RuntimeException("Produit non trouvé dans la boutique source"));
+
+    if (produit.getQuantite() < quantite) {
+        throw new RuntimeException("Quantité insuffisante dans la boutique source !");
+    }
+
+    // 🔽 Mise à jour de la quantité dans la boutique source
+    produit.setQuantite(produit.getQuantite() - quantite);
+    produitRepository.save(produit);
+
+    // 📦 Vérification ou création du produit dans la boutique de destination
+    Optional<Produit> produitDestinationOpt = produitRepository.findByBoutiqueAndCodeGenerique(
+            boutiqueDestination.getId(), produit.getCodeGenerique());
+
+    Produit produitDestination;
+    if (produitDestinationOpt.isPresent()) {
+        produitDestination = produitDestinationOpt.get();
+        produitDestination.setQuantite(produitDestination.getQuantite() + quantite);
+    } else {
+        produitDestination = new Produit();
+        produitDestination.setNom(produit.getNom());
+        produitDestination.setPrixVente(produit.getPrixVente());
+        produitDestination.setPrixAchat(produit.getPrixAchat());
+        produitDestination.setQuantite(quantite);
+        produitDestination.setCodeGenerique(produit.getCodeGenerique());
+        produitDestination.setCodeBare(produit.getCodeBare());
+        produitDestination.setPhoto(produit.getPhoto());
+        produitDestination.setCategorie(produit.getCategorie());
+        produitDestination.setUniteDeMesure(produit.getUniteDeMesure());
+        produitDestination.setCreatedAt(produit.getCreatedAt());
+        produitDestination.setLastUpdated(produit.getLastUpdated());
+        produitDestination.setBoutique(boutiqueDestination);
+    }
+
+    produitDestination.setEnStock(true);
+    produitRepository.save(produitDestination);
+
+    // 🔄 Mise à jour ou création du stock
+    Stock stock = stockRepository.findByProduit(produitDestination);
+    if (stock == null) {
+        stock = new Stock();
+        stock.setProduit(produitDestination);
+        stock.setStockActuel(produitDestination.getQuantite());
+        stock.setQuantiteAjoute(quantite);
+        stock.setStockApres(produitDestination.getQuantite());
+        stock.setLastUpdated(LocalDateTime.now());
+    } else {
+        int stockAvant = stock.getStockActuel();
+        int stockApres = stockAvant + quantite;
+        stock.setStockActuel(stockApres);
+        stock.setQuantiteAjoute(quantite);
+        stock.setStockApres(stockApres);
+        stock.setLastUpdated(LocalDateTime.now());
+    }
+    stockRepository.save(stock);
+
+    // 📝 Historique de stock
+    StockHistory history = new StockHistory();
+    history.setAction("Transfert depuis boutique " + boutiqueSource.getNomBoutique());
+    history.setQuantite(quantite);
+    history.setStockAvant(stock.getStockApres() - quantite);
+    history.setStockApres(stock.getStockApres());
+    history.setDescription("Transfert automatique via fonctionnalité de transfert");
+    history.setCreatedAt(LocalDateTime.now());
+    history.setStock(stock);
+    history.setUser(admin);
+    stockHistoryRepository.save(history);
+
+    // 💾 Enregistrement du transfert
+    Transfert transfert = new Transfert();
+    transfert.setProduit(produit);
+    transfert.setBoutiqueSource(boutiqueSource);
+    transfert.setBoutiqueDestination(boutiqueDestination);
+    transfert.setQuantite(quantite);
+    transfertRepository.save(transfert);
+}
 
     //Copie
     @Transactional

@@ -387,22 +387,34 @@ public class ProduitService {
     
     // Méthode pour ajuster la quantité du produit en stock (retirer des produits)
     public FactureDTO retirerStock(Long boutiqueId, Map<Long, Integer> produitsQuantites, String description, HttpServletRequest request) {
-    // Récupérer le token JWT depuis le header "Authorization"
+
+    // 1️⃣ Authentification via JWT
     String token = request.getHeader("Authorization");
     if (token == null || !token.startsWith("Bearer ")) {
         throw new RuntimeException("Token JWT manquant ou mal formaté");
     }
-
     String jwtToken = token.substring(7);
     Long userId = jwtUtil.extractUserId(jwtToken);
 
+    // 2️⃣ Chargement de l'utilisateur
     User user = usersRepository.findById(userId)
             .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+
+    // 3️⃣ Vérification de la boutique
     Boutique boutique = boutiqueRepository.findById(boutiqueId)
-        .orElseThrow(() -> new RuntimeException("Boutique introuvable"));
+            .orElseThrow(() -> new RuntimeException("Boutique introuvable"));
 
-  Long entrepriseId = boutique.getEntreprise().getId();
+    if (!boutique.isActif()) {
+        throw new RuntimeException("La boutique est désactivée, opération non autorisée.");
+    }
 
+    // 4️⃣ Vérification que la boutique appartient à l'entreprise de l'utilisateur
+    Long entrepriseId = boutique.getEntreprise().getId();
+    if (!entrepriseId.equals(user.getEntreprise().getId())) {
+        throw new RuntimeException("Accès interdit : cette boutique n'appartient pas à votre entreprise.");
+    }
+
+    // 5️⃣ Vérification des permissions
     boolean isAdminOrManager = CentralAccess.isAdminOrManagerOfEntreprise(user, entrepriseId);
     boolean hasPermission = user.getRole().hasPermission(PermissionType.GERER_PRODUITS);
 
@@ -410,18 +422,19 @@ public class ProduitService {
         throw new RuntimeException("Vous n'avez pas les droits pour retirer du stock !");
     }
 
-
     List<Produit> produits = new ArrayList<>();
 
+    // 6️⃣ Traitement des produits
     for (Map.Entry<Long, Integer> entry : produitsQuantites.entrySet()) {
         Long produitId = entry.getKey();
         Integer quantiteRetirer = entry.getValue();
 
         Produit produit = produitRepository.findById(produitId)
                 .orElseThrow(() -> new RuntimeException("Produit non trouvé"));
-        
+
+        // Vérification que le produit appartient à la même entreprise que la boutique
         if (!produit.getBoutique().getEntreprise().getId().equals(entrepriseId)) {
-            throw new RuntimeException("Produit ID " + produitId + " n'appartient pas à la même entreprise que la boutique.");
+            throw new RuntimeException("Produit ID " + produitId + " n'appartient pas à l'entreprise de la boutique.");
         }
 
         Stock stock = stockRepository.findByProduit(produit);
@@ -431,12 +444,12 @@ public class ProduitService {
 
         int stockAvant = stock.getStockActuel();
         if (quantiteRetirer > stockAvant) {
-            throw new RuntimeException("Impossible de retirer plus que la quantité disponible en stock");
+            throw new RuntimeException("Impossible de retirer plus que le stock disponible (" + stockAvant + ").");
         }
 
         int nouvelleQuantiteProduit = produit.getQuantite() - quantiteRetirer;
 
-        // Mettre à jour le produit et le stock
+        // Mise à jour produit + stock
         produit.setQuantite(nouvelleQuantiteProduit);
         produitRepository.save(produit);
 
@@ -446,7 +459,7 @@ public class ProduitService {
         stock.setLastUpdated(LocalDateTime.now());
         stockRepository.save(stock);
 
-        // Enregistrer l'historique du stock
+        // 🕒 Historique du stock
         StockHistory stockHistory = new StockHistory();
         stockHistory.setAction("Réduction sur quantité");
         stockHistory.setQuantite(quantiteRetirer);
@@ -461,9 +474,8 @@ public class ProduitService {
         produits.add(produit);
     }
 
-    Facture facture = enregistrerFacture("Réduction", produits, produitsQuantites, description, null,null, user);
-
-
+    // 7️⃣ Génération de la facture
+    Facture facture = enregistrerFacture("Réduction", produits, produitsQuantites, description, null, null, user);
     return new FactureDTO(facture);
 }
 
