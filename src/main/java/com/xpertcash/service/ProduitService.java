@@ -991,10 +991,18 @@ public class ProduitService {
     }
 
     // Lister Produit par boutique (excluant les produits dans la corbeille)
-   public List<ProduitDTO> getProduitsParStock(Long boutiqueId, Long userId) {
+   public List<ProduitDTO> getProduitsParStock(Long boutiqueId, HttpServletRequest request) {
+    // 🔐 Extraction utilisateur depuis token JWT
+    String token = request.getHeader("Authorization");
+    if (token == null || !token.startsWith("Bearer ")) {
+        throw new RuntimeException("Token JWT manquant ou mal formaté");
+    }
+
+    Long userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
     User user = usersRepository.findById(userId)
             .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
 
+    // 🔍 Vérification de la boutique
     Boutique boutique = boutiqueRepository.findById(boutiqueId)
             .orElseThrow(() -> new RuntimeException("Boutique non trouvée"));
 
@@ -1002,13 +1010,12 @@ public class ProduitService {
         throw new RuntimeException("Cette boutique est désactivée, ses produits ne sont pas accessibles !");
     }
 
-        // Vérifier que la boutique appartient à la même entreprise que l'utilisateur
     Long entrepriseId = boutique.getEntreprise().getId();
     if (!entrepriseId.equals(user.getEntreprise().getId())) {
         throw new RuntimeException("Accès interdit : cette boutique ne vous appartient pas");
     }
 
-    // 🔐 Vérification CentralAccess
+    // 🔒 Vérifications CentralAccess & permissions
     boolean isAdminOrManager = CentralAccess.isAdminOrManagerOfEntreprise(user, entrepriseId);
     boolean hasPermissionVente = user.getRole().hasPermission(PermissionType.VENDRE_PRODUITS);
     boolean hasPermissionGestion = user.getRole().hasPermission(PermissionType.GERER_PRODUITS);
@@ -1016,7 +1023,6 @@ public class ProduitService {
     if (!isAdminOrManager && !hasPermissionVente && !hasPermissionGestion) {
         throw new RuntimeException("Accès interdit : vous n'avez pas les droits pour consulter les produits.");
     }
-
 
     return recupererProduitsDTO(boutiqueId);
 }
