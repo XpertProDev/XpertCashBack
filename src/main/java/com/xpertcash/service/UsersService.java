@@ -694,36 +694,30 @@ public User assignPermissionsToUser(Long userId, Map<PermissionType, Boolean> pe
 }
 
     // Pour la récupération de tous les utilisateurs d'une entreprise
-    public List<User> getAllUsersOfEntreprise(Long entrepriseId, HttpServletRequest request) {
-    // Extraire userId depuis le JWT dans la requête
+    public List<User> getAllUsersOfEntreprise(HttpServletRequest request) {
     String token = request.getHeader("Authorization");
     if (token == null || !token.startsWith("Bearer ")) {
         throw new RuntimeException("Token JWT manquant ou mal formaté");
     }
-    Long userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
 
+    Long userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
     User user = usersRepository.findById(userId)
             .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
 
-    Entreprise entreprise = entrepriseRepository.findById(entrepriseId)
-            .orElseThrow(() -> new RuntimeException("Entreprise non trouvée"));
-
-    // Vérifier que l'utilisateur appartient bien à cette entreprise
-    if (!user.getEntreprise().getId().equals(entrepriseId)) {
-        throw new RuntimeException("Accès refusé : cette entreprise ne vous appartient pas !");
+    Entreprise entreprise = user.getEntreprise();
+    if (entreprise == null) {
+        throw new RuntimeException("Aucune entreprise associée à cet utilisateur.");
     }
 
-    RoleType role = user.getRole().getName();
-    boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
+    boolean isAdminOrManager = CentralAccess.isAdminOrManagerOfEntreprise(user, entreprise.getId());
     boolean hasPermission = user.getRole().hasPermission(PermissionType.GERER_UTILISATEURS);
 
     if (!isAdminOrManager && !hasPermission) {
-        throw new RuntimeException("Accès refusé : vous n'avez pas la permission de consulter les utilisateurs");
+        throw new RuntimeException("Accès refusé : vous n'avez pas les droits nécessaires.");
     }
 
-    // Exclure l’admin fondateur
     Long adminId = entreprise.getAdmin().getId();
-    return usersRepository.findByEntrepriseIdAndIdNot(entrepriseId, adminId);
+    return usersRepository.findByEntrepriseIdAndIdNot(entreprise.getId(), adminId);
 }
 
 

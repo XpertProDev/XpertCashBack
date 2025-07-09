@@ -192,11 +192,11 @@ public class UsersController {
 
 
     //Get all users
-    @GetMapping("/entreprise/{entrepriseId}/allusers")
-    public ResponseEntity<List<User>> getAllUsersOfEntreprise(@PathVariable Long entrepriseId, HttpServletRequest request) {
-        List<User> users = usersService.getAllUsersOfEntreprise(entrepriseId, request);
+        @GetMapping("/entreprise/{entrepriseId}/allusers")
+        public ResponseEntity<List<User>> getAllUsersOfEntreprise(HttpServletRequest request) {
+        List<User> users = usersService.getAllUsersOfEntreprise(request);
         return ResponseEntity.ok(users);
-    }
+    }   
 
 
 
