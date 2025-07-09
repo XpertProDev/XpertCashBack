@@ -8,6 +8,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.xpertcash.configuration.CentralAccess;
 import com.xpertcash.configuration.JwtUtil;
 import com.xpertcash.entity.Boutique;
 import com.xpertcash.entity.PermissionType;
@@ -97,37 +98,44 @@ public class BoutiqueService {
 
     // Récupérer toutes les boutiques d'une entreprise
     public List<Boutique> getBoutiquesByEntreprise(HttpServletRequest request) {
-        // Vérifier la présence du token JWT dans l'entête de la requête
-        String token = request.getHeader("Authorization");
-        if (token == null || !token.startsWith("Bearer ")) {
-            throw new RuntimeException("Token JWT manquant ou mal formaté");
-        }
-
-        // Extraire l'ID de l'utilisateur depuis le token
-        Long userId = null;
-        try {
-            userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
-        } catch (Exception e) {
-            throw new RuntimeException("Erreur lors de l'extraction de l'ID de l'utilisateur depuis le token", e);
-        }
-
-        // Récupérer l'utilisateur par son ID
-        User user = usersRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
-
-        // Vérifier que l'utilisateur est bien un admin et qu'il a une entreprise associée
-        if (user.getRole() == null || !user.getRole().getName().equals(RoleType.ADMIN)) {
-            throw new RuntimeException("Seul un admin peut récupérer les boutiques d'une entreprise !");
-        }
-
-        if (user.getEntreprise() == null) {
-            throw new RuntimeException("L'Admin n'a pas d'entreprise associée.");
-        }
-
-        // Récupérer et retourner toutes les boutiques de l'entreprise
-        return boutiqueRepository.findByEntrepriseId(user.getEntreprise().getId());
+    // ✅ Vérification du token JWT
+    String token = request.getHeader("Authorization");
+    if (token == null || !token.startsWith("Bearer ")) {
+        throw new RuntimeException("Token JWT manquant ou mal formaté");
     }
 
+    String jwtToken = token.substring(7); // Retirer "Bearer "
+
+    Long userId;
+    try {
+        userId = jwtUtil.extractUserId(jwtToken);
+    } catch (Exception e) {
+        throw new RuntimeException("Erreur lors de l'extraction de l'ID utilisateur depuis le token", e);
+    }
+
+    // 👤 Récupération de l'utilisateur
+    User user = usersRepository.findById(userId)
+            .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+
+    if (user.getEntreprise() == null) {
+        throw new RuntimeException("Vous n'êtes associé à aucune entreprise.");
+    }
+
+    Long entrepriseId = user.getEntreprise().getId();
+
+    // 🔐 Vérification des rôles et permissions via CentralAccess
+    boolean isAdminOrManager = CentralAccess.isAdminOrManagerOfEntreprise(user, entrepriseId);
+    boolean hasPermission = user.getRole().hasPermission(PermissionType.GERER_BOUTIQUE);
+
+    if (!isAdminOrManager && !hasPermission) {
+        throw new RuntimeException("Vous n'avez pas les droits pour consulter les boutiques de cette entreprise !");
+    }
+
+    // ✅ Récupération des boutiques de l'entreprise
+    return boutiqueRepository.findByEntrepriseId(entrepriseId);
+}
+
+    
     // Methode pour recuperer une boutique par son ID
     public Boutique getBoutiqueById(Long boutiqueId, HttpServletRequest request) {
         // Vérifier la présence du token JWT dans l'entête de la requête
