@@ -12,6 +12,7 @@ import org.springframework.stereotype.Repository;
 import com.xpertcash.entity.Entreprise;
 import com.xpertcash.entity.FactureProForma;
 import com.xpertcash.entity.FactureReelle;
+import com.xpertcash.entity.User;
 import com.xpertcash.entity.Enum.StatutPaiementFacture;
 
 @Repository
@@ -52,6 +53,9 @@ public interface FactureReelleRepository extends JpaRepository<FactureReelle, Lo
     );
 
     List<FactureReelle> findAllByFactureProForma(FactureProForma factureProForma);
+
+    List<FactureReelle> findByEntrepriseAndUtilisateurCreateurOrderByDateCreationDesc(Entreprise entreprise, User utilisateurCreateur);
+
 
 
 }

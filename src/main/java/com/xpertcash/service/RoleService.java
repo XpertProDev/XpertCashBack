@@ -78,11 +78,19 @@ public class RoleService {
                 permissionMap.get(PermissionType.VENDRE_PRODUITS)
             ));
 
-            /*   Role rhRole = new Role();
+            Role gestionClient = new Role();
+            gestionClient.setName(RoleType.Clientel);
+            gestionClient.setPermissions(Collections.singletonList(
+                 permissionMap.get(PermissionType.GERER_CLIENTS)
+            ));
+
+            Role rhRole = new Role();
             rhRole.setName(RoleType.RH);
             rhRole.setPermissions(Collections.singletonList(
-                permissionMap.get(PermissionType.GERER_PERSONNEL)
+                permissionMap.get(PermissionType.GERER_UTILISATEURS)
             ));
+
+            /*  
 
             Role comptableRole = new Role();
             comptableRole.setName(RoleType.COMPTABLE);
@@ -138,7 +146,7 @@ public class RoleService {
     
         // Vérifier que l'utilisateur appartient à la même entreprise que l'admin
         if (!userToUpdate.getEntreprise().equals(admin.getEntreprise())) {
-            throw new RuntimeException("Cet utilisateur n'appartient pas à la même entreprise.");
+            throw new RuntimeException("Cet utilisateur n'appartient pas à votre entreprise.");
         }
     
         // Convertir la String en RoleType

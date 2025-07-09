@@ -183,17 +183,22 @@ public class UsersController {
     @PostMapping("/{userId}/permissions")
     public ResponseEntity<User> assignPermissionsToUser(
             @PathVariable Long userId,
-            @RequestBody Map<PermissionType, Boolean> permissions) {
-        User updatedUser = usersService.assignPermissionsToUser(userId, permissions);
+            @RequestBody Map<PermissionType, Boolean> permissions,
+            HttpServletRequest request) {
+
+        User updatedUser = usersService.assignPermissionsToUser(userId, permissions, request);
         return ResponseEntity.ok(updatedUser);
     }
 
+
     //Get all users
     @GetMapping("/entreprise/{entrepriseId}/allusers")
-    public ResponseEntity<List<User>> getAllUsersOfEntreprise(@PathVariable Long entrepriseId) {
-        List<User> users = usersService.getAllUsersOfEntreprise(entrepriseId);
+    public ResponseEntity<List<User>> getAllUsersOfEntreprise(@PathVariable Long entrepriseId, HttpServletRequest request) {
+        List<User> users = usersService.getAllUsersOfEntreprise(entrepriseId, request);
         return ResponseEntity.ok(users);
     }
+
+
 
     //Endpoint Get user by id
         @GetMapping("/user/{userId}")

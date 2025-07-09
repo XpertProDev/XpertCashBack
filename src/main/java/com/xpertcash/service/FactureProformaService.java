@@ -15,6 +15,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 
+import com.xpertcash.configuration.CentralAccess;
 import com.xpertcash.configuration.JwtUtil;
 import com.xpertcash.entity.Client;
 import com.xpertcash.entity.Entreprise;
@@ -110,6 +111,15 @@ public class FactureProformaService {
     if (entrepriseUtilisateur == null) {
         throw new RuntimeException("L'utilisateur n'a pas d'entreprise associée.");
     }
+
+    // Vérification CentralAccess + permission spécifique
+    boolean isAdminOrManager = CentralAccess.isAdminOrManagerOfEntreprise(user, entrepriseUtilisateur.getId());
+    boolean hasPermission = user.getRole().hasPermission(PermissionType.Gestion_Facture);
+
+    if (!isAdminOrManager || !hasPermission) {
+        throw new RuntimeException("Accès refusé : vous n'avez pas les droits nécessaires sur cette entreprise !");
+    }
+    
 
     // 🔒 Vérification d'accès au module Gestion Facturation
     moduleActivationService.verifierAccesModulePourEntreprise(entrepriseUtilisateur, "GESTION_FACTURATION");
@@ -313,6 +323,23 @@ public class FactureProformaService {
 
         User user = usersRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("Utilisateur introuvable !"));
+        
+         // --- Vérification que la facture appartient à la même entreprise que l'utilisateur ---
+        Entreprise entrepriseFacture = facture.getEntreprise();
+        Entreprise entrepriseUtilisateur = user.getEntreprise();
+
+        if (entrepriseFacture == null || entrepriseUtilisateur == null || !entrepriseFacture.getId().equals(entrepriseUtilisateur.getId())) {
+            throw new RuntimeException("Accès refusé : vous ne pouvez modifier que les factures de votre entreprise.");
+        }
+
+        // --- Optionnel : Vérification des droits via CentralAccess et permission ---
+        boolean isAdminOrManager = CentralAccess.isAdminOrManagerOfEntreprise(user, entrepriseUtilisateur.getId());
+        boolean hasPermission = user.getRole().hasPermission(PermissionType.Gestion_Facture);
+
+        if (!isAdminOrManager || !hasPermission) {
+            throw new RuntimeException("Accès refusé : vous n'avez pas les droits nécessaires pour modifier cette facture.");
+        }
+        
 
         // 🔒 Blocage total si facture annulée
         if (facture.getStatut() == StatutFactureProForma.ANNULE) {

@@ -5,7 +5,9 @@ public enum RoleType {
     ADMIN,
     VENDEUR,
     MANAGER,
+    Clientel,
+    RH;
    // COMPTABLE,
-  // RH;
+  
     
 }
