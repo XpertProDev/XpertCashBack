@@ -276,16 +276,22 @@ public class ProduitService {
             throw new RuntimeException("Token JWT manquant ou mal formaté");
         }
     
-        String jwtToken = token.substring(7);
-        Long userId = jwtUtil.extractUserId(jwtToken);
-    
+          Long userId = jwtUtil.extractUserId(token.substring(7));
         User user = usersRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+            .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+    
+  
         Boutique boutique = boutiqueRepository.findById(boutiqueId)
         .orElseThrow(() -> new RuntimeException("Boutique introuvable"));
 
         Long entrepriseId = boutique.getEntreprise().getId();
-        //Verification et Permission
+
+         // 🔐 Vérifier que l'utilisateur appartient à la même entreprise que la boutique
+        if (!user.getEntreprise().getId().equals(entrepriseId)) {
+            throw new RuntimeException("Accès interdit : cette boutique ne vous appartient pas");
+        }
+
+         // 🔐 Contrôle d'accès
         boolean isAdminOrManager = CentralAccess.isAdminOrManagerOfEntreprise(user, entrepriseId);
         boolean hasPermission = user.getRole().hasPermission(PermissionType.GERER_PRODUITS);
 
@@ -303,8 +309,9 @@ public class ProduitService {
         Produit produit = produitRepository.findById(produitId)
                 .orElseThrow(() -> new RuntimeException("Produit non trouvé"));
         
-          // Vérifier que le produit appartient à la même entreprise que la boutique
-        if (!produit.getBoutique().getEntreprise().getId().equals(entrepriseId)) {
+          // 🔒 Vérifier que le produit appartient à la même entreprise (via sa boutique)
+        Boutique produitBoutique = produit.getBoutique();
+        if (produitBoutique == null || !produitBoutique.getEntreprise().getId().equals(entrepriseId)) {
             throw new RuntimeException("Le produit ID " + produitId + " n'appartient pas à l'entreprise de la boutique.");
         }
 
