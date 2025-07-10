@@ -4,15 +4,21 @@ package com.xpertcash.controller;
 import com.xpertcash.DTOs.UpdateUserRequest;
 import com.xpertcash.DTOs.USER.UserRequest;
 import com.xpertcash.composant.AuthorizationService;
+import com.xpertcash.configuration.JwtConfig;
 import com.xpertcash.configuration.JwtUtil;
 import com.xpertcash.entity.Entreprise;
 import com.xpertcash.entity.PermissionType;
 import com.xpertcash.entity.User;
+import com.xpertcash.repository.UsersRepository;
 import com.xpertcash.DTOs.EntrepriseDTO;
 import com.xpertcash.DTOs.LoginRequest;
 import com.xpertcash.DTOs.RegistrationRequest;
 import com.xpertcash.service.UsersService;
 
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.ExpiredJwtException;
+import io.jsonwebtoken.JwtException;
+import io.jsonwebtoken.Jwts;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -22,8 +28,7 @@ import org.springframework.http.MediaType;
 import org.springframework.web.multipart.MultipartFile;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-
-
+import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -37,8 +42,14 @@ public class UsersController {
     private UsersService usersService;
     @Autowired
     private JwtUtil jwtUtil;
+    @Autowired JwtConfig jwtConfig;
     @Autowired
     private AuthorizationService authorizationService;
+
+    
+
+    @Autowired
+    private UsersRepository usersRepository;
 
     // Inscription
     @PostMapping("/register")
@@ -70,23 +81,63 @@ public class UsersController {
     // Connexion
     @PostMapping("/login")
     public ResponseEntity<Map<String, String>> login(@RequestBody LoginRequest request) {
-                try {
-                    String token = usersService.login(request.getEmail(), request.getPassword());
+        try {
+            Map<String, String> tokens = usersService.login(request.getEmail(), request.getPassword());
+            tokens.put("message", "Connexion réussie");
+            return ResponseEntity.ok(tokens);
+        } catch (Exception e) {
+            Map<String, String> errorResponse = new HashMap<>();
+            errorResponse.put("error", e.getMessage() != null ? e.getMessage() : "Erreur inconnue");
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(errorResponse);
+        }
+    }
 
-                    // Construire une réponse JSON avec le message et le token
-                    Map<String, String> response = new HashMap<>();
-                    response.put("message", "Connexion réussie");
-                    response.put("token", token);
 
-                    return ResponseEntity.ok(response);
-                } catch (Exception e) {
-                    // Construire une réponse JSON en cas d'erreur
-                    Map<String, String> errorResponse = new HashMap<>();
-                    errorResponse.put("error", e.getMessage());
+    @PostMapping("/refresh-token")
+    public ResponseEntity<Map<String, String>> refreshToken(@RequestBody Map<String, String> request) {
+        String refreshToken = request.get("refreshToken");
+        System.out.println("🔁 Refresh Token reçu!!!!! : " + refreshToken);
 
-                    return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(errorResponse);
-                }
-            }
+        if (refreshToken == null || refreshToken.isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Le refresh token est manquant"));
+        }
+
+        try {
+            Claims claims = Jwts.parser()
+                    .setSigningKey(jwtConfig.getSecretKey())
+                    .parseClaimsJws(refreshToken)
+                    .getBody();
+
+            Long userId = Long.parseLong(claims.getSubject());
+            User user = usersRepository.findById(userId)
+                    .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
+
+            User admin = user.getEntreprise().getAdmin();
+            boolean within24Hours = LocalDateTime.now().isBefore(user.getCreatedAt().plusHours(24));
+
+            // ✅ Appel via usersService :
+            String newAccessToken = usersService.generateAccessToken(user, admin, within24Hours);
+
+            return ResponseEntity.ok(Map.of(
+                "accessToken", newAccessToken,
+                "message", "Nouveau token généré avec succès"
+            ));
+
+        } catch (ExpiredJwtException e) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(
+                Map.of("error", "Refresh token expiré")
+            );
+        } catch (JwtException e) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(
+                Map.of("error", "Refresh token invalide")
+            );
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(
+                Map.of("error", "Erreur lors du traitement du refresh token")
+            );
+        }
+    }
+
 
 
     // Activation du compte via le lien d'activation (GET avec paramètres dans l'URL)

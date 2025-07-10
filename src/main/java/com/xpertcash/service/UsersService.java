@@ -244,64 +244,73 @@ public class UsersService {
         }
     }
 
-   // Connexion : permet la connexion même si le compte n'est pas activé
-    public String login(String email, String password) {
-        User user = usersRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Email ou mot de passe incorrect"));
+    // Connexion : permet la connexion même si le compte n'est pas activé
+     public Map<String, String> login(String email, String password) {
+    User user = usersRepository.findByEmail(email)
+        .orElseThrow(() -> new RuntimeException("Email ou mot de passe incorrect"));
 
-        // Vérification du mot de passe
-        if (!passwordEncoder.matches(password, user.getPassword())) {
-            throw new RuntimeException("Email ou mot de passe incorrect");
-        }
-
-        // Vérification si le compte est verrouillé
-        if (user.isLocked()) {
-            throw new RuntimeException("Votre compte est verrouillé pour inactivité.");
-        }
-
-        // Récupérer l'admin associé à l'entreprise de l'utilisateur
-        User admin = user.getEntreprise().getAdmin();
-
-        // Vérifier si l'utilisateur est ADMIN
-        boolean isAdmin = user.getRole().getName().equals(RoleType.ADMIN);
-
-        // Vérifier si le compte a été créé il y a moins de 24h
-        LocalDateTime expirationDate = user.getCreatedAt().plusHours(24);
-        boolean within24Hours = LocalDateTime.now().isBefore(expirationDate);
-
-        //  on ne BLOQUE plus la connexion même si les comptes ne sont pas activés
-        // Les statuts seront renvoyés au front dans le token
-
-        user.setLastActivity(LocalDateTime.now());
-        usersRepository.save(user);
-
-        return generateToken(user, admin, within24Hours);
+    if (!passwordEncoder.matches(password, user.getPassword())) {
+        throw new RuntimeException("Email ou mot de passe incorrect");
     }
 
-    // Génération du token avec infos supplémentaires
-    private String generateToken(User user, User admin, boolean within24Hours) {
-        long expirationTime = 1000 * 60 * 60 * 24 * 7;
-        Date now = new Date();
-        Date expirationDate = new Date(now.getTime() + expirationTime);
-
-        boolean isAdmin = user.getRole().getName().equals(RoleType.ADMIN);
-
-        // Statuts à envoyer dans le token
-        boolean userActivated = user.isEnabledLien();
-        boolean adminActivated = admin.isEnabledLien();
-        boolean userActivationPossible = isAdmin ? (user.isActivatedLien() || within24Hours) : true;
-
-        return Jwts.builder()
-                .setSubject(String.valueOf(user.getId()))
-                .claim("role", user.getRole().getName())
-                .claim("userActivated", userActivated)
-                .claim("adminActivated", adminActivated)
-                .claim("userActivationPossible", userActivationPossible)
-                .setIssuedAt(now)
-                .setExpiration(expirationDate)
-                .signWith(SignatureAlgorithm.HS256, jwtConfig.getSecretKey())
-                .compact();
+    if (user.isLocked()) {
+        throw new RuntimeException("Votre compte est verrouillé pour inactivité.");
     }
+
+    User admin = user.getEntreprise().getAdmin();
+    boolean isAdmin = user.getRole().getName().equals(RoleType.ADMIN);
+    boolean within24Hours = LocalDateTime.now().isBefore(user.getCreatedAt().plusHours(24));
+
+    user.setLastActivity(LocalDateTime.now());
+    usersRepository.save(user);
+
+    String accessToken = generateAccessToken(user, admin, within24Hours);
+    String refreshToken = generateRefreshToken(user);
+
+    Map<String, String> tokens = new HashMap<>();
+    tokens.put("accessToken", accessToken);
+    tokens.put("refreshToken", refreshToken);
+    return tokens;
+}
+
+            // Génération du token avec infos supplémentaires
+            public String generateAccessToken(User user, User admin, boolean within24Hours) {
+            long expirationTime = 1000 * 60 * 1;
+            Date now = new Date();
+            Date expirationDate = new Date(now.getTime() + expirationTime);
+
+            boolean isAdmin = user.getRole().getName().equals(RoleType.ADMIN);
+
+            boolean userActivated = user.isEnabledLien();
+            boolean adminActivated = admin.isEnabledLien();
+            boolean userActivationPossible = isAdmin ? (user.isActivatedLien() || within24Hours) : true;
+
+            return Jwts.builder()
+                    .setSubject(String.valueOf(user.getId()))
+                    .claim("role", user.getRole().getName())
+                    .claim("userActivated", userActivated)
+                    .claim("adminActivated", adminActivated)
+                    .claim("userActivationPossible", userActivationPossible)
+                    .setIssuedAt(now)
+                    .setExpiration(expirationDate)
+                    .signWith(SignatureAlgorithm.HS256, jwtConfig.getSecretKey())
+                    .compact();
+        }
+        public String generateRefreshToken(User user) {
+            long refreshExpiration = 1000L * 60 * 60 * 24 * 7; // 7 jours
+            Date now = new Date();
+            Date expirationDate = new Date(now.getTime() + refreshExpiration);
+
+            return Jwts.builder()
+                    .setSubject(String.valueOf(user.getId()))
+                    .setIssuedAt(now)
+                    .setExpiration(expirationDate)
+                    .signWith(SignatureAlgorithm.HS256, jwtConfig.getSecretKey())
+                    .compact();
+        }
+
+
+    
 
 
     // Activation du compte via le lien d'activation (email + code PIN)
