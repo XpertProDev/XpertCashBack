@@ -152,21 +152,23 @@ public class FactureProformaController {
         if (token == null || !token.startsWith("Bearer ")) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(null);
         }
-    
+
         Long userId;
         try {
             userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(null);
         }
-    
+
         try {
-            List<Map<String, Object>> factures = factureProformaService.getFacturesParEntrepriseParUtilisateur(userId);
+            List<Map<String, Object>> factures = factureProformaService.getFacturesParEntrepriseParUtilisateur(userId, request);
             return ResponseEntity.ok(factures);
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
         }
     }
+
+
 
     // Endpoint Get bye id
     @GetMapping("/factureProforma/{id}")

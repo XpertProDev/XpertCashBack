@@ -172,60 +172,61 @@ public void supprimerFactureReelleLiee(FactureProForma proforma) {
 }
 
 
-    //Methode pour lister les factures Reel
-    public List<FactureReelleDTO> listerMesFacturesReelles(HttpServletRequest request) {
-        // 1. Récupérer le token et extraire l'ID utilisateur
-        String token = request.getHeader("Authorization");
-        if (token == null || !token.startsWith("Bearer ")) {
-            throw new RuntimeException("Token JWT manquant ou mal formaté");
-        }
+   // Méthode pour lister les factures réelles
+public List<FactureReelleDTO> listerMesFacturesReelles(HttpServletRequest request) {
+    // 🔐 Récupération et validation du token
+    String token = request.getHeader("Authorization");
+    if (token == null || !token.startsWith("Bearer ")) {
+        throw new RuntimeException("Token JWT manquant ou mal formaté");
+    }
 
-        Long userId;
-        try {
-            userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
-        } catch (Exception e) {
-            throw new RuntimeException("Erreur lors de l'extraction de l'utilisateur", e);
-        }
+    Long userId;
+    try {
+        userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
+    } catch (Exception e) {
+        throw new RuntimeException("Erreur lors de l'extraction de l'utilisateur", e);
+    }
 
-        User utilisateur = usersRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
+    // 👤 Utilisateur courant
+    User utilisateur = usersRepository.findById(userId)
+            .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
 
-        Entreprise entreprise = utilisateur.getEntreprise();
-        if (entreprise == null) {
-            throw new RuntimeException("L'utilisateur n'est associé à aucune entreprise");
-        }
+    // 🏢 Vérification de l'entreprise
+    Entreprise entreprise = utilisateur.getEntreprise();
+    if (entreprise == null) {
+        throw new RuntimeException("L'utilisateur n'est associé à aucune entreprise");
+    }
 
+    // 🔐 Vérification des permissions
+    boolean isAdmin = CentralAccess.isAdminOfEntreprise(utilisateur, entreprise.getId());
+    boolean hasPermission = utilisateur.getRole().hasPermission(PermissionType.Gestion_Facture);
 
-       Long entrepriseId = entreprise.getId();
-        boolean isAdminOrManager = CentralAccess.isAdminOrManagerOfEntreprise(utilisateur, entrepriseId);
-        boolean hasPermission = utilisateur.getRole().hasPermission(PermissionType.Gestion_Facture);
+    // 📦 Vérification de l'activation du module
+    moduleActivationService.verifierAccesModulePourEntreprise(entreprise, "GESTION_FACTURATION");
 
-        List<FactureReelle> factures;
-
-        if (isAdminOrManager || hasPermission) {
-            // Peut voir toutes les factures de l’entreprise
-            factures = factureReelleRepository.findByEntrepriseOrderByDateCreationDesc(entreprise);
-        } else {
-            // Peut voir uniquement ses propres factures
-            factures = factureReelleRepository.findByEntrepriseAndUtilisateurCreateurOrderByDateCreationDesc(
+    // 🔍 Récupération des factures
+    List<FactureReelle> factures;
+    if (isAdmin || hasPermission) {
+        // Peut voir toutes les factures de l’entreprise
+        factures = factureReelleRepository.findByEntrepriseOrderByDateCreationDesc(entreprise);
+    } else {
+        // Peut voir uniquement ses propres factures
+        factures = factureReelleRepository.findByEntrepriseAndUtilisateurCreateurOrderByDateCreationDesc(
                 entreprise, utilisateur
-            );
-        }
+        );
+    }
 
-        moduleActivationService.verifierAccesModulePourEntreprise(entreprise, "GESTION_FACTURATION");
-
-
-        return factures.stream()
-                .map(facture -> {
+    // 🔄 Transformation en DTO
+    return factures.stream()
+            .map(facture -> {
                 BigDecimal totalFacture = BigDecimal.valueOf(facture.getTotalFacture());
                 BigDecimal totalPaye = paiementRepository.sumMontantsByFactureReelle(facture.getId());
                 if (totalPaye == null) totalPaye = BigDecimal.ZERO;
                 BigDecimal montantRestant = totalFacture.subtract(totalPaye);
                 return new FactureReelleDTO(facture, montantRestant);
             })
-
-                .collect(Collectors.toList());
-    }
+            .collect(Collectors.toList());
+}
 
     // Trier les facture par mois/année
     public ResponseEntity<?> filtrerFacturesParMoisEtAnnee(Integer mois, Integer annee, HttpServletRequest request) {
@@ -347,15 +348,8 @@ public void supprimerFactureReelleLiee(FactureProForma proforma) {
 }
 
 
-   public FactureReelle enregistrerPaiement(Long factureId, BigDecimal montant, String modePaiement, HttpServletRequest request) {
-    FactureReelle facture = factureReelleRepository.findById(factureId)
-        .orElseThrow(() -> new RuntimeException("Facture introuvable"));
-
-      // Bloquer tout paiement si facture déjà réglée
-    if (facture.getStatutPaiement() == StatutPaiementFacture.PAYEE) {
-        throw new RuntimeException("Cette facture est déjà totalement réglée.");
-    }
-
+  public FactureReelle enregistrerPaiement(Long factureId, BigDecimal montant, String modePaiement, HttpServletRequest request) {
+    // 🔐 Vérification du token
     String token = request.getHeader("Authorization");
     if (token == null || !token.startsWith("Bearer ")) {
         throw new RuntimeException("Token JWT manquant ou mal formaté");
@@ -363,24 +357,49 @@ public void supprimerFactureReelleLiee(FactureProForma proforma) {
 
     Long userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
     User utilisateur = usersRepository.findById(userId)
-        .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
+            .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
 
-    // Recalculer le total payé avant ce nouveau paiement
+    // 🧾 Récupération de la facture
+    FactureReelle facture = factureReelleRepository.findById(factureId)
+            .orElseThrow(() -> new RuntimeException("Facture introuvable"));
+
+    Entreprise entrepriseUtilisateur = utilisateur.getEntreprise();
+    Entreprise entrepriseFacture = facture.getEntreprise();
+
+    if (entrepriseUtilisateur == null || entrepriseFacture == null ||
+        !entrepriseUtilisateur.getId().equals(entrepriseFacture.getId())) {
+        throw new RuntimeException("L'utilisateur et la facture ne sont pas dans la même entreprise.");
+    }
+
+    // 🔐 Vérification des droits
+    boolean isAdmin = CentralAccess.isAdminOfEntreprise(utilisateur, entrepriseUtilisateur.getId());
+    boolean hasPermission = utilisateur.getRole().hasPermission(PermissionType.Gestion_Facture);
+
+    if (!isAdmin && !hasPermission) {
+        throw new RuntimeException("Vous n'avez pas les droits pour enregistrer un paiement.");
+    }
+
+    // ✅ Vérification du module
+    moduleActivationService.verifierAccesModulePourEntreprise(entrepriseUtilisateur, "GESTION_FACTURATION");
+
+    // ❌ Facture déjà réglée
+    if (facture.getStatutPaiement() == StatutPaiementFacture.PAYEE) {
+        throw new RuntimeException("Cette facture est déjà totalement réglée.");
+    }
+
+    // 💰 Recalcul du total payé avant ce nouveau paiement
     BigDecimal totalPayeAvant = paiementRepository.sumMontantsByFactureReelle(factureId);
     if (totalPayeAvant == null) totalPayeAvant = BigDecimal.ZERO;
 
     BigDecimal totalFacture = BigDecimal.valueOf(facture.getTotalFacture());
-
-    // Calcul du nouveau total après ajout de ce paiement
     BigDecimal totalApresPaiement = totalPayeAvant.add(montant);
 
-    // On n'accepte pas un dépassement du montant total
     if (totalApresPaiement.compareTo(totalFacture) > 0) {
         BigDecimal montantRestant = totalFacture.subtract(totalPayeAvant);
         throw new RuntimeException("Le paiement dépasse le montant total de la facture. Montant restant dû : " + montantRestant + " FCFA");
     }
 
-    // Création du paiement
+    // 📝 Création du paiement
     Paiement paiement = new Paiement();
     paiement.setMontant(montant);
     paiement.setDatePaiement(LocalDate.now());
@@ -390,10 +409,8 @@ public void supprimerFactureReelleLiee(FactureProForma proforma) {
 
     paiementRepository.save(paiement);
 
-    // Recalculer après paiement
+    // 🔁 Mise à jour du statut de la facture
     BigDecimal totalPaye = paiementRepository.sumMontantsByFactureReelle(factureId);
-
-    // Mettre à jour le statut
     if (totalPaye.compareTo(totalFacture) >= 0) {
         facture.setStatutPaiement(StatutPaiementFacture.PAYEE);
     } else if (totalPaye.compareTo(BigDecimal.ZERO) > 0) {

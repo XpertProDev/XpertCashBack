@@ -102,30 +102,44 @@ public class ProduitService {
     public List<ProduitDTO> createProduit(HttpServletRequest request, List<Long> boutiqueIds, 
                                       List<Integer> quantites, List<Integer> seuilAlert, ProduitRequest produitRequest, boolean addToStock, String image) {
         try {
-            // Vérification de la validité du token
+            // ✅ Extraction et validation du token
             String token = request.getHeader("Authorization");
             if (token == null || !token.startsWith("Bearer ")) {
                 throw new RuntimeException("Token JWT manquant ou mal formaté");
             }
+
             String jwtToken = token.substring(7);
-            Long adminId = jwtUtil.extractUserId(jwtToken);
-            User admin = usersRepository.findById(adminId)
-                    .orElseThrow(() -> new RuntimeException("Admin non trouvé"));
+            Long utilisateurId;
+            try {
+                utilisateurId = jwtUtil.extractUserId(jwtToken);
+            } catch (Exception e) {
+                throw new RuntimeException("Erreur lors de l'extraction de l'ID utilisateur depuis le token", e);
+            }
 
+            // ✅ Chargement de l'utilisateur connecté
+            User utilisateur = usersRepository.findById(utilisateurId)
+                    .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
 
-             // Récupérer la première boutique pour identifier l'entreprise
+            // ✅ Récupération de la boutique et de l’entreprise associée
             Boutique premiereBoutique = boutiqueRepository.findById(boutiqueIds.get(0))
                     .orElseThrow(() -> new RuntimeException("Boutique non trouvée"));
-            Long entrepriseId = premiereBoutique.getEntreprise().getId();
 
-            // ✅ Vérification des rôles et permissions
-            RoleType role = admin.getRole().getName();
-            boolean isAdminOrManager = CentralAccess.isAdminOrManagerOfEntreprise(admin, entrepriseId);
-            boolean hasPermission = admin.getRole().hasPermission(PermissionType.GERER_PRODUITS);
-
-            if (!isAdminOrManager && !hasPermission) {
-                throw new RuntimeException("Vous n'avez pas les droits pour ajouter un produit !");
+            Entreprise entreprise = premiereBoutique.getEntreprise();
+            if (entreprise == null) {
+                throw new RuntimeException("La boutique n'est liée à aucune entreprise.");
             }
+
+            Long entrepriseId = entreprise.getId();
+
+            // 🔐 Vérification : seul un ADMIN ou un utilisateur avec la permission peut continuer
+            boolean isAdmin = utilisateur.getRole().getName() == RoleType.ADMIN;
+            boolean hasPermission = utilisateur.getRole().hasPermission(PermissionType.GERER_PRODUITS);
+
+            if (!isAdmin && !hasPermission) {
+                throw new RuntimeException("Accès refusé : seuls les ADMIN ou les utilisateurs ayant la permission GERER_PRODUITS peuvent ajouter un produit.");
+            }
+
+     
 
 
 
@@ -223,8 +237,6 @@ public class ProduitService {
 }
 
 
-
-
     private ProduitDTO mapToDTO(Produit produit) {
         ProduitDTO produitDTO = new ProduitDTO();
         produitDTO.setId(produit.getId());
@@ -270,34 +282,43 @@ public class ProduitService {
     //Methode pour ajuster la quantiter du produit en stock
     public Facture ajouterStock(Long boutiqueId, Map<Long, Integer> produitsQuantites, String description, String codeFournisseur, Long fournisseurId, HttpServletRequest request) {
 
-        // Récupérer le token JWT depuis le header "Authorization"
+        // Extraction du token JWT
         String token = request.getHeader("Authorization");
         if (token == null || !token.startsWith("Bearer ")) {
             throw new RuntimeException("Token JWT manquant ou mal formaté");
         }
-    
-          Long userId = jwtUtil.extractUserId(token.substring(7));
+
+        Long userId;
+        try {
+            userId = jwtUtil.extractUserId(token.substring(7));
+        } catch (Exception e) {
+            throw new RuntimeException("Erreur lors de l'extraction de l'ID de l'utilisateur depuis le token", e);
+        }
+
+        // ✅ Récupération de l'utilisateur
         User user = usersRepository.findById(userId)
-            .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
-    
-  
+                .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+
+        // ✅ Récupération de la boutique
         Boutique boutique = boutiqueRepository.findById(boutiqueId)
-        .orElseThrow(() -> new RuntimeException("Boutique introuvable"));
+                .orElseThrow(() -> new RuntimeException("Boutique introuvable"));
 
         Long entrepriseId = boutique.getEntreprise().getId();
 
-         // 🔐 Vérifier que l'utilisateur appartient à la même entreprise que la boutique
+        // 🔒 Vérifier que l'utilisateur appartient bien à la même entreprise
         if (!user.getEntreprise().getId().equals(entrepriseId)) {
             throw new RuntimeException("Accès interdit : cette boutique ne vous appartient pas");
         }
 
-         // 🔐 Contrôle d'accès
-        boolean isAdminOrManager = CentralAccess.isAdminOrManagerOfEntreprise(user, entrepriseId);
+        // 🔐 Contrôle d'accès strict : seulement ADMIN ou permission explicite
+        boolean isAdmin = user.getRole().getName() == RoleType.ADMIN;
         boolean hasPermission = user.getRole().hasPermission(PermissionType.GERER_PRODUITS);
 
-        if (!isAdminOrManager && !hasPermission) {
-            throw new RuntimeException("Vous n'avez pas les droits pour ajouter du stock à cette boutique !");
+        if (!isAdmin && !hasPermission) {
+            throw new RuntimeException("Accès refusé : seuls les ADMIN ou les utilisateurs ayant la permission GERER_PRODUITS peuvent gérer le stock de cette boutique.");
         }
+
+        
     
         List<Produit> produits = new ArrayList<>();
         Fournisseur fournisseurEntity = null;
@@ -388,39 +409,47 @@ public class ProduitService {
     // Méthode pour ajuster la quantité du produit en stock (retirer des produits)
     public FactureDTO retirerStock(Long boutiqueId, Map<Long, Integer> produitsQuantites, String description, HttpServletRequest request) {
 
-    // 1️⃣ Authentification via JWT
-    String token = request.getHeader("Authorization");
-    if (token == null || !token.startsWith("Bearer ")) {
-        throw new RuntimeException("Token JWT manquant ou mal formaté");
-    }
-    String jwtToken = token.substring(7);
-    Long userId = jwtUtil.extractUserId(jwtToken);
+        // 🔐 Extraction et vérification du token JWT
+        String token = request.getHeader("Authorization");
+        if (token == null || !token.startsWith("Bearer ")) {
+            throw new RuntimeException("Token JWT manquant ou mal formaté");
+        }
+        String jwtToken = token.substring(7);
 
-    // 2️⃣ Chargement de l'utilisateur
-    User user = usersRepository.findById(userId)
-            .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+        Long userId;
+        try {
+            userId = jwtUtil.extractUserId(jwtToken);
+        } catch (Exception e) {
+            throw new RuntimeException("Erreur lors de l'extraction de l'ID utilisateur depuis le token", e);
+        }
 
-    // 3️⃣ Vérification de la boutique
-    Boutique boutique = boutiqueRepository.findById(boutiqueId)
-            .orElseThrow(() -> new RuntimeException("Boutique introuvable"));
+        // 2️⃣ Chargement de l'utilisateur
+        User user = usersRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
 
-    if (!boutique.isActif()) {
-        throw new RuntimeException("La boutique est désactivée, opération non autorisée.");
-    }
+        // 3️⃣ Vérification de la boutique
+        Boutique boutique = boutiqueRepository.findById(boutiqueId)
+                .orElseThrow(() -> new RuntimeException("Boutique introuvable"));
 
-    // 4️⃣ Vérification que la boutique appartient à l'entreprise de l'utilisateur
-    Long entrepriseId = boutique.getEntreprise().getId();
-    if (!entrepriseId.equals(user.getEntreprise().getId())) {
-        throw new RuntimeException("Accès interdit : cette boutique n'appartient pas à votre entreprise.");
-    }
+        if (!boutique.isActif()) {
+            throw new RuntimeException("La boutique est désactivée, opération non autorisée.");
+        }
 
-    // 5️⃣ Vérification des permissions
-    boolean isAdminOrManager = CentralAccess.isAdminOrManagerOfEntreprise(user, entrepriseId);
-    boolean hasPermission = user.getRole().hasPermission(PermissionType.GERER_PRODUITS);
+        // 4️⃣ Vérification que la boutique appartient à l'entreprise de l'utilisateur
+        Long entrepriseId = boutique.getEntreprise().getId();
+        if (!entrepriseId.equals(user.getEntreprise().getId())) {
+            throw new RuntimeException("Accès interdit : cette boutique n'appartient pas à votre entreprise.");
+        }
 
-    if (!isAdminOrManager && !hasPermission) {
-        throw new RuntimeException("Vous n'avez pas les droits pour retirer du stock !");
-    }
+        // 5️⃣ Vérification stricte des droits : seul ADMIN ou permission explicite
+        boolean isAdmin = user.getRole().getName() == RoleType.ADMIN;
+        boolean hasPermission = user.getRole().hasPermission(PermissionType.GERER_PRODUITS);
+
+        if (!isAdmin && !hasPermission) {
+            throw new RuntimeException("Vous n'avez pas les droits nécessaires pour retirer du stock !");
+        }
+
+ 
 
     List<Produit> produits = new ArrayList<>();
 
@@ -936,11 +965,11 @@ public class ProduitService {
         User user = usersRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
 
-        RoleType role = user.getRole().getName();
-        boolean isAuthorized = (role == RoleType.ADMIN || role == RoleType.MANAGER) 
-                            && user.getRole().hasPermission(PermissionType.GERER_PRODUITS);
+       boolean isAdmin = user.getRole().getName() == RoleType.ADMIN;
+       boolean hasPermission = user.getRole().hasPermission(PermissionType.GERER_PRODUITS);
+        
 
-        if (!isAuthorized) {
+       if (!isAdmin && !hasPermission) {
             throw new RuntimeException("Action non autorisée : permissions insuffisantes");
         }
 
@@ -987,11 +1016,10 @@ public class ProduitService {
                 .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
 
         // 3. Vérification des rôles et permissions
-        RoleType role = user.getRole().getName();
-        boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
+        boolean isAdmin = user.getRole().getName() == RoleType.ADMIN;
         boolean hasPermission = user.getRole().hasPermission(PermissionType.GERER_PRODUITS);
 
-        if (!isAdminOrManager && !hasPermission) {
+        if (!isAdmin && !hasPermission) {
             throw new RuntimeException("Action non autorisée : permissions insuffisantes");
         }
 
@@ -1035,11 +1063,11 @@ public class ProduitService {
     }
 
     // 🔒 Vérifications CentralAccess & permissions
-    boolean isAdminOrManager = CentralAccess.isAdminOrManagerOfEntreprise(user, entrepriseId);
+    boolean isAdmin = user.getRole().getName() == RoleType.ADMIN;
     boolean hasPermissionVente = user.getRole().hasPermission(PermissionType.VENDRE_PRODUITS);
     boolean hasPermissionGestion = user.getRole().hasPermission(PermissionType.GERER_PRODUITS);
 
-    if (!isAdminOrManager && !hasPermissionVente && !hasPermissionGestion) {
+    if (!isAdmin && !hasPermissionVente && !hasPermissionGestion) {
         throw new RuntimeException("Accès interdit : vous n'avez pas les droits pour consulter les produits.");
     }
 
