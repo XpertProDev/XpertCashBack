@@ -240,35 +240,44 @@ public class ProduitController {
         }
 
      // Lister les produits par boutique
+        // @GetMapping("/produits/{boutiqueId}/stock")
+        // public ResponseEntity<?> getProduitsParStock(@PathVariable Long boutiqueId, HttpServletRequest request) {
+        //     try {
+        //         // Supposons que l'ID utilisateur est injecté via le middleware de sécurité (ex : JWT)
+        //         Long userId = (Long) request.getAttribute("userId");
+
+        //         if (userId == null) {
+        //             Map<String, String> errorResponse = new HashMap<>();
+        //             errorResponse.put("error", "Utilisateur non authentifié.");
+        //             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(errorResponse);
+        //         }
+
+        //         List<ProduitDTO> produitsDTO = produitService.getProduitsParStock(boutiqueId, userId);
+        //         return ResponseEntity.ok(produitsDTO);
+
+        //     } catch (RuntimeException e) {
+        //         Map<String, String> errorResponse = new HashMap<>();
+        //         errorResponse.put("error", e.getMessage());
+
+        //         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
+
+        //     } catch (Exception e) {
+        //         Map<String, String> errorResponse = new HashMap<>();
+        //         errorResponse.put("error", "Une erreur interne est survenue lors de la récupération des produits.");
+
+        //         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
+        //     }
+        // }
+
+
         @GetMapping("/produits/{boutiqueId}/stock")
-        public ResponseEntity<?> getProduitsParStock(@PathVariable Long boutiqueId, HttpServletRequest request) {
-            try {
-                // Supposons que l'ID utilisateur est injecté via le middleware de sécurité (ex : JWT)
-                Long userId = (Long) request.getAttribute("userId");
-
-                if (userId == null) {
-                    Map<String, String> errorResponse = new HashMap<>();
-                    errorResponse.put("error", "Utilisateur non authentifié.");
-                    return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(errorResponse);
-                }
-
-                List<ProduitDTO> produitsDTO = produitService.getProduitsParStock(boutiqueId, userId);
-                return ResponseEntity.ok(produitsDTO);
-
-            } catch (RuntimeException e) {
-                Map<String, String> errorResponse = new HashMap<>();
-                errorResponse.put("error", e.getMessage());
-
-                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
-
-            } catch (Exception e) {
-                Map<String, String> errorResponse = new HashMap<>();
-                errorResponse.put("error", "Une erreur interne est survenue lors de la récupération des produits.");
-
-                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
-            }
+         public ResponseEntity<List<ProduitDTO>> getProduitsParStock(
+        @PathVariable Long boutiqueId,
+        HttpServletRequest request
+        ) {
+            List<ProduitDTO> produits = produitService.getProduitsParStock(boutiqueId, request);
+            return ResponseEntity.ok(produits);
         }
-
 
 
 

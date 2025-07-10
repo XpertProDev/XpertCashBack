@@ -4,6 +4,7 @@ import com.xpertcash.DTOs.BoutiqueResponse;
 import com.xpertcash.DTOs.EntrepriseDTO;
 import com.xpertcash.DTOs.UpdateUserRequest;
 import com.xpertcash.DTOs.USER.UserRequest;
+import com.xpertcash.configuration.CentralAccess;
 import com.xpertcash.configuration.JwtConfig;
 import com.xpertcash.configuration.JwtUtil;
 import com.xpertcash.configuration.PasswordGenerator;
@@ -388,14 +389,18 @@ public class UsersService {
                 User admin = usersRepository.findById(adminId)
                         .orElseThrow(() -> new RuntimeException("Admin non trouvé"));
 
-                // Vérifier que l'Admin est bien un ADMIN
-                if (admin.getRole() == null || !admin.getRole().getName().equals(RoleType.ADMIN)) {
-                    throw new RuntimeException("Seul un ADMIN peut ajouter des utilisateurs !");
+                 // Vérifier que l'utilisateur a une entreprise
+                Entreprise entreprise = admin.getEntreprise();
+                if (entreprise == null) {
+                    throw new BusinessException("Vous n'avez pas d'entreprise associée.");
                 }
 
-                // Vérifier que l'Admin possède une entreprise
-                if (admin.getEntreprise() == null) {
-                    throw new BusinessException("L'Admin n'a pas d'entreprise associée.");
+                  // 🔐 Vérification des droits : admin, manager ou permission gestion personnel
+                boolean isAdminOrManager = CentralAccess.isAdminOrManagerOfEntreprise(admin, entreprise.getId());
+                boolean hasPermission = admin.getRole().hasPermission(PermissionType.GERER_UTILISATEURS);
+
+                if (!isAdminOrManager && !hasPermission) {
+                    throw new RuntimeException("Accès refusé : seuls les administrateurs, managers ou les utilisateurs autorisés peuvent ajouter un employé.");
                 }
 
                 // Vérifier si un utilisateur avec le même email ou téléphone existe déjà
@@ -480,41 +485,73 @@ public class UsersService {
             }
 
     //Attribution des permissions à un utilisateur
-    @Transactional
-    public User assignPermissionsToUser(Long userId, Map<PermissionType, Boolean> permissions) {
-        User user = usersRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
-
-        // Vérifier que l'utilisateur a un rôle
-        if (user.getRole() == null) {
-            throw new RuntimeException("L'utilisateur n'a pas de rôle attribué.");
-        }
-
-        // Récupérer les permissions existantes du rôle
-        List<Permission> existingPermissions = user.getRole().getPermissions();
-
-        // Ajouter ou retirer les permissions en fonction de la map reçue
-        permissions.forEach((permissionType, isEnabled) -> {
-            Permission permission = permissionRepository.findByType(permissionType)
-                    .orElseThrow(() -> new RuntimeException("Permission non trouvée : " + permissionType));
-
-            if (isEnabled) {
-                // Ajouter la permission si elle n'existe pas déjà
-                if (!existingPermissions.contains(permission)) {
-                    existingPermissions.add(permission);
-                }
-            } else {
-                // Retirer la permission si elle existe
-                existingPermissions.remove(permission);
-            }
-        });
-
-        // Mettre à jour les permissions du rôle
-        user.getRole().setPermissions(existingPermissions);
-        roleRepository.save(user.getRole());
-
-        return user;
+        @Transactional
+public User assignPermissionsToUser(Long userId, Map<PermissionType, Boolean> permissions, HttpServletRequest request) {
+    // 🔐 Extraction du token JWT
+    String token = request.getHeader("Authorization");
+    if (token == null || !token.startsWith("Bearer ")) {
+        throw new RuntimeException("Token JWT manquant ou mal formaté");
     }
+
+    token = token.replace("Bearer ", "");
+    Long currentUserId;
+    try {
+        currentUserId = jwtUtil.extractUserId(token);
+    } catch (Exception e) {
+        throw new RuntimeException("Erreur lors de l'extraction de l'ID utilisateur depuis le token", e);
+    }
+
+    // 👤 Utilisateur connecté
+    User currentUser = usersRepository.findById(currentUserId)
+            .orElseThrow(() -> new RuntimeException("Utilisateur courant non trouvé"));
+
+    // 👤 Utilisateur cible
+    User targetUser = usersRepository.findById(userId)
+            .orElseThrow(() -> new RuntimeException("Utilisateur cible non trouvé"));
+
+    // 🔒 Vérification d'appartenance à la même entreprise
+    Entreprise entrepriseCourante = currentUser.getEntreprise();
+    Entreprise entrepriseCible = targetUser.getEntreprise();
+
+    if (entrepriseCourante == null || entrepriseCible == null || !entrepriseCourante.getId().equals(entrepriseCible.getId())) {
+        throw new RuntimeException("Opération interdite : les deux utilisateurs ne sont pas dans la même entreprise.");
+    }
+
+    // 🔐 Vérification des autorisations
+    boolean isAdminOrManager = CentralAccess.isAdminOrManagerOfEntreprise(currentUser, entrepriseCourante.getId());
+    boolean hasPermission = currentUser.getRole().hasPermission(PermissionType.GERER_UTILISATEURS);
+
+    if (!isAdminOrManager && !hasPermission) {
+        throw new RuntimeException("Accès refusé : seuls les administrateurs, managers ou personnes autorisées peuvent gérer les permissions.");
+    }
+
+    // 🎯 Vérification du rôle de l'utilisateur cible
+    if (targetUser.getRole() == null) {
+        throw new RuntimeException("L'utilisateur cible n'a pas de rôle attribué.");
+    }
+
+    // ⚙️ Mise à jour des permissions
+    List<Permission> existingPermissions = targetUser.getRole().getPermissions();
+
+    permissions.forEach((permissionType, isEnabled) -> {
+        Permission permission = permissionRepository.findByType(permissionType)
+                .orElseThrow(() -> new RuntimeException("Permission non trouvée : " + permissionType));
+
+        if (isEnabled) {
+            if (!existingPermissions.contains(permission)) {
+                existingPermissions.add(permission);
+            }
+        } else {
+            existingPermissions.remove(permission);
+        }
+    });
+
+    // 💾 Sauvegarde
+    targetUser.getRole().setPermissions(existingPermissions);
+    roleRepository.save(targetUser.getRole());
+
+    return targetUser;
+}
 
     //Suprim UserToEntreprise
     @Transactional
@@ -657,15 +694,32 @@ public class UsersService {
 }
 
     // Pour la récupération de tous les utilisateurs d'une entreprise
-    public List<User> getAllUsersOfEntreprise(Long entrepriseId) {
-        // Récupérer l'entreprise
-        Entreprise entreprise = entrepriseRepository.findById(entrepriseId)
-                .orElseThrow(() -> new RuntimeException("Entreprise non trouvée"));
-
-        // Exclure l'ADMIN de la liste des utilisateurs
-        Long adminId = entreprise.getAdmin().getId();
-        return usersRepository.findByEntrepriseIdAndIdNot(entrepriseId, adminId);
+    public List<User> getAllUsersOfEntreprise(HttpServletRequest request) {
+    String token = request.getHeader("Authorization");
+    if (token == null || !token.startsWith("Bearer ")) {
+        throw new RuntimeException("Token JWT manquant ou mal formaté");
     }
+
+    Long userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
+    User user = usersRepository.findById(userId)
+            .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
+
+    Entreprise entreprise = user.getEntreprise();
+    if (entreprise == null) {
+        throw new RuntimeException("Aucune entreprise associée à cet utilisateur.");
+    }
+
+    boolean isAdminOrManager = CentralAccess.isAdminOrManagerOfEntreprise(user, entreprise.getId());
+    boolean hasPermission = user.getRole().hasPermission(PermissionType.GERER_UTILISATEURS);
+
+    if (!isAdminOrManager && !hasPermission) {
+        throw new RuntimeException("Accès refusé : vous n'avez pas les droits nécessaires.");
+    }
+
+    Long adminId = entreprise.getAdmin().getId();
+    return usersRepository.findByEntrepriseIdAndIdNot(entreprise.getId(), adminId);
+}
+
 
     //Get user by id
    public User getUserById(Long userId, HttpServletRequest request) {

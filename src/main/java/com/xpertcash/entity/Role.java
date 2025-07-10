@@ -24,7 +24,7 @@ public class Role {
     @Column(unique = true, nullable = false)
     private RoleType name;
 
-    @ManyToMany(fetch = FetchType.EAGER)  // Relation ManyToMany avec Permission
+    @ManyToMany(fetch = FetchType.EAGER)
     @JoinTable(
         name = "role_permissions",
         joinColumns = @JoinColumn(name = "role_id"),

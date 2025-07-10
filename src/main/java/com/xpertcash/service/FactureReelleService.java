@@ -17,6 +17,7 @@ import org.springframework.stereotype.Service;
 
 import com.xpertcash.DTOs.FactureReelleDTO;
 import com.xpertcash.DTOs.PaiementDTO;
+import com.xpertcash.configuration.CentralAccess;
 import com.xpertcash.configuration.JwtUtil;
 import com.xpertcash.entity.Entreprise;
 import com.xpertcash.entity.FactureProForma;
@@ -194,9 +195,25 @@ public void supprimerFactureReelleLiee(FactureProForma proforma) {
             throw new RuntimeException("L'utilisateur n'est associé à aucune entreprise");
         }
 
+
+       Long entrepriseId = entreprise.getId();
+        boolean isAdminOrManager = CentralAccess.isAdminOrManagerOfEntreprise(utilisateur, entrepriseId);
+        boolean hasPermission = utilisateur.getRole().hasPermission(PermissionType.Gestion_Facture);
+
+        List<FactureReelle> factures;
+
+        if (isAdminOrManager || hasPermission) {
+            // Peut voir toutes les factures de l’entreprise
+            factures = factureReelleRepository.findByEntrepriseOrderByDateCreationDesc(entreprise);
+        } else {
+            // Peut voir uniquement ses propres factures
+            factures = factureReelleRepository.findByEntrepriseAndUtilisateurCreateurOrderByDateCreationDesc(
+                entreprise, utilisateur
+            );
+        }
+
         moduleActivationService.verifierAccesModulePourEntreprise(entreprise, "GESTION_FACTURATION");
 
-        List<FactureReelle> factures = factureReelleRepository.findByEntrepriseOrderByDateCreationDesc(entreprise);
 
         return factures.stream()
                 .map(facture -> {
@@ -291,19 +308,32 @@ public void supprimerFactureReelleLiee(FactureProForma proforma) {
         throw new RuntimeException("Erreur lors de l'extraction de l'ID utilisateur", e);
     }
 
-    // 👤 Récupérer l'utilisateur et son entreprise
+    // 👤 Récupérer l'utilisateur connecté
     User user = usersRepository.findById(userId)
             .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
-    Long entrepriseId = user.getEntreprise().getId();
 
     // 📄 Récupérer la facture
     FactureReelle facture = factureReelleRepository.findById(factureId)
             .orElseThrow(() -> new RuntimeException("Aucune facture trouvée"));
 
-    // 🔐 Vérifier que la facture appartient bien à l'entreprise de l'utilisateur
-    if (!facture.getEntreprise().getId().equals(entrepriseId)) {
+    Long entrepriseFactureId = facture.getEntreprise() != null ? facture.getEntreprise().getId() : null;
+    Long entrepriseUserId = user.getEntreprise() != null ? user.getEntreprise().getId() : null;
+
+     // 🔐 Vérification entreprise
+    if (entrepriseFactureId == null || entrepriseUserId == null || !entrepriseFactureId.equals(entrepriseUserId)) {
         throw new RuntimeException("Accès refusé : cette facture ne vous appartient pas !");
     }
+
+    // 🔒 Vérification des rôles et permissions
+        // 🔒 Vérification des rôles et permissions
+    boolean isAdminOrManagerOfEntreprise = CentralAccess.isAdminOrManagerOfEntreprise(user, entrepriseFactureId);
+    boolean hasPermission = user.getRole().hasPermission(PermissionType.Gestion_Facture);
+    boolean isCreateur = facture.getUtilisateurCreateur().getId().equals(userId);
+
+    if (!(isAdminOrManagerOfEntreprise || hasPermission || isCreateur)) {
+        throw new RuntimeException("Accès interdit : vous n'avez pas les droits pour consulter cette facture !");
+    }
+
 
     // 💰 Calculer le montant restant
     BigDecimal totalFacture = BigDecimal.valueOf(facture.getTotalFacture());
@@ -312,7 +342,7 @@ public void supprimerFactureReelleLiee(FactureProForma proforma) {
 
     BigDecimal montantRestant = totalFacture.subtract(totalPaye);
 
-    // ✅ Retourner le DTO avec montantRestant
+    // ✅ Retour DTO
     return new FactureReelleDTO(facture, montantRestant);
 }
 
@@ -430,47 +460,53 @@ public void supprimerFactureReelleLiee(FactureProForma proforma) {
 
 
     //Facture impayer all facture
-    public List<FactureReelleDTO> listerFacturesImpayees(HttpServletRequest request) {
-    // 🔐 1. Extraire l'utilisateur connecté depuis le token
+   public List<FactureReelleDTO> listerFacturesImpayees(HttpServletRequest request) {
+    // 🔐 1. Extraire le token JWT
     String token = request.getHeader("Authorization");
     if (token == null || !token.startsWith("Bearer ")) {
         throw new RuntimeException("Token JWT manquant ou mal formaté");
     }
 
-    Long userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
+    Long userId;
+    try {
+        userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
+    } catch (Exception e) {
+        throw new RuntimeException("Erreur lors de l'extraction de l'utilisateur depuis le token", e);
+    }
 
+    // 👤 2. Récupérer l'utilisateur connecté
     User user = usersRepository.findById(userId)
-        .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+            .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
 
-    Entreprise entreprise = user.getEntreprise();
-    if (entreprise == null) {
+    if (user.getEntreprise() == null) {
         throw new RuntimeException("Utilisateur n'est associé à aucune entreprise");
     }
 
-    Long entrepriseId = entreprise.getId();
+    Long entrepriseId = user.getEntreprise().getId();
 
-    // 🔐 2. Vérification des rôles et permissions
-    RoleType role = user.getRole().getName();
-    boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
-    boolean hasGestionFacturePermission = user.getRole().hasPermission(PermissionType.Gestion_Facture);
+    // 🔐 3. Vérifier s'il a le droit de voir toutes les factures
+    boolean isAuthorized = CentralAccess.isAdminOrManagerOfEntreprise(user, entrepriseId)
+            || user.getRole().hasPermission(PermissionType.Gestion_Facture);
 
-    List<FactureReelle> factures;
-
-    // 🔎 3. Sélectionner les factures impayées
+    // 🧾 4. Statuts concernés
     List<StatutPaiementFacture> statutsImpayes = List.of(
         StatutPaiementFacture.EN_ATTENTE,
         StatutPaiementFacture.PARTIELLEMENT_PAYEE
     );
 
-    if (isAdminOrManager || hasGestionFacturePermission) {
+    List<FactureReelle> factures;
+
+    if (isAuthorized) {
+        // Peut voir toutes les factures impayées de son entreprise
         factures = factureReelleRepository.findByEntrepriseIdAndStatutPaiementIn(entrepriseId, statutsImpayes);
     } else {
+        // Peut seulement voir les factures qu'il a créées dans son entreprise
         factures = factureReelleRepository.findByEntrepriseIdAndUtilisateurCreateurIdAndStatutPaiementIn(
             entrepriseId, userId, statutsImpayes
         );
     }
 
-   // on mappe et filtrer les champs
+    // 📦 5. Mapper vers des DTO filtrés
     return factures.stream().map(facture -> {
         BigDecimal total = BigDecimal.valueOf(facture.getTotalFacture());
         BigDecimal paye = paiementRepository.sumMontantsByFactureReelle(facture.getId());
@@ -478,11 +514,9 @@ public void supprimerFactureReelleLiee(FactureProForma proforma) {
 
         BigDecimal montantRestant = total.subtract(paye);
 
-        // DTO avec tous les champs remplis
         FactureReelleDTO dto = new FactureReelleDTO(facture, montantRestant);
 
-        // Supprimer les champs non nécessaires pour cette route
-        // dto.setUtilisateur(null);
+        // Nettoyage des infos sensibles ou inutiles
         dto.setEntrepriseClient(null);
         dto.setClient(null);
         dto.setLignesFacture(null);
@@ -492,11 +526,10 @@ public void supprimerFactureReelleLiee(FactureProForma proforma) {
 }
 
 
-
 //Modifier le statut d'une facture
 @Transactional
 public FactureProForma annulerFactureReelle(FactureReelle modifications, HttpServletRequest request) {
-    // 🔐 Extraction utilisateur depuis JWT
+    // 🔐 1. Extraction utilisateur depuis JWT
     String token = request.getHeader("Authorization");
     if (token == null || !token.startsWith("Bearer ")) {
         throw new RuntimeException("Token JWT manquant ou mal formaté");
@@ -512,39 +545,35 @@ public FactureProForma annulerFactureReelle(FactureReelle modifications, HttpSer
     User user = usersRepository.findById(userId)
             .orElseThrow(() -> new RuntimeException("Utilisateur introuvable !"));
 
+    // 📄 2. Récupération de la facture réelle
     FactureReelle factureReelle = factureReelleRepository.findById(modifications.getId())
             .orElseThrow(() -> new RuntimeException("Facture réelle introuvable !"));
 
     FactureProForma factureProForma = factureReelle.getFactureProForma();
+    Long entrepriseFactureId = factureReelle.getEntreprise().getId();
 
-    // érification du rôle et permission
-    RoleType role = user.getRole().getName();
-    boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
-    boolean hasGestionFacturePermission = user.getRole().hasPermission(PermissionType.Gestion_Facture);
+    // 🔐 3. Vérification des droits
+    boolean isAuthorized = CentralAccess.isAdminOrManagerOfEntreprise(user, entrepriseFactureId)
+            || user.getRole().hasPermission(PermissionType.Gestion_Facture);
 
-    
-    if (!isAdminOrManager && !hasGestionFacturePermission) {
+    if (!isAuthorized) {
         throw new RuntimeException("Accès refusé : vous n'avez pas les droits pour annuler cette facture.");
     }
-    if (!isAdminOrManager ) {
-        throw new RuntimeException("Vous n'êtes pas autorisé à annuler cette facture.");
-    }
 
-    // 🔒 Blocage si déjà annulée
+    // 🔒 4. Blocage si déjà annulée
     if (factureProForma.getStatut() == StatutFactureProForma.ANNULE) {
         throw new RuntimeException("Cette facture est déjà annulée.");
     }
 
-    // 🔒 Paiements associés ?
+    // 🔒 5. Vérifier les paiements
     BigDecimal totalPaye = paiementRepository.sumMontantsByFactureReelle(factureReelle.getId());
     if (totalPaye != null && totalPaye.compareTo(BigDecimal.ZERO) > 0) {
         throw new RuntimeException("Impossible d’annuler : des paiements ont déjà été effectués.");
     }
 
-    // ✅ Suppression via méthode utilitaire
+    // ✅ 6. Suppression et mise à jour
     supprimerFactureReelleLiee(factureProForma);
 
-    // ✅ Mise à jour de la proforma
     factureProForma.setStatut(StatutFactureProForma.ANNULE);
     factureProForma.setDateAnnulation(LocalDateTime.now());
     factureProForma.setUtilisateurAnnulateur(user);
@@ -552,7 +581,7 @@ public FactureProForma annulerFactureReelle(FactureReelle modifications, HttpSer
     factureProForma.setDernierRappelEnvoye(null);
     factureProForma.setNotifie(false);
 
-    // 📝 Historique
+    // 📝 7. Historique
     factProHistoriqueService.enregistrerActionHistorique(
             factureProForma,
             user,

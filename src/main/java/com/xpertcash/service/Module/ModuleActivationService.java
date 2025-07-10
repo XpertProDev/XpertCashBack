@@ -397,9 +397,13 @@ public void activerModuleAvecPaiement(Long userId,
     }
 
     // Vérification des droits
-    RoleType role = user.getRole().getName();
-    if (!(role == RoleType.ADMIN || role == RoleType.MANAGER)) {
-        throw new RuntimeException("Accès refusé : vous n'avez pas les droits nécessaires.");
+    // RoleType role = user.getRole().getName();
+    // if (!(role == RoleType.ADMIN || role == RoleType.MANAGER)) {
+    //     throw new RuntimeException("Accès refusé : vous n'avez pas les droits nécessaires.");
+    // }
+
+    if (user.getEntreprise() == null) {
+        throw new RuntimeException("L'utilisateur n'est associé à aucune entreprise");
     }
 
     Entreprise entreprise = user.getEntreprise();

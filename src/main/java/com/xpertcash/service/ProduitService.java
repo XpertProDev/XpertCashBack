@@ -18,6 +18,7 @@ import com.xpertcash.DTOs.FactureDTO;
 import com.xpertcash.DTOs.ProduitDTO;
 import com.xpertcash.DTOs.ProduitRequest;
 import com.xpertcash.DTOs.StockHistoryDTO;
+import com.xpertcash.configuration.CentralAccess;
 import com.xpertcash.configuration.JwtUtil;
 import com.xpertcash.entity.Boutique;
 import com.xpertcash.entity.Categorie;
@@ -100,122 +101,125 @@ public class ProduitService {
     // Ajouter un produit à la liste sans le stock
     public List<ProduitDTO> createProduit(HttpServletRequest request, List<Long> boutiqueIds, 
                                       List<Integer> quantites, List<Integer> seuilAlert, ProduitRequest produitRequest, boolean addToStock, String image) {
-    try {
-        // Vérification de la validité du token
-        String token = request.getHeader("Authorization");
-        if (token == null || !token.startsWith("Bearer ")) {
-            throw new RuntimeException("Token JWT manquant ou mal formaté");
-        }
-        String jwtToken = token.substring(7);
-        Long adminId = jwtUtil.extractUserId(jwtToken);
-        User admin = usersRepository.findById(adminId)
-                .orElseThrow(() -> new RuntimeException("Admin non trouvé"));
-
-        //autorisation et permission
-        RoleType role = admin.getRole().getName();
-        boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
-        boolean hasPermission = admin.getRole().hasPermission(PermissionType.GERER_PRODUITS);
-
-        if (!isAdminOrManager && !hasPermission) {
-            throw new RuntimeException("Vous n'avez pas les droits pour ajouter un produit !");
-        }
+        try {
+            // Vérification de la validité du token
+            String token = request.getHeader("Authorization");
+            if (token == null || !token.startsWith("Bearer ")) {
+                throw new RuntimeException("Token JWT manquant ou mal formaté");
+            }
+            String jwtToken = token.substring(7);
+            Long adminId = jwtUtil.extractUserId(jwtToken);
+            User admin = usersRepository.findById(adminId)
+                    .orElseThrow(() -> new RuntimeException("Admin non trouvé"));
 
 
-        List<ProduitDTO> produitsAjoutes = new ArrayList<>();
-
-        // Vérification que le nombre de boutiques et quantités est le même
-        if (boutiqueIds.size() != quantites.size()) {
-            throw new RuntimeException("Le nombre de boutiques ne correspond pas au nombre de quantités !");
-        }
-
-        // Récupérer la première boutique pour identifier l'entreprise
-        Boutique premiereBoutique = boutiqueRepository.findById(boutiqueIds.get(0))
-                .orElseThrow(() -> new RuntimeException("Boutique non trouvée"));
-        Long entrepriseId = premiereBoutique.getEntreprise().getId();
-
-        // Vérifier si le produit existe déjà dans une boutique de la même entreprise
-        Produit produitExistant = produitRepository.findByNomAndEntrepriseId(produitRequest.getNom(), entrepriseId);
-
-        String codeGenerique;
-        if (produitExistant != null) {
-            // Réutiliser le codeGenerique existant
-            codeGenerique = produitExistant.getCodeGenerique();
-        } else {
-            // Générer un nouveau codeGenerique unique
-            codeGenerique = generateProductCode();
-        }
-
-        // Pour chaque boutique et sa quantité spécifique
-        for (int i = 0; i < boutiqueIds.size(); i++) {
-            Long boutiqueId = boutiqueIds.get(i);
-            Integer quantite = quantites.get(i);
-            Integer seuil = seuilAlert.get(i);
-
-            Boutique boutique = boutiqueRepository.findById(boutiqueId)
+             // Récupérer la première boutique pour identifier l'entreprise
+            Boutique premiereBoutique = boutiqueRepository.findById(boutiqueIds.get(0))
                     .orElseThrow(() -> new RuntimeException("Boutique non trouvée"));
+            Long entrepriseId = premiereBoutique.getEntreprise().getId();
 
-            // Vérification si le produit est déjà enregistré dans cette boutique
-            if (produitRepository.findByNomAndBoutiqueId(produitRequest.getNom(), boutiqueId) != null) {
-                throw new RuntimeException("Un produit avec le même nom existe déjà dans la boutique ID: " + boutiqueId);
-            }
-            if (produitRequest.getCodeBare() != null && !produitRequest.getCodeBare().trim().isEmpty() &&
-                    produitRepository.findByCodeBareAndBoutiqueId(produitRequest.getCodeBare().trim(), boutiqueId) != null) {
-                throw new RuntimeException("Un produit avec le même code-barre existe déjà dans la boutique ID: " + boutiqueId);
-            }
+            // ✅ Vérification des rôles et permissions
+            RoleType role = admin.getRole().getName();
+            boolean isAdminOrManager = CentralAccess.isAdminOrManagerOfEntreprise(admin, entrepriseId);
+            boolean hasPermission = admin.getRole().hasPermission(PermissionType.GERER_PRODUITS);
 
-            // Récupérer la catégorie et unité
-            Categorie categorie = (produitRequest.getCategorieId() != null) ?
-                    categorieRepository.findById(produitRequest.getCategorieId())
-                            .orElseThrow(() -> new RuntimeException("Catégorie non trouvée")) : null;
-
-            Unite unite = (produitRequest.getUniteId() != null) ?
-                    uniteRepository.findById(produitRequest.getUniteId())
-                            .orElseThrow(() -> new RuntimeException("Unité de mesure non trouvée")) : null;
-
-            Produit produit = new Produit();
-            produit.setNom(produitRequest.getNom());
-            produit.setDescription(produitRequest.getDescription());
-            produit.setPrixVente(produitRequest.getPrixVente());
-            produit.setPrixAchat(produitRequest.getPrixAchat());
-            produit.setQuantite(quantite != null ? quantite : 0);
-            produit.setSeuilAlert(seuil != null ? seuil : 0);
-            produit.setTypeProduit(produitRequest.getTypeProduit());
-            produit.setCategorie(categorie);
-            produit.setUniteDeMesure(unite);
-            produit.setCodeGenerique(codeGenerique);
-            produit.setCodeBare(produitRequest.getCodeBare());
-            produit.setPhoto(image);
-            produit.setCreatedAt(LocalDateTime.now());
-            produit.setLastUpdated(LocalDateTime.now());
-            produit.setBoutique(boutique);
-
-            Produit savedProduit = produitRepository.save(produit);
-
-            // Ajouter au stock si demandé
-            if (produitRequest.getTypeProduit() == TypeProduit.PHYSIQUE && addToStock) {
-                Stock stock = new Stock();
-                stock.setStockActuel(quantite != null ? quantite : 0);
-                stock.setStockApres(stock.getStockActuel());
-                stock.setQuantiteAjoute(0);
-                stock.setBoutique(boutique);
-                stock.setProduit(savedProduit);
-                stock.setCreatedAt(LocalDateTime.now());
-                stock.setLastUpdated(LocalDateTime.now());
-                stock.setSeuilAlert(seuil != null ? seuil : 0);
-                stockRepository.save(stock);
-                savedProduit.setEnStock(true);
-                produitRepository.save(savedProduit);
+            if (!isAdminOrManager && !hasPermission) {
+                throw new RuntimeException("Vous n'avez pas les droits pour ajouter un produit !");
             }
 
-            produitsAjoutes.add(mapToDTO(savedProduit));
+
+
+
+            List<ProduitDTO> produitsAjoutes = new ArrayList<>();
+
+            // Vérification que le nombre de boutiques et quantités est le même
+            if (boutiqueIds.size() != quantites.size()) {
+                throw new RuntimeException("Le nombre de boutiques ne correspond pas au nombre de quantités !");
+            }
+
+            // Vérifier si le produit existe déjà dans une boutique de la même entreprise
+            Produit produitExistant = produitRepository.findByNomAndEntrepriseId(produitRequest.getNom(), entrepriseId);
+
+            String codeGenerique;
+            if (produitExistant != null) {
+                // Réutiliser le codeGenerique existant
+                codeGenerique = produitExistant.getCodeGenerique();
+            } else {
+                // Générer un nouveau codeGenerique unique
+                codeGenerique = generateProductCode();
+            }
+
+            // Pour chaque boutique et sa quantité spécifique
+            for (int i = 0; i < boutiqueIds.size(); i++) {
+                Long boutiqueId = boutiqueIds.get(i);
+                Integer quantite = quantites.get(i);
+                Integer seuil = seuilAlert.get(i);
+
+                Boutique boutique = boutiqueRepository.findById(boutiqueId)
+                        .orElseThrow(() -> new RuntimeException("Boutique non trouvée"));
+
+                // Vérification si le produit est déjà enregistré dans cette boutique
+                if (produitRepository.findByNomAndBoutiqueId(produitRequest.getNom(), boutiqueId) != null) {
+                    throw new RuntimeException("Un produit avec le même nom existe déjà dans la boutique ID: " + boutiqueId);
+                }
+                if (produitRequest.getCodeBare() != null && !produitRequest.getCodeBare().trim().isEmpty() &&
+                        produitRepository.findByCodeBareAndBoutiqueId(produitRequest.getCodeBare().trim(), boutiqueId) != null) {
+                    throw new RuntimeException("Un produit avec le même code-barre existe déjà dans la boutique ID: " + boutiqueId);
+                }
+
+                // Récupérer la catégorie et unité
+                Categorie categorie = (produitRequest.getCategorieId() != null) ?
+                        categorieRepository.findById(produitRequest.getCategorieId())
+                                .orElseThrow(() -> new RuntimeException("Catégorie non trouvée")) : null;
+
+                Unite unite = (produitRequest.getUniteId() != null) ?
+                        uniteRepository.findById(produitRequest.getUniteId())
+                                .orElseThrow(() -> new RuntimeException("Unité de mesure non trouvée")) : null;
+
+                Produit produit = new Produit();
+                produit.setNom(produitRequest.getNom());
+                produit.setDescription(produitRequest.getDescription());
+                produit.setPrixVente(produitRequest.getPrixVente());
+                produit.setPrixAchat(produitRequest.getPrixAchat());
+                produit.setQuantite(quantite != null ? quantite : 0);
+                produit.setSeuilAlert(seuil != null ? seuil : 0);
+                produit.setTypeProduit(produitRequest.getTypeProduit());
+                produit.setCategorie(categorie);
+                produit.setUniteDeMesure(unite);
+                produit.setCodeGenerique(codeGenerique);
+                produit.setCodeBare(produitRequest.getCodeBare());
+                produit.setPhoto(image);
+                produit.setCreatedAt(LocalDateTime.now());
+                produit.setLastUpdated(LocalDateTime.now());
+                produit.setBoutique(boutique);
+
+                Produit savedProduit = produitRepository.save(produit);
+
+                // Ajouter au stock si demandé
+                if (produitRequest.getTypeProduit() == TypeProduit.PHYSIQUE && addToStock) {
+                    Stock stock = new Stock();
+                    stock.setStockActuel(quantite != null ? quantite : 0);
+                    stock.setStockApres(stock.getStockActuel());
+                    stock.setQuantiteAjoute(0);
+                    stock.setBoutique(boutique);
+                    stock.setProduit(savedProduit);
+                    stock.setCreatedAt(LocalDateTime.now());
+                    stock.setLastUpdated(LocalDateTime.now());
+                    stock.setSeuilAlert(seuil != null ? seuil : 0);
+                    stockRepository.save(stock);
+                    savedProduit.setEnStock(true);
+                    produitRepository.save(savedProduit);
+                }
+
+                produitsAjoutes.add(mapToDTO(savedProduit));
+            }
+
+            return produitsAjoutes;
+
+        } catch (RuntimeException e) {
+            System.err.println("Erreur lors de la création du produit : " + e.getMessage());
+            throw new RuntimeException(e.getMessage(), e);
         }
-
-        return produitsAjoutes;
-
-    } catch (RuntimeException e) {
-        System.err.println("Erreur lors de la création du produit : " + e.getMessage());
-        throw new RuntimeException(e.getMessage(), e);
-    }
 }
 
 
@@ -277,29 +281,37 @@ public class ProduitService {
     
         User user = usersRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+        Boutique boutique = boutiqueRepository.findById(boutiqueId)
+        .orElseThrow(() -> new RuntimeException("Boutique introuvable"));
+
+        Long entrepriseId = boutique.getEntreprise().getId();
         //Verification et Permission
-        RoleType role = user.getRole().getName();
-        boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
+        boolean isAdminOrManager = CentralAccess.isAdminOrManagerOfEntreprise(user, entrepriseId);
         boolean hasPermission = user.getRole().hasPermission(PermissionType.GERER_PRODUITS);
 
         if (!isAdminOrManager && !hasPermission) {
-            throw new RuntimeException("Vous n'avez pas les droits pour ajouter du stock !");
+            throw new RuntimeException("Vous n'avez pas les droits pour ajouter du stock à cette boutique !");
         }
     
         List<Produit> produits = new ArrayList<>();
         Fournisseur fournisseurEntity = null;
 
        for (Map.Entry<Long, Integer> entry : produitsQuantites.entrySet()) {
-    Long produitId = entry.getKey();
-    Integer quantiteAjoute = entry.getValue();
+        Long produitId = entry.getKey();
+        Integer quantiteAjoute = entry.getValue();
 
-    Produit produit = produitRepository.findById(produitId)
-            .orElseThrow(() -> new RuntimeException("Produit non trouvé"));
+        Produit produit = produitRepository.findById(produitId)
+                .orElseThrow(() -> new RuntimeException("Produit non trouvé"));
+        
+          // Vérifier que le produit appartient à la même entreprise que la boutique
+        if (!produit.getBoutique().getEntreprise().getId().equals(entrepriseId)) {
+            throw new RuntimeException("Le produit ID " + produitId + " n'appartient pas à l'entreprise de la boutique.");
+        }
 
-    Stock stock = stockRepository.findByProduit(produit);
-    if (stock == null) {
-        throw new RuntimeException("Stock introuvable pour ce produit");
-    }
+        Stock stock = stockRepository.findByProduit(produit);
+        if (stock == null) {
+            throw new RuntimeException("Stock introuvable pour ce produit");
+        }
 
     int stockAvant = stock.getStockActuel();
     int nouvelleQuantiteProduit = produit.getQuantite() + quantiteAjoute;
@@ -379,11 +391,14 @@ public class ProduitService {
 
     User user = usersRepository.findById(userId)
             .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+    Boutique boutique = boutiqueRepository.findById(boutiqueId)
+        .orElseThrow(() -> new RuntimeException("Boutique introuvable"));
 
-    // Vérification des permissions
-    RoleType role = user.getRole().getName();
-    boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;  
+  Long entrepriseId = boutique.getEntreprise().getId();
+
+    boolean isAdminOrManager = CentralAccess.isAdminOrManagerOfEntreprise(user, entrepriseId);
     boolean hasPermission = user.getRole().hasPermission(PermissionType.GERER_PRODUITS);
+
     if (!isAdminOrManager && !hasPermission) {
         throw new RuntimeException("Vous n'avez pas les droits pour retirer du stock !");
     }
@@ -397,6 +412,10 @@ public class ProduitService {
 
         Produit produit = produitRepository.findById(produitId)
                 .orElseThrow(() -> new RuntimeException("Produit non trouvé"));
+        
+        if (!produit.getBoutique().getEntreprise().getId().equals(entrepriseId)) {
+            throw new RuntimeException("Produit ID " + produitId + " n'appartient pas à la même entreprise que la boutique.");
+        }
 
         Stock stock = stockRepository.findByProduit(produit);
         if (stock == null) {
@@ -653,18 +672,26 @@ public class ProduitService {
     }
 
     User admin = usersRepository.findById(adminId)
-            .orElseThrow(() -> new RuntimeException("Admin non trouvé"));
+        .orElseThrow(() -> new RuntimeException("Admin non trouvé"));
 
-    // Autorisation et permission
+    // 🛡️ Autorisation et permission
     RoleType role = admin.getRole().getName();
     boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
     boolean hasPermission = admin.getRole().hasPermission(PermissionType.GERER_PRODUITS);
+
     if (!isAdminOrManager && !hasPermission) {
         throw new RuntimeException("Vous n'avez pas les droits pour modifier un produit !");
     }
 
     Produit produit = produitRepository.findById(produitId)
             .orElseThrow(() -> new RuntimeException("Produit non trouvé"));
+
+    // ✅ Vérifier que l'admin et le produit sont dans la même entreprise
+    Long produitEntrepriseId = produit.getBoutique().getEntreprise().getId();
+    Long adminEntrepriseId = admin.getEntreprise().getId();
+    if (!produitEntrepriseId.equals(adminEntrepriseId)) {
+        throw new RuntimeException("Accès interdit : ce produit n'appartient pas à votre entreprise.");
+    }
 
     // Mise à jour des informations du produit
     if (produitRequest.getNom() != null) produit.setNom(produitRequest.getNom());
@@ -808,7 +835,7 @@ public class ProduitService {
 }
 
     // Méthode pour "supprimer" (mettre dans la corbeille) le produit s'il n'est pas en stock
-   @Transactional
+     @Transactional
     public void corbeille(Long produitId, HttpServletRequest request) {
         // 1. Vérification du produit
         Produit produit = produitRepository.findById(produitId)
@@ -819,34 +846,40 @@ public class ProduitService {
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
             throw new RuntimeException("Token JWT manquant ou mal formaté");
         }
-        
+
         String token = authHeader.substring(7);
         Long userId = jwtUtil.extractUserId(token);
-        
+
         // 3. Vérification de l'utilisateur
         User user = usersRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
 
-        // 4. Vérification des permissions
+        // ✅ 4. Vérification d'appartenance à la même entreprise
+        Long produitEntrepriseId = produit.getBoutique().getEntreprise().getId();
+        Long userEntrepriseId = user.getEntreprise().getId();
+        if (!produitEntrepriseId.equals(userEntrepriseId)) {
+            throw new RuntimeException("Action interdite : ce produit n'appartient pas à votre entreprise.");
+        }
+
+        // 🔐 5. Vérification des permissions
         RoleType role = user.getRole().getName();
-        boolean isAuthorized = (role == RoleType.ADMIN || role == RoleType.MANAGER) 
-                            && user.getRole().hasPermission(PermissionType.GERER_PRODUITS);
-        
-        if (!isAuthorized) {
+        boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
+        boolean hasPermission = user.getRole().hasPermission(PermissionType.GERER_PRODUITS);
+
+        if (!isAdminOrManager && !hasPermission) {
             throw new RuntimeException("Action non autorisée : permissions insuffisantes");
         }
 
-        // 5. Validation métier
+        // 🚫 6. Validation métier
         if (produit.getEnStock()) {
-            throw new RuntimeException("⚠️ Impossible de supprimer le produit en stock");
+            throw new RuntimeException("⚠️ Impossible de supprimer le produit car il est encore en stock");
         }
 
-        // 6. Marquage comme supprimé
+        // 🗑️ 7. Marquage comme supprimé
         produit.setDeleted(true);
         produit.setDeletedAt(LocalDateTime.now());
         produit.setDeletedBy(userId);
         produitRepository.save(produit);
-        
     }
 
     //Methoce Supprimer uniquement le stock
@@ -921,66 +954,78 @@ public class ProduitService {
     @Transactional
     public void viderCorbeille(Long boutiqueId, HttpServletRequest request) {
 
-    // Vérification token & user & permissions
-    String authHeader = request.getHeader("Authorization");
-    if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-        throw new RuntimeException("Token JWT manquant ou mal formaté");
-    }
-    String token = authHeader.substring(7);
-    Long userId = jwtUtil.extractUserId(token);
+        // 1. Vérification du token
+        String authHeader = request.getHeader("Authorization");
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            throw new RuntimeException("Token JWT manquant ou mal formaté");
+        }
 
-    User user = usersRepository.findById(userId)
-            .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+        String token = authHeader.substring(7);
+        Long userId = jwtUtil.extractUserId(token);
 
-    RoleType role = user.getRole().getName();
-    boolean isAuthorized = (role == RoleType.ADMIN || role == RoleType.MANAGER) 
-                        && user.getRole().hasPermission(PermissionType.GERER_PRODUITS);
-
-    if (!isAuthorized) {
-        throw new RuntimeException("Action non autorisée : permissions insuffisantes");
-    }
-
-    // Vérifier que la boutique existe
-    Boutique boutique = boutiqueRepository.findById(boutiqueId)
-            .orElseThrow(() -> new RuntimeException("Boutique non trouvée"));
-
-    // Récupérer tous les produits supprimés dans la boutique
-    List<Produit> produitsSupprimes = produitRepository.findByBoutiqueIdAndDeletedTrue(boutiqueId);
-
-    // Suppression définitive
-    produitRepository.deleteAll(produitsSupprimes);
-}
-    
-    // Lister Produit par boutique (excluant les produits dans la corbeille)
-    public List<ProduitDTO> getProduitsParStock(Long boutiqueId, Long userId) {
+        // 2. Récupération de l'utilisateur
         User user = usersRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
 
-        Boutique boutique = boutiqueRepository.findById(boutiqueId)
-            .orElseThrow(() -> new RuntimeException("Boutique non trouvée"));
-
-        if (!boutique.isActif()) {
-            throw new RuntimeException("Cette boutique est désactivée, ses produits ne sont pas accessibles !");
-        }
-
-        // Vérification que la boutique appartient à l'entreprise de l'utilisateur
-        if (!boutique.getEntreprise().getId().equals(user.getEntreprise().getId())) {
-            throw new RuntimeException("Accès interdit : cette boutique n'appartient pas à votre entreprise.");
-        }
-
-        // Vérifier rôle et permissions
+        // 3. Vérification des rôles et permissions
         RoleType role = user.getRole().getName();
         boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
-        boolean hasGestionFacturePermission = user.getRole().hasPermission(PermissionType.Gestion_Facture);
+        boolean hasPermission = user.getRole().hasPermission(PermissionType.GERER_PRODUITS);
 
-        // Si Admin, Manager ou permission spécifique, accès aux produits de la boutique de leur entreprise
-        if (isAdminOrManager || hasGestionFacturePermission) {
-            return recupererProduitsDTO(boutiqueId);
+        if (!isAdminOrManager && !hasPermission) {
+            throw new RuntimeException("Action non autorisée : permissions insuffisantes");
         }
 
-        // Si utilisateur standard, accès uniquement à la boutique de leur entreprise (déjà vérifié)
-        return recupererProduitsDTO(boutiqueId);
+        // 4. Vérification de la boutique
+        Boutique boutique = boutiqueRepository.findById(boutiqueId)
+                .orElseThrow(() -> new RuntimeException("Boutique non trouvée"));
+
+        // ✅ 5. Vérification d'appartenance à la même entreprise
+        if (!boutique.getEntreprise().getId().equals(user.getEntreprise().getId())) {
+            throw new RuntimeException("Action interdite : cette boutique ne vous appartient pas");
+        }
+
+        // 6. Suppression des produits marqués comme supprimés
+        List<Produit> produitsSupprimes = produitRepository.findByBoutiqueIdAndDeletedTrue(boutiqueId);
+        produitRepository.deleteAll(produitsSupprimes);
     }
+
+    // Lister Produit par boutique (excluant les produits dans la corbeille)
+   public List<ProduitDTO> getProduitsParStock(Long boutiqueId, HttpServletRequest request) {
+    // 🔐 Extraction utilisateur depuis token JWT
+    String token = request.getHeader("Authorization");
+    if (token == null || !token.startsWith("Bearer ")) {
+        throw new RuntimeException("Token JWT manquant ou mal formaté");
+    }
+
+    Long userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
+    User user = usersRepository.findById(userId)
+            .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+
+    // 🔍 Vérification de la boutique
+    Boutique boutique = boutiqueRepository.findById(boutiqueId)
+            .orElseThrow(() -> new RuntimeException("Boutique non trouvée"));
+
+    if (!boutique.isActif()) {
+        throw new RuntimeException("Cette boutique est désactivée, ses produits ne sont pas accessibles !");
+    }
+
+    Long entrepriseId = boutique.getEntreprise().getId();
+    if (!entrepriseId.equals(user.getEntreprise().getId())) {
+        throw new RuntimeException("Accès interdit : cette boutique ne vous appartient pas");
+    }
+
+    // 🔒 Vérifications CentralAccess & permissions
+    boolean isAdminOrManager = CentralAccess.isAdminOrManagerOfEntreprise(user, entrepriseId);
+    boolean hasPermissionVente = user.getRole().hasPermission(PermissionType.VENDRE_PRODUITS);
+    boolean hasPermissionGestion = user.getRole().hasPermission(PermissionType.GERER_PRODUITS);
+
+    if (!isAdminOrManager && !hasPermissionVente && !hasPermissionGestion) {
+        throw new RuntimeException("Accès interdit : vous n'avez pas les droits pour consulter les produits.");
+    }
+
+    return recupererProduitsDTO(boutiqueId);
+}
 
     /**
      * Récupère et mappe les produits d'une boutique
@@ -1036,9 +1081,8 @@ public class ProduitService {
         }
 
     // Méthode pour lister les produits dans la corbeille
-    @Transactional(readOnly = true)
-    public List<ProduitDTO> getProduitsDansCorbeille(Long boutiqueId, HttpServletRequest request) {
-
+        @Transactional(readOnly = true)
+public List<ProduitDTO> getProduitsDansCorbeille(Long boutiqueId, HttpServletRequest request) {
     // 1. Vérification du token JWT
     String authHeader = request.getHeader("Authorization");
     if (authHeader == null || !authHeader.startsWith("Bearer ")) {
@@ -1052,18 +1096,27 @@ public class ProduitService {
     User user = usersRepository.findById(userId)
             .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
 
-    // 3. Vérification des permissions
-    RoleType role = user.getRole().getName();
-    boolean isAuthorized = (role == RoleType.ADMIN || role == RoleType.MANAGER) 
-                        && user.getRole().hasPermission(PermissionType.GERER_PRODUITS);
-
-    if (!isAuthorized) {
-        throw new RuntimeException("Action non autorisée : permissions insuffisantes");
-    }
-
-    // 4. Vérification de la boutique
+    // 3. Vérification de la boutique
     Boutique boutique = boutiqueRepository.findById(boutiqueId)
             .orElseThrow(() -> new RuntimeException("Boutique non trouvée"));
+
+    if (!boutique.isActif()) {
+        throw new RuntimeException("Cette boutique est désactivée !");
+    }
+
+    if (!boutique.getEntreprise().getId().equals(user.getEntreprise().getId())) {
+        throw new RuntimeException("Accès interdit : cette boutique ne vous appartient pas");
+    }
+
+    // 4. Vérification des rôles et permissions
+    RoleType role = user.getRole().getName();
+    boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
+    boolean hasProduitPermission = user.getRole().hasPermission(PermissionType.GERER_PRODUITS);
+    boolean hasVentePermission = user.getRole().hasPermission(PermissionType.VENDRE_PRODUITS);
+
+    if (!isAdminOrManager && !hasProduitPermission && !hasVentePermission) {
+        throw new RuntimeException("Accès interdit : vous n'avez pas les droits pour consulter la corbeille.");
+    }
 
     // 5. Récupération des produits supprimés
     List<Produit> produitsSupprimes = produitRepository.findByBoutiqueIdAndDeletedTrue(boutiqueId);

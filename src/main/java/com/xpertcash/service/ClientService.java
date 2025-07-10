@@ -17,10 +17,12 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.xpertcash.configuration.CentralAccess;
 import com.xpertcash.configuration.JwtUtil;
 import com.xpertcash.entity.Client;
 import com.xpertcash.entity.Entreprise;
 import com.xpertcash.entity.EntrepriseClient;
+import com.xpertcash.entity.PermissionType;
 import com.xpertcash.entity.User;
 import com.xpertcash.repository.ClientRepository;
 import com.xpertcash.repository.EntrepriseClientRepository;
@@ -183,70 +185,86 @@ public class ClientService {
     }
 
 
-    public List<Client> getAllClients(HttpServletRequest request) {
-        // 1. Extraire l'utilisateur à partir du token
-        String token = request.getHeader("Authorization");
-        if (token == null || !token.startsWith("Bearer ")) {
-            throw new RuntimeException("Token JWT manquant ou mal formaté");
-        }
-
-        Long userId;
-        try {
-            userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
-        } catch (Exception e) {
-            throw new RuntimeException("Erreur lors de l'extraction de l'ID utilisateur", e);
-        }
-
-        User user = usersRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
-
-        Entreprise entreprise = user.getEntreprise();
-        if (entreprise == null) {
-            throw new RuntimeException("Aucune entreprise associée à cet utilisateur");
-        }
-
-        // 2. Récupérer tous les clients
-        List<Client> allClients = clientRepository.findAll();
-
-        // 3. Filtrer : client lié à entreprise OU entrepriseClient liée à l'entreprise
-        return allClients.stream()
-                .filter(c ->
-                        (c.getEntreprise() != null && c.getEntreprise().getId().equals(entreprise.getId())) ||
-                                (c.getEntrepriseClient() != null &&
-                                        c.getEntrepriseClient().getEntreprise() != null &&
-                                        c.getEntrepriseClient().getEntreprise().getId().equals(entreprise.getId()))
-                )
-                .collect(Collectors.toList());
-
-
+public List<Client> getAllClients(HttpServletRequest request) {
+    // 1. Extraire l'utilisateur à partir du token
+    String token = request.getHeader("Authorization");
+    if (token == null || !token.startsWith("Bearer ")) {
+        throw new RuntimeException("Token JWT manquant ou mal formaté");
     }
+
+    Long userId;
+    try {
+        userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
+    } catch (Exception e) {
+        throw new RuntimeException("Erreur lors de l'extraction de l'ID utilisateur", e);
+    }
+
+    User user = usersRepository.findById(userId)
+            .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
+
+    Entreprise entreprise = user.getEntreprise();
+    if (entreprise == null) {
+        throw new RuntimeException("Aucune entreprise associée à cet utilisateur");
+    }
+
+    // Vérification des droits
+    boolean isAdminOrManager = CentralAccess.isAdminOrManagerOfEntreprise(user, entreprise.getId());
+    boolean hasPermissionGestionClients = user.getRole().hasPermission(PermissionType.GERER_CLIENTS);
+
+    if (!isAdminOrManager && !hasPermissionGestionClients) {
+        throw new RuntimeException("Accès refusé : vous n'avez pas les droits nécessaires pour consulter les clients.");
+    }
+
+    // 2. Récupérer tous les clients
+    List<Client> allClients = clientRepository.findAll();
+
+    // 3. Filtrer : client lié à entreprise OU entrepriseClient liée à l'entreprise
+    return allClients.stream()
+            .filter(c ->
+                (c.getEntreprise() != null && c.getEntreprise().getId().equals(entreprise.getId())) ||
+                (c.getEntrepriseClient() != null &&
+                 c.getEntrepriseClient().getEntreprise() != null &&
+                 c.getEntrepriseClient().getEntreprise().getId().equals(entreprise.getId()))
+            )
+            .collect(Collectors.toList());
+}
+
 
     //Methode pour recuperer seulement les entreprise client
     public List<EntrepriseClient> getAllEntrepriseClients(HttpServletRequest request) {
-        // 1. Extraire le token et l'utilisateur
-        String token = request.getHeader("Authorization");
-        if (token == null || !token.startsWith("Bearer ")) {
-            throw new RuntimeException("Token JWT manquant ou mal formaté");
-        }
-
-        Long userId;
-        try {
-            userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
-        } catch (Exception e) {
-            throw new RuntimeException("Erreur lors de l'extraction de l'ID utilisateur", e);
-        }
-
-        User user = usersRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
-
-        Entreprise entreprise = user.getEntreprise();
-        if (entreprise == null) {
-            throw new RuntimeException("Aucune entreprise associée à cet utilisateur");
-        }
-
-        // 2. Retourner uniquement les EntrepriseClient liés à cette entreprise
-        return entrepriseClientRepository.findByEntrepriseId(entreprise.getId());
+    // 1. Extraire le token et l'utilisateur
+    String token = request.getHeader("Authorization");
+    if (token == null || !token.startsWith("Bearer ")) {
+        throw new RuntimeException("Token JWT manquant ou mal formaté");
     }
+
+    Long userId;
+    try {
+        userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
+    } catch (Exception e) {
+        throw new RuntimeException("Erreur lors de l'extraction de l'ID utilisateur", e);
+    }
+
+    User user = usersRepository.findById(userId)
+            .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
+
+    Entreprise entreprise = user.getEntreprise();
+    if (entreprise == null) {
+        throw new RuntimeException("Aucune entreprise associée à cet utilisateur");
+    }
+
+    // Vérification avec CentralAccess
+    boolean isAdminOrManager = CentralAccess.isAdminOrManagerOfEntreprise(user, entreprise.getId());
+    boolean hasPermissionGestionClients = user.getRole().hasPermission(PermissionType.GERER_CLIENTS);
+
+    if (!isAdminOrManager && !hasPermissionGestionClients) {
+        throw new RuntimeException("Accès refusé : vous n'avez pas les droits nécessaires pour consulter les clients.");
+    }
+
+    // 2. Retourner uniquement les EntrepriseClient liés à cette entreprise
+    return entrepriseClientRepository.findByEntrepriseId(entreprise.getId());
+}
+
 
 
 
@@ -279,6 +297,48 @@ public class ClientService {
         }
 
         Client existingClient = existingClientOpt.get();
+
+
+        // 🔐 Authentification de l'utilisateur
+        String token = request.getHeader("Authorization");
+        if (token == null || !token.startsWith("Bearer ")) {
+            throw new RuntimeException("Token JWT manquant ou mal formaté");
+        }
+
+        Long userId;
+        try {
+            userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
+        } catch (Exception e) {
+            throw new RuntimeException("Erreur lors de l'extraction de l'ID utilisateur", e);
+        }
+
+        User user = usersRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
+
+        Entreprise entreprise = user.getEntreprise();
+        if (entreprise == null) {
+            throw new RuntimeException("Aucune entreprise associée à cet utilisateur");
+        }
+
+        // 🔒 Vérifier que le client appartient à cette entreprise
+        boolean appartientEntreprise = (existingClient.getEntreprise() != null &&
+                existingClient.getEntreprise().getId().equals(entreprise.getId())) ||
+                (existingClient.getEntrepriseClient() != null &&
+                        existingClient.getEntrepriseClient().getEntreprise() != null &&
+                        existingClient.getEntrepriseClient().getEntreprise().getId().equals(entreprise.getId()));
+
+        if (!appartientEntreprise) {
+            throw new RuntimeException("Accès refusé : ce client ne vous appartient pas.");
+        }
+
+        // 🔒 Vérifier que l'utilisateur a les droits
+        boolean isAdminOrManager = CentralAccess.isAdminOrManagerOfEntreprise(user, entreprise.getId());
+        boolean hasPermissionGestionClient = user.getRole().hasPermission(PermissionType.GERER_CLIENTS);
+
+        if (!isAdminOrManager && !hasPermissionGestionClient) {
+            throw new RuntimeException("Accès refusé : vous n'avez pas les permissions pour modifier un client.");
+        }
+
 
         // Vérifier unicité de l'email (hors lui-même)
         String email = client.getEmail();
