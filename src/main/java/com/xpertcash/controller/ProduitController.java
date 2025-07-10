@@ -308,33 +308,36 @@ public class ProduitController {
         //Endpoint pour ajuster la quantiter du produit en stock
         @PatchMapping(value = "/ajouterStock", consumes = MediaType.APPLICATION_JSON_VALUE)
         public ResponseEntity<?> ajouterStock(
-                @RequestBody AjouterStockRequest request, 
-                @RequestHeader("Authorization") String token, 
-                HttpServletRequest httpRequest) {
-            try {
-                if (request.getProduitsQuantites() == null || request.getProduitsQuantites().isEmpty()) {
-                    return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                            .body("Erreur : La liste des produits et quantités est obligatoire.");
-                }
-        
-                // Appel du service pour ajouter plusieurs produits en stock
-                Facture facture = produitService.ajouterStock(
-                    request.getBoutiqueId(),
-                    request.getProduitsQuantites(),
-                    request.getDescription(),
-                    request.getCodeFournisseur(),
-                    request.getFournisseurId(),
-                    httpRequest);
+                @RequestBody AjouterStockRequest request,
+                @RequestHeader("Authorization") String token,
+                HttpServletRequest httpRequest
+        ) {
+            System.out.println("➡️ Boutique ID: " + request.getBoutiqueId());
+            System.out.println("➡️ Produits et quantités: " + request.getProduitsQuantites());
+            System.out.println("➡️ Fournisseur ID: " + request.getFournisseurId());
 
-        
-                return ResponseEntity.status(HttpStatus.OK).body(new FactureDTO(facture));
-        
+            if (request.getBoutiqueId() == null) {
+                return ResponseEntity.badRequest().body("Le champ 'boutiqueId' est obligatoire.");
+            }
+
+            try {
+                Facture facture = produitService.ajouterStock(
+                        request.getBoutiqueId(),
+                        request.getProduitsQuantites(),
+                        request.getDescription(),
+                        request.getCodeFournisseur(),
+                        request.getFournisseurId(),
+                        httpRequest
+                );
+
+                return ResponseEntity.ok(new FactureDTO(facture));
             } catch (Exception e) {
                 return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                         .body("Erreur lors de l'ajout du stock : " + e.getMessage());
             }
         }
-        
+
+            
             // Endpoint Stock Historique
             @GetMapping("/stockhistorique/{produitId}")
                     public ResponseEntity<List<StockHistoryDTO>> getStockHistory(@PathVariable Long produitId, HttpServletRequest request) {

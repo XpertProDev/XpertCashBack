@@ -62,7 +62,10 @@ public class RoleService {
                 permissionMap.get(PermissionType.GERER_BOUTIQUE),
                 permissionMap.get(PermissionType.Gestion_Facture),
                 permissionMap.get(PermissionType.GERER_UTILISATEURS),
-                permissionMap.get(PermissionType.APPROVISIONNER_STOCK)
+                permissionMap.get(PermissionType.APPROVISIONNER_STOCK),
+                permissionMap.get(PermissionType.ACTIVER_BOUTIQUE),
+                permissionMap.get(PermissionType.DESACTIVER_BOUTIQUE)
+
             ));
 
             Role managerRole = new Role();

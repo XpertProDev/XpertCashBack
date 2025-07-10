@@ -5,6 +5,18 @@ import com.xpertcash.entity.Enum.RoleType;
 
 public class CentralAccess {
 
+        // Vérifie si l'utilisateur est ADMIN et appartient à l'entreprise donnée
+    public static boolean isAdminOfEntreprise(User user, Long entrepriseId) {
+        if (user == null || user.getEntreprise() == null || user.getRole() == null) {
+            return false;
+        }
+
+        boolean isAdmin = user.getRole().getName() == RoleType.ADMIN;
+        boolean belongsToEntreprise = user.getEntreprise().getId().equals(entrepriseId);
+
+        return isAdmin && belongsToEntreprise;
+    }
+
     public static boolean isAdminOrManagerOfEntreprise(User user, Long targetEntrepriseId) {
         if (user == null || user.getEntreprise() == null || targetEntrepriseId == null) {
             return false;

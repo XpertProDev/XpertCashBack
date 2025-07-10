@@ -8,6 +8,9 @@ public enum PermissionType {
     GERER_CLIENTS,
     GERER_UTILISATEURS,
     GERER_BOUTIQUE,
+    ACTIVER_BOUTIQUE,
+    DESACTIVER_BOUTIQUE
+
     
     /*
     VOIR_FLUX_COMPTABLE,

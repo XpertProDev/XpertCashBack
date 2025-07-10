@@ -95,31 +95,31 @@ public class FactureProformaService {
         throw new RuntimeException("Token JWT manquant ou mal formaté");
     }
 
-    Long userId = null;
+        Long userId;
     try {
         userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
     } catch (Exception e) {
         throw new RuntimeException("Erreur lors de l'extraction de l'ID de l'utilisateur depuis le token", e);
     }
 
-    // Récupérer l'utilisateur par son ID
+    // 👤 Récupérer l'utilisateur connecté
     User user = usersRepository.findById(userId)
             .orElseThrow(() -> new RuntimeException("Utilisateur introuvable !"));
 
-    // Vérifier que l'utilisateur a une entreprise associée (entreprise créatrice de la facture)
+    // 🏢 Vérifier que l'utilisateur est bien associé à une entreprise
     Entreprise entrepriseUtilisateur = user.getEntreprise();
     if (entrepriseUtilisateur == null) {
         throw new RuntimeException("L'utilisateur n'a pas d'entreprise associée.");
     }
 
-    // Vérification CentralAccess + permission spécifique
-    boolean isAdminOrManager = CentralAccess.isAdminOrManagerOfEntreprise(user, entrepriseUtilisateur.getId());
+    // 🔐 Vérification des droits d'accès
+    boolean isAdmin = CentralAccess.isAdminOfEntreprise(user, entrepriseUtilisateur.getId());
     boolean hasPermission = user.getRole().hasPermission(PermissionType.Gestion_Facture);
 
-    if (!isAdminOrManager || !hasPermission) {
-        throw new RuntimeException("Accès refusé : vous n'avez pas les droits nécessaires sur cette entreprise !");
+    if (!isAdmin && !hasPermission) {
+        throw new RuntimeException("Accès refusé : vous n'avez pas les droits nécessaires pour créer une facture dans cette entreprise !");
     }
-    
+
 
     // 🔒 Vérification d'accès au module Gestion Facturation
     moduleActivationService.verifierAccesModulePourEntreprise(entrepriseUtilisateur, "GESTION_FACTURATION");
@@ -333,11 +333,12 @@ public class FactureProformaService {
         }
 
         // --- Optionnel : Vérification des droits via CentralAccess et permission ---
-        boolean isAdminOrManager = CentralAccess.isAdminOrManagerOfEntreprise(user, entrepriseUtilisateur.getId());
+        // 🔐 Vérification des droits d'accès
+        boolean isAdmin = CentralAccess.isAdminOfEntreprise(user, entrepriseUtilisateur.getId());
         boolean hasPermission = user.getRole().hasPermission(PermissionType.Gestion_Facture);
 
-        if (!isAdminOrManager || !hasPermission) {
-            throw new RuntimeException("Accès refusé : vous n'avez pas les droits nécessaires pour modifier cette facture.");
+        if (!isAdmin && !hasPermission) {
+            throw new RuntimeException("Accès refusé : vous n'avez pas les droits nécessaires pour créer une facture dans cette entreprise !");
         }
         
 
@@ -672,85 +673,70 @@ public class FactureProformaService {
     }
    
     //Methode pour recuperer les factures pro forma dune entreprise
-    public List<Map<String, Object>> getFacturesParEntrepriseParUtilisateur(Long userId) {
-        User user = usersRepository.findById(userId)
-            .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
-    
-        Entreprise entreprise = user.getEntreprise();
-        if (entreprise == null) {
-            throw new RuntimeException("Utilisateur n'est associé à aucune entreprise");
-        }
-    
-        Long entrepriseId = entreprise.getId(); 
-        List<FactureProForma> factures;
-
-        // S’il est ADMIN ou MANAGER, ou sil a la permisson il peut voir toutes les factures de son entreprise
-        RoleType role = user.getRole().getName();
-        boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
-        boolean hasGestionFacturePermission = user.getRole().hasPermission(PermissionType.Gestion_Facture);
-
-        if (isAdminOrManager || hasGestionFacturePermission) {
-            factures = factureProformaRepository.findByEntrepriseId(entrepriseId);
-        } else {
-            factures = factureProformaRepository.findByEntrepriseIdAndUtilisateur(userId, entrepriseId);
-        }
-
-        // Tri manuel par date de création décroissante
-//        factures.sort(Comparator
-//                .comparing(FactureProForma::getDateCreation, Comparator.nullsLast(Comparator.reverseOrder()))
-//                .thenComparing(FactureProForma::getId, Comparator.reverseOrder()));
-
-        factures = factures.stream()
-                .sorted((f1, f2) -> {
-                    // Comparaison par date
-                    int dateCompare = f2.getDateCreation().compareTo(f1.getDateCreation());
-                    if (dateCompare != 0) return dateCompare;
-
-                    // Si dates égales, comparer par ID
-                    return f2.getId().compareTo(f1.getId());
-                })
-                .collect(Collectors.toList());
-
-        List<Map<String, Object>> factureMaps = new ArrayList<>();
-    
-        for (FactureProForma facture : factures) {
-            Map<String, Object> factureMap = new HashMap<>();
-    
-            // Informations principales
-            factureMap.put("id", facture.getId());
-            factureMap.put("numeroFacture", facture.getNumeroFacture());
-            factureMap.put("dateCreation", facture.getDateCreation());
-            factureMap.put("description", facture.getDescription());
-            factureMap.put("totalHT", facture.getTotalHT());
-            factureMap.put("remise", facture.getRemise());
-            factureMap.put("tva", facture.isTva());
-            factureMap.put("totalFacture", facture.getTotalFacture());
-            factureMap.put("statut", facture.getStatut());
-            factureMap.put("ligneFactureProforma", facture.getLignesFacture());
-    
-            // Client
-            factureMap.put("client", facture.getClient() != null ? facture.getClient().getNomComplet() : null);
-    
-            // Entreprise cliente
-            factureMap.put("entrepriseClient", facture.getEntrepriseClient() != null
-                ? facture.getEntrepriseClient().getNom()
-                : null);
-    
-            // Entreprise émettrice
-            factureMap.put("entreprise", facture.getEntreprise() != null
-                ? facture.getEntreprise().getNomEntreprise()
-                : null);
-    
-            // Relance et notification
-            factureMap.put("dateRelance", facture.getDateRelance());
-            factureMap.put("notifie", facture.isNotifie());
-    
-            // Ajout final
-            factureMaps.add(factureMap);
-        }
-    
-        return factureMaps;
+    public List<Map<String, Object>> getFacturesParEntrepriseParUtilisateur(Long userIdRequete, HttpServletRequest request) {
+    // 🔐 Extraire le token JWT et récupérer l'utilisateur courant
+    String token = request.getHeader("Authorization");
+    if (token == null || !token.startsWith("Bearer ")) {
+        throw new RuntimeException("Token JWT manquant ou mal formaté");
     }
+
+    Long userIdCourant = jwtUtil.extractUserId(token.replace("Bearer ", ""));
+    User currentUser = usersRepository.findById(userIdCourant)
+            .orElseThrow(() -> new RuntimeException("Utilisateur courant introuvable"));
+
+    User targetUser = usersRepository.findById(userIdRequete)
+            .orElseThrow(() -> new RuntimeException("Utilisateur cible non trouvé"));
+
+    Entreprise entrepriseCourante = currentUser.getEntreprise();
+    Entreprise entrepriseCible = targetUser.getEntreprise();
+
+    // 🏢 Vérification d'appartenance à la même entreprise
+    if (entrepriseCourante == null || entrepriseCible == null
+        || !entrepriseCourante.getId().equals(entrepriseCible.getId())) {
+        throw new RuntimeException("Opération interdite : utilisateurs de différentes entreprises.");
+    }
+
+    boolean isAdmin = currentUser.getRole().getName() == RoleType.ADMIN;
+    boolean hasPermission = currentUser.getRole().hasPermission(PermissionType.Gestion_Facture);
+
+    List<FactureProForma> factures;
+
+    if (isAdmin || hasPermission) {
+        // 👑 Admin ou autorisé : accès à toutes les factures de l’entreprise
+        factures = factureProformaRepository.findByEntrepriseId(entrepriseCourante.getId());
+    } else {
+        // 👤 Sinon : accès uniquement à ses propres factures
+        if (!Objects.equals(userIdCourant, userIdRequete)) {
+            throw new RuntimeException("Vous ne pouvez voir que vos propres factures.");
+        }
+        factures = factureProformaRepository.findByEntrepriseIdAndUtilisateur(userIdCourant, entrepriseCourante.getId());
+    }
+
+    // ✅ Trier et transformer en liste de map
+    return factures.stream()
+        .sorted(Comparator.comparing(FactureProForma::getDateCreation).reversed()
+                .thenComparing(FactureProForma::getId).reversed())
+        .map(facture -> {
+            Map<String, Object> map = new HashMap<>();
+            map.put("id", facture.getId());
+            map.put("numeroFacture", facture.getNumeroFacture());
+            map.put("dateCreation", facture.getDateCreation());
+            map.put("description", facture.getDescription());
+            map.put("totalHT", facture.getTotalHT());
+            map.put("remise", facture.getRemise());
+            map.put("tva", facture.isTva());
+            map.put("totalFacture", facture.getTotalFacture());
+            map.put("statut", facture.getStatut());
+            map.put("ligneFactureProforma", facture.getLignesFacture());
+            map.put("client", facture.getClient() != null ? facture.getClient().getNomComplet() : null);
+            map.put("entrepriseClient", facture.getEntrepriseClient() != null ? facture.getEntrepriseClient().getNom() : null);
+            map.put("entreprise", facture.getEntreprise() != null ? facture.getEntreprise().getNomEntreprise() : null);
+            map.put("dateRelance", facture.getDateRelance());
+            map.put("notifie", facture.isNotifie());
+            return map;
+        })
+        .collect(Collectors.toList());
+}
 
     // Methode pour recuperer une facture pro forma par son id
     public FactureProForma getFactureProformaById(Long id, HttpServletRequest request) {
@@ -759,22 +745,41 @@ public class FactureProformaService {
             throw new RuntimeException("Token JWT manquant ou mal formaté");
         }
     
-        Long userId;
-        try {
-            userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
-        } catch (Exception e) {
-            throw new RuntimeException("Erreur lors de l'extraction de l'ID de l'utilisateur depuis le token", e);
-        }
+          Long userId;
+            try {
+                userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
+            } catch (Exception e) {
+                throw new RuntimeException("Erreur lors de l'extraction de l'ID utilisateur depuis le token", e);
+            }
     
-        User user = usersRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("Utilisateur introuvable !"));
-    
+         User utilisateur = usersRepository.findById(userId)
+        .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
+
         FactureProForma facture = factureProformaRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Facture Proforma introuvable avec l'ID : " + id));
-    
-        if (!facture.getEntreprise().getId().equals(user.getEntreprise().getId())) {
-            throw new RuntimeException("Accès refusé : Cette facture ne vous appartient pas !");
+            .orElseThrow(() -> new RuntimeException("Facture Proforma introuvable avec l'ID : " + id));
+        
+        Entreprise entrepriseUtilisateur = utilisateur.getEntreprise();
+        Entreprise entrepriseFacture = facture.getEntreprise();
+
+        // 🔒 Vérifier l'appartenance à la même entreprise
+        if (entrepriseUtilisateur == null || entrepriseFacture == null ||
+            !entrepriseUtilisateur.getId().equals(entrepriseFacture.getId())) {
+            throw new RuntimeException("Accès refusé : cette facture ne vous appartient pas.");
         }
+
+        boolean isAdmin = utilisateur.getRole().getName() == RoleType.ADMIN;
+        boolean hasPermission = utilisateur.getRole().hasPermission(PermissionType.Gestion_Facture);
+
+        boolean isCreateurFacture = facture.getUtilisateurCreateur() != null &&
+                                facture.getUtilisateurCreateur().getId().equals(utilisateur.getId());
+
+
+        // 🔐 Accès autorisé si admin, permission, ou créateur de la facture
+        if (!(isAdmin || hasPermission || isCreateurFacture)) {
+            throw new RuntimeException("Accès refusé : vous n'avez pas les droits pour consulter cette facture.");
+        }
+            
+       
     
         System.out.println("✅ Facture récupérée par l'utilisateur ID: " + userId);
         return facture;

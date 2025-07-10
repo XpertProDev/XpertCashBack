@@ -24,6 +24,7 @@ import com.xpertcash.entity.Entreprise;
 import com.xpertcash.entity.EntrepriseClient;
 import com.xpertcash.entity.PermissionType;
 import com.xpertcash.entity.User;
+import com.xpertcash.entity.Enum.RoleType;
 import com.xpertcash.repository.ClientRepository;
 import com.xpertcash.repository.EntrepriseClientRepository;
 import com.xpertcash.repository.UsersRepository;
@@ -53,32 +54,42 @@ public class ClientService {
 
 
     public Client saveClient(Client client,  HttpServletRequest request) {
-        if (client.getNomComplet() == null || client.getNomComplet().trim().isEmpty()) {
+            if (client.getNomComplet() == null || client.getNomComplet().trim().isEmpty()) {
             throw new RuntimeException("Le nom du client est obligatoire !");
         }
 
-        // Vérifier la présence du token JWT et récupérer l'ID de l'utilisateur connecté
-        String token = request.getHeader("Authorization");
-        if (token == null || !token.startsWith("Bearer ")) {
-            throw new RuntimeException("Token JWT manquant ou mal formaté");
-        }
+    // 🔐 Vérifier la présence du token JWT et récupérer l'ID de l'utilisateur connecté
+    String token = request.getHeader("Authorization");
+    if (token == null || !token.startsWith("Bearer ")) {
+        throw new RuntimeException("Token JWT manquant ou mal formaté");
+    }
 
-        Long userId = null;
-        try {
-            userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
-        } catch (Exception e) {
-            throw new RuntimeException("Erreur lors de l'extraction de l'ID de l'utilisateur depuis le token", e);
-        }
+    Long userId;
+    try {
+        userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
+    } catch (Exception e) {
+        throw new RuntimeException("Erreur lors de l'extraction de l'ID de l'utilisateur depuis le token", e);
+    }
 
-        // Récupérer l'utilisateur par son ID
-        User user = usersRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("Utilisateur introuvable !"));
+    // 🔐 Récupérer l'utilisateur
+    User user = usersRepository.findById(userId)
+            .orElseThrow(() -> new RuntimeException("Utilisateur introuvable !"));
 
-        // Vérifier que l'utilisateur a une entreprise associée (entreprise créatrice de la facture)
-        Entreprise entrepriseUtilisateur = user.getEntreprise();
-        if (entrepriseUtilisateur == null) {
-            throw new RuntimeException("L'utilisateur n'a pas d'entreprise associée.");
-        }
+    // 🔐 Vérifier que l'utilisateur est lié à une entreprise
+    Entreprise entrepriseUtilisateur = user.getEntreprise();
+    if (entrepriseUtilisateur == null) {
+        throw new RuntimeException("L'utilisateur n'a pas d'entreprise associée.");
+    }
+
+    // 🔐 Vérifier que l'utilisateur a le rôle ou la permission appropriée
+    RoleType role = user.getRole().getName();
+    boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
+    boolean hasPermission = user.getRole().hasPermission(PermissionType.GERER_CLIENTS);
+
+    if (!isAdminOrManager && !hasPermission) {
+        throw new RuntimeException("Accès refusé : vous n'avez pas les droits pour créer un client !");
+    }
+
 
         client.setEntreprise(entrepriseUtilisateur);
 
@@ -168,8 +179,6 @@ public class ClientService {
             client.setEntrepriseClient(savedEntreprise);
         }
     }
-
-
 
 
     public Optional<Client> getClientById(Long id) {
