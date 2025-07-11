@@ -275,7 +275,7 @@ public class UsersService {
 
             // Génération du token avec infos supplémentaires
             public String generateAccessToken(User user, User admin, boolean within24Hours) {
-            long expirationTime = 1000 * 60 * 1;
+            long expirationTime = 1000 * 60 * 15;
             Date now = new Date();
             Date expirationDate = new Date(now.getTime() + expirationTime);
 
@@ -297,7 +297,7 @@ public class UsersService {
                     .compact();
         }
         public String generateRefreshToken(User user) {
-            long refreshExpiration = 1000L * 60 * 2; // 7 jours
+            long refreshExpiration = 1000L * 60 * 24 * 2;
             Date now = new Date();
             Date expirationDate = new Date(now.getTime() + refreshExpiration);
 
