@@ -2,6 +2,8 @@ package com.xpertcash.configuration;
 
 import org.springframework.stereotype.Component;
 import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.ExpiredJwtException;
+import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 
 import java.util.function.Function;
@@ -17,8 +19,32 @@ public class JwtUtil {
 
     // Méthode pour extraire l'ID de l'utilisateur depuis le JWT
     public Long extractUserId(String token) {
-        return Long.parseLong(extractClaim(token, Claims::getSubject));
+        try {
+            return Long.parseLong(extractClaim(token, Claims::getSubject));
+        } catch (ExpiredJwtException e) {
+            System.out.println("⚠️ Token expiré : impossible d'extraire l'ID utilisateur.");
+            return null;
+        } catch (JwtException | IllegalArgumentException e) {
+            System.out.println("⚠️ Token invalide ou mal formé : " + e.getMessage());
+            return null;
+        }
     }
+
+    public Claims extractAllClaimsSafe(String token) {
+        try {
+            return Jwts.parserBuilder()
+                    .setSigningKey(jwtConfig.getSecretKey())
+                    .build()
+                    .parseClaimsJws(token)
+                    .getBody();
+        } catch (JwtException | IllegalArgumentException e) {
+            System.out.println("⚠️ Erreur lors de l'extraction des claims : " + e.getMessage());
+            return null;
+        }
+    }
+
+
+
 
     // Méthode générique pour extraire une information spécifique du token
     private <T> T extractClaim(String token, Function<Claims, T> claimsResolver) {

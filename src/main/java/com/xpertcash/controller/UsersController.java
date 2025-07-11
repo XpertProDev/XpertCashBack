@@ -96,26 +96,28 @@ public class UsersController {
     @PostMapping("/refresh-token")
     public ResponseEntity<Map<String, String>> refreshToken(@RequestBody Map<String, String> request) {
         String refreshToken = request.get("refreshToken");
-        System.out.println("🔁 Refresh Token reçu!!!!! : " + refreshToken);
+        System.out.println("🔁 Refresh Token reçu : " + refreshToken);
 
         if (refreshToken == null || refreshToken.isEmpty()) {
             return ResponseEntity.badRequest().body(Map.of("error", "Le refresh token est manquant"));
         }
 
         try {
-            Claims claims = Jwts.parser()
-                    .setSigningKey(jwtConfig.getSecretKey())
-                    .parseClaimsJws(refreshToken)
-                    .getBody();
+            Claims claims = jwtUtil.extractAllClaimsSafe(refreshToken);
+            if (claims == null) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(
+                    Map.of("error", "Refresh token expiré ou invalide")
+                );
+            }
 
             Long userId = Long.parseLong(claims.getSubject());
+
             User user = usersRepository.findById(userId)
                     .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
 
             User admin = user.getEntreprise().getAdmin();
             boolean within24Hours = LocalDateTime.now().isBefore(user.getCreatedAt().plusHours(24));
 
-            // ✅ Appel via usersService :
             String newAccessToken = usersService.generateAccessToken(user, admin, within24Hours);
 
             return ResponseEntity.ok(Map.of(
@@ -123,14 +125,6 @@ public class UsersController {
                 "message", "Nouveau token généré avec succès"
             ));
 
-        } catch (ExpiredJwtException e) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(
-                Map.of("error", "Refresh token expiré")
-            );
-        } catch (JwtException e) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(
-                Map.of("error", "Refresh token invalide")
-            );
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(
                 Map.of("error", "Erreur lors du traitement du refresh token")
