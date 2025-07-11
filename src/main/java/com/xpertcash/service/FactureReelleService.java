@@ -11,6 +11,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
+import org.hibernate.Hibernate;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
@@ -316,6 +317,9 @@ public List<FactureReelleDTO> listerMesFacturesReelles(HttpServletRequest reques
     // 📄 Récupérer la facture
     FactureReelle facture = factureReelleRepository.findById(factureId)
             .orElseThrow(() -> new RuntimeException("Aucune facture trouvée"));
+
+    // Charger explicitement la relation factureProForma
+    Hibernate.initialize(facture.getFactureProForma());
 
     Long entrepriseFactureId = facture.getEntreprise() != null ? facture.getEntreprise().getId() : null;
     Long entrepriseUserId = user.getEntreprise() != null ? user.getEntreprise().getId() : null;
