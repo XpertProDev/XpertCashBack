@@ -28,7 +28,7 @@ public class FactureReelleDTO {
     private LocalDate dateCreationPro;
     private String utilisateurCreateur;
     private String utilisateurValidateur;
-
+    private Long factureProFormaId;
 
     private double totalFacture;
     private double remise;
@@ -63,6 +63,9 @@ public class FactureReelleDTO {
         this.montantRestant = montantRestant;
         this.lignesFacture = (facture.getLignesFacture() != null) ?
                 facture.getLignesFacture().stream().map(LigneFactureDTO::new).collect(Collectors.toList()) : null;
+        this.factureProFormaId = facture.getFactureProForma() != null
+                ? facture.getFactureProForma().getId()
+                : null;
         
         if (facture.getEntrepriseClient() != null) {
             this.nomEntrepriseClient = facture.getEntrepriseClient().getNom();
