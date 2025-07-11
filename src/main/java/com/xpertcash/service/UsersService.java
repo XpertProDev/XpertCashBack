@@ -297,7 +297,7 @@ public class UsersService {
                     .compact();
         }
         public String generateRefreshToken(User user) {
-            long refreshExpiration = 1000L * 60 * 24 * 2;
+            long refreshExpiration = 1000L * 60 * 60 * 24 * 2;
             Date now = new Date();
             Date expirationDate = new Date(now.getTime() + refreshExpiration);
 
