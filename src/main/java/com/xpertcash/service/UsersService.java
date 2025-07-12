@@ -296,7 +296,7 @@ public class UsersService {
                     .signWith(SignatureAlgorithm.HS256, jwtConfig.getSecretKey())
                     .compact();
         }
-        public String generateRefreshToken(User user) {
+            public String generateRefreshToken(User user) {
             long refreshExpiration = 1000L * 60 * 60 * 24 * 2;
             Date now = new Date();
             Date expirationDate = new Date(now.getTime() + refreshExpiration);
@@ -600,7 +600,7 @@ public class UsersService {
 
     // Pour la modification de utilisateur
    @Transactional
-    public User updateUser(Long userId, UpdateUserRequest request, MultipartFile imageUserFile) {
+    public User updateUser(Long userId, UpdateUserRequest request, MultipartFile imageUserFile, Boolean deletePhoto) {
     User user = usersRepository.findById(userId)
             .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
 
@@ -671,6 +671,20 @@ public class UsersService {
     }
 
     System.out.println("📥 DTO reçu dans le controller : " + request);
+
+        if (Boolean.TRUE.equals(deletePhoto)) {
+        String oldImagePath = user.getPhoto();
+        if (oldImagePath != null && !oldImagePath.isBlank()) {
+            Path oldPath = Paths.get("src/main/resources/static" + oldImagePath);
+            try {
+                Files.deleteIfExists(oldPath);
+                System.out.println("🗑️ Ancienne photo supprimée : " + oldImagePath);
+            } catch (IOException e) {
+                System.out.println("⚠️ Erreur suppression photo : " + e.getMessage());
+            }
+            user.setPhoto(null);
+        }
+    }
     usersRepository.save(user);
     return user;
 }

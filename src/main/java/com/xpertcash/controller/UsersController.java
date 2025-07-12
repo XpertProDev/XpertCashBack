@@ -158,24 +158,26 @@ public class UsersController {
     }
 
     // Pour la mise en jour de user en multipart/form-data avec image
-      @PatchMapping(value = "/updateUsers/{id}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE) 
-     public ResponseEntity<?>updateUser(
-            @PathVariable Long id,
-            @RequestPart(value = "user", required = false) String userJson,
-            @RequestPart(value = "photo", required = false) MultipartFile imageUserFile,
-            HttpServletRequest request) {
-        try {  
-            UpdateUserRequest dto = new UpdateUserRequest();
-            if (userJson != null && !userJson.isBlank()) {
-                dto = new ObjectMapper().readValue(userJson, UpdateUserRequest.class);
-            }
-            usersService.updateUser(id, dto, imageUserFile);
-            return ResponseEntity.ok("Utilisateur mis à jour avec succès !");
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Erreur : " + e.getMessage());
+     @PatchMapping(value = "/updateUsers/{id}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE) 
+public ResponseEntity<?> updateUser(
+    @PathVariable Long id,
+    @RequestPart(value = "user", required = false) String userJson,
+    @RequestPart(value = "photo", required = false) MultipartFile imageUserFile,
+    @RequestPart(value = "deletePhoto", required = false) String deletePhotoStr,
+    HttpServletRequest request) {
+    
+    try {  
+        UpdateUserRequest dto = new UpdateUserRequest();
+        if (userJson != null && !userJson.isBlank()) {
+            dto = new ObjectMapper().readValue(userJson, UpdateUserRequest.class);
         }
-     
+        Boolean deletePhoto = "true".equalsIgnoreCase(deletePhotoStr);
+        usersService.updateUser(id, dto, imageUserFile, deletePhoto);
+        return ResponseEntity.ok("Utilisateur mis à jour avec succès !");
+    } catch (Exception e) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Erreur : " + e.getMessage());
     }
+}
 
     // Déverrouillage du compte via le lien de déverrouillage (GET avec paramètres)
     /*@GetMapping("/unlock")
