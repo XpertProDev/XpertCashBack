@@ -431,18 +431,17 @@ public class ProduitController {
                 @RequestParam("file") MultipartFile file,
                 @RequestParam Long entrepriseId,
                 @RequestParam(required = false) Long boutiqueId,
-                @RequestHeader("Authorization") String tokenHeader, // Correction ici
+                @RequestHeader("Authorization") String tokenHeader,
                 HttpServletRequest request) {
 
             try {
-
-                // Extraction du token
+                // Validation du token JWT
                 if (tokenHeader == null || !tokenHeader.startsWith("Bearer ")) {
                     throw new RuntimeException("Token JWT manquant ou mal formaté");
                 }
                 String token = tokenHeader.substring(7);
 
-                // Vérifier le type de fichier
+                // Vérification du type de fichier
                 String contentType = file.getContentType();
                 if (!Arrays.asList(
                         "application/vnd.ms-excel",          // .xls
@@ -453,7 +452,7 @@ public class ProduitController {
                     );
                 }
 
-                // Vérifier la signature magique du fichier
+                // Vérification de la signature magique du fichier
                 byte[] fileBytes = file.getBytes();
                 if (!isExcelFile(fileBytes)) {
                     return ResponseEntity.badRequest().body(
@@ -461,7 +460,7 @@ public class ProduitController {
                     );
                 }
 
-                // Vérifier la taille du fichier
+                // Vérification de la taille du fichier
                 if (file.getSize() > 5 * 1024 * 1024) {
                     return ResponseEntity.badRequest().body(
                             Collections.singletonMap("error", "Le fichier est trop volumineux (max 5MB)")
@@ -473,6 +472,7 @@ public class ProduitController {
                         file.getInputStream(),
                         entrepriseId,
                         boutiqueId,
+                        token, // Passer le token au service
                         request
                 );
 
@@ -501,15 +501,15 @@ public class ProduitController {
             }
         }
 
-        private boolean isExcelFile(byte[] bytes) {
-            // Vérifier la signature pour .xlsx (PK header)
-            boolean isXlsx = bytes[0] == 0x50 && bytes[1] == 0x4B && bytes[2] == 0x03 && bytes[3] == 0x04;
+    private boolean isExcelFile(byte[] bytes) {
+        // Vérifier la signature pour .xlsx (PK header)
+        boolean isXlsx = bytes[0] == 0x50 && bytes[1] == 0x4B && bytes[2] == 0x03 && bytes[3] == 0x04;
 
-            // Vérifier la signature pour .xls (OLE header)
-            boolean isXls = bytes[0] == 0xD0 && bytes[1] == 0xCF && bytes[2] == 0x11 && bytes[3] == 0xE0;
+        // Vérifier la signature pour .xls (OLE header)
+        boolean isXls = bytes[0] == 0xD0 && bytes[1] == 0xCF && bytes[2] == 0x11 && bytes[3] == 0xE0;
 
-            return isXlsx || isXls;
-        }
+        return isXlsx || isXls;
+    }
 
         @GetMapping("/generate-test-excel")
         public void generateTestExcel(HttpServletResponse response) throws IOException {

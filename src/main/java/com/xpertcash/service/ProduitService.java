@@ -10,6 +10,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import com.xpertcash.repository.*;
 import org.apache.poi.hssf.usermodel.HSSFWorkbook;
 import org.apache.poi.openxml4j.exceptions.NotOfficeXmlFileException;
 import org.apache.poi.poifs.filesystem.OfficeXmlFileException;
@@ -40,16 +41,6 @@ import com.xpertcash.entity.Unite;
 import com.xpertcash.entity.User;
 import com.xpertcash.entity.Enum.RoleType;
 import com.xpertcash.entity.Enum.TypeProduit;
-import com.xpertcash.repository.BoutiqueRepository;
-import com.xpertcash.repository.CategorieRepository;
-import com.xpertcash.repository.FactureRepository;
-import com.xpertcash.repository.FournisseurRepository;
-import com.xpertcash.repository.ProduitRepository;
-import com.xpertcash.repository.StockHistoryRepository;
-import com.xpertcash.repository.StockProduitFournisseurRepository;
-import com.xpertcash.repository.StockRepository;
-import com.xpertcash.repository.UniteRepository;
-import com.xpertcash.repository.UsersRepository;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -101,6 +92,9 @@ public class ProduitService {
 
     @Autowired
     private ImageStorageService imageStorageService;
+
+    @Autowired
+    private EntrepriseRepository entrepriseRepository;
 
 
     // Ajouter un produit à la liste sans le stock
@@ -1333,26 +1327,57 @@ public List<ProduitDTO> getProduitsDansCorbeille(Long boutiqueId, HttpServletReq
         return new ArrayList<>(produitsUniques.values());
     }
 
-    @Transactional
     public Map<String, Object> importProduitsFromExcel(
             InputStream inputStream,
             Long entrepriseId,
             Long boutiqueId,
+            String token,  // Token JWT reçu du controller
             HttpServletRequest request) {
 
         Map<String, Object> result = new HashMap<>();
         int successCount = 0;
         List<String> errors = new ArrayList<>();
 
-        // Créez un flux tamponné pour la réutilisation
-        BufferedInputStream bis = new BufferedInputStream(inputStream);
-        bis.mark(Integer.MAX_VALUE);
-
         try {
+            // 1. Vérification du token JWT
+            if (token == null || token.isBlank()) {
+                throw new RuntimeException("Token JWT manquant");
+            }
+
+            // 2. Extraction de l'ID utilisateur
+            Long userId;
+            try {
+                userId = jwtUtil.extractUserId(token);
+            } catch (Exception e) {
+                throw new RuntimeException("Token JWT invalide ou expiré", e);
+            }
+
+            // 3. Chargement de l'utilisateur
+            User user = usersRepository.findById(userId)
+                    .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+
+            // 4. Vérification de l'entreprise
+            Entreprise entreprise = entrepriseRepository.findById(entrepriseId)
+                    .orElseThrow(() -> new RuntimeException("Entreprise introuvable"));
+
+            // 5. Vérification des permissions
+            boolean isAdmin = user.getRole().getName() == RoleType.ADMIN;
+            boolean hasPermission = user.getRole().hasPermission(PermissionType.GERER_PRODUITS);
+
+            if (!isAdmin && !hasPermission) {
+                throw new RuntimeException("Accès refusé : permissions insuffisantes");
+            }
+
+            // 6. Vérification d'appartenance à l'entreprise
+            if (!user.getEntreprise().getId().equals(entrepriseId)) {
+                throw new RuntimeException("Accès interdit : utilisateur ne fait pas partie de cette entreprise");
+            }
+
+            // 7. Traitement du fichier Excel
+            BufferedInputStream bis = new BufferedInputStream(inputStream);
+            bis.mark(Integer.MAX_VALUE);
+
             Workbook workbook;
-
-
-
             try {
                 // Essayer de lire comme OOXML (.xlsx)
                 workbook = WorkbookFactory.create(bis);
@@ -1360,7 +1385,10 @@ public List<ProduitDTO> getProduitsDansCorbeille(Long boutiqueId, HttpServletReq
                 // Réessayer comme OLE2 (.xls)
                 bis.reset();
                 workbook = new HSSFWorkbook(bis);
+            } catch (Exception e) {
+                throw new RuntimeException("Format de fichier non reconnu", e);
             }
+
             Sheet sheet = workbook.getSheetAt(0);
             DataFormatter dataFormatter = new DataFormatter();
             DecimalFormat decimalFormat = new DecimalFormat("#,##0.00", new DecimalFormatSymbols(Locale.FRENCH));
@@ -1388,8 +1416,15 @@ public List<ProduitDTO> getProduitsDansCorbeille(Long boutiqueId, HttpServletReq
                         // Récupérer toutes les boutiques de l'entreprise
                         List<Boutique> boutiques = boutiqueRepository.findByEntrepriseId(entrepriseId);
                         for (Boutique b : boutiques) {
-                            boutiqueIds.add(b.getId());
+                            if (b.isActif()) { // Ne prendre que les boutiques actives
+                                boutiqueIds.add(b.getId());
+                            }
                         }
+                    }
+
+                    // Si aucune boutique active trouvée
+                    if (boutiqueIds.isEmpty()) {
+                        throw new RuntimeException("Aucune boutique active trouvée pour cette entreprise");
                     }
 
                     List<Integer> quantites = new ArrayList<>();
@@ -1399,6 +1434,7 @@ public List<ProduitDTO> getProduitsDansCorbeille(Long boutiqueId, HttpServletReq
                         seuils.add(produitRequest.getSeuilAlert() != null ? produitRequest.getSeuilAlert() : 0);
                     }
 
+                    // Appel à createProduit avec le token
                     createProduit(
                             request,
                             boutiqueIds,
@@ -1417,7 +1453,7 @@ public List<ProduitDTO> getProduitsDansCorbeille(Long boutiqueId, HttpServletReq
             }
 
         } catch (Exception e) {
-            errors.add("Erreur lors de la lecture du fichier: " + e.getMessage());
+            errors.add("Erreur système: " + e.getMessage());
             e.printStackTrace();
         }
 
