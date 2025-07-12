@@ -1,14 +1,19 @@
 package com.xpertcash.service;
 
+import java.io.BufferedInputStream;
+import java.io.InputStream;
+import java.text.DecimalFormat;
+import java.text.DecimalFormatSymbols;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.NoSuchElementException;
+import java.util.*;
 import java.util.stream.Collectors;
+
+import org.apache.poi.hssf.usermodel.HSSFWorkbook;
+import org.apache.poi.openxml4j.exceptions.NotOfficeXmlFileException;
+import org.apache.poi.poifs.filesystem.OfficeXmlFileException;
+import org.apache.poi.ss.usermodel.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -1327,8 +1332,226 @@ public List<ProduitDTO> getProduitsDansCorbeille(Long boutiqueId, HttpServletReq
     
         return new ArrayList<>(produitsUniques.values());
     }
-    
 
-    
+    @Transactional
+    public Map<String, Object> importProduitsFromExcel(
+            InputStream inputStream,
+            Long entrepriseId,
+            Long boutiqueId,
+            HttpServletRequest request) {
+
+        Map<String, Object> result = new HashMap<>();
+        int successCount = 0;
+        List<String> errors = new ArrayList<>();
+
+        // Créez un flux tamponné pour la réutilisation
+        BufferedInputStream bis = new BufferedInputStream(inputStream);
+        bis.mark(Integer.MAX_VALUE);
+
+        try {
+            Workbook workbook;
+
+
+
+            try {
+                // Essayer de lire comme OOXML (.xlsx)
+                workbook = WorkbookFactory.create(bis);
+            } catch (NotOfficeXmlFileException | OfficeXmlFileException e) {
+                // Réessayer comme OLE2 (.xls)
+                bis.reset();
+                workbook = new HSSFWorkbook(bis);
+            }
+            Sheet sheet = workbook.getSheetAt(0);
+            DataFormatter dataFormatter = new DataFormatter();
+            DecimalFormat decimalFormat = new DecimalFormat("#,##0.00", new DecimalFormatSymbols(Locale.FRENCH));
+
+            Iterator<Row> rowIterator = sheet.iterator();
+
+            // Sauter l'en-tête
+            if (rowIterator.hasNext()) rowIterator.next();
+
+            while (rowIterator.hasNext()) {
+                Row row = rowIterator.next();
+                try {
+                    // Vérifier si la ligne est vide
+                    if (isRowEmpty(row)) {
+                        continue;
+                    }
+
+                    ProduitRequest produitRequest = mapRowToProduitRequest(row, dataFormatter, decimalFormat);
+
+                    // Créer le produit
+                    List<Long> boutiqueIds = new ArrayList<>();
+                    if (boutiqueId != null) {
+                        boutiqueIds.add(boutiqueId);
+                    } else {
+                        // Récupérer toutes les boutiques de l'entreprise
+                        List<Boutique> boutiques = boutiqueRepository.findByEntrepriseId(entrepriseId);
+                        for (Boutique b : boutiques) {
+                            boutiqueIds.add(b.getId());
+                        }
+                    }
+
+                    List<Integer> quantites = new ArrayList<>();
+                    List<Integer> seuils = new ArrayList<>();
+                    for (int i = 0; i < boutiqueIds.size(); i++) {
+                        quantites.add(produitRequest.getQuantite() != null ? produitRequest.getQuantite() : 0);
+                        seuils.add(produitRequest.getSeuilAlert() != null ? produitRequest.getSeuilAlert() : 0);
+                    }
+
+                    createProduit(
+                            request,
+                            boutiqueIds,
+                            quantites,
+                            seuils,
+                            produitRequest,
+                            true,
+                            null
+                    );
+
+                    successCount++;
+
+                } catch (Exception e) {
+                    errors.add("Ligne " + (row.getRowNum() + 1) + ": " + e.getMessage());
+                }
+            }
+
+        } catch (Exception e) {
+            errors.add("Erreur lors de la lecture du fichier: " + e.getMessage());
+            e.printStackTrace();
+        }
+
+        result.put("successCount", successCount);
+        if (!errors.isEmpty()) {
+            result.put("errors", errors);
+        }
+        return result;
+    }
+
+    private boolean isRowEmpty(Row row) {
+        if (row == null) return true;
+        for (int c = row.getFirstCellNum(); c < row.getLastCellNum(); c++) {
+            Cell cell = row.getCell(c);
+            if (cell != null && cell.getCellType() != CellType.BLANK) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private ProduitRequest mapRowToProduitRequest(Row row, DataFormatter dataFormatter, DecimalFormat decimalFormat) {
+        ProduitRequest request = new ProduitRequest();
+
+        try {
+            // Colonne 0: Nom produit
+            request.setNom(getStringValue(row, 0, dataFormatter));
+
+            // Colonne 1: Description
+            request.setDescription(getStringValue(row, 1, dataFormatter));
+
+            // Colonne 2: Catégorie
+            String categorieNom = getStringValue(row, 2, dataFormatter);
+            if (categorieNom != null && !categorieNom.isEmpty()) {
+                Optional<Categorie> categorieOpt = categorieRepository.findByNom(categorieNom);
+
+                if (categorieOpt.isPresent()) {
+                    request.setCategorieId(categorieOpt.get().getId());
+                } else {
+                    // Créer la catégorie si elle n'existe pas
+                    Categorie newCategorie = new Categorie();
+                    newCategorie.setNom(categorieNom);
+                    Categorie savedCategorie = categorieRepository.save(newCategorie);
+                    request.setCategorieId(savedCategorie.getId());
+                }
+            }
+
+            // Colonne 3: Prix Vente
+            request.setPrixVente(parseDouble(getStringValue(row, 3, dataFormatter), decimalFormat));
+
+            // Colonne 4: Prix Achat
+            request.setPrixAchat(parseDouble(getStringValue(row, 4, dataFormatter), decimalFormat));
+
+            // Colonne 5: Quantité
+            request.setQuantite(parseInt(getStringValue(row, 5, dataFormatter)));
+
+            // Colonne 6: Unité
+            String uniteNom = getStringValue(row, 6, dataFormatter);
+            if (uniteNom != null && !uniteNom.isEmpty()) {
+                Optional<Unite> uniteOpt = uniteRepository.findByNom(uniteNom);
+
+                if (uniteOpt.isPresent()) {
+                    request.setUniteId(uniteOpt.get().getId());
+                } else {
+                    // Créer l'unité si elle n'existe pas
+                    Unite newUnite = new Unite();
+                    newUnite.setNom(uniteNom);
+                    Unite savedUnite = uniteRepository.save(newUnite);
+                    request.setUniteId(savedUnite.getId());
+                }
+            }
+
+            // Colonne 7: Code Barre
+            request.setCodeBare(getStringValue(row, 7, dataFormatter));
+
+            // Colonne 8: Type Produit
+            String typeProduit = getStringValue(row, 8, dataFormatter);
+            if (typeProduit != null && !typeProduit.isEmpty()) {
+                try {
+                    // Normaliser la casse
+                    request.setTypeProduit(TypeProduit.valueOf(typeProduit.toUpperCase()));
+                } catch (IllegalArgumentException e) {
+                    // Valeur par défaut si le type est invalide
+                    request.setTypeProduit(TypeProduit.PHYSIQUE);
+                }
+            } else {
+                // Valeur par défaut si non spécifié
+                request.setTypeProduit(TypeProduit.PHYSIQUE);
+            }
+
+            // Colonne 9: Seuil Alert
+            request.setSeuilAlert(parseInt(getStringValue(row, 9, dataFormatter)));
+
+        } catch (Exception e) {
+            throw new RuntimeException("Erreur ligne " + (row.getRowNum() + 1) + ": " + e.getMessage());
+        }
+
+        return request;
+    }
+
+    private String getStringValue(Row row, int cellIndex, DataFormatter dataFormatter) {
+        if (row == null) return null;
+
+        Cell cell = row.getCell(cellIndex);
+        if (cell == null) return null;
+
+        return dataFormatter.formatCellValue(cell).trim();
+    }
+
+    private Double parseDouble(String value, DecimalFormat decimalFormat) {
+        if (value == null || value.isEmpty()) return null;
+
+        try {
+            // Nettoyage des formats numériques européens
+            value = value.replace(" ", "").replace(".", "");
+            return decimalFormat.parse(value).doubleValue();
+        } catch (Exception e) {
+            throw new RuntimeException("Valeur numérique invalide: " + value);
+        }
+    }
+
+    private Integer parseInt(String value) {
+        if (value == null || value.isEmpty()) return null;
+
+        try {
+            // Nettoyage des formats numériques européens
+            value = value.replace(" ", "").replace(".", "");
+            return Integer.parseInt(value);
+        } catch (Exception e) {
+            throw new RuntimeException("Valeur entière invalide: " + value);
+        }
+    }
+
+
+
 
 }

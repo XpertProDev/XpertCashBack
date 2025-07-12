@@ -457,7 +457,7 @@ public class BoutiqueService {
 
     // 🔒 Vérifier les droits d'accès avec CentralAccess
     boolean isAdminOrManager = CentralAccess.isAdminOrManagerOfEntreprise(user, entrepriseId);
-    boolean hasPermission = user.getRole().hasPermission(PermissionType.GERER_BOUTIQUE); // ou GERER_PRODUITS selon ton modèle
+    boolean hasPermission = user.getRole().hasPermission(PermissionType.GERER_BOUTIQUE);
 
     if (!isAdminOrManager && !hasPermission) {
         throw new RuntimeException("Vous n'avez pas les droits pour accéder aux produits de cette boutique.");
