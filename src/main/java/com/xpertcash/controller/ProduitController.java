@@ -430,16 +430,15 @@ public class ProduitController {
         public ResponseEntity<?> importProduitsFromExcel(
                 @RequestParam("file") MultipartFile file,
                 @RequestParam Long entrepriseId,
-                @RequestParam(required = false) Long boutiqueId,
-                @RequestHeader("Authorization") String tokenHeader,
+                @RequestParam(value = "boutiqueIds", required = false) String boutiqueIdsJson,
+                @RequestHeader("Authorization") String token, // Token complet avec "Bearer"
                 HttpServletRequest request) {
 
             try {
                 // Validation du token JWT
-                if (tokenHeader == null || !tokenHeader.startsWith("Bearer ")) {
+                if (token == null || !token.startsWith("Bearer ")) {
                     throw new RuntimeException("Token JWT manquant ou mal formaté");
                 }
-                String token = tokenHeader.substring(7);
 
                 // Vérification du type de fichier
                 String contentType = file.getContentType();
@@ -467,12 +466,19 @@ public class ProduitController {
                     );
                 }
 
-                // Traitement du fichier Excel
+                // Désérialiser les IDs des boutiques
+                List<Long> boutiqueIds = new ArrayList<>();
+                if (boutiqueIdsJson != null && !boutiqueIdsJson.isEmpty()) {
+                    ObjectMapper objectMapper = new ObjectMapper();
+                    boutiqueIds = objectMapper.readValue(boutiqueIdsJson, new TypeReference<List<Long>>() {});
+                }
+
+                // Passer le token COMPLET au service
                 Map<String, Object> result = produitService.importProduitsFromExcel(
                         file.getInputStream(),
                         entrepriseId,
-                        boutiqueId,
-                        token, // Passer le token au service
+                        boutiqueIds,
+                        token, // Token complet avec "Bearer"
                         request
                 );
 

@@ -1330,8 +1330,8 @@ public List<ProduitDTO> getProduitsDansCorbeille(Long boutiqueId, HttpServletReq
     public Map<String, Object> importProduitsFromExcel(
             InputStream inputStream,
             Long entrepriseId,
-            Long boutiqueId,
-            String token,  // Token JWT reçu du controller
+            List<Long> boutiqueIds,
+            String tokenHeader, // Token complet avec "Bearer"
             HttpServletRequest request) {
 
         Map<String, Object> result = new HashMap<>();
@@ -1340,9 +1340,12 @@ public List<ProduitDTO> getProduitsDansCorbeille(Long boutiqueId, HttpServletReq
 
         try {
             // 1. Vérification du token JWT
-            if (token == null || token.isBlank()) {
-                throw new RuntimeException("Token JWT manquant");
+            if (tokenHeader == null || !tokenHeader.startsWith("Bearer ")) {
+                throw new RuntimeException("Token JWT manquant ou mal formaté");
             }
+
+            // Extraire le token sans "Bearer "
+            String token = tokenHeader.substring(7);
 
             // 2. Extraction de l'ID utilisateur
             Long userId;
@@ -1373,7 +1376,32 @@ public List<ProduitDTO> getProduitsDansCorbeille(Long boutiqueId, HttpServletReq
                 throw new RuntimeException("Accès interdit : utilisateur ne fait pas partie de cette entreprise");
             }
 
-            // 7. Traitement du fichier Excel
+            // 7. Récupération des boutiques sélectionnées
+            List<Boutique> selectedBoutiques;
+            if (boutiqueIds != null && !boutiqueIds.isEmpty()) {
+                // Récupérer les boutiques par leurs IDs
+                selectedBoutiques = boutiqueRepository.findAllById(boutiqueIds);
+
+                // Vérifier que chaque boutique appartient à l'entreprise et est active
+                for (Boutique boutique : selectedBoutiques) {
+                    if (!boutique.getEntreprise().getId().equals(entrepriseId)) {
+                        throw new RuntimeException("La boutique ID " + boutique.getId() + " n'appartient pas à l'entreprise ID " + entrepriseId);
+                    }
+                    if (!boutique.isActif()) {
+                        throw new RuntimeException("La boutique ID " + boutique.getId() + " est désactivée");
+                    }
+                }
+            } else {
+                // Si aucune boutique n'est spécifiée, on prend toutes les boutiques actives de l'entreprise
+                selectedBoutiques = boutiqueRepository.findByEntrepriseIdAndActifTrue(entrepriseId);
+            }
+
+            // Convertir en liste d'IDs
+            List<Long> boutiqueIdsFinal = selectedBoutiques.stream()
+                    .map(Boutique::getId)
+                    .collect(Collectors.toList());
+
+            // 8. Traitement du fichier Excel
             BufferedInputStream bis = new BufferedInputStream(inputStream);
             bis.mark(Integer.MAX_VALUE);
 
@@ -1408,36 +1436,18 @@ public List<ProduitDTO> getProduitsDansCorbeille(Long boutiqueId, HttpServletReq
 
                     ProduitRequest produitRequest = mapRowToProduitRequest(row, dataFormatter, decimalFormat);
 
-                    // Créer le produit
-                    List<Long> boutiqueIds = new ArrayList<>();
-                    if (boutiqueId != null) {
-                        boutiqueIds.add(boutiqueId);
-                    } else {
-                        // Récupérer toutes les boutiques de l'entreprise
-                        List<Boutique> boutiques = boutiqueRepository.findByEntrepriseId(entrepriseId);
-                        for (Boutique b : boutiques) {
-                            if (b.isActif()) { // Ne prendre que les boutiques actives
-                                boutiqueIds.add(b.getId());
-                            }
-                        }
-                    }
-
-                    // Si aucune boutique active trouvée
-                    if (boutiqueIds.isEmpty()) {
-                        throw new RuntimeException("Aucune boutique active trouvée pour cette entreprise");
-                    }
-
+                    // Créer le produit dans les boutiques sélectionnées
                     List<Integer> quantites = new ArrayList<>();
                     List<Integer> seuils = new ArrayList<>();
-                    for (int i = 0; i < boutiqueIds.size(); i++) {
+                    for (int i = 0; i < boutiqueIdsFinal.size(); i++) {
                         quantites.add(produitRequest.getQuantite() != null ? produitRequest.getQuantite() : 0);
                         seuils.add(produitRequest.getSeuilAlert() != null ? produitRequest.getSeuilAlert() : 0);
                     }
 
-                    // Appel à createProduit avec le token
+                    // Appel à createProduit avec le token et les IDs des boutiques
                     createProduit(
                             request,
-                            boutiqueIds,
+                            boutiqueIdsFinal, // Utiliser les IDs des boutiques sélectionnées
                             quantites,
                             seuils,
                             produitRequest,
