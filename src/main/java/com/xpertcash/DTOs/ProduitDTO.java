@@ -1,10 +1,13 @@
 package com.xpertcash.DTOs;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
+import jakarta.persistence.Column;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
@@ -50,6 +53,8 @@ public class ProduitDTO {
 
     private LocalDateTime createdAt;
     private LocalDateTime lastUpdated;
+     @Column(name = "date_preemption")
+    private LocalDate datePreemption;
 
     private Long boutiqueId;
 

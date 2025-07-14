@@ -16,6 +16,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.xpertcash.DTOs.AjouterStockRequest;
 import com.xpertcash.DTOs.FactureDTO;
 import com.xpertcash.DTOs.ProduitDTO;
@@ -63,6 +65,8 @@ public class ProduitController {
         }
 
         ObjectMapper objectMapper = new ObjectMapper();
+        objectMapper.registerModule(new JavaTimeModule());
+        objectMapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
 
         // Conversion des JSON reçus en listes ou objets
         List<Long> boutiqueIds = objectMapper.readValue(boutiqueIdsJson, new TypeReference<List<Long>>() {});

@@ -206,6 +206,10 @@ public class ProduitService {
                 produit.setLastUpdated(LocalDateTime.now());
                 produit.setBoutique(boutique);
 
+                if (produitRequest.getDatePreemption() != null) {
+                    produit.setDatePreemption(produitRequest.getDatePreemption());
+                }
+
                 Produit savedProduit = produitRepository.save(produit);
 
                 // Ajouter au stock si demandé
@@ -219,9 +223,11 @@ public class ProduitService {
                     stock.setCreatedAt(LocalDateTime.now());
                     stock.setLastUpdated(LocalDateTime.now());
                     stock.setSeuilAlert(seuil != null ? seuil : 0);
+                    stock.setDatePreemption(savedProduit.getDatePreemption());
                     stockRepository.save(stock);
                     savedProduit.setEnStock(true);
                     produitRepository.save(savedProduit);
+                    
                 }
 
                 produitsAjoutes.add(mapToDTO(savedProduit));
@@ -250,6 +256,7 @@ public class ProduitService {
         produitDTO.setEnStock(produit.getEnStock());
         produitDTO.setCreatedAt(produit.getCreatedAt());
         produitDTO.setLastUpdated(produit.getLastUpdated());
+        produitDTO.setDatePreemption(produit.getDatePreemption());
 
     
         // Assigner les IDs des entités liées (pas directement les objets)
