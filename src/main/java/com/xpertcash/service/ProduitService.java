@@ -1,14 +1,20 @@
 package com.xpertcash.service;
 
+import java.io.BufferedInputStream;
+import java.io.InputStream;
+import java.text.DecimalFormat;
+import java.text.DecimalFormatSymbols;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.NoSuchElementException;
+import java.util.*;
 import java.util.stream.Collectors;
+
+import com.xpertcash.repository.*;
+import org.apache.poi.hssf.usermodel.HSSFWorkbook;
+import org.apache.poi.openxml4j.exceptions.NotOfficeXmlFileException;
+import org.apache.poi.poifs.filesystem.OfficeXmlFileException;
+import org.apache.poi.ss.usermodel.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -35,16 +41,6 @@ import com.xpertcash.entity.Unite;
 import com.xpertcash.entity.User;
 import com.xpertcash.entity.Enum.RoleType;
 import com.xpertcash.entity.Enum.TypeProduit;
-import com.xpertcash.repository.BoutiqueRepository;
-import com.xpertcash.repository.CategorieRepository;
-import com.xpertcash.repository.FactureRepository;
-import com.xpertcash.repository.FournisseurRepository;
-import com.xpertcash.repository.ProduitRepository;
-import com.xpertcash.repository.StockHistoryRepository;
-import com.xpertcash.repository.StockProduitFournisseurRepository;
-import com.xpertcash.repository.StockRepository;
-import com.xpertcash.repository.UniteRepository;
-import com.xpertcash.repository.UsersRepository;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -96,6 +92,9 @@ public class ProduitService {
 
     @Autowired
     private ImageStorageService imageStorageService;
+
+    @Autowired
+    private EntrepriseRepository entrepriseRepository;
 
 
     // Ajouter un produit à la liste sans le stock
@@ -1327,8 +1326,278 @@ public List<ProduitDTO> getProduitsDansCorbeille(Long boutiqueId, HttpServletReq
     
         return new ArrayList<>(produitsUniques.values());
     }
-    
 
-    
+    public Map<String, Object> importProduitsFromExcel(
+            InputStream inputStream,
+            Long entrepriseId,
+            List<Long> boutiqueIds,
+            String tokenHeader, // Token complet avec "Bearer"
+            HttpServletRequest request) {
+
+        Map<String, Object> result = new HashMap<>();
+        int successCount = 0;
+        List<String> errors = new ArrayList<>();
+
+        try {
+            // 1. Vérification du token JWT
+            if (tokenHeader == null || !tokenHeader.startsWith("Bearer ")) {
+                throw new RuntimeException("Token JWT manquant ou mal formaté");
+            }
+
+            // Extraire le token sans "Bearer "
+            String token = tokenHeader.substring(7);
+
+            // 2. Extraction de l'ID utilisateur
+            Long userId;
+            try {
+                userId = jwtUtil.extractUserId(token);
+            } catch (Exception e) {
+                throw new RuntimeException("Token JWT invalide ou expiré", e);
+            }
+
+            // 3. Chargement de l'utilisateur
+            User user = usersRepository.findById(userId)
+                    .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+
+            // 4. Vérification de l'entreprise
+            Entreprise entreprise = entrepriseRepository.findById(entrepriseId)
+                    .orElseThrow(() -> new RuntimeException("Entreprise introuvable"));
+
+            // 5. Vérification des permissions
+            boolean isAdmin = user.getRole().getName() == RoleType.ADMIN;
+            boolean hasPermission = user.getRole().hasPermission(PermissionType.GERER_PRODUITS);
+
+            if (!isAdmin && !hasPermission) {
+                throw new RuntimeException("Accès refusé : permissions insuffisantes");
+            }
+
+            // 6. Vérification d'appartenance à l'entreprise
+            if (!user.getEntreprise().getId().equals(entrepriseId)) {
+                throw new RuntimeException("Accès interdit : utilisateur ne fait pas partie de cette entreprise");
+            }
+
+            // 7. Récupération des boutiques sélectionnées
+            List<Boutique> selectedBoutiques;
+            if (boutiqueIds != null && !boutiqueIds.isEmpty()) {
+                // Récupérer les boutiques par leurs IDs
+                selectedBoutiques = boutiqueRepository.findAllById(boutiqueIds);
+
+                // Vérifier que chaque boutique appartient à l'entreprise et est active
+                for (Boutique boutique : selectedBoutiques) {
+                    if (!boutique.getEntreprise().getId().equals(entrepriseId)) {
+                        throw new RuntimeException("La boutique ID " + boutique.getId() + " n'appartient pas à l'entreprise ID " + entrepriseId);
+                    }
+                    if (!boutique.isActif()) {
+                        throw new RuntimeException("La boutique ID " + boutique.getId() + " est désactivée");
+                    }
+                }
+            } else {
+                // Si aucune boutique n'est spécifiée, on prend toutes les boutiques actives de l'entreprise
+                selectedBoutiques = boutiqueRepository.findByEntrepriseIdAndActifTrue(entrepriseId);
+            }
+
+            // Convertir en liste d'IDs
+            List<Long> boutiqueIdsFinal = selectedBoutiques.stream()
+                    .map(Boutique::getId)
+                    .collect(Collectors.toList());
+
+            // 8. Traitement du fichier Excel
+            BufferedInputStream bis = new BufferedInputStream(inputStream);
+            bis.mark(Integer.MAX_VALUE);
+
+            Workbook workbook;
+            try {
+                // Essayer de lire comme OOXML (.xlsx)
+                workbook = WorkbookFactory.create(bis);
+            } catch (NotOfficeXmlFileException | OfficeXmlFileException e) {
+                // Réessayer comme OLE2 (.xls)
+                bis.reset();
+                workbook = new HSSFWorkbook(bis);
+            } catch (Exception e) {
+                throw new RuntimeException("Format de fichier non reconnu", e);
+            }
+
+            Sheet sheet = workbook.getSheetAt(0);
+            DataFormatter dataFormatter = new DataFormatter();
+            DecimalFormat decimalFormat = new DecimalFormat("#,##0.00", new DecimalFormatSymbols(Locale.FRENCH));
+
+            Iterator<Row> rowIterator = sheet.iterator();
+
+            // Sauter l'en-tête
+            if (rowIterator.hasNext()) rowIterator.next();
+
+            while (rowIterator.hasNext()) {
+                Row row = rowIterator.next();
+                try {
+                    // Vérifier si la ligne est vide
+                    if (isRowEmpty(row)) {
+                        continue;
+                    }
+
+                    ProduitRequest produitRequest = mapRowToProduitRequest(row, dataFormatter, decimalFormat);
+
+                    // Créer le produit dans les boutiques sélectionnées
+                    List<Integer> quantites = new ArrayList<>();
+                    List<Integer> seuils = new ArrayList<>();
+                    for (int i = 0; i < boutiqueIdsFinal.size(); i++) {
+                        quantites.add(produitRequest.getQuantite() != null ? produitRequest.getQuantite() : 0);
+                        seuils.add(produitRequest.getSeuilAlert() != null ? produitRequest.getSeuilAlert() : 0);
+                    }
+
+                    // Appel à createProduit avec le token et les IDs des boutiques
+                    createProduit(
+                            request,
+                            boutiqueIdsFinal, // Utiliser les IDs des boutiques sélectionnées
+                            quantites,
+                            seuils,
+                            produitRequest,
+                            true,
+                            null
+                    );
+
+                    successCount++;
+
+                } catch (Exception e) {
+                    errors.add("Ligne " + (row.getRowNum() + 1) + ": " + e.getMessage());
+                }
+            }
+
+        } catch (Exception e) {
+            errors.add("Erreur système: " + e.getMessage());
+            e.printStackTrace();
+        }
+
+        result.put("successCount", successCount);
+        if (!errors.isEmpty()) {
+            result.put("errors", errors);
+        }
+        return result;
+    }
+
+    private boolean isRowEmpty(Row row) {
+        if (row == null) return true;
+        for (int c = row.getFirstCellNum(); c < row.getLastCellNum(); c++) {
+            Cell cell = row.getCell(c);
+            if (cell != null && cell.getCellType() != CellType.BLANK) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private ProduitRequest mapRowToProduitRequest(Row row, DataFormatter dataFormatter, DecimalFormat decimalFormat) {
+        ProduitRequest request = new ProduitRequest();
+
+        try {
+            // Colonne 0: Nom produit
+            request.setNom(getStringValue(row, 0, dataFormatter));
+
+            // Colonne 1: Description
+            request.setDescription(getStringValue(row, 1, dataFormatter));
+
+            // Colonne 2: Catégorie
+            String categorieNom = getStringValue(row, 2, dataFormatter);
+            if (categorieNom != null && !categorieNom.isEmpty()) {
+                Optional<Categorie> categorieOpt = categorieRepository.findByNom(categorieNom);
+
+                if (categorieOpt.isPresent()) {
+                    request.setCategorieId(categorieOpt.get().getId());
+                } else {
+                    // Créer la catégorie si elle n'existe pas
+                    Categorie newCategorie = new Categorie();
+                    newCategorie.setNom(categorieNom);
+                    Categorie savedCategorie = categorieRepository.save(newCategorie);
+                    request.setCategorieId(savedCategorie.getId());
+                }
+            }
+
+            // Colonne 3: Prix Vente
+            request.setPrixVente(parseDouble(getStringValue(row, 3, dataFormatter), decimalFormat));
+
+            // Colonne 4: Prix Achat
+            request.setPrixAchat(parseDouble(getStringValue(row, 4, dataFormatter), decimalFormat));
+
+            // Colonne 5: Quantité
+            request.setQuantite(parseInt(getStringValue(row, 5, dataFormatter)));
+
+            // Colonne 6: Unité
+            String uniteNom = getStringValue(row, 6, dataFormatter);
+            if (uniteNom != null && !uniteNom.isEmpty()) {
+                Optional<Unite> uniteOpt = uniteRepository.findByNom(uniteNom);
+
+                if (uniteOpt.isPresent()) {
+                    request.setUniteId(uniteOpt.get().getId());
+                } else {
+                    // Créer l'unité si elle n'existe pas
+                    Unite newUnite = new Unite();
+                    newUnite.setNom(uniteNom);
+                    Unite savedUnite = uniteRepository.save(newUnite);
+                    request.setUniteId(savedUnite.getId());
+                }
+            }
+
+            // Colonne 7: Code Barre
+            request.setCodeBare(getStringValue(row, 7, dataFormatter));
+
+            // Colonne 8: Type Produit
+            String typeProduit = getStringValue(row, 8, dataFormatter);
+            if (typeProduit != null && !typeProduit.isEmpty()) {
+                try {
+                    // Normaliser la casse
+                    request.setTypeProduit(TypeProduit.valueOf(typeProduit.toUpperCase()));
+                } catch (IllegalArgumentException e) {
+                    // Valeur par défaut si le type est invalide
+                    request.setTypeProduit(TypeProduit.PHYSIQUE);
+                }
+            } else {
+                // Valeur par défaut si non spécifié
+                request.setTypeProduit(TypeProduit.PHYSIQUE);
+            }
+
+            // Colonne 9: Seuil Alert
+            request.setSeuilAlert(parseInt(getStringValue(row, 9, dataFormatter)));
+
+        } catch (Exception e) {
+            throw new RuntimeException("Erreur ligne " + (row.getRowNum() + 1) + ": " + e.getMessage());
+        }
+
+        return request;
+    }
+
+    private String getStringValue(Row row, int cellIndex, DataFormatter dataFormatter) {
+        if (row == null) return null;
+
+        Cell cell = row.getCell(cellIndex);
+        if (cell == null) return null;
+
+        return dataFormatter.formatCellValue(cell).trim();
+    }
+
+    private Double parseDouble(String value, DecimalFormat decimalFormat) {
+        if (value == null || value.isEmpty()) return null;
+
+        try {
+            // Nettoyage des formats numériques européens
+            value = value.replace(" ", "").replace(".", "");
+            return decimalFormat.parse(value).doubleValue();
+        } catch (Exception e) {
+            throw new RuntimeException("Valeur numérique invalide: " + value);
+        }
+    }
+
+    private Integer parseInt(String value) {
+        if (value == null || value.isEmpty()) return null;
+
+        try {
+            // Nettoyage des formats numériques européens
+            value = value.replace(" ", "").replace(".", "");
+            return Integer.parseInt(value);
+        } catch (Exception e) {
+            throw new RuntimeException("Valeur entière invalide: " + value);
+        }
+    }
+
+
+
 
 }

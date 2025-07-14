@@ -14,6 +14,7 @@ public interface BoutiqueRepository extends JpaRepository<Boutique, Long> {
     List<Boutique> findByEntrepriseId(Long entrepriseId);
 
     Optional<Boutique> findByEntreprise(Entreprise entreprise);
+    List<Boutique> findByEntrepriseIdAndActifTrue(Long entrepriseId);
 
 }
 

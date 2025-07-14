@@ -1,12 +1,14 @@
 package com.xpertcash.controller;
 
 
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.NoSuchElementException;
+import java.io.IOException;
+import java.util.*;
 
+import jakarta.servlet.http.HttpServletResponse;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -28,7 +30,6 @@ import com.xpertcash.service.ProduitService;
 import com.xpertcash.service.IMAGES.ImageStorageService;
 import jakarta.servlet.http.HttpServletRequest;
 import com.fasterxml.jackson.core.type.TypeReference;
-
 
 @CrossOrigin(origins = "*")
 @RestController
@@ -425,5 +426,127 @@ public class ProduitController {
         }
 
         //
+        @PostMapping(value = "/import-produits-excel", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+        public ResponseEntity<?> importProduitsFromExcel(
+                @RequestParam("file") MultipartFile file,
+                @RequestParam Long entrepriseId,
+                @RequestParam(value = "boutiqueIds", required = false) String boutiqueIdsJson,
+                @RequestHeader("Authorization") String token, // Token complet avec "Bearer"
+                HttpServletRequest request) {
+
+            try {
+                // Validation du token JWT
+                if (token == null || !token.startsWith("Bearer ")) {
+                    throw new RuntimeException("Token JWT manquant ou mal formaté");
+                }
+
+                // Vérification du type de fichier
+                String contentType = file.getContentType();
+                if (!Arrays.asList(
+                        "application/vnd.ms-excel",          // .xls
+                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" // .xlsx
+                ).contains(contentType)) {
+                    return ResponseEntity.badRequest().body(
+                            Collections.singletonMap("error", "Format de fichier non supporté: " + contentType)
+                    );
+                }
+
+                // Vérification de la signature magique du fichier
+                byte[] fileBytes = file.getBytes();
+                if (!isExcelFile(fileBytes)) {
+                    return ResponseEntity.badRequest().body(
+                            Collections.singletonMap("error", "Le fichier n'est pas un document Excel valide")
+                    );
+                }
+
+                // Vérification de la taille du fichier
+                if (file.getSize() > 5 * 1024 * 1024) {
+                    return ResponseEntity.badRequest().body(
+                            Collections.singletonMap("error", "Le fichier est trop volumineux (max 5MB)")
+                    );
+                }
+
+                // Désérialiser les IDs des boutiques
+                List<Long> boutiqueIds = new ArrayList<>();
+                if (boutiqueIdsJson != null && !boutiqueIdsJson.isEmpty()) {
+                    ObjectMapper objectMapper = new ObjectMapper();
+                    boutiqueIds = objectMapper.readValue(boutiqueIdsJson, new TypeReference<List<Long>>() {});
+                }
+
+                // Passer le token COMPLET au service
+                Map<String, Object> result = produitService.importProduitsFromExcel(
+                        file.getInputStream(),
+                        entrepriseId,
+                        boutiqueIds,
+                        token, // Token complet avec "Bearer"
+                        request
+                );
+
+                System.out.println("Import terminé. Succès: " + result.get("successCount"));
+                if (result.containsKey("errors")) {
+                    List<String> errors = (List<String>) result.get("errors");
+                    System.out.println("Erreurs (" + errors.size() + "):");
+                    errors.forEach(System.out::println);
+                }
+
+                Map<String, Object> response = new HashMap<>();
+                response.put("success", true);
+                response.put("message", "Importation réussie");
+                response.put("count", result.get("successCount"));
+
+                if (result.containsKey("errors")) {
+                    response.put("errors", result.get("errors"));
+                }
+
+                return ResponseEntity.ok(response);
+
+            } catch (Exception e) {
+                e.printStackTrace();
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                        .body(Collections.singletonMap("error", "Erreur lors du traitement du fichier: " + e.getMessage()));
+            }
+        }
+
+    private boolean isExcelFile(byte[] bytes) {
+        // Vérifier la signature pour .xlsx (PK header)
+        boolean isXlsx = bytes[0] == 0x50 && bytes[1] == 0x4B && bytes[2] == 0x03 && bytes[3] == 0x04;
+
+        // Vérifier la signature pour .xls (OLE header)
+        boolean isXls = bytes[0] == 0xD0 && bytes[1] == 0xCF && bytes[2] == 0x11 && bytes[3] == 0xE0;
+
+        return isXlsx || isXls;
+    }
+
+        @GetMapping("/generate-test-excel")
+        public void generateTestExcel(HttpServletResponse response) throws IOException {
+        response.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+        response.setHeader("Content-Disposition", "attachment; filename=test-import.xlsx");
+
+        try (Workbook workbook = new XSSFWorkbook()) {
+            Sheet sheet = workbook.createSheet("Produits");
+
+            // En-têtes
+            Row headerRow = sheet.createRow(0);
+            String[] headers = {"Nom produit", "Description", "Catégorie", "Prix Vente", "Prix Achat", "Quantité", "Unité", "Code Barre", "Type Produit", "Seuil Alert"};
+            for (int i = 0; i < headers.length; i++) {
+                headerRow.createCell(i).setCellValue(headers[i]);
+            }
+
+            // Données de test
+            Row dataRow = sheet.createRow(1);
+            dataRow.createCell(0).setCellValue("Produit Test");
+            dataRow.createCell(1).setCellValue("Description test");
+            dataRow.createCell(2).setCellValue("Catégorie Test");
+            dataRow.createCell(3).setCellValue(1000);
+            dataRow.createCell(4).setCellValue(500);
+            dataRow.createCell(5).setCellValue(50);
+            dataRow.createCell(6).setCellValue("Unité Test");
+            dataRow.createCell(7).setCellValue("123456789");
+            dataRow.createCell(8).setCellValue("PHYSIQUE");
+            dataRow.createCell(9).setCellValue(10);
+
+            workbook.write(response.getOutputStream());
+        }
+    }
        
 } 

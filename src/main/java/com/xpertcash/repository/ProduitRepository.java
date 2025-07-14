@@ -56,6 +56,9 @@ public interface ProduitRepository extends JpaRepository<Produit, Long> {
 
     List<Produit> findByBoutiqueIdAndDeletedTrue(Long boutiqueId);
 
+    List<Produit> findByBoutiqueIdAndDeletedFalse(Long boutiqueId);
+
+
     
 
     
