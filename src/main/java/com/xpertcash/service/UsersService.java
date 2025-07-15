@@ -162,6 +162,8 @@ public class UsersService {
         entreprise.setSecteur("");
         entreprise.setRccm("");
         entreprise.setSignataireNom("Fournisseur");
+        entreprise.setSignaturNum("");
+        entreprise.setCachetNum("");
         entreprise.setSiteWeb("");
         entreprise.setPrefixe(null);
         entreprise.setSuffixe(null);
@@ -884,9 +886,12 @@ public void suspendUser(HttpServletRequest request, Long userId, boolean suspend
     dto.setSiteWeb(entreprise.getSiteWeb());
     dto.setSignataire(entreprise.getSignataire());
     dto.setSignataireNom(entreprise.getSignataireNom());
+    dto.setSignaturNum(entreprise.getSignaturNum());
+    dto.setCachetNum(entreprise.getCachetNum());
     dto.setTauxTva(entreprise.getTauxTva());
     dto.setPrefixe(entreprise.getPrefixe());
     dto.setSuffixe(entreprise.getSuffixe());
+
 
     return dto;
 }

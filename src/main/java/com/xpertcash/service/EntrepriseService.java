@@ -64,7 +64,9 @@ public class EntrepriseService {
                         entreprise.getSignataireNom(),
                         entreprise.getPrefixe(),
                         entreprise.getSuffixe(),
-                        entreprise.getTauxTva()
+                        entreprise.getTauxTva(),
+                        entreprise.getSignaturNum(),
+                        entreprise.getCachetNum()
 
                 ))
                 .collect(Collectors.toList());
@@ -74,7 +76,8 @@ public class EntrepriseService {
 
    
     @Transactional
-    public void updateEntreprise(Long id, UpdateEntrepriseDTO dto, MultipartFile logoFile) {
+    public void updateEntreprise(Long id, UpdateEntrepriseDTO dto, MultipartFile logoFile,
+    MultipartFile imageSignatureFile, MultipartFile imageCachetFile) {
     Entreprise entreprise = entrepriseRepository.findById(id)
         .orElseThrow(() -> new RuntimeException("Entreprise non trouvée"));
 
@@ -142,7 +145,6 @@ public class EntrepriseService {
     }
 
         if (logoFile != null && !logoFile.isEmpty()) {
-        // Supprimer l'ancien logo s'il existe
         String oldLogoPath = entreprise.getLogo();
         if (oldLogoPath != null && !oldLogoPath.isBlank()) {
             Path oldPath = Paths.get("src/main/resources/static" + oldLogoPath);
@@ -160,6 +162,43 @@ public class EntrepriseService {
         System.out.println("📸 Nouveau logo enregistré : " + newLogoUrl);
     }
 
+
+    if (imageSignatureFile != null && !imageSignatureFile.isEmpty()) {
+        String oldLogoPath = entreprise.getSignaturNum();
+        if (oldLogoPath != null && !oldLogoPath.isBlank()) {
+            Path oldPath = Paths.get("src/main/resources/static" + oldLogoPath);
+            try {
+                Files.deleteIfExists(oldPath);
+                System.out.println("🗑️ Ancien signature supprimé : " + oldLogoPath);
+            } catch (IOException e) {
+                System.out.println("⚠️ Impossible de supprimer l'ancien signature : " + e.getMessage());
+            }
+        }
+
+        // Sauvegarde du nouveau signature
+        String newSignatureUrl = imageStorageService.SavesignatureNum(imageSignatureFile);
+        entreprise.setSignaturNum(newSignatureUrl);
+        System.out.println("📸 Nouveau signature enregistré : " + newSignatureUrl);
+    }
+
+
+     if (imageCachetFile != null && !imageCachetFile.isEmpty()) {
+        String oldLogoPath = entreprise.getCachetNum();
+        if (oldLogoPath != null && !oldLogoPath.isBlank()) {
+            Path oldPath = Paths.get("src/main/resources/static" + oldLogoPath);
+            try {
+                Files.deleteIfExists(oldPath);
+                System.out.println("🗑️ Ancien signature supprimé : " + oldLogoPath);
+            } catch (IOException e) {
+                System.out.println("⚠️ Impossible de supprimer l'ancien cachet : " + e.getMessage());
+            }
+        }
+
+        // Sauvegarde du nouveau signature
+        String newCachetUrl = imageStorageService.SaveCachetNum(imageCachetFile);
+        entreprise.setCachetNum(newCachetUrl);
+        System.out.println("📸 Nouveau cachet enregistré : " + newCachetUrl);
+    }
 
 
     System.out.println("DTO reçu dans le controller : " + dto);
