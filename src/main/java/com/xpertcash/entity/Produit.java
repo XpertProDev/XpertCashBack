@@ -1,4 +1,5 @@
 package com.xpertcash.entity;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -36,6 +37,9 @@ public class Produit {
     private LocalDateTime lastUpdated;
     private Boolean deleted = false;
     private LocalDateTime deletedAt;
+
+    @Column(name = "date_preemption")
+    private LocalDate datePreemption;
 
     @Column(name = "deleted_by")
     private Long deletedBy;

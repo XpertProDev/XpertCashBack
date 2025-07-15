@@ -1,10 +1,12 @@
 package com.xpertcash.service;
 
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.List;
-
+import java.util.Map;
 import java.util.Optional;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -581,5 +583,52 @@ public class BoutiqueService {
 
     return vendeurs;
 }
+
+// Méthode pour supprimer une boutique
+@Transactional
+public ResponseEntity<Map<String, String>> supprimerBoutique(Long boutiqueId, HttpServletRequest request) {
+    // 🔐 Vérification du token JWT
+    String token = request.getHeader("Authorization");
+    if (token == null || !token.startsWith("Bearer ")) {
+        throw new RuntimeException("Token JWT manquant ou mal formaté");
+    }
+
+    Long userId = jwtUtil.extractUserId(token.substring(7));
+    User user = usersRepository.findById(userId)
+            .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+
+    // 🏬 Récupération de la boutique
+    Boutique boutique = boutiqueRepository.findById(boutiqueId)
+            .orElseThrow(() -> new RuntimeException("Boutique non trouvée"));
+
+    Long entrepriseId = boutique.getEntreprise().getId();
+
+    // 🔐 Vérification des droits
+    boolean isAdmin = CentralAccess.isAdminOfEntreprise(user, entrepriseId);
+    boolean hasPermission = user.getRole().hasPermission(PermissionType.GERER_BOUTIQUE);
+
+    if (!isAdmin && !hasPermission) {
+        throw new RuntimeException("Vous n'avez pas les droits pour supprimer cette boutique !");
+    }
+
+    // 📦 Vérification des produits
+    List<Produit> produits = produitRepository.findByBoutiqueIdAndDeletedFalse(boutiqueId);
+    boolean tousProduitsSansStock = produits.stream()
+        .allMatch(p -> !Boolean.TRUE.equals(p.getEnStock()));
+
+    if (!produits.isEmpty() && !tousProduitsSansStock) {
+        throw new RuntimeException("Impossible de supprimer cette boutique : elle contient des produits en stock.");
+    }
+
+    // 🗑️ Suppression
+    boutiqueRepository.deleteById(boutiqueId);
+
+    Map<String, String> response = new HashMap<>();
+    response.put("message", "Boutique supprimée avec succès.");
+    response.put("status", "success");
+
+    return ResponseEntity.ok(response);
+}
+
 
 }

@@ -466,11 +466,11 @@ public class FactureProformaService {
       
     if (modifications.getStatut() == StatutFactureProForma.BROUILLON
             && facture.getStatut() != StatutFactureProForma.BROUILLON
-            && !(modifications.getNoteModification() != null
+            // && !(modifications.getNoteModification() != null
                 && (modifications.getLignesFacture() == null || modifications.getLignesFacture().isEmpty())
                 && modifications.getDescription() == null
                 && modifications.getDateRelance() == null
-                && modifications.getMethodeEnvoi() == null)) {
+                && modifications.getMethodeEnvoi() == null) {
 
         facture.setStatut(StatutFactureProForma.BROUILLON);
 

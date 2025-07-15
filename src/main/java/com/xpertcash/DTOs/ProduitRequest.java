@@ -2,6 +2,9 @@ package com.xpertcash.DTOs;
 
 
 
+import java.time.LocalDate;
+
+import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.xpertcash.entity.Categorie;
 import com.xpertcash.entity.Unite;
@@ -26,5 +29,8 @@ public class ProduitRequest {
     private TypeProduit typeProduit;
     private String nomCategorie;
     private String nomUnite;
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd")
+    private LocalDate datePreemption;
+
 }
 
