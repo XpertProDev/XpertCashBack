@@ -62,7 +62,7 @@ public class ProduitService {
     private BoutiqueRepository boutiqueRepository;
 
     @Autowired
-    private JwtUtil jwtUtil; 
+    private JwtUtil jwtUtil;
 
     @Autowired
     private UsersRepository usersRepository;
@@ -78,12 +78,12 @@ public class ProduitService {
 
     @Autowired
     private UniteRepository uniteRepository;
-  
+
     @Autowired
     private StockHistoryRepository stockHistoryRepository;
     @Autowired
     private FactureRepository factureRepository;
-    
+
     @Autowired
     private FournisseurRepository fournisseurRepository;
 
@@ -98,7 +98,7 @@ public class ProduitService {
 
 
     // Ajouter un produit à la liste sans le stock
-    public List<ProduitDTO> createProduit(HttpServletRequest request, List<Long> boutiqueIds, 
+    public List<ProduitDTO> createProduit(HttpServletRequest request, List<Long> boutiqueIds,
                                       List<Integer> quantites, List<Integer> seuilAlert, ProduitRequest produitRequest, boolean addToStock, String image) {
         try {
             // ✅ Extraction et validation du token
@@ -138,7 +138,7 @@ public class ProduitService {
                 throw new RuntimeException("Accès refusé : seuls les ADMIN ou les utilisateurs ayant la permission GERER_PRODUITS peuvent ajouter un produit.");
             }
 
-     
+
 
 
 
@@ -227,7 +227,7 @@ public class ProduitService {
                     stockRepository.save(stock);
                     savedProduit.setEnStock(true);
                     produitRepository.save(savedProduit);
-                    
+
                 }
 
                 produitsAjoutes.add(mapToDTO(savedProduit));
@@ -258,7 +258,7 @@ public class ProduitService {
         produitDTO.setLastUpdated(produit.getLastUpdated());
         produitDTO.setDatePreemption(produit.getDatePreemption());
 
-    
+
         // Assigner les IDs des entités liées (pas directement les objets)
         if (produit.getCategorie() != null) {
             produitDTO.setCategorieId(produit.getCategorie().getId());
@@ -269,22 +269,22 @@ public class ProduitService {
 
        TypeProduit type = produit.getTypeProduit();
         produitDTO.setTypeProduit(type != null ? type.name() : null);
-        
 
-    
+
+
         return produitDTO;
     }
-    
+
     private String generateProductCode() {
         String code;
         do {
             String randomCode = String.format("%05d", (int)(Math.random() * 100000));
             code = "P-" + randomCode;
         } while (produitRepository.existsByCodeGenerique(code));
-    
+
         return code;
     }
-     
+
     //Methode pour ajuster la quantiter du produit en stock
     public Facture ajouterStock(Long boutiqueId, Map<Long, Integer> produitsQuantites, String description, String codeFournisseur, Long fournisseurId, HttpServletRequest request) {
 
@@ -324,8 +324,8 @@ public class ProduitService {
             throw new RuntimeException("Accès refusé : seuls les ADMIN ou les utilisateurs ayant la permission GERER_PRODUITS peuvent gérer le stock de cette boutique.");
         }
 
-        
-    
+
+
         List<Produit> produits = new ArrayList<>();
         Fournisseur fournisseurEntity = null;
 
@@ -335,7 +335,7 @@ public class ProduitService {
 
         Produit produit = produitRepository.findById(produitId)
                 .orElseThrow(() -> new RuntimeException("Produit non trouvé"));
-        
+
           // 🔒 Vérifier que le produit appartient à la même entreprise (via sa boutique)
         Boutique produitBoutique = produit.getBoutique();
         if (produitBoutique == null || !produitBoutique.getEntreprise().getId().equals(entrepriseId)) {
@@ -361,7 +361,7 @@ public class ProduitService {
 
 
     // Initialiser la liste si null
-   
+
     stockRepository.save(stock);
 
     // Charger le fournisseur seulement s'il est fourni
@@ -369,21 +369,21 @@ public class ProduitService {
         fournisseurEntity = fournisseurRepository.findById(fournisseurId)
             .orElseThrow(() -> new RuntimeException("Fournisseur non trouvé avec l'ID : " + fournisseurId));
     }
-    
+
     // 🔁 Enregistrer dans StockProduitFournisseur
     StockProduitFournisseur spf = new StockProduitFournisseur();
     spf.setStock(stock);
     spf.setProduit(produit);
     spf.setQuantiteAjoutee(quantiteAjoute);
-    
+
     // Affecter le fournisseur uniquement s'il existe
     if (fournisseurEntity != null) {
         spf.setFournisseur(fournisseurEntity);
     }
-    
+
     stockProduitFournisseurRepository.save(spf);
-    
-    
+
+
 
     // 🕒 Historique
     StockHistory stockHistory = new StockHistory();
@@ -402,7 +402,7 @@ public class ProduitService {
     if (fournisseurId != null) {
         stockHistory.setFournisseur(fournisseurEntity);
     }
-    
+
     stockHistoryRepository.save(stockHistory);
 
     produits.add(produit);
@@ -411,7 +411,7 @@ public class ProduitService {
         // Enregistrer une facture avec plusieurs produits
         return enregistrerFacture("AJOUTER", produits, produitsQuantites, description, codeFournisseur, fournisseurEntity, user);
     }
-    
+
     // Méthode pour ajuster la quantité du produit en stock (retirer des produits)
     public FactureDTO retirerStock(Long boutiqueId, Map<Long, Integer> produitsQuantites, String description, HttpServletRequest request) {
 
@@ -455,7 +455,7 @@ public class ProduitService {
             throw new RuntimeException("Vous n'avez pas les droits nécessaires pour retirer du stock !");
         }
 
- 
+
 
     List<Produit> produits = new ArrayList<>();
 
@@ -599,7 +599,7 @@ public class ProduitService {
 
      //Methode liste Historique sur Stock
      public List<StockHistoryDTO> getStockHistory(Long produitId, HttpServletRequest request) {
-    
+
     // Récupérer le token JWT depuis l'en-tête
     String token = request.getHeader("Authorization");
     if (token == null || !token.startsWith("Bearer ")) {
@@ -673,7 +673,7 @@ public class ProduitService {
     // Récupérer tous les mouvements de stock
     public List<StockHistoryDTO> getAllStockHistory() {
         List<StockHistory> stockHistories = stockHistoryRepository.findAll();
-    
+
         // Convertir en DTOs (si nécessaire)
         return stockHistories.stream()
         .map(stockHistory -> {
@@ -690,24 +690,24 @@ public class ProduitService {
             if (user != null) {
                 dto.setNomComplet(user.getNomComplet());
                 dto.setPhone(user.getPhone());
-            
+
                 if (user.getRole() != null) {
                     dto.setRole(user.getRole().getName());
                 }
             }
-            
+
             return dto;
         })
                 .collect(Collectors.toList());
     }
-    
-    
+
+
    //Lister Stock
    public List<Stock> getAllStocks() {
     return stockRepository.findAll();
 }
- 
-    
+
+
    // Update Produit
     public ProduitDTO updateProduct(Long produitId, ProduitRequest produitRequest, MultipartFile imageFile, boolean addToStock, HttpServletRequest request)
  {
@@ -761,7 +761,7 @@ public class ProduitService {
     }
 
 
-   
+
     if (imageFile != null && !imageFile.isEmpty()) {
         // Supprimer l'ancienne image
         if (produit.getPhoto() != null && !produit.getPhoto().isBlank()) {
@@ -774,13 +774,13 @@ public class ProduitService {
                 System.err.println("⚠️ Erreur lors de la suppression de l'ancienne photo : " + e.getMessage());
             }
         }
-    
+
         // Enregistrement de la nouvelle image
         String newPhotoPath = imageStorageService.saveImage(imageFile); // stocke et retourne le chemin
         produit.setPhoto(newPhotoPath);
     }
-    
-    
+
+
 
     // Mise à jour de la catégorie si nécessaire
     if (produitRequest.getCategorieId() != null) {
@@ -803,7 +803,7 @@ public class ProduitService {
     if (addToStock) {
         // Recherche du stock existant pour ce produit
         Stock stock = stockRepository.findByProduit(produit);
-    
+
         if (stock == null) {
             // Si le stock n'existe pas, création d'un nouveau stock
             Stock newStock = new Stock();
@@ -812,53 +812,53 @@ public class ProduitService {
             newStock.setBoutique(produit.getBoutique());
             newStock.setCreatedAt(LocalDateTime.now());
             newStock.setLastUpdated(LocalDateTime.now());
-    
+
             // Ajouter le seuil d'alerte dans le stock
             if (produitRequest.getSeuilAlert() != null) {
                 newStock.setSeuilAlert(produitRequest.getSeuilAlert());
             } else {
                 newStock.setSeuilAlert(produit.getSeuilAlert());
             }
-    
+
             stockRepository.save(newStock);
         } else {
             // Si le stock existe déjà, mise à jour des informations du stock
             stock.setStockActuel(produit.getQuantite() != null ? produit.getQuantite() : 0);
-    
+
             stock.setQuantiteAjoute(0);
             stock.setQuantiteRetirer(0);
-            
-    
+
+
             // Mettre à jour le seuil d'alerte si nécessaire
             if (produitRequest.getSeuilAlert() != null) {
                 stock.setSeuilAlert(produitRequest.getSeuilAlert());
             }
-    
+
             stock.setLastUpdated(LocalDateTime.now());
             stockRepository.save(stock);
         }
-    
+
         produit.setEnStock(true);
     } else {
         // Si le produit ne doit plus être en stock, suppression du stock
         Stock stock = stockRepository.findByProduit(produit);
-    
+
         if (stock != null) {
             // Supprimer d'abord tous les historiques liés
             List<StockHistory> historyRecords = stockHistoryRepository.findByStock(stock);
             if (!historyRecords.isEmpty()) {
                 stockHistoryRepository.deleteAll(historyRecords);
             }
-        
+
             // Supprimer ensuite le stock
             stockRepository.delete(stock);
         }
-        
-        
-    
+
+
+
         produit.setEnStock(false);
     }
-    
+
     produitRepository.save(produit);
 
     // Mapper Produit vers ProduitDTO pour la réponse
@@ -883,7 +883,7 @@ public class ProduitService {
 
 
 
-    
+
 
     return produitDTO;
 }
@@ -940,11 +940,11 @@ public class ProduitService {
     public void deleteStock(Long produitId) {
         Produit produit = produitRepository.findById(produitId)
                 .orElseThrow(() -> new RuntimeException("Produit non trouvé"));
-    
+
         if (!produit.getEnStock()) {
             throw new RuntimeException("Le produit n'est pas en stock, suppression du stock impossible !");
         }
-    
+
         Stock stock = stockRepository.findByProduit(produit);
         if (stock != null) {
             stockRepository.delete(stock);
@@ -973,7 +973,7 @@ public class ProduitService {
 
        boolean isAdmin = user.getRole().getName() == RoleType.ADMIN;
        boolean hasPermission = user.getRole().hasPermission(PermissionType.GERER_PRODUITS);
-        
+
 
        if (!isAdmin && !hasPermission) {
             throw new RuntimeException("Action non autorisée : permissions insuffisantes");
@@ -1185,16 +1185,16 @@ public List<ProduitDTO> getProduitsDansCorbeille(Long boutiqueId, HttpServletReq
         List<Produit> produitsEnStock = produitRepository.findByBoutiqueIdAndEnStockTrue(boutiqueId);
         // Récupérer les produits non en stock de la boutique
         List<Produit> produitsNonEnStock = produitRepository.findByBoutiqueIdAndEnStockFalse(boutiqueId);
-    
+
         // Calculer les quantités en stock et non en stock
         int totalEnStock = produitsEnStock.stream().mapToInt(Produit::getQuantite).sum();
         int totalNonEnStock = produitsNonEnStock.stream().mapToInt(Produit::getQuantite).sum();
-    
+
         // Créer une map avec les résultats
         Map<String, Integer> totals = new HashMap<>();
         totals.put("totalEnStock", totalEnStock);
         totals.put("totalNonEnStock", totalNonEnStock);
-    
+
         return totals;
     }
 
@@ -1249,7 +1249,7 @@ public List<ProduitDTO> getProduitsDansCorbeille(Long boutiqueId, HttpServletReq
 
     // Boucle pour traiter chaque produit avec le même codeGenerique
     for (Produit p : produitsMemeCode) {
-        if (p.getBoutique() != null 
+        if (p.getBoutique() != null
                 && p.getBoutique().isActif()
                 && p.getBoutique().getEntreprise().getId().equals(admin.getEntreprise().getId())) {
 
@@ -1294,19 +1294,19 @@ public List<ProduitDTO> getProduitsDansCorbeille(Long boutiqueId, HttpServletReq
         dto.setBoutiqueId(produit.getBoutique() != null ? produit.getBoutique().getId() : null);
         return dto;
     }
-    
+
     // Méthode pour récupérer tous les produits de toutes les boutiques d'une entreprise
     public List<ProduitDTO> getProduitsParEntreprise(Long entrepriseId) {
         // Récupérer tous les produits de l'entreprise
         List<Produit> produits = produitRepository.findByEntrepriseId(entrepriseId);
-    
+
         // Regrouper les produits par codeGenerique
         Map<String, ProduitDTO> produitsUniques = new HashMap<>();
-    
+
         for (Produit produit : produits) {
             if (produit.getBoutique() != null && produit.getBoutique().isActif()) {
                 String codeGenerique = produit.getCodeGenerique();
-    
+
                 // Vérifier si ce produit unique existe déjà dans la map
                 if (!produitsUniques.containsKey(codeGenerique)) {
                     ProduitDTO produitDTO = convertToProduitDTO(produit);
@@ -1314,23 +1314,23 @@ public List<ProduitDTO> getProduitsDansCorbeille(Long boutiqueId, HttpServletReq
                     produitDTO.setQuantite(0); // Initialiser la quantité totale à 0
                     produitsUniques.put(codeGenerique, produitDTO);
                 }
-    
+
                 // Ajouter la boutique et sa quantité
                 Boutique boutique = produit.getBoutique();
                 Map<String, Object> boutiqueInfo = new HashMap<>();
                 boutiqueInfo.put("nom", boutique.getNomBoutique());
                 boutiqueInfo.put("id", boutique.getId());
                 boutiqueInfo.put("quantite", produit.getQuantite());
-    
+
                 produitsUniques.get(codeGenerique).getBoutiques().add(boutiqueInfo);
-    
+
                 // Additionner la quantité totale
                 produitsUniques.get(codeGenerique).setQuantite(
                     produitsUniques.get(codeGenerique).getQuantite() + produit.getQuantite()
                 );
             }
         }
-    
+
         return new ArrayList<>(produitsUniques.values());
     }
 
@@ -1561,8 +1561,21 @@ public List<ProduitDTO> getProduitsDansCorbeille(Long boutiqueId, HttpServletReq
                 request.setTypeProduit(TypeProduit.PHYSIQUE);
             }
 
+            // Colonne 10: Date Preemption (facultative)
+            String datePreemptionStr = getStringValue(row, 9, dataFormatter);
+            if (datePreemptionStr != null && !datePreemptionStr.isEmpty()) {
+                try {
+                    DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd-MM-yyyy");
+                    LocalDate datePreemption = LocalDate.parse(datePreemptionStr, formatter);
+                    request.setDatePreemption(datePreemption);
+                } catch (Exception e) {
+                    throw new RuntimeException("Format de date invalide. Utilisez dd-MM-yyyy (ex: 31-12-2025)");
+                }
+            }
+
             // Colonne 9: Seuil Alert
-            request.setSeuilAlert(parseInt(getStringValue(row, 9, dataFormatter)));
+            request.setSeuilAlert(parseInt(getStringValue(row, 10, dataFormatter)));
+
 
         } catch (Exception e) {
             throw new RuntimeException("Erreur ligne " + (row.getRowNum() + 1) + ": " + e.getMessage());

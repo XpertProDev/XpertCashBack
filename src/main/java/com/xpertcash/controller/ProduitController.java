@@ -2,6 +2,8 @@ package com.xpertcash.controller;
 
 
 import java.io.IOException;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 
 import jakarta.servlet.http.HttpServletResponse;
@@ -531,7 +533,7 @@ public class ProduitController {
 
             // En-têtes
             Row headerRow = sheet.createRow(0);
-            String[] headers = {"Nom produit", "Description", "Catégorie", "Prix Vente", "Prix Achat", "Quantité", "Unité", "Code Barre", "Type Produit", "Seuil Alert"};
+            String[] headers = {"Nom produit", "Description", "Catégorie", "Prix Vente", "Prix Achat", "Quantité", "Unité", "Code Barre", "Type Produit", "Date Preemption", "Seuil Alert"};
             for (int i = 0; i < headers.length; i++) {
                 headerRow.createCell(i).setCellValue(headers[i]);
             }
@@ -547,7 +549,8 @@ public class ProduitController {
             dataRow.createCell(6).setCellValue("Unité Test");
             dataRow.createCell(7).setCellValue("123456789");
             dataRow.createCell(8).setCellValue("PHYSIQUE");
-            dataRow.createCell(9).setCellValue(10);
+            dataRow.createCell(9).setCellValue(LocalDate.now().plusMonths(6).toString()); // Date préemption
+            dataRow.createCell(10).setCellValue(10);
 
             workbook.write(response.getOutputStream());
         }
