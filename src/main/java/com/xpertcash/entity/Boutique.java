@@ -6,6 +6,7 @@ import java.util.List;
 
 import com.fasterxml.jackson.annotation.JsonBackReference;
 import com.fasterxml.jackson.annotation.JsonManagedReference;
+import com.xpertcash.entity.Enum.TypeBoutique;
 
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
@@ -29,6 +30,9 @@ public class Boutique {
     private LocalDateTime createdAt;
     private LocalDateTime lastUpdated;
     private boolean actif = true;
+     @Column(nullable = false)
+    @Enumerated(EnumType.STRING)
+    private TypeBoutique typeBoutique;
 
     @ManyToOne
     @JoinColumn(name = "entreprise_id", nullable = false)

@@ -10,6 +10,7 @@ import com.xpertcash.configuration.JwtUtil;
 import com.xpertcash.configuration.PasswordGenerator;
 import com.xpertcash.entity.*;
 import com.xpertcash.entity.Enum.RoleType;
+import com.xpertcash.entity.Enum.TypeBoutique;
 import com.xpertcash.entity.Module.AppModule;
 import com.xpertcash.entity.Module.EntrepriseModuleEssai;
 import com.xpertcash.exceptions.BusinessException;
@@ -196,6 +197,7 @@ public class UsersService {
         boutique.setTelephone(phone);
         boutique.setEmail(email);
         boutique.setCreatedAt(LocalDateTime.now());
+        boutique.setTypeBoutique(TypeBoutique.BOUTIQUE);
         boutiqueRepository.save(boutique);
     
         // Créer un stock vide initial
@@ -707,7 +709,8 @@ public class UsersService {
                     b.getTelephone(),
                     b.getEmail(),
                     b.getCreatedAt(),
-                    b.isActif())
+                    b.isActif(),
+                    b.getTypeBoutique())
             )
             .collect(Collectors.toList());
 
