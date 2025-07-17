@@ -96,6 +96,14 @@ public class ProduitService {
     @Autowired
     private EntrepriseRepository entrepriseRepository;
 
+    @Autowired
+    private LigneFactureReelleRepository ligneFactureReelleRepository;
+
+    @Autowired
+    private LigneFactureProformaRepository ligneFactureProformaRepository;
+
+
+
 
     // Ajouter un produit à la liste sans le stock
     public List<ProduitDTO> createProduit(HttpServletRequest request, List<Long> boutiqueIds,
@@ -929,7 +937,17 @@ public class ProduitService {
             throw new RuntimeException("⚠️ Impossible de supprimer le produit car il est encore en stock");
         }
 
-        // 🗑️ 7. Marquage comme supprimé
+        // 🚫 7. Validation métier : lié à des factures ?
+        boolean produitUtilise = ligneFactureReelleRepository.existsByProduitId(produitId);
+        boolean produitUtiliseProforma = ligneFactureProformaRepository.existsByProduitId(produitId);
+        
+        if (produitUtilise || produitUtiliseProforma) {
+            throw new RuntimeException("⚠️ Impossible de supprimer le produit car il est lié à des factures");
+        }
+        
+        
+
+        // 🗑️ 8. Marquage comme supprimé
         produit.setDeleted(true);
         produit.setDeletedAt(LocalDateTime.now());
         produit.setDeletedBy(userId);
@@ -1320,6 +1338,7 @@ public List<ProduitDTO> getProduitsDansCorbeille(Long boutiqueId, HttpServletReq
                 Map<String, Object> boutiqueInfo = new HashMap<>();
                 boutiqueInfo.put("nom", boutique.getNomBoutique());
                 boutiqueInfo.put("id", boutique.getId());
+                boutiqueInfo.put("typeBoutique", boutique.getTypeBoutique());
                 boutiqueInfo.put("quantite", produit.getQuantite());
 
                 produitsUniques.get(codeGenerique).getBoutiques().add(boutiqueInfo);
