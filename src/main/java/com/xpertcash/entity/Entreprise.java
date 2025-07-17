@@ -48,16 +48,21 @@ public class Entreprise {
     @Column(nullable = true)
     private String signataireNom;
 
-  @Column(nullable = true)
-   private String prefixe;
+     @Column(nullable = true)
+    private String signaturNum;
 
-   @Column(nullable = true)
-   private String suffixe;
+    @Column(nullable = true)
+     private String cachetNum;
 
-  @Column(nullable = true)
-   private Double tauxTva;
+    @Column(nullable = true)
+    private String prefixe;
 
-    
+    @Column(nullable = true)
+    private String suffixe;
+
+    @Column(nullable = true)
+    private Double tauxTva;
+
     @Column(nullable = true)
     private String nina;
 

@@ -62,6 +62,9 @@ public class EntrepriseController {
             @PathVariable Long entrepriseId,
             @RequestPart(value = "entreprise", required = false) String entrepriseJson,
             @RequestPart(value = "logo", required = false) MultipartFile imageLogoFile,
+            @RequestPart(value = "siganture", required = false) MultipartFile imageSignatureFile,
+            @RequestPart(value = "cachet", required = false) MultipartFile imageCachetFile,
+
             HttpServletRequest request) {
     
         try {
@@ -71,7 +74,7 @@ public class EntrepriseController {
                 dto = new ObjectMapper().readValue(entrepriseJson, UpdateEntrepriseDTO.class);
             }
     
-            entrepriseService.updateEntreprise(entrepriseId, dto, imageLogoFile);
+            entrepriseService.updateEntreprise(entrepriseId, dto, imageLogoFile, imageSignatureFile, imageCachetFile);
     
             return ResponseEntity.ok("Entreprise mise à jour avec succès !");
         } catch (Exception e) {

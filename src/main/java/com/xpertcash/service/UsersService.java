@@ -10,6 +10,7 @@ import com.xpertcash.configuration.JwtUtil;
 import com.xpertcash.configuration.PasswordGenerator;
 import com.xpertcash.entity.*;
 import com.xpertcash.entity.Enum.RoleType;
+import com.xpertcash.entity.Enum.TypeBoutique;
 import com.xpertcash.entity.Module.AppModule;
 import com.xpertcash.entity.Module.EntrepriseModuleEssai;
 import com.xpertcash.exceptions.BusinessException;
@@ -162,6 +163,8 @@ public class UsersService {
         entreprise.setSecteur("");
         entreprise.setRccm("");
         entreprise.setSignataireNom("Fournisseur");
+        entreprise.setSignaturNum("");
+        entreprise.setCachetNum("");
         entreprise.setSiteWeb("");
         entreprise.setPrefixe(null);
         entreprise.setSuffixe(null);
@@ -194,6 +197,7 @@ public class UsersService {
         boutique.setTelephone(phone);
         boutique.setEmail(email);
         boutique.setCreatedAt(LocalDateTime.now());
+        boutique.setTypeBoutique(TypeBoutique.BOUTIQUE);
         boutiqueRepository.save(boutique);
     
         // Créer un stock vide initial
@@ -705,7 +709,8 @@ public class UsersService {
                     b.getTelephone(),
                     b.getEmail(),
                     b.getCreatedAt(),
-                    b.isActif())
+                    b.isActif(),
+                    b.getTypeBoutique())
             )
             .collect(Collectors.toList());
 
@@ -884,9 +889,12 @@ public void suspendUser(HttpServletRequest request, Long userId, boolean suspend
     dto.setSiteWeb(entreprise.getSiteWeb());
     dto.setSignataire(entreprise.getSignataire());
     dto.setSignataireNom(entreprise.getSignataireNom());
+    dto.setSignaturNum(entreprise.getSignaturNum());
+    dto.setCachetNum(entreprise.getCachetNum());
     dto.setTauxTva(entreprise.getTauxTva());
     dto.setPrefixe(entreprise.getPrefixe());
     dto.setSuffixe(entreprise.getSuffixe());
+
 
     return dto;
 }

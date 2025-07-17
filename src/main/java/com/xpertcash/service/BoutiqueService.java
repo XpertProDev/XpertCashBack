@@ -20,6 +20,7 @@ import com.xpertcash.entity.StockHistory;
 import com.xpertcash.entity.Transfert;
 import com.xpertcash.entity.User;
 import com.xpertcash.entity.Enum.RoleType;
+import com.xpertcash.entity.Enum.TypeBoutique;
 import com.xpertcash.exceptions.BusinessException;
 import com.xpertcash.repository.BoutiqueRepository;
 import com.xpertcash.repository.ProduitRepository;
@@ -56,7 +57,7 @@ public class BoutiqueService {
 
     // Ajouter une nouvelle boutique pour l'admin
     @Transactional
-    public Boutique ajouterBoutique(HttpServletRequest request, String nomBoutique, String adresse, String Telephone, String email) {
+    public Boutique ajouterBoutique(HttpServletRequest request, String nomBoutique, String adresse, String Telephone, String email, TypeBoutique typeBoutique) {
         // Vérifier la présence du token JWT dans l'entête de la requête
         String token = request.getHeader("Authorization");
         if (token == null || !token.startsWith("Bearer ")) {
@@ -92,6 +93,7 @@ public class BoutiqueService {
         boutique.setEmail(email);
         boutique.setEntreprise(admin.getEntreprise());
         boutique.setCreatedAt(LocalDateTime.now());
+        boutique.setTypeBoutique(typeBoutique);
 
         // Sauvegarder la boutique en base de données
         return boutiqueRepository.save(boutique);

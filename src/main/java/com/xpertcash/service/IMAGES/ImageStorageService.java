@@ -151,5 +151,55 @@ public class ImageStorageService {
     }
 
 
+    //Sinature numerique
+
+    public String SavesignatureNum(MultipartFile imageSignatureFile) {
+        if (imageSignatureFile == null || imageSignatureFile.isEmpty()) {
+            throw new NotFoundException("Le fichier image est vide ou invalide.");
+        }
+
+        try {
+            // Emplacement de l'image dans le dossier static/signatureUpload
+            Path imageRootLocation = Paths.get("src/main/resources/static/signatureUpload");
+            if (!Files.exists(imageRootLocation)) {
+                Files.createDirectories(imageRootLocation);
+            }
+            String imageName = UUID.randomUUID().toString() + "_" + imageSignatureFile.getOriginalFilename();
+            Path imagePath = imageRootLocation.resolve(imageName);
+            Files.copy(imageSignatureFile.getInputStream(), imagePath, StandardCopyOption.REPLACE_EXISTING);
+            String imageUrl = "/signatureUpload/" + imageName;
+            System.out.println("✅ Signature sauvegardée : " + imageUrl);
+            return "/signatureUpload/" + imageName;
+        } catch (IOException e) {
+            System.out.println("❌ ERREUR lors de l'enregistrement de signature : " + e.getMessage());
+            throw new NotFoundException("Erreur lors de l'enregistrement de signature : " + e.getMessage());
+        }
+    }
+
+
+    //Cachet numerique
+     public String SaveCachetNum(MultipartFile imageCachetFile) {
+        if (imageCachetFile == null || imageCachetFile.isEmpty()) {
+            throw new NotFoundException("Le fichier image est vide ou invalide.");
+        }
+
+        try {
+            // Emplacement de l'image dans le dossier static/cachetUpload
+            Path imageRootLocation = Paths.get("src/main/resources/static/cachetUpload");
+            if (!Files.exists(imageRootLocation)) {
+                Files.createDirectories(imageRootLocation);
+            }
+            String imageName = UUID.randomUUID().toString() + "_" + imageCachetFile.getOriginalFilename();
+            Path imagePath = imageRootLocation.resolve(imageName);
+            Files.copy(imageCachetFile.getInputStream(), imagePath, StandardCopyOption.REPLACE_EXISTING);
+            String imageUrl = "/cachetUpload/" + imageName;
+            System.out.println("✅ Cachet sauvegardée : " + imageUrl);
+            return "/cachetUpload/" + imageName;
+        } catch (IOException e) {
+            System.out.println("❌ ERREUR lors de l'enregistrement de signature : " + e.getMessage());
+            throw new NotFoundException("Erreur lors de l'enregistrement de cachet : " + e.getMessage());
+        }
+    }
+
 }
 

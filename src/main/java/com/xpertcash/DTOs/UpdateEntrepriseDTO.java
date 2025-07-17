@@ -21,6 +21,8 @@ public class UpdateEntrepriseDTO {
     private String prefixe;
     private String suffixe;
     private Double tauxTva;
+    private String signaturNum;
+    private String cachetNum;
 
    
 
