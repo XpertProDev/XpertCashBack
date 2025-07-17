@@ -6,6 +6,7 @@ import java.util.Date;
 import java.util.List;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
@@ -27,12 +28,26 @@ public class NotificationService {
      @Autowired
     private FactureProformaRepository factureProformaRepository;
 
+    private final SimpMessagingTemplate messagingTemplate;
 
-      // tâche planifiée : Vérifie tous les jours à 08h00 quelles factures doivent être relancées
-      @Scheduled(cron = "0 0 8 * * ?")
-      //@Scheduled(cron = "0 * * * * ?")  // Tâche planifiée toutes les minutes mode Dev
-      @Transactional
-      public void verifierFacturesAEnvoyer() {
+    @Autowired
+    public NotificationService(SimpMessagingTemplate messagingTemplate) {
+        this.messagingTemplate = messagingTemplate;
+    }
+
+    public void sendApprovalRequest(Long userId, String message) {
+        messagingTemplate.convertAndSendToUser(
+                userId.toString(),
+                "/queue/notifications",
+                message
+        );
+    }
+
+    // tâche planifiée : Vérifie tous les jours à 08h00 quelles factures doivent être relancées
+    @Scheduled(cron = "0 0 8 * * ?")
+    //@Scheduled(cron = "0 * * * * ?")  // Tâche planifiée toutes les minutes mode Dev
+    @Transactional
+    public void verifierFacturesAEnvoyer() {
         LocalDateTime maintenant = LocalDateTime.now().withSecond(0).withNano(0);
     
         System.out.println("🔍 Vérification des factures à relancer à " + maintenant);

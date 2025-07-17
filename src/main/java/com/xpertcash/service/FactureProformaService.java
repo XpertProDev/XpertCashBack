@@ -82,6 +82,9 @@ public class FactureProformaService {
 
     @Autowired
     private ModuleActivationService moduleActivationService;
+
+    @Autowired
+    private NotificationService notificationService;
     
     // Methode pour creer une facture pro forma
     public FactureProForma ajouterFacture(FactureProForma facture, Double remisePourcentage, Boolean appliquerTVA, HttpServletRequest request) {
@@ -512,6 +515,8 @@ public class FactureProformaService {
                 if (!user.getEntreprise().getId().equals(approbateur.getEntreprise().getId())) {
                     throw new RuntimeException("Tous les approbateurs doivent appartenir à la même entreprise.");
                 }
+                String message = "Nouvelle facture à approuver: " + facture.getNumeroFacture();
+                notificationService.sendApprovalRequest(approbateur.getId(), message);
             }
 
             facture.setApprobateurs(approbateurs);
