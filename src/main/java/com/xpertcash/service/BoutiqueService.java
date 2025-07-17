@@ -139,7 +139,6 @@ public class BoutiqueService {
     return boutiqueRepository.findByEntrepriseId(entrepriseId);
 }
 
-    
     // Methode pour recuperer une boutique par son ID
     public Boutique getBoutiqueById(Long boutiqueId, HttpServletRequest request) {
     // 🔐 Vérification du token JWT
