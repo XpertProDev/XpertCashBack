@@ -23,6 +23,8 @@ import com.xpertcash.entity.User;
 import com.xpertcash.entity.Enum.RoleType;
 import com.xpertcash.repository.ClientRepository;
 import com.xpertcash.repository.EntrepriseClientRepository;
+import com.xpertcash.repository.FactureProformaRepository;
+import com.xpertcash.repository.FactureReelleRepository;
 import com.xpertcash.repository.UsersRepository;
 import com.xpertcash.service.IMAGES.ImageStorageService;
 
@@ -47,6 +49,12 @@ public class ClientService {
 
     @Autowired
     private ImageStorageService imageStorageService;
+
+    @Autowired
+    private FactureProformaRepository factureProformaRepository;
+
+    @Autowired
+    private FactureReelleRepository factureReelleRepository;
 
 
     public Client saveClient(Client client,  HttpServletRequest request) {
@@ -185,54 +193,50 @@ public class ClientService {
         return clientRepository.findByEntrepriseClientId(entrepriseId);
     }
 
-    public void deleteClient(Long id) {
-        clientRepository.deleteById(id);
+
+    public List<Client> getAllClients(HttpServletRequest request) {
+        // 1. Extraire l'utilisateur à partir du token
+        String token = request.getHeader("Authorization");
+        if (token == null || !token.startsWith("Bearer ")) {
+            throw new RuntimeException("Token JWT manquant ou mal formaté");
+        }
+
+        Long userId;
+        try {
+            userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
+        } catch (Exception e) {
+            throw new RuntimeException("Erreur lors de l'extraction de l'ID utilisateur", e);
+        }
+
+        User user = usersRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
+
+        Entreprise entreprise = user.getEntreprise();
+        if (entreprise == null) {
+            throw new RuntimeException("Aucune entreprise associée à cet utilisateur");
+        }
+
+        // Vérification des droits
+        boolean isAdminOrManager = CentralAccess.isAdminOrManagerOfEntreprise(user, entreprise.getId());
+        boolean hasPermissionGestionClients = user.getRole().hasPermission(PermissionType.GERER_CLIENTS);
+
+        if (!isAdminOrManager && !hasPermissionGestionClients) {
+            throw new RuntimeException("Accès refusé : vous n'avez pas les droits nécessaires pour consulter les clients.");
+        }
+
+        // 2. Récupérer tous les clients
+        List<Client> allClients = clientRepository.findAll();
+
+        // 3. Filtrer : client lié à entreprise OU entrepriseClient liée à l'entreprise
+        return allClients.stream()
+                .filter(c ->
+                    (c.getEntreprise() != null && c.getEntreprise().getId().equals(entreprise.getId())) ||
+                    (c.getEntrepriseClient() != null &&
+                    c.getEntrepriseClient().getEntreprise() != null &&
+                    c.getEntrepriseClient().getEntreprise().getId().equals(entreprise.getId()))
+                )
+                .collect(Collectors.toList());
     }
-
-
-public List<Client> getAllClients(HttpServletRequest request) {
-    // 1. Extraire l'utilisateur à partir du token
-    String token = request.getHeader("Authorization");
-    if (token == null || !token.startsWith("Bearer ")) {
-        throw new RuntimeException("Token JWT manquant ou mal formaté");
-    }
-
-    Long userId;
-    try {
-        userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
-    } catch (Exception e) {
-        throw new RuntimeException("Erreur lors de l'extraction de l'ID utilisateur", e);
-    }
-
-    User user = usersRepository.findById(userId)
-            .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
-
-    Entreprise entreprise = user.getEntreprise();
-    if (entreprise == null) {
-        throw new RuntimeException("Aucune entreprise associée à cet utilisateur");
-    }
-
-    // Vérification des droits
-    boolean isAdminOrManager = CentralAccess.isAdminOrManagerOfEntreprise(user, entreprise.getId());
-    boolean hasPermissionGestionClients = user.getRole().hasPermission(PermissionType.GERER_CLIENTS);
-
-    if (!isAdminOrManager && !hasPermissionGestionClients) {
-        throw new RuntimeException("Accès refusé : vous n'avez pas les droits nécessaires pour consulter les clients.");
-    }
-
-    // 2. Récupérer tous les clients
-    List<Client> allClients = clientRepository.findAll();
-
-    // 3. Filtrer : client lié à entreprise OU entrepriseClient liée à l'entreprise
-    return allClients.stream()
-            .filter(c ->
-                (c.getEntreprise() != null && c.getEntreprise().getId().equals(entreprise.getId())) ||
-                (c.getEntrepriseClient() != null &&
-                 c.getEntrepriseClient().getEntreprise() != null &&
-                 c.getEntrepriseClient().getEntreprise().getId().equals(entreprise.getId()))
-            )
-            .collect(Collectors.toList());
-}
 
 
     //Methode pour recuperer seulement les entreprise client
@@ -271,8 +275,6 @@ public List<Client> getAllClients(HttpServletRequest request) {
 }
 
 
-
-
     // Méthode pour récupérer tous les clients (personnes) et entreprises sans leurs clients associés
     public List<Object> getAllClientsAndEntreprises() {
         List<Object> clientsAndEntreprises = new ArrayList<>();
@@ -287,7 +289,6 @@ public List<Client> getAllClients(HttpServletRequest request) {
 
         return clientsAndEntreprises;
     }
-
 
     // Méthode pour modifier un client
     @Transactional
@@ -404,4 +405,83 @@ public List<Client> getAllClients(HttpServletRequest request) {
         return clientRepository.save(existingClient);
     }
 
+
+    //Methode pour  supprimer un client qui n'as pas de facture et de commande
+    @Transactional
+    public void deleteClientIfNoOrdersOrInvoices(Long clientId, HttpServletRequest request) {
+        if (clientId == null) {
+            throw new IllegalArgumentException("L'ID du client est obligatoire !");
+        }
+
+        Client client = clientRepository.findById(clientId)
+                .orElseThrow(() -> new EntityNotFoundException("Client introuvable avec l'ID : " + clientId));
+
+        // 🔐 Authentification de l'utilisateur
+        String token = request.getHeader("Authorization");
+        if (token == null || !token.startsWith("Bearer ")) {
+            throw new RuntimeException("Token JWT manquant ou mal formaté");
+        }
+
+        Long userId;
+        try {
+            userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
+        } catch (Exception e) {
+            throw new RuntimeException("Erreur lors de l'extraction de l'ID utilisateur", e);
+        }
+
+        User user = usersRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
+
+        Entreprise entreprise = user.getEntreprise();
+        if (entreprise == null) {
+            throw new RuntimeException("Aucune entreprise associée à cet utilisateur");
+        }
+
+        // 🔒 Vérification que le client appartient bien à cette entreprise
+        boolean appartientEntreprise = (client.getEntreprise() != null &&
+                client.getEntreprise().getId().equals(entreprise.getId())) ||
+                (client.getEntrepriseClient() != null &&
+                        client.getEntrepriseClient().getEntreprise() != null &&
+                        client.getEntrepriseClient().getEntreprise().getId().equals(entreprise.getId()));
+
+        if (!appartientEntreprise) {
+            throw new RuntimeException("Accès refusé : ce client ne vous appartient pas.");
+        }
+
+        // 🔒 Vérifier que l'utilisateur a les droits
+        boolean isAdminOrManager = CentralAccess.isAdminOrManagerOfEntreprise(user, entreprise.getId());
+        boolean hasPermissionGestionClient = user.getRole().hasPermission(PermissionType.GERER_CLIENTS);
+
+        if (!isAdminOrManager && !hasPermissionGestionClient) {
+            throw new RuntimeException("Accès refusé : vous n'avez pas les permissions pour supprimer un client.");
+        }
+
+        // ❌ Vérifier que le client n’a pas de commandes ou de factures
+        boolean hasFactures = factureProformaRepository.existsByClientId(clientId);
+        boolean hasFacturesReel = factureReelleRepository.existsByClientId(clientId);
+
+
+        if ( hasFactures || hasFacturesReel) {
+            throw new RuntimeException("Ce client ne peut pas être supprimé car il a  des factures.");
+        }
+
+        // 🗑️ Supprimer l’image si elle existe
+        String imagePath = client.getPhoto();
+        if (imagePath != null && !imagePath.isBlank()) {
+            Path path = Paths.get("src/main/resources/static" + imagePath);
+            try {
+                Files.deleteIfExists(path);
+                System.out.println("🗑️ Photo supprimée : " + imagePath);
+            } catch (IOException e) {
+                System.out.println("⚠️ Erreur lors de la suppression de la photo : " + e.getMessage());
+            }
+        }
+
+        clientRepository.delete(client);
+        System.out.println("✅ Client supprimé avec succès : " + clientId);
+    }
+
+  
+  
+            
 }

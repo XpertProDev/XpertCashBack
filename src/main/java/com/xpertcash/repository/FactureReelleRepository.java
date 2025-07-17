@@ -56,6 +56,11 @@ public interface FactureReelleRepository extends JpaRepository<FactureReelle, Lo
 
     List<FactureReelle> findByEntrepriseAndUtilisateurCreateurOrderByDateCreationDesc(Entreprise entreprise, User utilisateurCreateur);
 
+    boolean existsByClientId(Long clientId);
+    boolean existsByEntrepriseClientId(Long entrepriseClientId);
+
+
+
 
 
 }

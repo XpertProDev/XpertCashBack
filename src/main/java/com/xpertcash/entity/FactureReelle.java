@@ -26,7 +26,7 @@ public class FactureReelle {
     private String numeroFacture;
     private String description;
     private LocalDate dateCreation;
-    private LocalDate dateCreationPro;
+   private LocalDateTime dateCreationPro;
     private double totalHT;
     private double remise;
     private Double tauxRemise;

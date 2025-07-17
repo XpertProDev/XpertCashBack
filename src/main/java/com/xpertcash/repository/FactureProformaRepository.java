@@ -64,6 +64,9 @@ public interface FactureProformaRepository extends JpaRepository<FactureProForma
     List<FactureProForma> findByClientIdOrEntrepriseClientId(@Param("clientId") Long clientId,
                                                          @Param("entrepriseClientId") Long entrepriseClientId);
 
+    boolean existsByClientId(Long clientId);
+    boolean existsByEntrepriseClientId(Long entrepriseClientId);
+
 
 
     

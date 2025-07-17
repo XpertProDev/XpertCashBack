@@ -10,11 +10,7 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-
 import com.xpertcash.configuration.CentralAccess;
 import com.xpertcash.configuration.JwtUtil;
 import com.xpertcash.entity.Client;
@@ -25,7 +21,6 @@ import com.xpertcash.entity.FactureReelle;
 import com.xpertcash.entity.LigneFactureProforma;
 import com.xpertcash.entity.MethodeEnvoi;
 import com.xpertcash.entity.NoteFactureProForma;
-import com.xpertcash.entity.Permission;
 import com.xpertcash.entity.PermissionType;
 import com.xpertcash.entity.Produit;
 import com.xpertcash.entity.User;
@@ -181,7 +176,7 @@ public class FactureProformaService {
 
     // Initialisation des valeurs
     facture.setStatut(StatutFactureProForma.BROUILLON);
-    facture.setDateCreation(LocalDate.now());
+    facture.setDateCreation(LocalDateTime.now());
 
     if (facture.getDateFacture() == null) {
         facture.setDateFacture(LocalDate.now());
@@ -528,7 +523,7 @@ public class FactureProformaService {
 
         // 🔁 Mise à jour de la date de relance
         if (modifications.getDateRelance() != null) {
-            if (modifications.getDateRelance().isBefore(facture.getDateCreation().atStartOfDay())) {
+            if (modifications.getDateRelance().isBefore(facture.getDateCreation())) {
                 throw new RuntimeException("La date de relance ne peut pas être antérieure à la date de création de la facture !");
             }
 
