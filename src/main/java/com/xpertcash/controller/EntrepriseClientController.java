@@ -92,7 +92,7 @@ public class EntrepriseClientController {
     public ResponseEntity<?> deleteEntrepriseClientIfNoOrdersOrInvoices(@PathVariable Long id, HttpServletRequest request) {
         try {
             entrepriseClientService.deleteEntrepriseClientIfNoOrdersOrInvoices(id, request);
-            return ResponseEntity.ok().body("Client entreprise supprimé avec succès.");
+            return ResponseEntity.ok().body("Entreprise Cliente supprimé avec succès.");
         } catch (EntityNotFoundException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
         } catch (RuntimeException e) {
