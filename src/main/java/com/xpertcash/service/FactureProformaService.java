@@ -972,40 +972,36 @@ public class FactureProformaService {
     boolean isAdmin = currentUser.getRole().getName() == RoleType.ADMIN;
     boolean hasPermission = currentUser.getRole().hasPermission(PermissionType.Gestion_Facture);
 
-    LocalDate dateStart;
-LocalDate dateEnd;
+    LocalDateTime dateStart;
+    LocalDateTime dateEnd;
 
-switch (typePeriode.toLowerCase()) {
-    case "jour":
-        dateStart = LocalDate.now();
-        dateEnd = dateStart.plusDays(1);
-        break;
-    case "mois":
-        dateStart = LocalDate.now().withDayOfMonth(1);
-        dateEnd = dateStart.plusMonths(1);
-        break;
-    case "annee":
-        dateStart = LocalDate.now().withDayOfYear(1);
-        dateEnd = dateStart.plusYears(1);
-        break;
-    case "personnalise":
-        if (dateDebut == null || dateFin == null) {
-            throw new RuntimeException("Dates de début et de fin requises pour une période personnalisée.");
-        }
-        dateStart = dateDebut;
-        dateEnd = dateFin.plusDays(1); // Pour inclure toute la journée de fin
-        break;
-    default:
-        throw new RuntimeException("Type de période invalide.");
-}
+    switch (typePeriode.toLowerCase()) {
+        case "jour":
+            dateStart = LocalDate.now().atStartOfDay();
+            dateEnd = dateStart.plusDays(1);
+            break;
+        case "mois":
+            dateStart = LocalDate.now().withDayOfMonth(1).atStartOfDay();
+            dateEnd = dateStart.plusMonths(1);
+            break;
+        case "annee":
+            dateStart = LocalDate.now().withDayOfYear(1).atStartOfDay();
+            dateEnd = dateStart.plusYears(1);
+            break;
+        case "personnalise":
+            if (dateDebut == null || dateFin == null) {
+                throw new RuntimeException("Dates de début et de fin requises pour une période personnalisée.");
+            }
+            dateStart = dateDebut.atStartOfDay();
+            dateEnd = dateFin.plusDays(1).atStartOfDay();
+            break;
+        default:
+            throw new RuntimeException("Type de période invalide.");
+    }
 
-// Et ici l'appel au repository fonctionne désormais car les types correspondent
-List<FactureProForma> factures = factureProformaRepository.findByEntrepriseIdAndDateCreationBetween(
-    entrepriseCourante.getId(), dateStart, dateEnd
-);
-
-
-   
+    List<FactureProForma> factures = factureProformaRepository.findByEntrepriseIdAndDateCreationBetween(
+        entrepriseCourante.getId(), dateStart, dateEnd
+    );
 
     return factures.stream()
         .sorted(Comparator.comparing(FactureProForma::getDateCreation).reversed())

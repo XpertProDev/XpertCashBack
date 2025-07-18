@@ -67,7 +67,7 @@ public interface FactureProformaRepository extends JpaRepository<FactureProForma
     boolean existsByClientId(Long clientId);
     boolean existsByEntrepriseClientId(Long entrepriseClientId);
 
-    List<FactureProForma> findByEntrepriseIdAndDateCreationBetween(Long entrepriseId, LocalDate start, LocalDate end);
+    List<FactureProForma> findByEntrepriseIdAndDateCreationBetween(Long entrepriseId, LocalDateTime start, LocalDateTime end);
 
 
 
