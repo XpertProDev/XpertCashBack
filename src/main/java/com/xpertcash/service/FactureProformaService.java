@@ -85,7 +85,8 @@ public class FactureProformaService {
     private ModuleActivationService moduleActivationService;
 
     @Autowired
-    private NotificationService notificationService;
+    private GlobalNotificationService globalNotificationService;
+//    private NotificationService notificationService;
     
     // Methode pour creer une facture pro forma
     public FactureProForma ajouterFacture(FactureProForma facture, Double remisePourcentage, Boolean appliquerTVA, HttpServletRequest request) {
@@ -327,7 +328,7 @@ public class FactureProformaService {
 
         User user = usersRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("Utilisateur introuvable !"));
-        
+
          // --- Vérification que la facture appartient à la même entreprise que l'utilisateur ---
         Entreprise entrepriseFacture = facture.getEntreprise();
         Entreprise entrepriseUtilisateur = user.getEntreprise();
@@ -344,7 +345,7 @@ public class FactureProformaService {
         if (!isAdmin && !hasPermission) {
             throw new RuntimeException("Accès refusé : vous n'avez pas les droits nécessaires pour créer une facture dans cette entreprise !");
         }
-        
+
 
         // 🔒 Blocage total si facture annulée
         if (facture.getStatut() == StatutFactureProForma.ANNULE) {
@@ -363,7 +364,7 @@ public class FactureProformaService {
             }
         }
 
-        // Si demande d’annulation 
+        // Si demande d’annulation
         if (modifications.getStatut() == StatutFactureProForma.ANNULE) {
 
                 // si paiements existants
@@ -409,7 +410,7 @@ public class FactureProformaService {
         if (modifications.getStatut() == StatutFactureProForma.VALIDE && facture.getStatut() != StatutFactureProForma.VALIDE) {
             // On récupère et enregistre le validateur
             facture.setUtilisateurValidateur(user);
-            
+
             FactureReelle factureReelle = factureReelleService.genererFactureReelle(facture);
             System.out.println("✅ Facture Réelle générée avec succès : " + factureReelle.getNumeroFacture());
 
@@ -467,7 +468,7 @@ public class FactureProformaService {
             );
         }
 
-      
+
     if (modifications.getStatut() == StatutFactureProForma.BROUILLON
             && facture.getStatut() != StatutFactureProForma.BROUILLON
             // && !(modifications.getNoteModification() != null
@@ -502,35 +503,53 @@ public class FactureProformaService {
          */
 
         // ✅ Ajout des approbateurs
+        // === Ajout des approbateurs et notifications ===
         if (modifications.getStatut() == StatutFactureProForma.APPROBATION) {
             if (idsApprobateurs == null || idsApprobateurs.isEmpty()) {
                 throw new RuntimeException("Vous devez fournir au moins un utilisateur pour approuver cette facture.");
             }
-
             List<User> approbateurs = usersRepository.findAllById(idsApprobateurs);
             if (approbateurs.size() != idsApprobateurs.size()) {
                 throw new RuntimeException("Un ou plusieurs approbateurs sont introuvables !");
             }
 
-            for (User approbateur : approbateurs) {
-                Map<String, Object> notification = new HashMap<>();
-                notification.put("type", "APPROBATION_DEMANDE");
-                notification.put("factureId", facture.getId());
-                notification.put("factureNumero", facture.getNumeroFacture());
-                notification.put("createur", user.getNomComplet());
-                notification.put("message", "Nouvelle facture à approuver: " + facture.getNumeroFacture());
-
-            }
-
+            // Persistance des approbateurs sur la facture
             facture.setApprobateurs(approbateurs);
-            System.out.println("👥 Approbateurs ajoutés : " + approbateurs.stream().map(User::getId).toList());
+            System.out.println("👥 Approbateurs ajoutés : " + approbateurs.stream()
+                    .map(User::getId).toList());
 
+            // Construction des messages
+            String numero = Optional.ofNullable(facture.getNumeroFacture())
+                    .filter(s -> !s.isBlank())
+                    .orElseGet(() -> "Facture #" + facture.getId());
+            String createur = Optional.ofNullable(user.getNomComplet())
+                    .filter(s -> !s.isBlank())
+                    .orElse("un utilisateur");
+
+            String msgAppro = String.format(
+                    "Nouvelle facture '%s' à approuver, créée par %s.",
+                    Optional.ofNullable(numero).orElse("N/A"),
+                    Optional.ofNullable(createur).orElse("un utilisateur")
+            );
+            String destinataires = approbateurs.stream()
+                    .map(u -> u.getNomComplet() != null ? u.getNomComplet() : "(nom inconnu)")
+                    .collect(Collectors.joining(", "));
+            String msgSender = String.format(
+                    "Vous avez envoyé une demande d'approbation pour la facture '%s' à: %s.",
+                    numero,
+                    destinataires
+            );
+
+            // Notifications
+            globalNotificationService.notifyRecipients(approbateurs, msgAppro);
+            globalNotificationService.notifySingle(user, msgSender);
+
+            // Historique
             factProHistoriqueService.enregistrerActionHistorique(
                     facture,
                     user,
                     "Demande Approbation",
-                    "Demande d'approbation envoyée à : " +
-                            approbateurs.stream().map(User::getNomComplet).collect(Collectors.joining(", "))
+                    "Demande envoyée à: " + destinataires
             );
         }
 
@@ -679,7 +698,7 @@ public class FactureProformaService {
 
         return factureProformaRepository.save(facture);
     }
-   
+
     //Methode pour recuperer les factures pro forma dune entreprise
     public List<Map<String, Object>> getFacturesParEntrepriseParUtilisateur(Long userIdRequete, HttpServletRequest request) {
     // 🔐 Extraire le token JWT et récupérer l'utilisateur courant
