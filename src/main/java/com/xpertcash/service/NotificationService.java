@@ -30,27 +30,6 @@ public class NotificationService {
      @Autowired
     private FactureProformaRepository factureProformaRepository;
 
-    private final SimpMessagingTemplate messagingTemplate;
-
-    @Autowired
-    public NotificationService(SimpMessagingTemplate messagingTemplate) {
-        this.messagingTemplate = messagingTemplate;
-    }
-
-    public void sendApprovalNotification(Long userId, String message, Map<String, Object> details) {
-        Map<String, Object> payload = new HashMap<>();
-        payload.put("message", message);
-        payload.put("type", "FACTURE_APPROBATION");
-        payload.put("timestamp", LocalDateTime.now().toString());
-        payload.put("details", details);
-
-        messagingTemplate.convertAndSendToUser(
-                userId.toString(),
-                "/queue/notifications",
-                payload
-        );
-    }
-
     // tâche planifiée : Vérifie tous les jours à 08h00 quelles factures doivent être relancées
     @Scheduled(cron = "0 0 8 * * ?")
     //@Scheduled(cron = "0 * * * * ?")  // Tâche planifiée toutes les minutes mode Dev

@@ -86,9 +86,6 @@ public class FactureProformaService {
 
     @Autowired
     private NotificationService notificationService;
-
-    @Autowired
-    private SimpMessagingTemplate messagingTemplate;
     
     // Methode pour creer une facture pro forma
     public FactureProForma ajouterFacture(FactureProForma facture, Double remisePourcentage, Boolean appliquerTVA, HttpServletRequest request) {
@@ -523,11 +520,6 @@ public class FactureProformaService {
                 notification.put("createur", user.getNomComplet());
                 notification.put("message", "Nouvelle facture à approuver: " + facture.getNumeroFacture());
 
-                messagingTemplate.convertAndSendToUser(
-                        approbateur.getId().toString(),
-                        "/queue/notifications",
-                        notification
-                );
             }
 
             facture.setApprobateurs(approbateurs);
