@@ -321,7 +321,7 @@ private User getUserFromRequest(HttpServletRequest request) {
 
     // Supprimer un fournisseur
  @Transactional
-public void supprimerFournisseur(Long fournisseurId, HttpServletRequest request) {
+  public void supprimerFournisseur(Long fournisseurId, HttpServletRequest request) {
     User user = getUserFromRequest(request);
 
     // 🔒 Vérification rôle ou permission

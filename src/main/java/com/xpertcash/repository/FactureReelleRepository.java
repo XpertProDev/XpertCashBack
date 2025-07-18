@@ -1,6 +1,7 @@
 package com.xpertcash.repository;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -58,6 +59,9 @@ public interface FactureReelleRepository extends JpaRepository<FactureReelle, Lo
 
     boolean existsByClientId(Long clientId);
     boolean existsByEntrepriseClientId(Long entrepriseClientId);
+
+    List<FactureReelle> findByEntrepriseIdAndDateCreationBetween(Long entrepriseId, LocalDate start, LocalDate end);
+
 
 
 

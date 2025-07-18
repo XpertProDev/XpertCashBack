@@ -4,12 +4,14 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import java.util.Comparator;
 
 import org.hibernate.Hibernate;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -613,5 +615,84 @@ public FactureProForma annulerFactureReelle(FactureReelle modifications, HttpSer
     return factureProformaRepository.save(factureProForma);
 }
 
+
+
+//Trier
+
+public List<Map<String, Object>> getFacturesParPeriode(Long userIdRequete, HttpServletRequest request,
+                                                           String typePeriode, LocalDate dateDebut, LocalDate dateFin) {
+        String token = request.getHeader("Authorization");
+        if (token == null || !token.startsWith("Bearer ")) {
+            throw new RuntimeException("Token JWT manquant ou mal formaté");
+        }
+
+        Long userIdCourant = jwtUtil.extractUserId(token.replace("Bearer ", ""));
+        User currentUser = usersRepository.findById(userIdCourant)
+                .orElseThrow(() -> new RuntimeException("Utilisateur courant introuvable"));
+        User targetUser = usersRepository.findById(userIdRequete)
+                .orElseThrow(() -> new RuntimeException("Utilisateur cible non trouvé"));
+
+        Entreprise entrepriseCourante = currentUser.getEntreprise();
+        Entreprise entrepriseCible = targetUser.getEntreprise();
+
+        if (entrepriseCourante == null || entrepriseCible == null
+            || !entrepriseCourante.getId().equals(entrepriseCible.getId())) {
+            throw new RuntimeException("Opération interdite : utilisateurs de différentes entreprises.");
+        }
+
+        
+
+        LocalDateTime dateStart;
+        LocalDateTime dateEnd;
+
+        switch (typePeriode.toLowerCase()) {
+            case "jour":
+                dateStart = LocalDate.now().atStartOfDay();
+                dateEnd = dateStart.plusDays(1);
+                break;
+            case "mois":
+                dateStart = LocalDate.now().withDayOfMonth(1).atStartOfDay();
+                dateEnd = dateStart.plusMonths(1);
+                break;
+            case "annee":
+                dateStart = LocalDate.now().withDayOfYear(1).atStartOfDay();
+                dateEnd = dateStart.plusYears(1);
+                break;
+            case "personnalise":
+                if (dateDebut == null || dateFin == null) {
+                    throw new RuntimeException("Dates de début et de fin requises pour une période personnalisée.");
+                }
+                dateStart = dateDebut.atStartOfDay();
+                dateEnd = dateFin.plusDays(1).atStartOfDay();
+                break;
+            default:
+                throw new RuntimeException("Type de période invalide.");
+        }
+
+        List<FactureReelle> factures = factureReelleRepository.findByEntrepriseIdAndDateCreationBetween(
+                entrepriseCourante.getId(), dateStart.toLocalDate(), dateEnd.toLocalDate()
+        );
+
+        return factures.stream()
+            .sorted(Comparator.comparing(FactureReelle::getDateCreation).reversed())
+            .map(facture -> {
+                Map<String, Object> map = new HashMap<>();
+                map.put("id", facture.getId());
+                map.put("numeroFacture", facture.getNumeroFacture());
+                map.put("dateCreation", facture.getDateCreation());
+                map.put("description", facture.getDescription());
+                map.put("totalHT", facture.getTotalHT());
+                map.put("remise", facture.getRemise());
+                map.put("tva", facture.isTva());
+                map.put("totalFacture", facture.getTotalFacture());
+                map.put("statut", facture.getStatut());
+                map.put("ligneFactureProforma", facture.getLignesFacture());
+                map.put("client", facture.getClient() != null ? facture.getClient().getNomComplet() : null);
+                map.put("entrepriseClient", facture.getEntrepriseClient() != null ? facture.getEntrepriseClient().getNom() : null);
+                map.put("entreprise", facture.getEntreprise() != null ? facture.getEntreprise().getNomEntreprise() : null);
+                return map;
+            })
+            .collect(Collectors.toList());
+    }
 
 }
