@@ -11,6 +11,7 @@ import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -85,6 +86,9 @@ public class FactureProformaService {
 
     @Autowired
     private NotificationService notificationService;
+
+    @Autowired
+    private SimpMessagingTemplate messagingTemplate;
     
     // Methode pour creer une facture pro forma
     public FactureProForma ajouterFacture(FactureProForma facture, Double remisePourcentage, Boolean appliquerTVA, HttpServletRequest request) {
@@ -512,11 +516,18 @@ public class FactureProformaService {
             }
 
             for (User approbateur : approbateurs) {
-                if (!user.getEntreprise().getId().equals(approbateur.getEntreprise().getId())) {
-                    throw new RuntimeException("Tous les approbateurs doivent appartenir à la même entreprise.");
-                }
-                String message = "Nouvelle facture à approuver: " + facture.getNumeroFacture();
-                notificationService.sendApprovalRequest(approbateur.getId(), message);
+                Map<String, Object> notification = new HashMap<>();
+                notification.put("type", "APPROBATION_DEMANDE");
+                notification.put("factureId", facture.getId());
+                notification.put("factureNumero", facture.getNumeroFacture());
+                notification.put("createur", user.getNomComplet());
+                notification.put("message", "Nouvelle facture à approuver: " + facture.getNumeroFacture());
+
+                messagingTemplate.convertAndSendToUser(
+                        approbateur.getId().toString(),
+                        "/queue/notifications",
+                        notification
+                );
             }
 
             facture.setApprobateurs(approbateurs);

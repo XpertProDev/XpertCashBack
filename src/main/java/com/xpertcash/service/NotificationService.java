@@ -3,7 +3,9 @@ package com.xpertcash.service;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
@@ -35,11 +37,17 @@ public class NotificationService {
         this.messagingTemplate = messagingTemplate;
     }
 
-    public void sendApprovalRequest(Long userId, String message) {
+    public void sendApprovalNotification(Long userId, String message, Map<String, Object> details) {
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("message", message);
+        payload.put("type", "FACTURE_APPROBATION");
+        payload.put("timestamp", LocalDateTime.now().toString());
+        payload.put("details", details);
+
         messagingTemplate.convertAndSendToUser(
                 userId.toString(),
                 "/queue/notifications",
-                message
+                payload
         );
     }
 
