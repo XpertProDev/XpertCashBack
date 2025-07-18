@@ -1,6 +1,5 @@
 package com.xpertcash.controller;
 
-import com.xpertcash.entity.Notification;
 import com.xpertcash.entity.User;
 import com.xpertcash.repository.NotificationRepository;
 import org.springframework.beans.factory.annotation.Autowired;
