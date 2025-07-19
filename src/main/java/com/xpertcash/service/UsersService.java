@@ -825,6 +825,7 @@ public void suspendUser(HttpServletRequest request, Long userId, boolean suspend
     }
 
     // 🚫 Interdiction de se suspendre soi-même, sauf si ADMIN
+    
     boolean isSelf = currentUser.getId().equals(targetUser.getId());
     boolean isAdmin = CentralAccess.isAdminOfEntreprise(currentUser, currentUser.getEntreprise().getId());
     boolean hasPermission = currentUser.getRole().hasPermission(PermissionType.GERER_UTILISATEURS);
@@ -835,6 +836,12 @@ public void suspendUser(HttpServletRequest request, Long userId, boolean suspend
 
     if (!isAdmin && !hasPermission) {
         throw new RuntimeException("Accès refusé : seuls les administrateurs ou personnes autorisées peuvent suspendre/réactiver des utilisateurs.");
+    }
+
+       // 🚫 Interdiction de suspendre l'admin
+    boolean isTargetAdmin = CentralAccess.isAdminOfEntreprise(targetUser, targetUser.getEntreprise().getId());
+    if (isTargetAdmin) {
+        throw new RuntimeException("Impossible de suspendre l'administrateur de l'entreprise.");
     }
 
     // ✅ Suspension ou réactivation
