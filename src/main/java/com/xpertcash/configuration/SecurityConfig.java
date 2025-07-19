@@ -36,13 +36,14 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-                // 1) CORS via votre bean CorsConfigurationSource
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-                // 2) Désactivation de CSRF sans utiliser .and()
                 .csrf(AbstractHttpConfigurer::disable)
-                // 3) Règles d'autorisation
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/auth/**", "/ws/**").permitAll()
+                        .requestMatchers(
+                                "/api/auth/**",
+                                "/ws/**",
+                                "/api/auth/ws/**"  // Ajoutez cette ligne
+                        ).permitAll()
                         .anyRequest().authenticated()
                 );
         return http.build();
@@ -58,7 +59,7 @@ public class SecurityConfig {
         CorsConfiguration configuration = new CorsConfiguration();
         configuration.setAllowedOrigins(List.of(
                 "http://localhost:4200",
-                "http://192.168.1.7:4200",
+                "http://192.168.1.15:4200",
                 "https://tchakeda.com",
                 "https://www.tchakeda.com"
         ));
