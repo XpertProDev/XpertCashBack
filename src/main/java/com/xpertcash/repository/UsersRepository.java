@@ -30,6 +30,7 @@ public interface UsersRepository extends JpaRepository<User, Long> {
 
     // Méthode pour récupérer tous les utilisateurs d'une entreprise sauf l'ADMIN
     List<User> findByEntrepriseIdAndIdNot(Long entrepriseId, Long adminId);
+    
 
     boolean existsByPersonalCode(String personalCode);
    List<User> findByBoutiqueIdAndRole_Name(Long boutiqueId, RoleType roleName);

@@ -3,9 +3,12 @@ package com.xpertcash.service;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
@@ -27,12 +30,11 @@ public class NotificationService {
      @Autowired
     private FactureProformaRepository factureProformaRepository;
 
-
-      // tâche planifiée : Vérifie tous les jours à 08h00 quelles factures doivent être relancées
-      @Scheduled(cron = "0 0 8 * * ?")
-      //@Scheduled(cron = "0 * * * * ?")  // Tâche planifiée toutes les minutes mode Dev
-      @Transactional
-      public void verifierFacturesAEnvoyer() {
+    // tâche planifiée : Vérifie tous les jours à 08h00 quelles factures doivent être relancées
+    @Scheduled(cron = "0 0 8 * * ?")
+    //@Scheduled(cron = "0 * * * * ?")  // Tâche planifiée toutes les minutes mode Dev
+    @Transactional
+    public void verifierFacturesAEnvoyer() {
         LocalDateTime maintenant = LocalDateTime.now().withSecond(0).withNano(0);
     
         System.out.println("🔍 Vérification des factures à relancer à " + maintenant);

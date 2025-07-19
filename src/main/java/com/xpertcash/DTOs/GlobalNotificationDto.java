@@ -1,0 +1,43 @@
+package com.xpertcash.DTOs;
+
+import com.xpertcash.entity.GlobalNotification;
+
+import java.time.LocalDateTime;
+
+public class GlobalNotificationDto {
+    private Long id;
+    private String message;
+    private LocalDateTime createdAt;
+    private String senderName; // optionnel, selon ce que vous voulez afficher
+
+    public GlobalNotificationDto() {}
+
+    public GlobalNotificationDto(Long id, String message, LocalDateTime createdAt, String senderName) {
+        this.id = id;
+        this.message = message;
+        this.createdAt = createdAt;
+        this.senderName = senderName;
+    }
+
+    public GlobalNotificationDto(GlobalNotification notif) {
+        this.id = notif.getId();
+        this.message = notif.getMessage();
+        this.createdAt = notif.getCreatedAt();
+        // si vous voulez afficher qui a déclenché la notif, ajoutez dans l'entité GlobalNotification
+        // un champ comme `createdBy` ou prenez depuis notif.getRecipient() si c'est vous-même
+        this.senderName = notif.getRecipient().getNomComplet();
+    }
+
+    // getters & setters
+    public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
+
+    public String getMessage() { return message; }
+    public void setMessage(String message) { this.message = message; }
+
+    public LocalDateTime getCreatedAt() { return createdAt; }
+    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+
+    public String getSenderName() { return senderName; }
+    public void setSenderName(String senderName) { this.senderName = senderName; }
+}

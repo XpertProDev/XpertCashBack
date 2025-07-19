@@ -742,7 +742,7 @@ public class UsersService {
     }
 
     Long adminId = entreprise.getAdmin().getId();
-    return usersRepository.findByEntrepriseIdAndIdNot(entreprise.getId(), adminId);
+    return usersRepository.findByEntrepriseId(entreprise.getId());
 }
 
 
