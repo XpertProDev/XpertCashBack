@@ -30,10 +30,8 @@ public class GlobalNotificationService {
     public void notifyRecipients(List<User> recipients, String message) {
         recipients.forEach(user -> {
             log.info("Envoi notification à: {} | Message: {}", user.getEmail(), message);
-
             GlobalNotification notif = new GlobalNotification(user, message);
             notificationRepo.save(notif);
-
             messagingTemplate.convertAndSendToUser(
                     user.getId().toString(),
                     "/queue/notifications",
