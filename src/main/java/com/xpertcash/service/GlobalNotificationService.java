@@ -1,9 +1,11 @@
 package com.xpertcash.service;
 
+import com.xpertcash.DTOs.GlobalNotificationDto;
 import com.xpertcash.entity.GlobalNotification;
 import com.xpertcash.entity.User;
 import com.xpertcash.repository.GlobalNotificationRepository;
 import lombok.AllArgsConstructor;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -13,25 +15,58 @@ import java.util.List;
 public class GlobalNotificationService {
 
     private final GlobalNotificationRepository notificationRepo;
+    private final SimpMessagingTemplate messagingTemplate;
 
-    public GlobalNotificationService(GlobalNotificationRepository notificationRepo) {
+    public GlobalNotificationService(GlobalNotificationRepository notificationRepo,
+                                     SimpMessagingTemplate messagingTemplate) {
         this.notificationRepo = notificationRepo;
+        this.messagingTemplate = messagingTemplate;
     }
 
     @Transactional
     public void notifyRecipients(List<User> recipients, String message) {
         recipients.forEach(user -> {
-            GlobalNotification notification = new GlobalNotification(user, message);
-            notificationRepo.save(notification);
+            GlobalNotification notif = new GlobalNotification(user, message);
+            notificationRepo.save(notif);
+            // envoi temps réel
+            messagingTemplate.convertAndSendToUser(
+                    user.getId().toString(),
+                    "/queue/notifications",
+                    new GlobalNotificationDto(notif)    // un DTO léger
+            );
         });
     }
 
     @Transactional
     public void notifySingle(User recipient, String message) {
-        notificationRepo.save(new GlobalNotification(recipient, message));
+        GlobalNotification notif = new GlobalNotification(recipient, message);
+        notificationRepo.save(notif);
+        messagingTemplate.convertAndSendToUser(
+                recipient.getId().toString(),
+                "/queue/notifications",
+                new GlobalNotificationDto(notif)
+        );
     }
 
+
+    /**
+     * Récupère toutes les notifications pour un utilisateur, les plus récentes d'abord.
+     */
     public List<GlobalNotification> getUserNotifications(Long userId) {
         return notificationRepo.findByRecipientIdOrderByCreatedAtDesc(userId);
     }
+
+    @Transactional
+    public void markAsRead(Long notificationId, Long userId) {
+        GlobalNotification notif = notificationRepo.findById(notificationId)
+                .orElseThrow(() -> new RuntimeException("Notification introuvable : " + notificationId));
+
+        if (!notif.getRecipient().getId().equals(userId)) {
+            throw new RuntimeException("Accès refusé : cette notification n'appartient pas à l'utilisateur.");
+        }
+
+        notif.setRead(true);
+        notificationRepo.save(notif);
+    }
+
 }
