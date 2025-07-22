@@ -548,7 +548,7 @@ public class FactureProformaService {
                     "Demande envoyée à: " + destinataires
             );
         }
-
+        
         // 🔁 Mise à jour de la date de relance
         if (modifications.getDateRelance() != null) {
             if (modifications.getDateRelance().isBefore(facture.getDateCreation())) {

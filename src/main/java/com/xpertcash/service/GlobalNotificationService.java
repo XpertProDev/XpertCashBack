@@ -4,7 +4,8 @@ import com.xpertcash.DTOs.GlobalNotificationDto;
 import com.xpertcash.entity.GlobalNotification;
 import com.xpertcash.entity.User;
 import com.xpertcash.repository.GlobalNotificationRepository;
-import lombok.AllArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -16,6 +17,7 @@ public class GlobalNotificationService {
 
     private final GlobalNotificationRepository notificationRepo;
     private final SimpMessagingTemplate messagingTemplate;
+    private static final Logger log = LoggerFactory.getLogger(GlobalNotificationService.class);
 
     public GlobalNotificationService(GlobalNotificationRepository notificationRepo,
                                      SimpMessagingTemplate messagingTemplate) {
@@ -26,13 +28,13 @@ public class GlobalNotificationService {
     @Transactional
     public void notifyRecipients(List<User> recipients, String message) {
         recipients.forEach(user -> {
+            log.info("Envoi notification à: {} | Message: {}", user.getEmail(), message);
             GlobalNotification notif = new GlobalNotification(user, message);
             notificationRepo.save(notif);
-            // envoi temps réel
             messagingTemplate.convertAndSendToUser(
                     user.getId().toString(),
                     "/queue/notifications",
-                    new GlobalNotificationDto(notif)    // un DTO léger
+                    new GlobalNotificationDto(notif)
             );
         });
     }

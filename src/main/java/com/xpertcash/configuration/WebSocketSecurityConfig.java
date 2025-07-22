@@ -1,19 +1,27 @@
 package com.xpertcash.configuration;
 
 import org.springframework.context.annotation.Configuration;
-import org.springframework.security.config.annotation.web.socket.EnableWebSocketSecurity;
-import org.springframework.messaging.simp.config.ChannelRegistration;
-import org.springframework.security.messaging.context.SecurityContextChannelInterceptor;
-import org.springframework.web.socket.config.annotation.EnableWebSocketMessageBroker;
-import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerConfigurer;
+import org.springframework.security.config.annotation.web.messaging.MessageSecurityMetadataSourceRegistry;
+import org.springframework.security.config.annotation.web.socket.AbstractSecurityWebSocketMessageBrokerConfigurer;
+
 
 @Configuration
-@EnableWebSocketMessageBroker
-@EnableWebSocketSecurity
-public class WebSocketSecurityConfig implements WebSocketMessageBrokerConfigurer {
+public class WebSocketSecurityConfig
+        extends AbstractSecurityWebSocketMessageBrokerConfigurer {
 
     @Override
-    public void configureClientInboundChannel(ChannelRegistration registration) {
-        registration.interceptors(new SecurityContextChannelInterceptor());
+    protected void configureInbound(MessageSecurityMetadataSourceRegistry messages) {
+        messages
+                // autorise les abonnements à vos topics
+                .simpSubscribeDestMatchers("/topic/**").permitAll()
+                // autorise les envois vers vos @MessageMapping("/app/**")
+                .simpDestMatchers("/app/**").permitAll()
+                // et : autorise tout le reste (UNSUBSCRIBE, DISCONNECT, heartbeats…)
+                .anyMessage().permitAll();
+    }
+
+    @Override
+    protected boolean sameOriginDisabled() {
+        return true;
     }
 }

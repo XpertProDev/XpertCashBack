@@ -8,66 +8,61 @@ import org.springframework.messaging.simp.config.MessageBrokerRegistry;
 import org.springframework.messaging.simp.stomp.StompCommand;
 import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
 import org.springframework.messaging.support.ChannelInterceptor;
-import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
+import org.springframework.messaging.support.MessageHeaderAccessor;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.web.socket.config.annotation.EnableWebSocketMessageBroker;
 import org.springframework.web.socket.config.annotation.StompEndpointRegistry;
 import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerConfigurer;
 
+import java.security.Principal;
+import java.util.List;
+
 @Configuration
 @EnableWebSocketMessageBroker
-public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
+class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
+
+    private final JwtUtil jwtUtil;
+
+    // Spring injecte automatiquement votre bean JwtUtil ici
+    public WebSocketConfig(JwtUtil jwtUtil) {
+        this.jwtUtil = jwtUtil;
+    }
 
     @Override
     public void configureMessageBroker(MessageBrokerRegistry config) {
-        ThreadPoolTaskScheduler taskScheduler = new ThreadPoolTaskScheduler();
-        taskScheduler.setPoolSize(4);
-        taskScheduler.setThreadNamePrefix("wss-heartbeat-");
-        taskScheduler.initialize();
-
-        config.enableSimpleBroker("/topic", "/queue")
-                .setTaskScheduler(taskScheduler)
-                .setHeartbeatValue(new long[]{10000, 10000});
+        config.enableSimpleBroker("/topic", "/queue");
         config.setApplicationDestinationPrefixes("/app");
         config.setUserDestinationPrefix("/user");
     }
 
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
-        registry.addEndpoint("/api/auth/ws")
+        registry.addEndpoint("/ws")
                 .setAllowedOriginPatterns("*")
                 .withSockJS();
     }
 
     @Override
     public void configureClientInboundChannel(ChannelRegistration registration) {
-        // 1️⃣ Pool de threads
-        registration.taskExecutor()
-                .corePoolSize(8)
-                .maxPoolSize(16)
-                .queueCapacity(100)
-                .keepAliveSeconds(60);
-
-        // 2️⃣ Intercepteur STOMP
         registration.interceptors(new ChannelInterceptor() {
             @Override
             public Message<?> preSend(Message<?> message, MessageChannel channel) {
-                StompHeaderAccessor accessor = StompHeaderAccessor.wrap(message);
+                StompHeaderAccessor accessor = MessageHeaderAccessor.getAccessor(
+                        message, StompHeaderAccessor.class);
+
                 if (StompCommand.CONNECT.equals(accessor.getCommand())) {
-                    // ← Ici : on affiche le header Authorization venu du client
-                    String tokenHeader = accessor.getFirstNativeHeader("Authorization");
-                    System.out.println("🔑 STOMP CONNECT Authorization header = '" + tokenHeader + "'");
+                    String bearer = accessor.getFirstNativeHeader("Authorization");
+                    if (bearer != null && bearer.startsWith("Bearer ")) {
+                        String token = bearer.substring(7);
+                        // Maintenant jwtUtil est disponible
+                        Long userId = jwtUtil.extractUserId(token);
+                        Principal user = new UsernamePasswordAuthenticationToken(
+                                userId.toString(), null, List.of());
+                        accessor.setUser(user);
+                    }
                 }
                 return message;
             }
         });
-    }
-
-    @Override
-    public void configureClientOutboundChannel(ChannelRegistration registration) {
-        registration.taskExecutor()
-                .corePoolSize(4)
-                .maxPoolSize(8)
-                .queueCapacity(50)       // <— idem pour la sortie
-                .keepAliveSeconds(60);
     }
 }
