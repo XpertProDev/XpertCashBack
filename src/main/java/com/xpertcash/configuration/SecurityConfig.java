@@ -43,9 +43,14 @@ public class SecurityConfig {
                 // 3) Règles d'autorisation
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/auth/**", "/ws/**",
-                        "/fournisseurUpload/**",
-                        "/userUpload/**",
+                        "cachetUpload/**",
                         "/clientUpload/**",
+                        "/defaultLogo/**",
+                        "/fournisseurUpload/**",
+                        "/logoUpload/**",
+                        "/signatureUpload/**",
+                        "/produitUpload/**",
+                        "/userUpload/**",
                         "/uploads/**"
                 ).permitAll()
                         .anyRequest().authenticated()

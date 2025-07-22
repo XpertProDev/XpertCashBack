@@ -60,8 +60,11 @@ public interface ProduitRepository extends JpaRepository<Produit, Long> {
 
 
     
+    @Query("SELECT p FROM Produit p WHERE p.boutique.id = :boutiqueId AND (p.deleted IS NULL OR p.deleted = false)")
+    List<Produit> findByBoutiqueIdAndNotDeleted(@Param("boutiqueId") Long boutiqueId);
 
-    
+    List<Produit> findByBoutiqueIdAndDeletedFalseOrDeletedIsNull(Long boutiqueId);
+
 
 
 

@@ -46,7 +46,7 @@ public class EntrepriseClientService {
   
 
    @Transactional
-public EntrepriseClient saveEntreprise(EntrepriseClient entrepriseClient, HttpServletRequest request) {
+ public EntrepriseClient saveEntreprise(EntrepriseClient entrepriseClient, HttpServletRequest request) {
     // 🔐 Authentification via JWT
     String token = request.getHeader("Authorization");
     if (token == null || !token.startsWith("Bearer ")) {
@@ -190,10 +190,6 @@ public EntrepriseClient saveEntreprise(EntrepriseClient entrepriseClient, HttpSe
     // 🔎 Récupération filtrée
     return entrepriseClientRepository.findByEntrepriseId(entreprise.getId());
 }
-
-
-  
-
 
 
      //Methode pour modifier une Entreprise client

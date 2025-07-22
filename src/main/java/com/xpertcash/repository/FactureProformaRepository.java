@@ -70,6 +70,7 @@ public interface FactureProformaRepository extends JpaRepository<FactureProForma
     List<FactureProForma> findByEntrepriseIdAndDateCreationBetween(Long entrepriseId, LocalDateTime start, LocalDateTime end);
 
 
+    
 
 
     

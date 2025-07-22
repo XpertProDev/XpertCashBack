@@ -5,6 +5,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
@@ -23,6 +25,7 @@ import com.xpertcash.entity.Enum.RoleType;
 import com.xpertcash.entity.Enum.TypeBoutique;
 import com.xpertcash.exceptions.BusinessException;
 import com.xpertcash.repository.BoutiqueRepository;
+import com.xpertcash.repository.LigneFactureProformaRepository;
 import com.xpertcash.repository.ProduitRepository;
 import com.xpertcash.repository.StockHistoryRepository;
 import com.xpertcash.repository.StockRepository;
@@ -53,6 +56,9 @@ public class BoutiqueService {
     private StockRepository stockRepository;
     @Autowired
     private StockHistoryRepository stockHistoryRepository;
+
+    @Autowired
+    private LigneFactureProformaRepository ligneFactureProformaRepository;
 
 
     // Ajouter une nouvelle boutique pour l'admin
@@ -98,7 +104,6 @@ public class BoutiqueService {
         // Sauvegarder la boutique en base de données
         return boutiqueRepository.save(boutique);
     }
-
 
     // Récupérer toutes les boutiques d'une entreprise
     public List<Boutique> getBoutiquesByEntreprise(HttpServletRequest request) {
@@ -181,7 +186,6 @@ public class BoutiqueService {
 
     return boutique;
 }
-
 
     //Methode update de Boutique
     public Boutique updateBoutique(Long boutiqueId, String newNomBoutique, String newAdresse, String newTelephone, String newEmail, HttpServletRequest request) {
@@ -433,54 +437,53 @@ public class BoutiqueService {
     }
 
    
-   public List<Produit> getProduitsParBoutique(HttpServletRequest request, Long boutiqueId) {
-    // 🔐 Vérifier la présence et le format du token JWT
-    String token = request.getHeader("Authorization");
-    if (token == null || !token.startsWith("Bearer ")) {
-        throw new RuntimeException("Token JWT manquant ou mal formaté");
+    public List<Produit> getProduitsParBoutique(HttpServletRequest request, Long boutiqueId) {
+        // 🔐 Vérifier la présence et le format du token JWT
+        String token = request.getHeader("Authorization");
+        if (token == null || !token.startsWith("Bearer ")) {
+            throw new RuntimeException("Token JWT manquant ou mal formaté");
+        }
+
+        String jwtToken = token.substring(7);
+        Long userId;
+        try {
+            userId = jwtUtil.extractUserId(jwtToken);
+        } catch (Exception e) {
+            throw new RuntimeException("Erreur lors de l'extraction de l'ID utilisateur depuis le token", e);
+        }
+
+        // 👤 Récupérer l'utilisateur
+        User user = usersRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+
+        // 🏬 Récupérer la boutique
+        Boutique boutique = boutiqueRepository.findById(boutiqueId)
+                .orElseThrow(() -> new RuntimeException("Boutique non trouvée"));
+
+        Long entrepriseId = boutique.getEntreprise().getId();
+
+        // 🔒 Vérifier les droits d'accès avec CentralAccess
+        boolean isAdminOrManager = CentralAccess.isAdminOrManagerOfEntreprise(user, entrepriseId);
+        boolean hasPermission = user.getRole().hasPermission(PermissionType.GERER_BOUTIQUE);
+
+        if (!isAdminOrManager && !hasPermission) {
+            throw new RuntimeException("Vous n'avez pas les droits pour accéder aux produits de cette boutique.");
+        }
+
+        // ✅ Vérifier l'appartenance à la même entreprise
+        if (!user.getEntreprise().getId().equals(entrepriseId)) {
+            throw new RuntimeException("Vous n'avez pas accès à cette boutique (entreprise différente).");
+        }
+
+        // ❌ Vérifier si la boutique est désactivée
+        if (!boutique.isActif()) {
+            throw new RuntimeException("Cette boutique est désactivée, ses produits ne sont pas accessibles !");
+        }
+
+        // ✅ Retourner les produits non supprimés via le repository
+        return produitRepository.findByBoutiqueIdAndNotDeleted(boutiqueId);
     }
-
-    String jwtToken = token.substring(7);
-    Long userId;
-    try {
-        userId = jwtUtil.extractUserId(jwtToken);
-    } catch (Exception e) {
-        throw new RuntimeException("Erreur lors de l'extraction de l'ID utilisateur depuis le token", e);
-    }
-
-    // 👤 Récupérer l'utilisateur
-    User user = usersRepository.findById(userId)
-            .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
-
-    // 🏬 Récupérer la boutique
-    Boutique boutique = boutiqueRepository.findById(boutiqueId)
-            .orElseThrow(() -> new RuntimeException("Boutique non trouvée"));
-
-    Long entrepriseId = boutique.getEntreprise().getId();
-
-    // 🔒 Vérifier les droits d'accès avec CentralAccess
-    boolean isAdminOrManager = CentralAccess.isAdminOrManagerOfEntreprise(user, entrepriseId);
-    boolean hasPermission = user.getRole().hasPermission(PermissionType.GERER_BOUTIQUE);
-
-    if (!isAdminOrManager && !hasPermission) {
-        throw new RuntimeException("Vous n'avez pas les droits pour accéder aux produits de cette boutique.");
-    }
-
-    // ✅ Vérifier l'appartenance à la même entreprise
-    if (!user.getEntreprise().getId().equals(entrepriseId)) {
-        throw new RuntimeException("Vous n'avez pas accès à cette boutique (entreprise différente).");
-    }
-
-    // ❌ Vérifier si la boutique est désactivée
-    if (!boutique.isActif()) {
-        throw new RuntimeException("Cette boutique est désactivée, ses produits ne sont pas accessibles !");
-    }
-
-    // ✅ Retourner les produits
-    return boutique.getProduits();
-}
-
-
+ 
     // Methode pour descativer une boutique
      public Boutique desactiverBoutique(Long boutiqueId, HttpServletRequest request) {
     // 🔐 Vérification du token JWT
@@ -616,7 +619,7 @@ public class BoutiqueService {
             List<Produit> produits = produitRepository.findByBoutiqueIdAndDeletedFalse(boutiqueId);
 
             // ⚠️ Cas spécial : ne pas supprimer un entrepôt s’il contient des produits (peu importe le stock)
-        if (boutique.getTypeBoutique() == TypeBoutique.ENTREPOT && !produits.isEmpty()) {
+            if (boutique.getTypeBoutique() == TypeBoutique.ENTREPOT && !produits.isEmpty()) {
                 throw new RuntimeException("Impossible de supprimer cet entrepôt : il contient des produits.");
             }
 
@@ -628,6 +631,15 @@ public class BoutiqueService {
             if (!produits.isEmpty() && !tousProduitsSansStock) {
                 throw new RuntimeException("Impossible de supprimer cette boutique : elle contient des produits en stock.");
             }
+
+            // Vérification si un produit est lié à une ligne de facture
+            boolean produitLieALigneFacture = produits.stream()
+                .anyMatch(produit -> ligneFactureProformaRepository.existsByProduitId(produit.getId()));
+
+            if (produitLieALigneFacture) {
+                throw new RuntimeException("Impossible de supprimer la boutique : certains produits sont liés à des factures.");
+            }
+
 
         // 🗑️ Suppression
         boutiqueRepository.deleteById(boutiqueId);
