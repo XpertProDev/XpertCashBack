@@ -3,22 +3,24 @@ package com.xpertcash.configuration;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.messaging.MessageSecurityMetadataSourceRegistry;
 import org.springframework.security.config.annotation.web.socket.AbstractSecurityWebSocketMessageBrokerConfigurer;
-import org.springframework.security.config.annotation.web.socket.EnableWebSocketSecurity;
 
 @Configuration
-@EnableWebSocketSecurity
-public class WebSocketSecurityConfig extends AbstractSecurityWebSocketMessageBrokerConfigurer {
-
-    @Override
-    protected boolean sameOriginDisabled() {
-        return true; // Désactive CSRF pour WebSockets
-    }
+public class WebSocketSecurityConfig
+        extends AbstractSecurityWebSocketMessageBrokerConfigurer {
 
     @Override
     protected void configureInbound(MessageSecurityMetadataSourceRegistry messages) {
         messages
-                .simpDestMatchers("/app/**").authenticated()
-                .simpSubscribeDestMatchers("/user/**").authenticated()
+                // autorise les abonnements à vos topics
+                .simpSubscribeDestMatchers("/topic/**").permitAll()
+                // autorise les envois vers vos @MessageMapping("/app/**")
+                .simpDestMatchers("/app/**").permitAll()
+                // et : autorise tout le reste (UNSUBSCRIBE, DISCONNECT, heartbeats…)
                 .anyMessage().permitAll();
+    }
+
+    @Override
+    protected boolean sameOriginDisabled() {
+        return true;
     }
 }
