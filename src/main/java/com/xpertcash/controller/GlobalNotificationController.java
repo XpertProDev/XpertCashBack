@@ -50,8 +50,15 @@ public class GlobalNotificationController {
         List<GlobalNotification> notifs = globalNotificationService.getUserNotifications(userId);
 
         // 4️⃣ Mapper vers le DTO
+        // 4️⃣ Mapper vers le DTO
         List<GlobalNotificationDto> dtoList = notifs.stream()
-                .map(GlobalNotificationDto::new)
+                .map(notif -> new GlobalNotificationDto(
+                        notif.getId(),
+                        notif.getMessage(),
+                        notif.getCreatedAt(),
+                        notif.getRecipient().getNomComplet(),
+                        notif.isRead() // AJOUTEZ CE CHAMP
+                ))
                 .collect(Collectors.toList());
 
         return ResponseEntity.ok(dtoList);
