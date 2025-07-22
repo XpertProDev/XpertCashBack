@@ -238,7 +238,6 @@ public class ClientService {
                 .collect(Collectors.toList());
     }
 
-
     //Methode pour recuperer seulement les entreprise client
     public List<EntrepriseClient> getAllEntrepriseClients(HttpServletRequest request) {
     // 1. Extraire le token et l'utilisateur
