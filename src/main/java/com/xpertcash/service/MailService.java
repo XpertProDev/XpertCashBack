@@ -40,7 +40,7 @@ public class MailService {
     private String from;
 
     public void sendActivationLinkEmail(String to, String code, String personalCode) throws MessagingException {
-        String baseUrl = "http://localhost:8080"; // Adaptez cette URL à votre environnement
+        String baseUrl = "https://xpertcash.tchakeda.com"; // Adaptez cette URL à votre environnement
         String activationUrl = baseUrl + "/api/auth/activate?email=" + to + "&code=" + code;
 
         String subject = "Activation de votre compte";
@@ -51,7 +51,7 @@ public class MailService {
 
 
     public void sendEmployeEmail(String to, String fullName, String companyName, String role, String email, String password, String personalCode) throws MessagingException {
-        String subject = "Création de votre compte XpertCash";
+        String subject = "Création de votre compte Tchakeda";
         String htmlContent = generateInfoEmail(fullName, companyName, role, email, password, personalCode);
         sendEmail(to, subject, htmlContent);
     }
@@ -70,7 +70,7 @@ public class MailService {
 
 
     public void sendUnlockLinkEmail(String to, String code) throws MessagingException {
-        String baseUrl = "http://localhost:8080";
+        String baseUrl = "https://xpertcash.tchakeda.com";
         String unlockUrl = baseUrl + "/api/auth/unlock?email=" + to + "&code=" + code;
 
         String subject = "Déverrouillage de votre compte";
@@ -160,7 +160,7 @@ public class MailService {
                     <p><strong>Code PIN :</strong> %s</p>
                 </div>
                 <p style="margin-top: 8px;">Nous vous recommandons de changer votre mot de passe dès votre première connexion.</p>
-                <a href="http://localhost:8080/login" style="display: inline-block; padding: 12px 20px; background-color: #007bff; color: white; text-decoration: none; border-radius: 5px; font-weight: bold; margin-top: 10px;">
+                <a href="https://xpertcash.tchakeda.com/login" style="display: inline-block; padding: 12px 20px; background-color: #007bff; color: white; text-decoration: none; border-radius: 5px; font-weight: bold; margin-top: 10px;">
                     Se connecter
                 </a>
                 <p style="font-size: 10px; color: #777;">L'équipe Tchakeda</p>

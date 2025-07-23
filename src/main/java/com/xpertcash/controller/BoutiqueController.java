@@ -313,14 +313,14 @@ public ResponseEntity<Map<String, String>> ajouterBoutique(
 
     //Endpoint pour lister vendeur dune boutique spécifique
 
-        @GetMapping("/{boutiqueId}/vendeurs")
-    public ResponseEntity<List<User>> getVendeursByBoutique(
-            @PathVariable Long boutiqueId,
-            HttpServletRequest request
-    ) {
-        List<User> vendeurs = boutiqueService.getVendeursByBoutique(boutiqueId, request);
-        return ResponseEntity.ok(vendeurs);
-    }
+    //     @GetMapping("/{boutiqueId}/vendeurs")
+    // public ResponseEntity<List<User>> getVendeursByBoutique(
+    //         @PathVariable Long boutiqueId,
+    //         HttpServletRequest request
+    // ) {
+    //     List<User> vendeurs = boutiqueService.getVendeursByBoutique(boutiqueId, request);
+    //     return ResponseEntity.ok(vendeurs);
+    // }
 
 
     // Suprimer une boutique

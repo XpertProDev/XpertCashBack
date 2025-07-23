@@ -446,7 +446,7 @@ public class UsersService {
                     } while (!isUnique);
 
                 // Vérifier que l'ID de la boutique est présent s'il s'agit d'un vendeur
-                    Boutique boutique = null;
+                  /*  Boutique boutique = null;
                     if (userRequest.getBoutiqueId() != null) {
                         boutique = boutiqueRepository.findById(userRequest.getBoutiqueId())
                                 .orElseThrow(() -> new BusinessException("Boutique introuvable."));
@@ -456,7 +456,8 @@ public class UsersService {
                             throw new BusinessException("La boutique sélectionnée n'appartient pas à votre entreprise.");
                         }
                     }
-
+                    */ 
+                    
                 // Créer un nouvel utilisateur avec l'activation dépendante de l'admin
                 User newUser = new User();
                 newUser.setEmail(userRequest.getEmail());
@@ -471,7 +472,6 @@ public class UsersService {
                 newUser.setPersonalCode(personalCode);
                 newUser.setRole(role);
                 newUser.setPhoto(null);
-                newUser.setBoutique(boutique);
 
 
                 // Enregistrer l'utilisateur

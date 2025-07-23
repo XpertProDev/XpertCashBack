@@ -551,7 +551,7 @@ public class BoutiqueService {
 }
 
     //Methode pour recuperer les vendeur de la boutique
-    public List<User> getVendeursByBoutique(Long boutiqueId, HttpServletRequest request) {
+  /*   public List<User> getVendeursByBoutique(Long boutiqueId, HttpServletRequest request) {
 
     // Sécurisation : récupérer le token
     String token = request.getHeader("Authorization");
@@ -588,6 +588,7 @@ public class BoutiqueService {
     return vendeurs;
 }
 
+*/
 // Méthode pour supprimer une boutique
     @Transactional
     public ResponseEntity<Map<String, String>> supprimerBoutique(Long boutiqueId, HttpServletRequest request) {
