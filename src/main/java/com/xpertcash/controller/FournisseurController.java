@@ -9,6 +9,7 @@ import java.util.stream.Collectors;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -181,7 +182,7 @@ public ResponseEntity<?> getFournisseurById(@PathVariable Long id, HttpServletRe
 
     //Update fournisseur
     @PutMapping(value = "/updateFournisseur/{id}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-public ResponseEntity<?> updateFournisseur(
+    public ResponseEntity<?> updateFournisseur(
         @PathVariable Long id,
         @RequestPart("updatedFournisseur") Fournisseur updatedFournisseur,
         @RequestPart(value = "imageFournisseurFile", required = false) MultipartFile imageFournisseurFile,
@@ -282,5 +283,24 @@ public ResponseEntity<?> updateFournisseur(
 
 
 
+    // Delete fournisseur
+    @DeleteMapping("/fournisseur/{id}")
+    public ResponseEntity<Map<String, String>> supprimerFournisseur(
+        @PathVariable Long id,
+        HttpServletRequest request) {
+
+        try {
+            fournisseurService.supprimerFournisseur(id, request);
+            Map<String, String> response = new HashMap<>();
+            response.put("message", "Fournisseur supprimé avec succès.");
+            response.put("status", "success");
+            return ResponseEntity.ok(response);
+        } catch (RuntimeException ex) {
+            Map<String, String> response = new HashMap<>();
+            response.put("message", ex.getMessage());
+            response.put("status", "error");
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
+        }
+    }
 
 }

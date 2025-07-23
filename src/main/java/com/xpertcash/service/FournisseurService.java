@@ -17,13 +17,19 @@ import org.springframework.web.multipart.MultipartFile;
 import com.xpertcash.configuration.JwtUtil;
 import com.xpertcash.entity.Entreprise;
 import com.xpertcash.entity.Fournisseur;
+import com.xpertcash.entity.PermissionType;
 import com.xpertcash.entity.User;
+import com.xpertcash.entity.Enum.RoleType;
+import com.xpertcash.repository.FactureRepository;
 import com.xpertcash.repository.FournisseurRepository;
 import com.xpertcash.repository.StockProduitFournisseurRepository;
 import com.xpertcash.repository.UsersRepository;
 import com.xpertcash.service.IMAGES.ImageStorageService;
 
 import jakarta.servlet.http.HttpServletRequest;
+
+import org.springframework.transaction.annotation.Transactional;
+
 
 
 
@@ -41,6 +47,9 @@ public class FournisseurService {
 
      @Autowired
     private ImageStorageService imageStorageService;
+
+    @Autowired
+    private FactureRepository factureRepository;
 
     
 
@@ -140,24 +149,8 @@ public class FournisseurService {
 }
 
     // Get fournisseur by id
-    public Fournisseur getFournisseurById(Long id, HttpServletRequest request) {
-
-    // Vérifier la présence du token JWT et récupérer l'ID de l'utilisateur connecté
-    String token = request.getHeader("Authorization");
-    if (token == null || !token.startsWith("Bearer ")) {
-        throw new RuntimeException("Token JWT manquant ou mal formaté");
-    }
-
-    Long userId;
-    try {
-        userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
-    } catch (Exception e) {
-        throw new RuntimeException("Erreur lors de l'extraction de l'ID de l'utilisateur depuis le token", e);
-    }
-
-    // Récupérer l'utilisateur par son ID
-    User user = usersRepository.findById(userId)
-            .orElseThrow(() -> new RuntimeException("Utilisateur introuvable !"));
+  public Fournisseur getFournisseurById(Long fournisseurId, HttpServletRequest request) {
+    User user = getUserFromRequest(request);
 
     // Vérifier que l'utilisateur a une entreprise associée
     Entreprise entrepriseUtilisateur = user.getEntreprise();
@@ -166,16 +159,34 @@ public class FournisseurService {
     }
 
     // Récupérer le fournisseur
-    Fournisseur fournisseur = fournisseurRepository.findById(id)
+    Fournisseur fournisseur = fournisseurRepository.findById(fournisseurId)
             .orElseThrow(() -> new RuntimeException("Fournisseur introuvable !"));
 
     // Vérifier que le fournisseur appartient à la même entreprise que l'utilisateur
-    if (fournisseur.getEntreprise() == null || 
+    if (fournisseur.getEntreprise() == null ||
         !fournisseur.getEntreprise().getId().equals(entrepriseUtilisateur.getId())) {
         throw new RuntimeException("Ce fournisseur n'appartient pas à votre entreprise.");
     }
 
     return fournisseur;
+}
+
+private User getUserFromRequest(HttpServletRequest request) {
+    String authHeader = request.getHeader("Authorization");
+    if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+        throw new RuntimeException("Token JWT manquant ou mal formaté");
+    }
+
+    String token = authHeader.substring(7);
+    Long userId;
+    try {
+        userId = jwtUtil.extractUserId(token);
+    } catch (Exception e) {
+        throw new RuntimeException("Erreur lors de l'extraction de l'ID utilisateur depuis le token", e);
+    }
+
+    return usersRepository.findById(userId)
+            .orElseThrow(() -> new RuntimeException("Utilisateur introuvable !"));
 }
 
 
@@ -307,4 +318,38 @@ public class FournisseurService {
         return result;
     }
     
+
+    // Supprimer un fournisseur
+ @Transactional
+  public void supprimerFournisseur(Long fournisseurId, HttpServletRequest request) {
+    User user = getUserFromRequest(request);
+
+    // 🔒 Vérification rôle ou permission
+    RoleType role = user.getRole().getName();
+    boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
+
+    if (!isAdminOrManager) {
+        throw new RuntimeException("Action non autorisée : permissions insuffisantes");
+    }
+
+    // 🔍 Récupération fournisseur
+    Fournisseur fournisseur = fournisseurRepository.findById(fournisseurId)
+        .orElseThrow(() -> new RuntimeException("Fournisseur introuvable !"));
+
+    // 🏢 Vérification entreprise
+    if (fournisseur.getEntreprise() == null || 
+        !fournisseur.getEntreprise().getId().equals(user.getEntreprise().getId())) {
+        throw new RuntimeException("Ce fournisseur n'appartient pas à votre entreprise.");
+    }
+
+    // 📄 Vérification d'utilisation dans facture
+    boolean fournisseurUtilise = factureRepository.existsByFournisseur_Id(fournisseurId);
+    if (fournisseurUtilise) {
+        throw new RuntimeException("Impossible de supprimer ce fournisseur : il est lié à une ou plusieurs factures.");
+    }
+
+    // ✅ Suppression
+    fournisseurRepository.delete(fournisseur);
+}
+
 }

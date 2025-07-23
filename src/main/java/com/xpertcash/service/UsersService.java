@@ -523,6 +523,12 @@ public class UsersService {
                 throw new RuntimeException("Les utilisateurs doivent appartenir à la même entreprise.");
             }
 
+            // 🚫 Interdiction de modifier les permissions de l'admin
+            boolean isTargetAdmin = CentralAccess.isAdminOfEntreprise(targetUser, targetUser.getEntreprise().getId());
+            if (isTargetAdmin) {
+                throw new RuntimeException("Impossible de modifier les permissions de l'administrateur de l'entreprise.");
+            }
+
             // 🚫 Interdiction de modifier ses propres permissions sauf si ADMIN
             boolean isSelf = currentUser.getId().equals(targetUser.getId());
             boolean isAdmin = CentralAccess.isAdminOfEntreprise(currentUser, currentUser.getEntreprise().getId());
@@ -742,7 +748,7 @@ public class UsersService {
     }
 
     Long adminId = entreprise.getAdmin().getId();
-    return usersRepository.findByEntrepriseIdAndIdNot(entreprise.getId(), adminId);
+    return usersRepository.findByEntrepriseId(entreprise.getId());
 }
 
 
@@ -794,53 +800,60 @@ public class UsersService {
 
     // Méthode pour suspendre ou réactiver un utilisateur
     @Transactional
-public void suspendUser(HttpServletRequest request, Long userId, boolean suspend) {
-    // 🔐 Extraction du token
-    String token = request.getHeader("Authorization");
-    if (token == null || !token.startsWith("Bearer ")) {
-        throw new RuntimeException("Token JWT manquant ou mal formaté");
+    public void suspendUser(HttpServletRequest request, Long userId, boolean suspend) {
+        // 🔐 Extraction du token
+        String token = request.getHeader("Authorization");
+        if (token == null || !token.startsWith("Bearer ")) {
+            throw new RuntimeException("Token JWT manquant ou mal formaté");
+        }
+
+        token = token.replace("Bearer ", "");
+
+        Long currentUserId;
+        try {
+            currentUserId = jwtUtil.extractUserId(token);
+        } catch (Exception e) {
+            throw new RuntimeException("Erreur lors de l'extraction de l'ID utilisateur depuis le token", e);
+        }
+
+        // 👤 Utilisateur courant
+        User currentUser = usersRepository.findById(currentUserId)
+                .orElseThrow(() -> new RuntimeException("Utilisateur courant non trouvé"));
+
+        // 👤 Utilisateur cible
+        User targetUser = usersRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("Utilisateur cible non trouvé"));
+
+        // 🔐 Vérifier qu’ils sont dans la même entreprise
+        if (currentUser.getEntreprise() == null || targetUser.getEntreprise() == null ||
+            !currentUser.getEntreprise().getId().equals(targetUser.getEntreprise().getId())) {
+            throw new RuntimeException("Les utilisateurs doivent appartenir à la même entreprise.");
+        }
+
+        // 🚫 Interdiction de se suspendre soi-même, sauf si ADMIN
+        
+        boolean isSelf = currentUser.getId().equals(targetUser.getId());
+        boolean isAdmin = CentralAccess.isAdminOfEntreprise(currentUser, currentUser.getEntreprise().getId());
+        boolean hasPermission = currentUser.getRole().hasPermission(PermissionType.GERER_UTILISATEURS);
+
+        if (isSelf && !isAdmin) {
+            throw new RuntimeException("Vous ne pouvez pas vous suspendre vous-même !");
+        }
+
+        if (!isAdmin && !hasPermission) {
+            throw new RuntimeException("Accès refusé : seuls les administrateurs ou personnes autorisées peuvent suspendre/réactiver des utilisateurs.");
+        }
+
+        // 🚫 Interdiction de suspendre l'admin
+        boolean isTargetAdmin = CentralAccess.isAdminOfEntreprise(targetUser, targetUser.getEntreprise().getId());
+        if (isTargetAdmin) {
+            throw new RuntimeException("Impossible de suspendre l'administrateur de l'entreprise.");
+        }
+
+        // ✅ Suspension ou réactivation
+        targetUser.setEnabledLien(!suspend);
+        usersRepository.save(targetUser);
     }
-
-    token = token.replace("Bearer ", "");
-
-    Long currentUserId;
-    try {
-        currentUserId = jwtUtil.extractUserId(token);
-    } catch (Exception e) {
-        throw new RuntimeException("Erreur lors de l'extraction de l'ID utilisateur depuis le token", e);
-    }
-
-    // 👤 Utilisateur courant
-    User currentUser = usersRepository.findById(currentUserId)
-            .orElseThrow(() -> new RuntimeException("Utilisateur courant non trouvé"));
-
-    // 👤 Utilisateur cible
-    User targetUser = usersRepository.findById(userId)
-            .orElseThrow(() -> new RuntimeException("Utilisateur cible non trouvé"));
-
-    // 🔐 Vérifier qu’ils sont dans la même entreprise
-    if (currentUser.getEntreprise() == null || targetUser.getEntreprise() == null ||
-        !currentUser.getEntreprise().getId().equals(targetUser.getEntreprise().getId())) {
-        throw new RuntimeException("Les utilisateurs doivent appartenir à la même entreprise.");
-    }
-
-    // 🚫 Interdiction de se suspendre soi-même, sauf si ADMIN
-    boolean isSelf = currentUser.getId().equals(targetUser.getId());
-    boolean isAdmin = CentralAccess.isAdminOfEntreprise(currentUser, currentUser.getEntreprise().getId());
-    boolean hasPermission = currentUser.getRole().hasPermission(PermissionType.GERER_UTILISATEURS);
-
-    if (isSelf && !isAdmin) {
-        throw new RuntimeException("Vous ne pouvez pas vous suspendre vous-même !");
-    }
-
-    if (!isAdmin && !hasPermission) {
-        throw new RuntimeException("Accès refusé : seuls les administrateurs ou personnes autorisées peuvent suspendre/réactiver des utilisateurs.");
-    }
-
-    // ✅ Suspension ou réactivation
-    targetUser.setEnabledLien(!suspend);
-    usersRepository.save(targetUser);
-}
 
 
    

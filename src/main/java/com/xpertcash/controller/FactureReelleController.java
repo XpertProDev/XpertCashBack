@@ -1,9 +1,11 @@
 package com.xpertcash.controller;
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -16,9 +18,11 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import com.xpertcash.DTOs.FactureReelleDTO;
 import com.xpertcash.DTOs.PaiementDTO;
+import com.xpertcash.configuration.JwtUtil;
 import com.xpertcash.entity.FactureProForma;
 import com.xpertcash.entity.FactureReelle;
 import com.xpertcash.entity.Enum.StatutPaiementFacture;
+import com.xpertcash.repository.UsersRepository;
 import com.xpertcash.service.FactureReelleService;
 
 
@@ -30,6 +34,13 @@ public class FactureReelleController {
 
     @Autowired
     private FactureReelleService factureReelleService;
+
+    @Autowired
+    private UsersRepository usersRepository;
+
+      @Autowired
+    private JwtUtil jwtUtil;
+
 
  
     // Endpoint pour lister tout les factures reelles
@@ -122,6 +133,47 @@ public class FactureReelleController {
     }
 
 
+
+ // Endpoint pour trier
+
+@GetMapping("/par-periode")
+public ResponseEntity<?> getFacturesParPeriode(
+        @RequestParam String typePeriode,
+        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateDebut,
+        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateFin,
+        HttpServletRequest request
+) {
+    String token = request.getHeader("Authorization");
+    if (token == null || !token.startsWith("Bearer ")) {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of(
+                "status", 401,
+                "message", "Token manquant ou mal formaté"
+        ));
+    }
+
+    Long userId;
+    try {
+        userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
+    } catch (Exception e) {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of(
+                "status", 401,
+                "message", "Token invalide"
+        ));
+    }
+
+    try {
+        List<Map<String, Object>> factures = factureReelleService.getFacturesParPeriode(
+                userId, request, typePeriode, dateDebut, dateFin
+        );
+        return ResponseEntity.ok(factures);
+    } catch (Exception e) {
+        e.printStackTrace(); // Log technique pour le développeur
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
+                "status", 500,
+                "message", "Une erreur interne est survenue : " + e.getMessage()
+        ));
+    }
+}
 
 
 }

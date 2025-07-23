@@ -29,7 +29,7 @@ public class SecurityConfig {
                         .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
                         // on ignore CSRF pour WS et pour toute l'API d'auth
                         .ignoringRequestMatchers(
-                                new AntPathRequestMatcher("/ws/**"),
+                                // new AntPathRequestMatcher("/ws/**"),
                                 new AntPathRequestMatcher("/api/auth/**")
                         )
                 )
@@ -54,8 +54,10 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
         configuration.setAllowedOrigins(List.of(
-                "http://localhost:4200",
+                // "http://localhost:4200",
                 "http://192.168.1.12:4200",
+                // "https://tchakeda.com",
+                // "https://www.tchakeda.com"
                 "https://tchakeda.com",
                 "https://www.tchakeda.com"
         ));

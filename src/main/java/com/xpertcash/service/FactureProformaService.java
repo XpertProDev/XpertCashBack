@@ -13,9 +13,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-
 import com.xpertcash.configuration.CentralAccess;
 import com.xpertcash.configuration.JwtUtil;
 import com.xpertcash.entity.Client;
@@ -26,7 +23,6 @@ import com.xpertcash.entity.FactureReelle;
 import com.xpertcash.entity.LigneFactureProforma;
 import com.xpertcash.entity.MethodeEnvoi;
 import com.xpertcash.entity.NoteFactureProForma;
-import com.xpertcash.entity.Permission;
 import com.xpertcash.entity.PermissionType;
 import com.xpertcash.entity.Produit;
 import com.xpertcash.entity.User;
@@ -186,7 +182,7 @@ public class FactureProformaService {
 
     // Initialisation des valeurs
     facture.setStatut(StatutFactureProForma.BROUILLON);
-    facture.setDateCreation(LocalDate.now());
+    facture.setDateCreation(LocalDateTime.now());
 
     if (facture.getDateFacture() == null) {
         facture.setDateFacture(LocalDate.now());
@@ -552,10 +548,10 @@ public class FactureProformaService {
                     "Demande envoyée à: " + destinataires
             );
         }
-
+        
         // 🔁 Mise à jour de la date de relance
         if (modifications.getDateRelance() != null) {
-            if (modifications.getDateRelance().isBefore(facture.getDateCreation().atStartOfDay())) {
+            if (modifications.getDateRelance().isBefore(facture.getDateCreation())) {
                 throw new RuntimeException("La date de relance ne peut pas être antérieure à la date de création de la facture !");
             }
 
@@ -975,6 +971,88 @@ public class FactureProformaService {
     }
 
     return factureProformaRepository.findByClientIdOrEntrepriseClientId(clientId, entrepriseClientId);
+}
+
+
+    //Trier
+    public List<Map<String, Object>> getFacturesParPeriode(Long userIdRequete, HttpServletRequest request,
+                                                       String typePeriode, LocalDate dateDebut, LocalDate dateFin) {
+    // Authentification comme dans ta méthode précédente
+    String token = request.getHeader("Authorization");
+    if (token == null || !token.startsWith("Bearer ")) {
+        throw new RuntimeException("Token JWT manquant ou mal formaté");
+    }
+
+    Long userIdCourant = jwtUtil.extractUserId(token.replace("Bearer ", ""));
+    User currentUser = usersRepository.findById(userIdCourant)
+            .orElseThrow(() -> new RuntimeException("Utilisateur courant introuvable"));
+    User targetUser = usersRepository.findById(userIdRequete)
+            .orElseThrow(() -> new RuntimeException("Utilisateur cible non trouvé"));
+
+    Entreprise entrepriseCourante = currentUser.getEntreprise();
+    Entreprise entrepriseCible = targetUser.getEntreprise();
+
+    if (entrepriseCourante == null || entrepriseCible == null
+        || !entrepriseCourante.getId().equals(entrepriseCible.getId())) {
+        throw new RuntimeException("Opération interdite : utilisateurs de différentes entreprises.");
+    }
+
+    boolean isAdmin = currentUser.getRole().getName() == RoleType.ADMIN;
+    boolean hasPermission = currentUser.getRole().hasPermission(PermissionType.Gestion_Facture);
+
+    LocalDateTime dateStart;
+    LocalDateTime dateEnd;
+
+    switch (typePeriode.toLowerCase()) {
+        case "jour":
+            dateStart = LocalDate.now().atStartOfDay();
+            dateEnd = dateStart.plusDays(1);
+            break;
+        case "mois":
+            dateStart = LocalDate.now().withDayOfMonth(1).atStartOfDay();
+            dateEnd = dateStart.plusMonths(1);
+            break;
+        case "annee":
+            dateStart = LocalDate.now().withDayOfYear(1).atStartOfDay();
+            dateEnd = dateStart.plusYears(1);
+            break;
+        case "personnalise":
+            if (dateDebut == null || dateFin == null) {
+                throw new RuntimeException("Dates de début et de fin requises pour une période personnalisée.");
+            }
+            dateStart = dateDebut.atStartOfDay();
+            dateEnd = dateFin.plusDays(1).atStartOfDay();
+            break;
+        default:
+            throw new RuntimeException("Type de période invalide.");
+    }
+
+    List<FactureProForma> factures = factureProformaRepository.findByEntrepriseIdAndDateCreationBetween(
+        entrepriseCourante.getId(), dateStart, dateEnd
+    );
+
+    return factures.stream()
+        .sorted(Comparator.comparing(FactureProForma::getDateCreation).reversed())
+        .map(facture -> {
+            Map<String, Object> map = new HashMap<>();
+            map.put("id", facture.getId());
+            map.put("numeroFacture", facture.getNumeroFacture());
+            map.put("dateCreation", facture.getDateCreation());
+            map.put("description", facture.getDescription());
+            map.put("totalHT", facture.getTotalHT());
+            map.put("remise", facture.getRemise());
+            map.put("tva", facture.isTva());
+            map.put("totalFacture", facture.getTotalFacture());
+            map.put("statut", facture.getStatut());
+            map.put("ligneFactureProforma", facture.getLignesFacture());
+            map.put("client", facture.getClient() != null ? facture.getClient().getNomComplet() : null);
+            map.put("entrepriseClient", facture.getEntrepriseClient() != null ? facture.getEntrepriseClient().getNom() : null);
+            map.put("entreprise", facture.getEntreprise() != null ? facture.getEntreprise().getNomEntreprise() : null);
+            map.put("dateRelance", facture.getDateRelance());
+            map.put("notifie", facture.isNotifie());
+            return map;
+        })
+        .collect(Collectors.toList());
 }
 
 }

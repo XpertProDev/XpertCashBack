@@ -1,6 +1,7 @@
 package com.xpertcash.DTOs;
 
 import com.xpertcash.entity.GlobalNotification;
+
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.Getter;
@@ -29,5 +30,4 @@ public class GlobalNotificationDto {
         this.senderName = notif.getRecipient().getNomComplet();
         this.read = read; // Initialisez le champ
     }
-
 }

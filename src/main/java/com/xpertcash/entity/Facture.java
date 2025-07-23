@@ -35,6 +35,7 @@ public class Facture {
     @JoinColumn(name = "fournisseur_id", nullable = true)
     private Fournisseur fournisseur;
 
+    
 
 
 

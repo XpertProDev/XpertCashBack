@@ -24,7 +24,7 @@ public class FactureProForma {
     private String numeroFacture;
 
     @Column(name = "date_creation", nullable = false)
-    private LocalDate dateCreation;
+    private LocalDateTime dateCreation;
     private LocalDate dateFacture;
     private String description;
     private LocalDateTime dateApprobation;

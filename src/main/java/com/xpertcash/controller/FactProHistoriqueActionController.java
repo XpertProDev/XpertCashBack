@@ -28,5 +28,5 @@ public class FactProHistoriqueActionController {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
         }
     }
-
+ 
 }

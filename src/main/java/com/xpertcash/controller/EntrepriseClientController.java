@@ -19,6 +19,7 @@ import com.xpertcash.entity.EntrepriseClient;
 import com.xpertcash.service.EntrepriseClientService;
 
 import jakarta.persistence.EntityNotFoundException;
+import jakarta.servlet.http.HttpServletRequest;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -27,30 +28,46 @@ public class EntrepriseClientController {
     @Autowired
     private EntrepriseClientService entrepriseClientService;
 
-    @PostMapping("/entreprises")
-    public ResponseEntity<?> createEntreprise(@RequestBody EntrepriseClient entrepriseClient) {
+    @PostMapping("/entreprise-clients")
+    public ResponseEntity<?> createEntrepriseClient(@RequestBody EntrepriseClient entrepriseClient, HttpServletRequest request) {
         try {
-            EntrepriseClient savedEntreprise = entrepriseClientService.saveEntreprise(entrepriseClient);
-            return ResponseEntity.ok(savedEntreprise);
+            EntrepriseClient saved = entrepriseClientService.saveEntreprise(entrepriseClient, request);
+            return ResponseEntity.status(HttpStatus.CREATED).body(saved);
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().body(e.getMessage());
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Erreur lors de l'enregistrement de l'entreprise cliente.");
         }
     }
 
+
     @GetMapping("/entreprises/{id}")
-    public Optional<EntrepriseClient> getEntrepriseById(@PathVariable Long id) {
-        return entrepriseClientService.getEntrepriseById(id);
+    public ResponseEntity<?> getEntrepriseById(@PathVariable Long id, HttpServletRequest request) {
+        Optional<EntrepriseClient> entrepriseClient = entrepriseClientService.getEntrepriseById(id, request);
+
+        if (entrepriseClient.isPresent()) {
+            return ResponseEntity.ok(entrepriseClient.get());
+        } else {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body("Aucune entreprise cliente trouvée avec l'ID : " + id);
+        }
     }
 
-    @GetMapping("/entreprises")
-    public List<EntrepriseClient> getAllEntreprises() {
-        return entrepriseClientService.getAllEntreprises();
+ 
+
+   @GetMapping("/entreprises")
+    public ResponseEntity<?> getAllEntreprises(HttpServletRequest request) {
+        List<EntrepriseClient> entreprises = entrepriseClientService.getAllEntreprises(request);
+
+        if (entreprises.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body("Aucune entreprise cliente trouvée.");
+        }
+
+        return ResponseEntity.ok(entreprises);
     }
 
-    @DeleteMapping("/entreprises/{id}")
-    public void deleteEntreprise(@PathVariable Long id) {
-        entrepriseClientService.deleteEntreprise(id);
-    }
+
 
 
 
@@ -69,4 +86,20 @@ public class EntrepriseClientController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
         }
     }
+
+    
+    @DeleteMapping("/entrepriseClients/{id}")
+    public ResponseEntity<?> deleteEntrepriseClientIfNoOrdersOrInvoices(@PathVariable Long id, HttpServletRequest request) {
+        try {
+            entrepriseClientService.deleteEntrepriseClientIfNoOrdersOrInvoices(id, request);
+            return ResponseEntity.ok().body("Entreprise Cliente supprimé avec succès.");
+        } catch (EntityNotFoundException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Erreur lors de la suppression du client entreprise.");
+        }
+    }
+
 }

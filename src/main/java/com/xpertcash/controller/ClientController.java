@@ -78,12 +78,6 @@ public class ClientController {
         return clientService.getClientsByEntreprise(entrepriseId);
     }
 
-    @DeleteMapping("/clients/{id}")
-    public void deleteClient(@PathVariable Long id) {
-        clientService.deleteClient(id);
-    }
-
-
     @GetMapping("/clients-and-entreprises")
     public List<Object> getAllClientsAndEntreprises() {
         return clientService.getAllClientsAndEntreprises();
@@ -122,5 +116,22 @@ public class ClientController {
         List<EntrepriseClient> entrepriseClients = clientService.getAllEntrepriseClients(request);
         return ResponseEntity.ok(entrepriseClients);
     }
+
+    // Endpoint pour supprimer un client deleteClientIfNoOrdersOrInvoices
+    @DeleteMapping("/clients/{id}")
+    public ResponseEntity<?> deleteClientIfNoOrdersOrInvoices(@PathVariable Long id, HttpServletRequest request) {
+        try {
+            clientService.deleteClientIfNoOrdersOrInvoices(id, request);
+            return ResponseEntity.ok().body("Client supprimé avec succès.");
+        } catch (EntityNotFoundException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Erreur lors de la suppression du client.");
+        }
+    }
+
+
 
 }

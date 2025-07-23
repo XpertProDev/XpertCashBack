@@ -4,7 +4,6 @@ import com.xpertcash.DTOs.GlobalNotificationDto;
 import com.xpertcash.entity.GlobalNotification;
 import com.xpertcash.entity.User;
 import com.xpertcash.repository.GlobalNotificationRepository;
-import lombok.AllArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
