@@ -80,7 +80,7 @@
 		<dependency>
     <groupId>io.jsonwebtoken</groupId>
     <artifactId>jjwt-api</artifactId>
-    <version>0.11.5</version> <!-- Assure-toi que cette version est compatible -->
+    <version>0.11.5</version> 
 </dependency>
 <dependency>
     <groupId>io.jsonwebtoken</groupId>
@@ -142,13 +142,6 @@
 		<groupId>org.springframework.boot</groupId>
 		<artifactId>spring-boot-starter-webflux</artifactId>
 	</dependency>
-
-
-
-
-
-
-
 
 	</dependencies>
 

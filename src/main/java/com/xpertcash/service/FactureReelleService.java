@@ -202,7 +202,7 @@ public List<FactureReelleDTO> listerMesFacturesReelles(HttpServletRequest reques
 
     // 🔐 Vérification des permissions
     boolean isAdmin = CentralAccess.isAdminOfEntreprise(utilisateur, entreprise.getId());
-    boolean hasPermission = utilisateur.getRole().hasPermission(PermissionType.Gestion_Facture);
+    boolean hasPermission = utilisateur.getRole().hasPermission(PermissionType.GESTION_FACTURATION);
 
     // 📦 Vérification de l'activation du module
     moduleActivationService.verifierAccesModulePourEntreprise(entreprise, "GESTION_FACTURATION");
@@ -334,7 +334,7 @@ public List<FactureReelleDTO> listerMesFacturesReelles(HttpServletRequest reques
     // 🔒 Vérification des rôles et permissions
         // 🔒 Vérification des rôles et permissions
     boolean isAdminOrManagerOfEntreprise = CentralAccess.isAdminOrManagerOfEntreprise(user, entrepriseFactureId);
-    boolean hasPermission = user.getRole().hasPermission(PermissionType.Gestion_Facture);
+    boolean hasPermission = user.getRole().hasPermission(PermissionType.GESTION_FACTURATION);
     boolean isCreateur = facture.getUtilisateurCreateur().getId().equals(userId);
 
     if (!(isAdminOrManagerOfEntreprise || hasPermission || isCreateur)) {
@@ -379,7 +379,7 @@ public List<FactureReelleDTO> listerMesFacturesReelles(HttpServletRequest reques
 
     // 🔐 Vérification des droits
     boolean isAdmin = CentralAccess.isAdminOfEntreprise(utilisateur, entrepriseUtilisateur.getId());
-    boolean hasPermission = utilisateur.getRole().hasPermission(PermissionType.Gestion_Facture);
+    boolean hasPermission = utilisateur.getRole().hasPermission(PermissionType.GESTION_FACTURATION);
 
     if (!isAdmin && !hasPermission) {
         throw new RuntimeException("Vous n'avez pas les droits pour enregistrer un paiement.");
@@ -459,7 +459,7 @@ public List<FactureReelleDTO> listerMesFacturesReelles(HttpServletRequest reques
 
     RoleType role = user.getRole().getName();
     boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
-    boolean hasGestionFacturePermission = user.getRole().hasPermission(PermissionType.Gestion_Facture);
+    boolean hasGestionFacturePermission = user.getRole().hasPermission(PermissionType.GESTION_FACTURATION);
 
     // 2. Vérification de la facture
     FactureReelle facture = factureReelleRepository.findById(factureId)
@@ -509,7 +509,7 @@ public List<FactureReelleDTO> listerMesFacturesReelles(HttpServletRequest reques
 
     // 🔐 3. Vérifier s'il a le droit de voir toutes les factures
     boolean isAuthorized = CentralAccess.isAdminOrManagerOfEntreprise(user, entrepriseId)
-            || user.getRole().hasPermission(PermissionType.Gestion_Facture);
+            || user.getRole().hasPermission(PermissionType.GESTION_FACTURATION);
 
     // 🧾 4. Statuts concernés
     List<StatutPaiementFacture> statutsImpayes = List.of(
@@ -577,7 +577,7 @@ public FactureProForma annulerFactureReelle(FactureReelle modifications, HttpSer
 
     // 🔐 3. Vérification des droits
     boolean isAuthorized = CentralAccess.isAdminOrManagerOfEntreprise(user, entrepriseFactureId)
-            || user.getRole().hasPermission(PermissionType.Gestion_Facture);
+            || user.getRole().hasPermission(PermissionType.GESTION_FACTURATION);
 
     if (!isAuthorized) {
         throw new RuntimeException("Accès refusé : vous n'avez pas les droits pour annuler cette facture.");

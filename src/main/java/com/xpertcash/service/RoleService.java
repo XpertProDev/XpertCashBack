@@ -60,20 +60,34 @@ public class RoleService {
                 permissionMap.get(PermissionType.VENDRE_PRODUITS),
                 permissionMap.get(PermissionType.GERER_CLIENTS),
                 permissionMap.get(PermissionType.GERER_BOUTIQUE),
-                permissionMap.get(PermissionType.Gestion_Facture),
+                permissionMap.get(PermissionType.GESTION_FACTURATION),
                 permissionMap.get(PermissionType.GERER_UTILISATEURS),
                 permissionMap.get(PermissionType.APPROVISIONNER_STOCK),
                 permissionMap.get(PermissionType.ACTIVER_BOUTIQUE),
-                permissionMap.get(PermissionType.DESACTIVER_BOUTIQUE)
+                permissionMap.get(PermissionType.DESACTIVER_BOUTIQUE),
+                permissionMap.get(PermissionType.COMPTABILITE),
+                permissionMap.get(PermissionType.VOIR_FLUX_COMPTABLE),
+                permissionMap.get(PermissionType.GERER_FOURNISSEURS)
 
             ));
 
             Role managerRole = new Role();
             managerRole.setName(RoleType.MANAGER);
-            managerRole.setPermissions(Collections.singletonList(
-                permissionMap.get(PermissionType.GERER_UTILISATEURS)
+            managerRole.setPermissions(Arrays.asList(
+                permissionMap.get(PermissionType.GERER_UTILISATEURS),
+                permissionMap.get(PermissionType.VENDRE_PRODUITS),
+                permissionMap.get(PermissionType.GESTION_FACTURATION),
+                permissionMap.get(PermissionType.GERER_CLIENTS),
+                permissionMap.get(PermissionType.APPROVISIONNER_STOCK),
+                permissionMap.get(PermissionType.GERER_BOUTIQUE),
+                permissionMap.get(PermissionType.VOIR_FLUX_COMPTABLE),
+                permissionMap.get(PermissionType.GERER_FOURNISSEURS)
+
 
             ));
+
+            Role utilisateurRole = new Role();
+            utilisateurRole.setName(RoleType.UTILISATEUR);
 
             Role venteRole = new Role();
             venteRole.setName(RoleType.VENDEUR);
@@ -81,10 +95,17 @@ public class RoleService {
                 permissionMap.get(PermissionType.VENDRE_PRODUITS)
             ));
 
+
             Role gestionClient = new Role();
             gestionClient.setName(RoleType.Clientel);
             gestionClient.setPermissions(Collections.singletonList(
                  permissionMap.get(PermissionType.GERER_CLIENTS)
+            ));
+
+            Role gestionFournisseur = new Role();
+            gestionFournisseur.setName(RoleType.Fournisseur);
+            gestionFournisseur.setPermissions(Collections.singletonList(
+                permissionMap.get(PermissionType.GERER_FOURNISSEURS)
             ));
 
             Role rhRole = new Role();
@@ -93,7 +114,6 @@ public class RoleService {
                 permissionMap.get(PermissionType.GERER_UTILISATEURS)
             ));
 
-            /*  
 
             Role comptableRole = new Role();
             comptableRole.setName(RoleType.COMPTABLE);
@@ -101,10 +121,9 @@ public class RoleService {
                 permissionMap.get(PermissionType.VOIR_FLUX_COMPTABLE),
                 permissionMap.get(PermissionType.APPROVISIONNER_STOCK)
             ));
-            */
 
             // 4️⃣ Sauvegarder les rôles avec les permissions associées
-            roleRepository.saveAll(Arrays.asList(adminRole, venteRole, managerRole));
+            roleRepository.saveAll(Arrays.asList( adminRole ,managerRole, utilisateurRole ));
 
             System.out.println("✅ Rôles et permissions initialisés avec succès !");
         }

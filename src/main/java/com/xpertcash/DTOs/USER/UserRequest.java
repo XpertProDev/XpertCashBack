@@ -28,7 +28,8 @@ public class UserRequest {
     private String email;
     private RoleType roleType;
     private LocalDateTime createdAt;
-    // private Long boutiqueId;
+    private List<String> permissions; 
+    private Long boutiqueId;
 
 
     @Pattern(regexp = "^\\+?[0-9]{8,15}$", message = "Le téléphone doit être au format valide")
@@ -38,7 +39,7 @@ public class UserRequest {
     private String adresseEntreprise;
     private String logoEntreprise;
     private Long entrepriseId;
-    //private List<BoutiqueResponse> boutiques;
+    private List<BoutiqueResponse> boutiques;
     private String personalCode;
     private String photo;
     private boolean userActivated;
@@ -47,7 +48,7 @@ public class UserRequest {
 
 
     // Constructeur principal
-   public UserRequest(User user, Entreprise entreprise, List<BoutiqueResponse> boutiques) {
+   public UserRequest(User user, Entreprise entreprise, List<BoutiqueResponse> boutiques, List<String> permissions) {
     this.id = user.getId();
     this.nomComplet = user.getNomComplet();
     this.nomEntreprise = entreprise.getNomEntreprise();
@@ -60,7 +61,8 @@ public class UserRequest {
     this.adresseEntreprise = entreprise.getAdresse();
     this.logoEntreprise = entreprise.getLogo();
     this.entrepriseId = entreprise.getId();
-    // this.boutiques = boutiques;
+    this.boutiques = boutiques;
+    this.permissions = permissions;
     this.personalCode = user.getPersonalCode();
     this.photo = user.getPhoto();
     this.userActivated = user.isEnabledLien();
@@ -85,6 +87,7 @@ public class UserRequest {
 
     this.adminActivated = user.getEntreprise().getAdmin().isActivatedLien();
     this.adminCreatedAt = user.getEntreprise().getAdmin().getCreatedAt();
+    
 
 
 }

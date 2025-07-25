@@ -699,7 +699,7 @@ public class UsersService {
     return user;
 }
 
-   public UserRequest getInfo(Long userId) {
+    public UserRequest getInfo(Long userId) {
     User user = usersRepository.findById(userId)
             .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
 
@@ -720,8 +720,15 @@ public class UsersService {
             )
             .collect(Collectors.toList());
 
-    return new UserRequest(user, entreprise, boutiqueResponses);
+    // Récupérer la liste des permissions sous forme de noms
+        List<String> permissions = user.getRole().getPermissions().stream()
+            .map(permission -> permission.getType().name())
+            .collect(Collectors.toList());
+   
 
+    return new UserRequest(
+        user, entreprise, boutiqueResponses, permissions
+        );
 }
 
     // Pour la récupération de tous les utilisateurs d'une entreprise
