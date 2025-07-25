@@ -354,25 +354,16 @@ public class ProduitController {
             
 
             // Endpoint pour récupérer l'historique général des mouvements de stock
-            @GetMapping("/stockhistorique")
-            public ResponseEntity<?> getAllStockHistory() {
+           @GetMapping("/stockhistorique")
+            public ResponseEntity<?> getAllStockHistory(HttpServletRequest request) {
                 try {
-                    List<StockHistoryDTO> stockHistories = produitService.getAllStockHistory();
-            
-                    if (stockHistories.isEmpty()) {
-                        Map<String, String> response = new HashMap<>();
-                        response.put("message", "Aucun historique de stock disponible.");
-                        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
-                    }
-            
-                    return ResponseEntity.ok(stockHistories);
-                } catch (Exception e) {
-                    Map<String, String> errorResponse = new HashMap<>();
-                    errorResponse.put("error", "Erreur interne du serveur.");
-                    errorResponse.put("details", e.getMessage());
-                    return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
+                    List<StockHistoryDTO> historique = produitService.getAllStockHistory(request);
+                    return ResponseEntity.ok(historique);
+                } catch (RuntimeException e) {
+                    return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
                 }
             }
+
             
 
         // Endpoint pour retirer la quantité du produit en stock (un ou plusieurs produits)
@@ -404,18 +395,15 @@ public class ProduitController {
         
         //Endpoint List des Stock
         @GetMapping("/getAllStock")
-        public ResponseEntity<List<Stock>> getAllStocks() {
+        public ResponseEntity<?> getAllStocks(HttpServletRequest request) {
             try {
-                List<Stock> stocks = produitService.getAllStocks();
-                if (stocks.isEmpty()) {
-                    return ResponseEntity.status(HttpStatus.NO_CONTENT).body(stocks);
-                }
-                return ResponseEntity.status(HttpStatus.OK).body(stocks);
-            } catch (Exception e) {
-                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                        .body(Collections.emptyList());
+                List<Stock> stocks = produitService.getAllStocks(request);
+                return ResponseEntity.ok(stocks);
+            } catch (RuntimeException e) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
             }
         }
+
       
 
         //Endpoint GetAll produits de toutes les boutiques d'une entreprise

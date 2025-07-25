@@ -840,14 +840,14 @@ public class UsersService {
         // 🚫 Interdiction de se suspendre soi-même, sauf si ADMIN
         
         boolean isSelf = currentUser.getId().equals(targetUser.getId());
-        boolean isAdmin = CentralAccess.isAdminOfEntreprise(currentUser, currentUser.getEntreprise().getId());
+        boolean isAdminOrManager = CentralAccess.isAdminOrManagerOfEntreprise(currentUser, currentUser.getEntreprise().getId());
         boolean hasPermission = currentUser.getRole().hasPermission(PermissionType.GERER_UTILISATEURS);
 
-        if (isSelf && !isAdmin) {
+        if (isSelf && !isAdminOrManager) {
             throw new RuntimeException("Vous ne pouvez pas vous suspendre vous-même !");
         }
 
-        if (!isAdmin && !hasPermission) {
+        if (!isAdminOrManager && !hasPermission) {
             throw new RuntimeException("Accès refusé : seuls les administrateurs ou personnes autorisées peuvent suspendre/réactiver des utilisateurs.");
         }
 

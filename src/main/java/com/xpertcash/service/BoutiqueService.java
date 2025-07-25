@@ -233,20 +233,34 @@ public class BoutiqueService {
             throw new RuntimeException("Token JWT manquant ou mal formaté");
         }
 
-        Long adminId = jwtUtil.extractUserId(token.substring(7));
-        User admin = usersRepository.findById(adminId)
-                .orElseThrow(() -> new RuntimeException("Admin non trouvé"));
+          Long userId;
+        try {
+            userId = jwtUtil.extractUserId(token.substring(7));
+        } catch (Exception e) {
+            throw new RuntimeException("Erreur lors de l'extraction de l'ID utilisateur depuis le token", e);
+        }
+         User user = usersRepository.findById(userId)
+            .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+
+
+         if (user.getEntreprise() == null) {
+        throw new RuntimeException("Utilisateur non rattaché à une entreprise.");
+        }
+
+        Long entrepriseId = user.getEntreprise().getId();
 
         // 🔑 Vérification des droits
-        RoleType role = admin.getRole().getName();
+        RoleType role = user.getRole().getName();
         boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
-        boolean hasPermission = admin.getRole().hasPermission(PermissionType.GERER_PRODUITS);
+        boolean hasPermission = user.getRole().hasPermission(PermissionType.GERER_PRODUITS)
+                       || user.getRole().hasPermission(PermissionType.APPROVISIONNER_STOCK);
 
+   
         if (!isAdminOrManager && !hasPermission) {
             throw new RuntimeException("Vous n'avez pas les droits pour effectuer les transferts !");
         }
 
-        // ✅ Vérification des boutiques
+        // Vérification des boutiques
         Boutique boutiqueSource = boutiqueRepository.findById(boutiqueSourceId)
                 .orElseThrow(() -> new RuntimeException("Boutique source non trouvée"));
         Boutique boutiqueDestination = boutiqueRepository.findById(boutiqueDestinationId)
@@ -256,12 +270,12 @@ public class BoutiqueService {
             throw new RuntimeException("L'une des boutiques est désactivée !");
         }
 
-        if (!boutiqueSource.getEntreprise().equals(admin.getEntreprise()) ||
-            !boutiqueDestination.getEntreprise().equals(admin.getEntreprise())) {
-            throw new RuntimeException("Les boutiques doivent appartenir à l'entreprise de l'utilisateur !");
-        }
+            if (!boutiqueSource.getEntreprise().getId().equals(entrepriseId) ||
+            !boutiqueDestination.getEntreprise().getId().equals(entrepriseId)) {
+            throw new RuntimeException("Transfert interdit : les deux boutiques doivent appartenir à votre entreprise.");
+         }
 
-        // 🔍 Vérification du produit source
+        // Vérification du produit source
         Produit produit = produitRepository.findByBoutiqueAndId(boutiqueSourceId, produitId)
                 .orElseThrow(() -> new RuntimeException("Produit non trouvé dans la boutique source"));
 
@@ -269,11 +283,11 @@ public class BoutiqueService {
             throw new RuntimeException("Quantité insuffisante dans la boutique source !");
         }
 
-        // 🔽 Mise à jour de la quantité dans la boutique source
+        // Mise à jour de la quantité dans la boutique source
         produit.setQuantite(produit.getQuantite() - quantite);
         produitRepository.save(produit);
 
-        // 📦 Vérification ou création du produit dans la boutique de destination
+        // Vérification ou création du produit dans la boutique de destination
         Optional<Produit> produitDestinationOpt = produitRepository.findByBoutiqueAndCodeGenerique(
                 boutiqueDestination.getId(), produit.getCodeGenerique());
 
@@ -300,7 +314,7 @@ public class BoutiqueService {
         produitDestination.setEnStock(true);
         produitRepository.save(produitDestination);
 
-        // 🔄 Mise à jour ou création du stock
+        // Mise à jour ou création du stock
         Stock stock = stockRepository.findByProduit(produitDestination);
         if (stock == null) {
             stock = new Stock();
@@ -328,7 +342,7 @@ public class BoutiqueService {
         history.setDescription("Transfert automatique via fonctionnalité de transfert");
         history.setCreatedAt(LocalDateTime.now());
         history.setStock(stock);
-        history.setUser(admin);
+        history.setUser(user);
         stockHistoryRepository.save(history);
 
         // 💾 Enregistrement du transfert
@@ -363,7 +377,8 @@ public class BoutiqueService {
 
         // 🔐 Vérification des droits via CentralAccess
         boolean isAdminOrManager = CentralAccess.isAdminOrManagerOfEntreprise(user, entrepriseId);
-        boolean hasPermission = user.getRole().hasPermission(PermissionType.GERER_PRODUITS);
+        boolean hasPermission = user.getRole().hasPermission(PermissionType.GERER_PRODUITS)
+                             || user.getRole().hasPermission(PermissionType.GERER_BOUTIQUE);
 
         if (!isAdminOrManager && !hasPermission) {
             throw new RuntimeException("Vous n'avez pas les droits pour copier des produits !");
