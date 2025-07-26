@@ -1,8 +1,8 @@
 package com.xpertcash.service;
 
-import com.xpertcash.DTOs.BoutiqueResponse;
 import com.xpertcash.DTOs.EntrepriseDTO;
 import com.xpertcash.DTOs.UpdateUserRequest;
+import com.xpertcash.DTOs.Boutique.BoutiqueResponse;
 import com.xpertcash.DTOs.USER.UserRequest;
 import com.xpertcash.configuration.CentralAccess;
 import com.xpertcash.configuration.JwtConfig;
@@ -409,10 +409,10 @@ public class UsersService {
                 }
 
                   // 🔐 Vérification des droits : admin, manager ou permission gestion personnel
-                boolean isAdminOrManager = CentralAccess.isAdminOrManagerOfEntreprise(admin, entreprise.getId());
+                boolean isAdmin = CentralAccess.isAdminOfEntreprise(admin, entreprise.getId());
                 boolean hasPermission = admin.getRole().hasPermission(PermissionType.GERER_UTILISATEURS);
 
-                if (!isAdminOrManager && !hasPermission) {
+                if (!isAdmin && !hasPermission) {
                     throw new RuntimeException("Accès refusé : seuls les administrateurs, managers ou les utilisateurs autorisés peuvent ajouter un employé.");
                 }
 

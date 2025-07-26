@@ -6,9 +6,14 @@ import jakarta.validation.constraints.Size;
 import lombok.Data;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 
 import com.fasterxml.jackson.annotation.JsonBackReference;
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonManagedReference;
 
 @Entity
 @Data
@@ -75,9 +80,11 @@ public class User {
     @JoinColumn(name = "role_id", nullable = false)
     private Role role;
 
-    @ManyToOne
-    @JoinColumn(name = "boutique_id")
-    private Boutique boutique;
+    // @ManyToOne
+    // @JoinColumn(name = "boutique_id")
+    // private Boutique boutique;
 
+   @OneToMany(mappedBy = "user", cascade = CascadeType.ALL)
+    private List<UserBoutique> userBoutiques = new ArrayList<>();
 
 }

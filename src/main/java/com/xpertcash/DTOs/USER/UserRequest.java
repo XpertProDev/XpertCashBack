@@ -1,7 +1,7 @@
 package com.xpertcash.DTOs.USER;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
-import com.xpertcash.DTOs.BoutiqueResponse;
+import com.xpertcash.DTOs.Boutique.BoutiqueResponse;
 import com.xpertcash.entity.Entreprise;
 import com.xpertcash.entity.User;
 import com.xpertcash.entity.Enum.RoleType;
