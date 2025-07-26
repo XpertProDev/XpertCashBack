@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.xpertcash.DTOs.Boutique.AssignerVendeurRequest;
 import com.xpertcash.DTOs.Boutique.BoutiqueResponseVendeur;
+import com.xpertcash.DTOs.Boutique.VendeurDTO;
 import com.xpertcash.service.UserBoutiqueService;
 
 import jakarta.servlet.http.HttpServletRequest;
@@ -60,26 +61,26 @@ public class UserBoutiqueController {
 
     // Endpoint pour supprimer l'affectation d'un utilisateur à une boutique spécifique
    @PostMapping("/retirer-vendeur")
-public ResponseEntity<Map<String, Object>> retirerVendeur(@RequestBody AssignerVendeurRequest request, HttpServletRequest httpServletRequest) {
-    Map<String, Object> response = new HashMap<>();
-    try {
-        List<String> resultMessages = userBoutiqueService.retirerVendeurDesBoutiques(httpServletRequest, request.getUserId(), request.getBoutiqueIds());
+    public ResponseEntity<Map<String, Object>> retirerVendeur(@RequestBody AssignerVendeurRequest request, HttpServletRequest httpServletRequest) {
+        Map<String, Object> response = new HashMap<>();
+        try {
+            List<String> resultMessages = userBoutiqueService.retirerVendeurDesBoutiques(httpServletRequest, request.getUserId(), request.getBoutiqueIds());
 
-        if (resultMessages.isEmpty()) {
-            response.put("message", "Aucune boutique n'a été affectée.");
+            if (resultMessages.isEmpty()) {
+                response.put("message", "Aucune boutique n'a été affectée.");
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+            }
+
+            response.put("status", "success");
+            response.put("messages", resultMessages);
+            return ResponseEntity.ok(response);
+
+        } catch (RuntimeException e) {
+            response.put("status", "error");
+            response.put("message", e.getMessage());
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
         }
-
-        response.put("status", "success");
-        response.put("messages", resultMessages);
-        return ResponseEntity.ok(response);
-
-    } catch (RuntimeException e) {
-        response.put("status", "error");
-        response.put("message", e.getMessage());
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
     }
-}
 
 
 
@@ -92,5 +93,18 @@ public ResponseEntity<Map<String, Object>> retirerVendeur(@RequestBody AssignerV
         return userBoutiqueService.getBoutiquesParUtilisateur(userId, request);
     }
 
+    // Récupérer les vendeurs d'une boutique
+
+    @GetMapping("/vendeurs/{boutiqueId}")
+    public ResponseEntity<List<VendeurDTO>> getVendeursDeBoutique(
+            @PathVariable Long boutiqueId,
+            HttpServletRequest request) {
+
+        // Appeler la méthode du service pour récupérer les vendeurs
+        List<VendeurDTO> vendeursDTO = userBoutiqueService.getVendeursDeBoutique(boutiqueId, request);
+
+        // Retourner la réponse avec les vendeurs
+        return ResponseEntity.ok(vendeursDTO);
+    }
 
 }

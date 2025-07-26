@@ -16,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.xpertcash.DTOs.Boutique.BoutiqueResponse;
 import com.xpertcash.DTOs.Boutique.BoutiqueResponseVendeur;
+import com.xpertcash.DTOs.Boutique.VendeurDTO;
 import com.xpertcash.configuration.JwtUtil;
 import com.xpertcash.entity.Boutique;
 import com.xpertcash.entity.User;
@@ -268,5 +269,62 @@ public List<String> retirerVendeurDesBoutiques(HttpServletRequest request, Long 
     }
 
 
-   
+   // Methode pour recuperer tous les utilisateur dune boutique
+    @Transactional
+public List<VendeurDTO> getVendeursDeBoutique(Long boutiqueId, HttpServletRequest request) {
+    // 🔐 Vérification du token JWT et des droits d'accès
+    String token = request.getHeader("Authorization");
+    if (token == null || !token.startsWith("Bearer ")) {
+        throw new RuntimeException("Token JWT manquant ou mal formaté");
+    }
+
+    Long adminId;
+    try {
+        adminId = jwtUtil.extractUserId(token.substring(7));  // Extraction de l'ID de l'utilisateur connecté
+    } catch (Exception e) {
+        throw new RuntimeException("Erreur lors de l'extraction de l'ID utilisateur depuis le token", e);
+    }
+
+    // Récupération de l'utilisateur connecté (admin ou manager)
+    User admin = usersRepository.findById(adminId)
+            .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+    if (admin.getEntreprise() == null) {
+        throw new RuntimeException("L'utilisateur connecté n'appartient à aucune entreprise.");
+    }
+
+    // Vérification des droits d'accès de l'utilisateur connecté
+    RoleType role = admin.getRole().getName();
+    boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
+    if (!isAdminOrManager) {
+        throw new RuntimeException("Vous n'avez pas les droits pour récupérer les vendeurs.");
+    }
+
+    // Vérification que la boutique appartient à l'entreprise de l'admin
+    Boutique boutique = boutiqueRepository.findById(boutiqueId)
+            .orElseThrow(() -> new RuntimeException("La boutique n'a pas été trouvée"));
+
+    if (!boutique.getEntreprise().getId().equals(admin.getEntreprise().getId())) {
+        throw new RuntimeException("Cette boutique n'appartient pas à votre entreprise.");
+    }
+
+    // Récupérer les vendeurs affectés à cette boutique
+    List<UserBoutique> userBoutiques = userBoutiqueRepository.findByBoutiqueId(boutiqueId);
+
+    // Mapper les utilisateurs à des objets VendeurDTO
+    List<VendeurDTO> vendeursDTO = userBoutiques.stream().map(userBoutique -> {
+        User user = userBoutique.getUser();
+        LocalDateTime assignedAt = userBoutique.getAssignedAt();
+        return new VendeurDTO(
+                user.getNomComplet(),
+                user.getEmail(),
+                user.getPhone(),
+                user.getPays(),
+                user.getPhoto(),
+                assignedAt
+        );
+    }).collect(Collectors.toList());
+
+    return vendeursDTO;
+}
+
 }

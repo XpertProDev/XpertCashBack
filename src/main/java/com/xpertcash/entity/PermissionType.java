@@ -1,5 +1,7 @@
 package com.xpertcash.entity;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+
 public enum PermissionType {
     GERER_PRODUITS,
     VENDRE_PRODUITS,
@@ -12,12 +14,15 @@ public enum PermissionType {
     ACTIVER_BOUTIQUE,
     DESACTIVER_BOUTIQUE,
     COMPTABILITE,
-    VOIR_FLUX_COMPTABLE,
+    VOIR_FLUX_COMPTABLE;
 
+    @JsonCreator
+    public static PermissionType fromString(String value) {
+        try {
+            return PermissionType.valueOf(value);
+        } catch (IllegalArgumentException e) {
+            throw new RuntimeException("PermissionType invalide : " + value);
+        }
+    }
 
-    
-    /*
-    VOIR_FLUX_COMPTABLE,
-    GERER_PERSONNEL,
-    */
 }
