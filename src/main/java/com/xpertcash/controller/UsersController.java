@@ -2,6 +2,8 @@ package com.xpertcash.controller;
 
 //import com.xpertcash.DTOs.RegistrationResponse;
 import com.xpertcash.DTOs.UpdateUserRequest;
+import com.xpertcash.DTOs.USER.RoleDTO;
+import com.xpertcash.DTOs.USER.UserDTO;
 import com.xpertcash.DTOs.USER.UserRequest;
 import com.xpertcash.composant.AuthorizationService;
 import com.xpertcash.configuration.JwtConfig;
@@ -9,6 +11,7 @@ import com.xpertcash.configuration.JwtUtil;
 import com.xpertcash.entity.Entreprise;
 import com.xpertcash.entity.PermissionType;
 import com.xpertcash.entity.User;
+import com.xpertcash.entity.UserBoutique;
 import com.xpertcash.repository.UsersRepository;
 import com.xpertcash.DTOs.EntrepriseDTO;
 import com.xpertcash.DTOs.LoginRequest;
@@ -33,6 +36,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -159,25 +163,25 @@ public class UsersController {
 
     // Pour la mise en jour de user en multipart/form-data avec image
      @PatchMapping(value = "/updateUsers/{id}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE) 
-public ResponseEntity<?> updateUser(
-    @PathVariable Long id,
-    @RequestPart(value = "user", required = false) String userJson,
-    @RequestPart(value = "photo", required = false) MultipartFile imageUserFile,
-    @RequestPart(value = "deletePhoto", required = false) String deletePhotoStr,
-    HttpServletRequest request) {
-    
-    try {  
-        UpdateUserRequest dto = new UpdateUserRequest();
-        if (userJson != null && !userJson.isBlank()) {
-            dto = new ObjectMapper().readValue(userJson, UpdateUserRequest.class);
+    public ResponseEntity<?> updateUser(
+        @PathVariable Long id,
+        @RequestPart(value = "user", required = false) String userJson,
+        @RequestPart(value = "photo", required = false) MultipartFile imageUserFile,
+        @RequestPart(value = "deletePhoto", required = false) String deletePhotoStr,
+        HttpServletRequest request) {
+        
+        try {  
+            UpdateUserRequest dto = new UpdateUserRequest();
+            if (userJson != null && !userJson.isBlank()) {
+                dto = new ObjectMapper().readValue(userJson, UpdateUserRequest.class);
+            }
+            Boolean deletePhoto = "true".equalsIgnoreCase(deletePhotoStr);
+            usersService.updateUser(id, dto, imageUserFile, deletePhoto);
+            return ResponseEntity.ok("Utilisateur mis à jour avec succès !");
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Erreur : " + e.getMessage());
         }
-        Boolean deletePhoto = "true".equalsIgnoreCase(deletePhotoStr);
-        usersService.updateUser(id, dto, imageUserFile, deletePhoto);
-        return ResponseEntity.ok("Utilisateur mis à jour avec succès !");
-    } catch (Exception e) {
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Erreur : " + e.getMessage());
     }
-}
 
     // Déverrouillage du compte via le lien de déverrouillage (GET avec paramètres)
     /*@GetMapping("/unlock")
@@ -227,32 +231,47 @@ public ResponseEntity<?> updateUser(
         }
     }
 
-    @PostMapping("/{userId}/permissions")
-    public ResponseEntity<User> assignPermissionsToUser(
-            @PathVariable Long userId,
-            @RequestBody Map<PermissionType, Boolean> permissions,
-            HttpServletRequest request) {
+ @PostMapping("/{userId}/permissions")
+public ResponseEntity<UserDTO> assignPermissionsToUser(
+        @PathVariable Long userId,
+        @RequestBody Map<PermissionType, Boolean> permissions,
+        HttpServletRequest request) {
 
-        User updatedUser = usersService.assignPermissionsToUser(userId, permissions, request);
-        return ResponseEntity.ok(updatedUser);
-    }
+    UserDTO updatedUserDTO = usersService.assignPermissionsToUser(userId, permissions, request);
+    return ResponseEntity.ok(updatedUserDTO);
+}
+
 
 
     //Get all users
-        @GetMapping("/entreprise/{entrepriseId}/allusers")
-        public ResponseEntity<List<User>> getAllUsersOfEntreprise(HttpServletRequest request) {
-        List<User> users = usersService.getAllUsersOfEntreprise(request);
-        return ResponseEntity.ok(users);
-    }   
+ @GetMapping("/entreprise/{entrepriseId}/allusers")
+    public ResponseEntity<List<UserDTO>> getAllUsersOfEntreprise(@PathVariable Long entrepriseId, HttpServletRequest request) {
+        try {
+            // Appel du service pour récupérer la liste des utilisateurs transformée en UserDTO
+            List<UserDTO> users = usersService.getAllUsersOfEntreprise(request);
+            
+            // Si la liste est vide
+            if (users.isEmpty()) {
+                return ResponseEntity.noContent().build();
+            }
+            
+            // Retour de la liste des utilisateurs avec un statut HTTP 200 OK
+            return ResponseEntity.ok(users);
+        } catch (RuntimeException e) {
+            // Si une exception est levée dans le service (ex : token invalide, permissions manquantes)
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(List.of()); // Retourner une erreur claire ici si nécessaire
+        }
+    }
 
  
 
     //Endpoint Get user by id
-        @GetMapping("/user/{userId}")
-        public ResponseEntity<User> getUserById(@PathVariable Long userId, HttpServletRequest request) {
-            User user = usersService.getUserById(userId, request);
-            return ResponseEntity.ok(user);
+       @GetMapping("/user/{userId}")
+        public ResponseEntity<UserDTO> getUserById(@PathVariable Long userId, HttpServletRequest request) {
+            UserDTO userDTO = usersService.getUserById(userId, request);
+            return ResponseEntity.ok(userDTO);
         }
+
 
 
 

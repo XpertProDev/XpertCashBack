@@ -1,4 +1,4 @@
-package com.xpertcash.DTOs;
+package com.xpertcash.DTOs.Boutique;
 
 
 
@@ -19,5 +19,6 @@ public class BoutiqueResponse {
     private LocalDateTime createdAt;
     private boolean actif = true;
     private TypeBoutique typeBoutique;
+    
     
 }

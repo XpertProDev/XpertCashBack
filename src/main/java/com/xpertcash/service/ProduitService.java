@@ -139,17 +139,14 @@ public class ProduitService {
             Long entrepriseId = entreprise.getId();
 
             // 🔐 Vérification : seul un ADMIN ou un utilisateur avec la permission peut continuer
-            boolean isAdmin = utilisateur.getRole().getName() == RoleType.ADMIN;
+            RoleType role = utilisateur.getRole().getName();
+            // boolean isAdmin = utilisateur.getRole().getName() == RoleType.ADMIN;
+             boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
             boolean hasPermission = utilisateur.getRole().hasPermission(PermissionType.GERER_PRODUITS);
 
-            if (!isAdmin && !hasPermission) {
+            if (!isAdminOrManager && !hasPermission) {
                 throw new RuntimeException("Accès refusé : seuls les ADMIN ou les utilisateurs ayant la permission GERER_PRODUITS peuvent ajouter un produit.");
             }
-
-
-
-
-
 
             List<ProduitDTO> produitsAjoutes = new ArrayList<>();
 
@@ -325,10 +322,13 @@ public class ProduitService {
         }
 
         // 🔐 Contrôle d'accès strict : seulement ADMIN ou permission explicite
-        boolean isAdmin = user.getRole().getName() == RoleType.ADMIN;
+        RoleType role = user.getRole().getName();
+        boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
         boolean hasPermission = user.getRole().hasPermission(PermissionType.GERER_PRODUITS);
+        boolean hasPermissionGestion = user.getRole().hasPermission(PermissionType.APPROVISIONNER_STOCK);
 
-        if (!isAdmin && !hasPermission) {
+
+        if (!isAdminOrManager && !hasPermission && !hasPermissionGestion) {
             throw new RuntimeException("Accès refusé : seuls les ADMIN ou les utilisateurs ayant la permission GERER_PRODUITS peuvent gérer le stock de cette boutique.");
         }
 
@@ -456,10 +456,13 @@ public class ProduitService {
         }
 
         // 5️⃣ Vérification stricte des droits : seul ADMIN ou permission explicite
-        boolean isAdmin = user.getRole().getName() == RoleType.ADMIN;
+        RoleType role = user.getRole().getName();
+        boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
         boolean hasPermission = user.getRole().hasPermission(PermissionType.GERER_PRODUITS);
+        boolean hasPermissionGestion = user.getRole().hasPermission(PermissionType.APPROVISIONNER_STOCK);
+        
 
-        if (!isAdmin && !hasPermission) {
+        if (!isAdminOrManager && !hasPermission && !hasPermissionGestion) {
             throw new RuntimeException("Vous n'avez pas les droits nécessaires pour retirer du stock !");
         }
 
@@ -606,52 +609,69 @@ public class ProduitService {
 }
 
      //Methode liste Historique sur Stock
-     public List<StockHistoryDTO> getStockHistory(Long produitId, HttpServletRequest request) {
+  public List<StockHistoryDTO> getStockHistory(Long produitId, HttpServletRequest request) {
 
-    // Récupérer le token JWT depuis l'en-tête
+    // 🔐 Vérification du token JWT
     String token = request.getHeader("Authorization");
     if (token == null || !token.startsWith("Bearer ")) {
         throw new RuntimeException("Token JWT manquant ou mal formaté");
     }
 
-    token = token.replace("Bearer ", "");
     Long userId;
     try {
-        userId = jwtUtil.extractUserId(token);
+        userId = jwtUtil.extractUserId(token.substring(7));
     } catch (Exception e) {
-        throw new RuntimeException("Erreur lors de l'extraction de l'ID depuis le token", e);
+        throw new RuntimeException("Erreur lors de l'extraction de l'ID utilisateur depuis le token", e);
     }
 
+    // 🔐 Récupération de l'utilisateur
     User user = usersRepository.findById(userId)
             .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
 
-    // Vérifier si le produit existe
-    Produit produit = produitRepository.findById(produitId)
-            .orElseThrow(() -> new NoSuchElementException("Produit non trouvé avec l'ID : " + produitId));
-
-    // Vérifier que le produit appartient à l'entreprise du user
-    if (produit.getBoutique() == null || produit.getBoutique().getEntreprise() == null) {
-        throw new RuntimeException("Produit ou boutique non rattaché à une entreprise !");
+    if (user.getEntreprise() == null) {
+        throw new RuntimeException("Utilisateur non rattaché à une entreprise.");
     }
 
-    if (!produit.getBoutique().getEntreprise().getId().equals(user.getEntreprise().getId())) {
+    // 🔐 Vérification du rôle ou des permissions
+    RoleType role = user.getRole().getName();
+    boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
+    boolean hasPermission = user.getRole().hasPermission(PermissionType.GERER_PRODUITS)
+                            || user.getRole().hasPermission(PermissionType.VENDRE_PRODUITS);
+
+    if (!isAdminOrManager && !hasPermission) {
+        throw new RuntimeException("Accès refusé : vous n'avez pas les droits pour consulter l'historique de stock.");
+    }
+
+    // 🔍 Vérification de l'existence du produit
+    Produit produit = produitRepository.findById(produitId)
+            .orElseThrow(() -> new RuntimeException("Produit non trouvé avec l'ID : " + produitId));
+
+    // 🔐 Vérification d'appartenance du produit à l'entreprise de l'utilisateur
+    Boutique boutique = produit.getBoutique();
+    if (boutique == null || boutique.getEntreprise() == null) {
+        throw new RuntimeException("Le produit ou sa boutique ne sont pas liés à une entreprise.");
+    }
+
+    Long entrepriseProduitId = boutique.getEntreprise().getId();
+    Long entrepriseUserId = user.getEntreprise().getId();
+
+    if (!entrepriseProduitId.equals(entrepriseUserId)) {
         throw new RuntimeException("Accès interdit : ce produit n'appartient pas à votre entreprise !");
     }
 
-    // Vérifier si un stock est associé au produit
+    // 🔍 Vérification que le stock existe
     Stock stock = stockRepository.findByProduit(produit);
     if (stock == null) {
-        throw new RuntimeException("Stock introuvable pour ce produit");
+        throw new RuntimeException("Aucun stock associé à ce produit.");
     }
 
-    // Récupérer l'historique des stocks
+    // 📦 Récupération de l'historique du stock
     List<StockHistory> stockHistories = stockHistoryRepository.findByStock(stock);
-
     if (stockHistories.isEmpty()) {
-        throw new RuntimeException("Aucun historique de stock trouvé pour ce produit");
+        throw new RuntimeException("Aucun historique de stock trouvé pour ce produit.");
     }
 
-    // Mapper en DTO
+    // 🛠 Mapping vers DTO
     return stockHistories.stream()
             .map(stockHistory -> {
                 StockHistoryDTO dto = new StockHistoryDTO();
@@ -679,41 +699,106 @@ public class ProduitService {
 
 
     // Récupérer tous les mouvements de stock
-    public List<StockHistoryDTO> getAllStockHistory() {
-        List<StockHistory> stockHistories = stockHistoryRepository.findAll();
+    public List<StockHistoryDTO> getAllStockHistory(HttpServletRequest request) {
 
-        // Convertir en DTOs (si nécessaire)
-        return stockHistories.stream()
-        .map(stockHistory -> {
-            StockHistoryDTO dto = new StockHistoryDTO();
-            dto.setId(stockHistory.getId());
-            dto.setAction(stockHistory.getAction());
-            dto.setQuantite(stockHistory.getQuantite());
-            dto.setStockAvant(stockHistory.getStockAvant());
-            dto.setStockApres(stockHistory.getStockApres());
-            dto.setDescription(stockHistory.getDescription());
-            dto.setCreatedAt(stockHistory.getCreatedAt());
-
-            User user = stockHistory.getUser();
-            if (user != null) {
-                dto.setNomComplet(user.getNomComplet());
-                dto.setPhone(user.getPhone());
-
-                if (user.getRole() != null) {
-                    dto.setRole(user.getRole().getName());
-                }
-            }
-
-            return dto;
-        })
-                .collect(Collectors.toList());
+    // 🔐 Vérification du token JWT
+    String token = request.getHeader("Authorization");
+    if (token == null || !token.startsWith("Bearer ")) {
+        throw new RuntimeException("Token JWT manquant ou mal formaté");
     }
+
+    Long userId;
+    try {
+        userId = jwtUtil.extractUserId(token.substring(7));
+    } catch (Exception e) {
+        throw new RuntimeException("Erreur lors de l'extraction de l'ID utilisateur depuis le token", e);
+    }
+
+    // 🔐 Récupération de l'utilisateur
+    User user = usersRepository.findById(userId)
+            .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+
+    if (user.getEntreprise() == null) {
+        throw new RuntimeException("Utilisateur non rattaché à une entreprise.");
+    }
+
+    Long entrepriseId = user.getEntreprise().getId();
+
+    // 🔍 Récupérer tous les historiques filtrés par entreprise
+    List<StockHistory> stockHistories = stockHistoryRepository.findAll()
+        .stream()
+        .filter(history -> {
+            Stock stock = history.getStock();
+            Produit produit = (stock != null) ? stock.getProduit() : null;
+            Boutique boutique = (produit != null) ? produit.getBoutique() : null;
+            Entreprise entreprise = (boutique != null) ? boutique.getEntreprise() : null;
+            return entreprise != null && entrepriseId.equals(entreprise.getId());
+        })
+        .collect(Collectors.toList());
+
+    // 🛠 Mapping en DTO
+    return stockHistories.stream()
+            .map(stockHistory -> {
+                StockHistoryDTO dto = new StockHistoryDTO();
+                dto.setId(stockHistory.getId());
+                dto.setAction(stockHistory.getAction());
+                dto.setQuantite(stockHistory.getQuantite());
+                dto.setStockAvant(stockHistory.getStockAvant());
+                dto.setStockApres(stockHistory.getStockApres());
+                dto.setDescription(stockHistory.getDescription());
+                dto.setCreatedAt(stockHistory.getCreatedAt());
+
+                User historiqueUser = stockHistory.getUser();
+                if (historiqueUser != null) {
+                    dto.setNomComplet(historiqueUser.getNomComplet());
+                    dto.setPhone(historiqueUser.getPhone());
+                    if (historiqueUser.getRole() != null) {
+                        dto.setRole(historiqueUser.getRole().getName());
+                    }
+                }
+
+                return dto;
+            })
+            .collect(Collectors.toList());
+}
 
 
    //Lister Stock
-   public List<Stock> getAllStocks() {
-    return stockRepository.findAll();
-}
+    public List<Stock> getAllStocks(HttpServletRequest request) {
+        // 🔐 Vérification du token
+        String token = request.getHeader("Authorization");
+        if (token == null || !token.startsWith("Bearer ")) {
+            throw new RuntimeException("Token JWT manquant ou mal formaté");
+        }
+
+        Long userId;
+        try {
+            userId = jwtUtil.extractUserId(token.substring(7));
+        } catch (Exception e) {
+            throw new RuntimeException("Erreur lors de l'extraction de l'ID utilisateur depuis le token", e);
+        }
+
+        // 🔐 Récupération de l'utilisateur
+        User user = usersRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+
+        if (user.getEntreprise() == null) {
+            throw new RuntimeException("Utilisateur non rattaché à une entreprise.");
+        }
+
+        Long entrepriseId = user.getEntreprise().getId();
+
+        // 📦 Récupérer tous les stocks liés à cette entreprise
+        return stockRepository.findAll().stream()
+                .filter(stock -> {
+                    Produit produit = stock.getProduit();
+                    Boutique boutique = (produit != null) ? produit.getBoutique() : null;
+                    Entreprise entreprise = (boutique != null) ? boutique.getEntreprise() : null;
+                    return entreprise != null && entreprise.getId().equals(entrepriseId);
+                })
+                .collect(Collectors.toList());
+    }
+
 
 
    // Update Produit
@@ -989,11 +1074,13 @@ public class ProduitService {
         User user = usersRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
 
-       boolean isAdmin = user.getRole().getName() == RoleType.ADMIN;
+         // Vérification des rôles et permissions
+         RoleType role = user.getRole().getName();
+      boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
        boolean hasPermission = user.getRole().hasPermission(PermissionType.GERER_PRODUITS);
 
 
-       if (!isAdmin && !hasPermission) {
+       if (!isAdminOrManager && !hasPermission) {
             throw new RuntimeException("Action non autorisée : permissions insuffisantes");
         }
 
@@ -1063,7 +1150,7 @@ public class ProduitService {
 
     // Lister Produit par boutique (excluant les produits dans la corbeille)
    // Lister Produit par boutique (excluant les produits dans la corbeille)
-public List<ProduitDTO> getProduitsParStock(Long boutiqueId, HttpServletRequest request) {
+ public List<ProduitDTO> getProduitsParStock(Long boutiqueId, HttpServletRequest request) {
     // 🔐 Extraction utilisateur depuis token JWT
     String token = request.getHeader("Authorization");
     if (token == null || !token.startsWith("Bearer ")) {
@@ -1088,11 +1175,14 @@ public List<ProduitDTO> getProduitsParStock(Long boutiqueId, HttpServletRequest 
     }
 
     // 🔒 Vérifications CentralAccess & permissions
-    boolean isAdmin = user.getRole().getName() == RoleType.ADMIN;
-    boolean hasPermissionVente = user.getRole().hasPermission(PermissionType.VENDRE_PRODUITS);
-    boolean hasPermissionGestion = user.getRole().hasPermission(PermissionType.GERER_PRODUITS);
+     RoleType role = user.getRole().getName();
+    boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
+    boolean hasPermission = user.getRole().hasPermission(PermissionType.GERER_PRODUITS)
+                        || user.getRole().hasPermission(PermissionType.VENDRE_PRODUITS)
+                        || user.getRole().hasPermission(PermissionType.APPROVISIONNER_STOCK)
+                        || user.getRole().hasPermission(PermissionType.GERER_BOUTIQUE);
 
-    if (!isAdmin && !hasPermissionVente && !hasPermissionGestion) {
+    if (!isAdminOrManager && !hasPermission ) {
         throw new RuntimeException("Accès interdit : vous n'avez pas les droits pour consulter les produits.");
     }
 
@@ -1160,7 +1250,7 @@ public List<ProduitDTO> getProduitsParStock(Long boutiqueId, HttpServletRequest 
 
     // Méthode pour lister les produits dans la corbeille
         @Transactional(readOnly = true)
-public List<ProduitDTO> getProduitsDansCorbeille(Long boutiqueId, HttpServletRequest request) {
+    public List<ProduitDTO> getProduitsDansCorbeille(Long boutiqueId, HttpServletRequest request) {
     // 1. Vérification du token JWT
     String authHeader = request.getHeader("Authorization");
     if (authHeader == null || !authHeader.startsWith("Bearer ")) {
@@ -1245,7 +1335,13 @@ public List<ProduitDTO> getProduitsDansCorbeille(Long boutiqueId, HttpServletReq
     // Autorisation et permission
     RoleType role = admin.getRole().getName();
     boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
-    boolean hasPermission = admin.getRole().hasPermission(PermissionType.GERER_PRODUITS);
+    boolean hasPermission = admin.getRole().hasPermission(PermissionType.GERER_PRODUITS)
+                        || admin.getRole().hasPermission(PermissionType.VENDRE_PRODUITS)
+                        || admin.getRole().hasPermission(PermissionType.APPROVISIONNER_STOCK)
+                        || admin.getRole().hasPermission(PermissionType.GERER_BOUTIQUE);
+
+
+
     if (!isAdminOrManager && !hasPermission) {
         throw new RuntimeException("Vous n'avez pas les droits pour consulter ce produit !");
     }
@@ -1403,10 +1499,12 @@ public List<ProduitDTO> getProduitsParEntreprise(Long entrepriseId) {
                     .orElseThrow(() -> new RuntimeException("Entreprise introuvable"));
 
             // 5. Vérification des permissions
-            boolean isAdmin = user.getRole().getName() == RoleType.ADMIN;
-            boolean hasPermission = user.getRole().hasPermission(PermissionType.GERER_PRODUITS);
+            RoleType role = user.getRole().getName();
+            boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
+            boolean hasPermission = user.getRole().hasPermission(PermissionType.GERER_PRODUITS)
+                    || user.getRole().hasPermission(PermissionType.APPROVISIONNER_STOCK);
 
-            if (!isAdmin && !hasPermission) {
+            if (!isAdminOrManager && !hasPermission) {
                 throw new RuntimeException("Accès refusé : permissions insuffisantes");
             }
 

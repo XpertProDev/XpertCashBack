@@ -115,7 +115,7 @@ public class FactureProformaService {
 
     // 🔐 Vérification des droits d'accès
     boolean isAdmin = CentralAccess.isAdminOfEntreprise(user, entrepriseUtilisateur.getId());
-    boolean hasPermission = user.getRole().hasPermission(PermissionType.Gestion_Facture);
+    boolean hasPermission = user.getRole().hasPermission(PermissionType.GESTION_FACTURATION);
 
     if (!isAdmin && !hasPermission) {
         throw new RuntimeException("Accès refusé : vous n'avez pas les droits nécessaires pour créer une facture dans cette entreprise !");
@@ -336,7 +336,7 @@ public class FactureProformaService {
         // --- Optionnel : Vérification des droits via CentralAccess et permission ---
         // 🔐 Vérification des droits d'accès
         boolean isAdmin = CentralAccess.isAdminOfEntreprise(user, entrepriseUtilisateur.getId());
-        boolean hasPermission = user.getRole().hasPermission(PermissionType.Gestion_Facture);
+        boolean hasPermission = user.getRole().hasPermission(PermissionType.GESTION_FACTURATION);
 
         if (!isAdmin && !hasPermission) {
             throw new RuntimeException("Accès refusé : vous n'avez pas les droits nécessaires pour créer une facture dans cette entreprise !");
@@ -720,7 +720,7 @@ public class FactureProformaService {
     }
 
     boolean isAdmin = currentUser.getRole().getName() == RoleType.ADMIN;
-    boolean hasPermission = currentUser.getRole().hasPermission(PermissionType.Gestion_Facture);
+    boolean hasPermission = currentUser.getRole().hasPermission(PermissionType.GESTION_FACTURATION);
 
     List<FactureProForma> factures;
 
@@ -791,7 +791,7 @@ public class FactureProformaService {
         }
 
         boolean isAdmin = utilisateur.getRole().getName() == RoleType.ADMIN;
-        boolean hasPermission = utilisateur.getRole().hasPermission(PermissionType.Gestion_Facture);
+        boolean hasPermission = utilisateur.getRole().hasPermission(PermissionType.GESTION_FACTURATION);
 
         boolean isCreateurFacture = facture.getUtilisateurCreateur() != null &&
                                 facture.getUtilisateurCreateur().getId().equals(utilisateur.getId());
@@ -998,7 +998,7 @@ public class FactureProformaService {
     }
 
     boolean isAdmin = currentUser.getRole().getName() == RoleType.ADMIN;
-    boolean hasPermission = currentUser.getRole().hasPermission(PermissionType.Gestion_Facture);
+    boolean hasPermission = currentUser.getRole().hasPermission(PermissionType.GESTION_FACTURATION);
 
     LocalDateTime dateStart;
     LocalDateTime dateEnd;
