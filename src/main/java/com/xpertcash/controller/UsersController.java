@@ -205,11 +205,22 @@ public class UsersController {
     }
 
     //Endpoint pour Delet un user a l'enreprise de l'admin
-    @DeleteMapping("/delete/{userId}")
-    public ResponseEntity<String> deleteUserFromEntreprise(HttpServletRequest request, @PathVariable Long userId) {
-        usersService.deleteUserFromEntreprise(request, userId);
-        return ResponseEntity.ok("Utilisateur supprimé avec succès.");
+  @DeleteMapping("/delete/{userId}")
+    public ResponseEntity<Map<String, String>> deleteUserFromEntreprise(
+            HttpServletRequest request,
+            @PathVariable Long userId) {
+
+        Map<String, String> response = new HashMap<>();
+        try {
+            usersService.deleteUserFromEntreprise(request, userId);
+            response.put("message", "Utilisateur supprimé avec succès.");
+            return ResponseEntity.ok(response);
+        } catch (RuntimeException e) {
+            response.put("error", e.getMessage());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+        }
     }
+
 
 
     @GetMapping("/user/info")
