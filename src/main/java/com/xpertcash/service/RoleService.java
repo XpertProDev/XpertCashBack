@@ -4,6 +4,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
@@ -193,4 +194,26 @@ public class RoleService {
     public List<Role> getAllRoles() {
         return roleRepository.findAll();
     }
+
+
+    //Methode public pour les vendeur
+    public Role getOrCreateVendeurRole() {
+    Optional<Role> existingRole = roleRepository.findByName(RoleType.VENDEUR);
+    if (existingRole.isPresent()) {
+        return existingRole.get();
+    }
+
+    // Sinon on le crée
+    Map<PermissionType, Permission> permissionMap = permissionRepository.findAll().stream()
+            .collect(Collectors.toMap(Permission::getType, p -> p));
+
+    Role venteRole = new Role();
+    venteRole.setName(RoleType.VENDEUR);
+    venteRole.setPermissions(Collections.singletonList(
+        permissionMap.get(PermissionType.VENDRE_PRODUITS)
+    ));
+
+    return roleRepository.save(venteRole);
+}
+
 }
