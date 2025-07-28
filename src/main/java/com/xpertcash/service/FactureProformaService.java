@@ -347,6 +347,11 @@ public class FactureProformaService {
         if (facture.getStatut() == StatutFactureProForma.ANNULE) {
             throw new RuntimeException("Cette facture est annulée. Elle ne peut plus être modifiée.");
         }
+        
+        // Si l'utilisateur tente de revalider une facture déjà validée
+        if (modifications.getStatut() == StatutFactureProForma.VALIDE) {
+            throw new RuntimeException("Cette facture est déjà VALIDÉE. Vous ne pouvez pas la valider une seconde fois.");
+        }
 
         // 🔒 Traitement spécial si facture VALIDÉE
         if (facture.getStatut() == StatutFactureProForma.VALIDE) {
