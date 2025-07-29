@@ -30,14 +30,17 @@ import com.xpertcash.entity.Enum.RoleType;
 import com.xpertcash.entity.Enum.StatutFactureProForma;
 import com.xpertcash.repository.ClientRepository;
 import com.xpertcash.repository.EntrepriseClientRepository;
+import com.xpertcash.repository.FactProHistoriqueActionRepository;
 import com.xpertcash.repository.FactureProformaRepository;
 import com.xpertcash.repository.FactureReelleRepository;
+import com.xpertcash.repository.LigneFactureProformaRepository;
 import com.xpertcash.repository.NoteFactureProFormaRepository;
 import com.xpertcash.repository.PaiementRepository;
 import com.xpertcash.repository.ProduitRepository;
 import com.xpertcash.repository.UsersRepository;
 import com.xpertcash.service.Module.ModuleActivationService;
 
+import jakarta.persistence.EntityNotFoundException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.transaction.Transactional;
 
@@ -73,6 +76,14 @@ public class FactureProformaService {
     private NoteFactureProFormaRepository noteFactureProFormaRepository;
     @Autowired
     private PaiementRepository paiementRepository;
+
+    @Autowired
+    private LigneFactureProformaRepository ligneFactureProformaRepository;
+
+    @Autowired 
+    private FactProHistoriqueActionRepository factProHistoriqueActionRepository;
+
+
 
     @Autowired
     private JwtUtil jwtUtil;
@@ -347,11 +358,11 @@ public class FactureProformaService {
         if (facture.getStatut() == StatutFactureProForma.ANNULE) {
             throw new RuntimeException("Cette facture est annulée. Elle ne peut plus être modifiée.");
         }
-        
+
         // Si l'utilisateur tente de revalider une facture déjà validée
-        if (modifications.getStatut() == StatutFactureProForma.VALIDE) {
-            throw new RuntimeException("Cette facture est déjà VALIDÉE. Vous ne pouvez pas la valider une seconde fois.");
-        }
+        // if (modifications.getStatut() == StatutFactureProForma.VALIDE) {
+        //     throw new RuntimeException("Cette facture est déjà VALIDÉE. Vous ne pouvez pas la valider une seconde fois.");
+        // }
 
         // 🔒 Traitement spécial si facture VALIDÉE
         if (facture.getStatut() == StatutFactureProForma.VALIDE) {
@@ -699,6 +710,54 @@ public class FactureProformaService {
 
         return factureProformaRepository.save(facture);
     }
+
+    //Supression dune facture proforma en brouillon
+     @Transactional
+public void supprimerFactureProforma(Long factureId, String token) {
+    if (token == null || !token.startsWith("Bearer ")) {
+        throw new RuntimeException("Token JWT manquant ou mal formaté");
+    }
+
+    token = token.replace("Bearer ", "");
+    Long userId = jwtUtil.extractUserId(token);
+
+    User user = usersRepository.findById(userId)
+            .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+
+    FactureProForma facture = factureProformaRepository.findById(factureId)
+            .orElseThrow(() -> new EntityNotFoundException("Facture introuvable avec l'ID : " + factureId));
+
+    if (facture.getStatut() != StatutFactureProForma.BROUILLON) {
+        throw new RuntimeException("Seules les factures en statut BROUILLON peuvent être supprimées.");
+    }
+
+    if (!facture.getEntreprise().getId().equals(user.getEntreprise().getId())) {
+        throw new RuntimeException("Cette facture ne vous appartient pas.");
+    }
+
+    RoleType role = user.getRole().getName();
+    boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
+    boolean hasPermission = user.getRole().hasPermission(PermissionType.GERER_CLIENTS);
+
+    if (!isAdminOrManager && !hasPermission) {
+        throw new RuntimeException("Accès refusé : vous n'avez pas les droits pour supprimer une facture.");
+    }
+
+    // 🔥 Supprimer d'abord les lignes de facture
+    ligneFactureProformaRepository.deleteByFactureProForma(facture);
+
+    // 🔥 Supprimer les historiques liés à la facture
+    factProHistoriqueActionRepository.deleteByFacture(facture);
+
+    // Suprimer les note
+    noteFactureProFormaRepository.deleteByFacture(facture);
+
+    // ✅ Ensuite on peut supprimer la facture
+    factureProformaRepository.delete(facture);
+}
+
+
+   
 
     //Methode pour recuperer les factures pro forma dune entreprise
     public List<Map<String, Object>> getFacturesParEntrepriseParUtilisateur(Long userIdRequete, HttpServletRequest request) {

@@ -54,7 +54,8 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
         configuration.setAllowedOrigins(List.of(
-                "http://192.168.1.2:4200",
+                "http://localhost:4200",
+                "http://192.168.1.11:4200",
                 "https://tchakeda.com",
                 "https://www.tchakeda.com",
                 "https://xpertcash.tchakeda.com"

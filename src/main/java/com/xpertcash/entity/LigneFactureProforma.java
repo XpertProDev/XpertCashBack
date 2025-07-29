@@ -14,7 +14,7 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @NoArgsConstructor
 
-public class LigneFactureProforma {
+    public class LigneFactureProforma {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -32,6 +32,8 @@ public class LigneFactureProforma {
     private Integer quantite;
     private Double prixUnitaire;
     private Double montantTotal;
+    @Lob
+    @Column(name = "ligne_description")
     private String ligneDescription;
 
 

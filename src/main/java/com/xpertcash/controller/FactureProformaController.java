@@ -102,6 +102,34 @@ public class FactureProformaController {
         return ResponseEntity.ok(factureModifiee);
     }
     
+    //Suprimer une facture
+    @DeleteMapping("/deletefactureproforma/{factureId}")
+    public ResponseEntity<?> supprimerFactureProforma(
+            @PathVariable("factureId") Long factureId,
+            HttpServletRequest request) {
+        try {
+            String token = request.getHeader("Authorization");
+            factureProformaService.supprimerFactureProforma(factureId, token);
+
+            // ✅ Retourner un objet JSON
+            Map<String, String> response = new HashMap<>();
+            response.put("message", "Facture supprimée avec succès.");
+            return ResponseEntity.ok(response);
+
+        } catch (RuntimeException e) {
+            Map<String, String> error = new HashMap<>();
+            error.put("error", e.getMessage());
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error);
+
+        } catch (Exception e) {
+            Map<String, String> error = new HashMap<>();
+            error.put("error", "Erreur lors de la suppression de la facture.");
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(error);
+        }
+    }
+
+
+
     //Endpoint Pour Envoyer une facture
     @PostMapping(value = "/factures/{id}/envoyer-email", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<?> envoyerFactureEmail(
