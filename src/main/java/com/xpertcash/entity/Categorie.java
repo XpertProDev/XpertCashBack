@@ -21,5 +21,9 @@ public class Categorie {
     @OneToMany(mappedBy = "categorie")
     private List<Produit> produits;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "entreprise_id", nullable = false)
+    private Entreprise entreprise; 
+
 
 }

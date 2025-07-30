@@ -19,9 +19,13 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.xpertcash.DTOs.CategorieResponseDTO;
+import com.xpertcash.configuration.JwtUtil;
 import com.xpertcash.entity.Categorie;
+import com.xpertcash.entity.Entreprise;
 import com.xpertcash.entity.Unite;
+import com.xpertcash.entity.User;
 import com.xpertcash.repository.CategorieRepository;
+import com.xpertcash.repository.UsersRepository;
 import com.xpertcash.service.CategorieService;
 
 import jakarta.servlet.http.HttpServletRequest;
@@ -33,64 +37,80 @@ public class CategorieController {
     private CategorieService categorieService;
     @Autowired
     private CategorieRepository categorieRepository;
+    @Autowired
+    private UsersRepository usersRepository;
+    @Autowired
+    private JwtUtil jwtUtil;
 
     // Ajouter une catégorie (seul ADMIN)
     @PostMapping("/createCategory")
-    public ResponseEntity<Object> createCategorie(@RequestBody Map<String, String> payload) {
-        try {
-            String nom = payload.get("nom");
-
-            if (nom == null || nom.isEmpty()) {
-                // Si le nom de la catégorie est vide
-                throw new RuntimeException("Catégorie ne peut pas être vide !");
-            }
-
-            // Vérifier si la catégorie existe déjà
-            if (categorieRepository.existsByNom(nom)) {
-                // Si la catégorie existe déjà, on renvoie une réponse 409 Conflict avec un message
-                Map<String, String> errorResponse = new HashMap<>();
-                errorResponse.put("error", "Cette catégorie existe déjà !");
-                return ResponseEntity.status(HttpStatus.CONFLICT).body(errorResponse);
-            }
-
-            // Créer la catégorie
-            Categorie categorie = new Categorie();
-            categorie.setNom(nom);
-            categorie.setCreatedAt(LocalDateTime.now());
-
-            // Sauvegarder la catégorie dans la base de données
-            Categorie savedCategorie = categorieRepository.save(categorie);
-
-            // Retourner la réponse avec la catégorie créée
-            return ResponseEntity.status(HttpStatus.CREATED).body(savedCategorie);
-        } catch (RuntimeException e) {
-            // Gestion des erreurs
-            Map<String, String> errorResponse = new HashMap<>();
-            errorResponse.put("error", e.getMessage());
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse); // Retour d'une erreur générique en cas de problème
+public ResponseEntity<Object> createCategorie(@RequestBody Map<String, String> payload, HttpServletRequest request) {
+    try {
+        String nom = payload.get("nom");
+        
+        // Récupérer l'ID de l'entreprise de l'utilisateur authentifié à partir du token JWT
+        String token = request.getHeader("Authorization");
+        if (token == null || !token.startsWith("Bearer ")) {
+            throw new RuntimeException("Token JWT manquant ou mal formaté");
         }
+
+        Long userId;
+        try {
+            userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
+        } catch (Exception e) {
+            throw new RuntimeException("Erreur lors de l'extraction de l'ID utilisateur", e);
+        }
+
+        User user = usersRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
+
+        Entreprise entreprise = user.getEntreprise();
+        if (entreprise == null) {
+            throw new RuntimeException("Aucune entreprise associée à cet utilisateur");
+        }
+
+        // Si le nom de la catégorie est vide
+        if (nom == null || nom.isEmpty()) {
+            throw new RuntimeException("Catégorie ne peut pas être vide !");
+        }
+
+        // Vérifier si la catégorie existe déjà
+        if (categorieRepository.existsByNom(nom)) {
+            Map<String, String> errorResponse = new HashMap<>();
+            errorResponse.put("error", "Cette catégorie existe déjà !");
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(errorResponse);
+        }
+
+        // Créer la catégorie et l'associer à l'entreprise de l'utilisateur
+        Categorie savedCategorie = categorieService.createCategorie(nom, entreprise.getId());
+
+        // Retourner un message de succès ou un objet simple
+        Map<String, String> response = new HashMap<>();
+        response.put("message", "Catégorie créée avec succès !");
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    } catch (RuntimeException e) {
+        Map<String, String> errorResponse = new HashMap<>();
+        errorResponse.put("error", e.getMessage());
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
     }
+}
 
 
 
         // Récupérer toutes les catégories
    @GetMapping("/allCategory")
-public ResponseEntity<List<CategorieResponseDTO>> getAllCategories(HttpServletRequest request) {
-    try {
-        // Appeler la méthode de service qui retourne des CategorieResponseDTO
-        List<CategorieResponseDTO> categoriesAvecProduitCount = categorieService.getCategoriesWithProduitCount(request);
+    public ResponseEntity<List<CategorieResponseDTO>> getAllCategories(HttpServletRequest request) {
+        try {
+            List<CategorieResponseDTO> categoriesAvecProduitCount = categorieService.getCategoriesWithProduitCount(request);
 
-        // Renvoyer la réponse avec un statut OK et les catégories en DTO
-        return ResponseEntity.ok(categoriesAvecProduitCount);
-    } catch (RuntimeException e) {
-        // En cas d'erreur d'autorisation (accès refusé)
-        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(null);
-    } catch (Exception e) {
-        // En cas d'erreur serveur interne
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                             .body(null);
+            return ResponseEntity.ok(categoriesAvecProduitCount);
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(null);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                                .body(null);
+        }
     }
-}
     
 
     // Supprimer une catégorie

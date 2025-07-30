@@ -20,6 +20,7 @@ import com.xpertcash.entity.PermissionType;
 import com.xpertcash.entity.Produit;
 import com.xpertcash.entity.User;
 import com.xpertcash.repository.CategorieRepository;
+import com.xpertcash.repository.EntrepriseRepository;
 import com.xpertcash.repository.ProduitRepository;
 import com.xpertcash.repository.UsersRepository;
 
@@ -36,24 +37,33 @@ public class CategorieService {
     @Autowired
     private ProduitRepository produitRepository;
 
+    @Autowired EntrepriseRepository entrepriseRepository;
+
     @Autowired
     private JwtUtil jwtUtil;
 
      // Ajouter une nouvelle catégorie (seul ADMIN peut le faire)
-    public Categorie createCategorie(String nom) {
-        if (categorieRepository.existsByNom(nom)) {
-            throw new RuntimeException("Cette catégorie existe déjà !");
-        }
-
-        Categorie categorie = new Categorie();
-        categorie.setNom(nom);
-        categorie.setCreatedAt(LocalDateTime.now());
-        return categorieRepository.save(categorie);
+  public Categorie createCategorie(String nom, Long entrepriseId) {
+    if (categorieRepository.existsByNom(nom)) {
+        throw new RuntimeException("Cette catégorie existe déjà !");
     }
+
+    Categorie categorie = new Categorie();
+    categorie.setNom(nom);
+    categorie.setCreatedAt(LocalDateTime.now());
+    
+    // Récupérer l'entreprise par son ID et l'assigner à la catégorie
+    Entreprise entreprise = entrepriseRepository.findById(entrepriseId)
+            .orElseThrow(() -> new RuntimeException("Entreprise non trouvée"));
+
+    categorie.setEntreprise(entreprise); // Assurer que cette méthode existe dans l'entité Categorie
+
+    return categorieRepository.save(categorie);
+}
+
 
     // Récupérer toutes les catégories
   public List<CategorieResponseDTO> getCategoriesWithProduitCount(HttpServletRequest request) {
-    // 1. Extraire l'utilisateur à partir du token
     String token = request.getHeader("Authorization");
     if (token == null || !token.startsWith("Bearer ")) {
         throw new RuntimeException("Token JWT manquant ou mal formaté");
