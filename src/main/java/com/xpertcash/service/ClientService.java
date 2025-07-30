@@ -89,8 +89,10 @@ public class ClientService {
     RoleType role = user.getRole().getName();
     boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
     boolean hasPermission = user.getRole().hasPermission(PermissionType.GERER_CLIENTS);
+    boolean hasPermissionGestionFacturation = user.getRole().hasPermission(PermissionType.GESTION_FACTURATION);
 
-    if (!isAdminOrManager && !hasPermission) {
+
+    if (!isAdminOrManager && !hasPermission && !hasPermissionGestionFacturation) {
         throw new RuntimeException("Accès refusé : vous n'avez pas les droits pour créer un client !");
     }
 
@@ -195,48 +197,57 @@ public class ClientService {
 
 
     public List<Client> getAllClients(HttpServletRequest request) {
-        // 1. Extraire l'utilisateur à partir du token
-        String token = request.getHeader("Authorization");
-        if (token == null || !token.startsWith("Bearer ")) {
-            throw new RuntimeException("Token JWT manquant ou mal formaté");
-        }
-
-        Long userId;
-        try {
-            userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
-        } catch (Exception e) {
-            throw new RuntimeException("Erreur lors de l'extraction de l'ID utilisateur", e);
-        }
-
-        User user = usersRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
-
-        Entreprise entreprise = user.getEntreprise();
-        if (entreprise == null) {
-            throw new RuntimeException("Aucune entreprise associée à cet utilisateur");
-        }
-
-        // Vérification des droits
-        boolean isAdminOrManager = CentralAccess.isAdminOrManagerOfEntreprise(user, entreprise.getId());
-        boolean hasPermissionGestionClients = user.getRole().hasPermission(PermissionType.GERER_CLIENTS);
-
-        if (!isAdminOrManager && !hasPermissionGestionClients) {
-            throw new RuntimeException("Accès refusé : vous n'avez pas les droits nécessaires pour consulter les clients.");
-        }
-
-        // 2. Récupérer tous les clients
-        List<Client> allClients = clientRepository.findAll();
-
-        // 3. Filtrer : client lié à entreprise OU entrepriseClient liée à l'entreprise
-        return allClients.stream()
-                .filter(c ->
-                    (c.getEntreprise() != null && c.getEntreprise().getId().equals(entreprise.getId())) ||
-                    (c.getEntrepriseClient() != null &&
-                    c.getEntrepriseClient().getEntreprise() != null &&
-                    c.getEntrepriseClient().getEntreprise().getId().equals(entreprise.getId()))
-                )
-                .collect(Collectors.toList());
+    // 1. Extraire l'utilisateur à partir du token
+    String token = request.getHeader("Authorization");
+    if (token == null || !token.startsWith("Bearer ")) {
+        throw new RuntimeException("Token JWT manquant ou mal formaté");
     }
+
+    Long userId;
+    try {
+        userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
+    } catch (Exception e) {
+        throw new RuntimeException("Erreur lors de l'extraction de l'ID utilisateur", e);
+    }
+
+    User user = usersRepository.findById(userId)
+            .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
+
+    Entreprise entreprise = user.getEntreprise();
+    if (entreprise == null) {
+        throw new RuntimeException("Aucune entreprise associée à cet utilisateur");
+    }
+
+    // 2. Vérification des droits
+    boolean isAdminOrManager = CentralAccess.isAdminOrManagerOfEntreprise(user, entreprise.getId());
+    boolean hasPermissionGestionClients = user.getRole().hasPermission(PermissionType.GERER_CLIENTS);
+    boolean hasPermissionGestionFacturation = user.getRole().hasPermission(PermissionType.GESTION_FACTURATION);
+    
+
+
+    // Si l'utilisateur n'est ni Admin, ni Manager, ni n'a la permission de gérer les clients
+    if (!isAdminOrManager && !hasPermissionGestionClients && !hasPermissionGestionFacturation) {
+        throw new RuntimeException("Accès refusé : vous n'avez pas les droits nécessaires pour consulter les clients.");
+    }
+
+    // 3. Vérification que l'utilisateur est bien associé à l'entreprise
+    if (!entreprise.getId().equals(user.getEntreprise().getId())) {
+        throw new RuntimeException("Accès refusé : vous ne pouvez pas accéder aux clients d'une autre entreprise.");
+    }
+
+    // 4. Récupérer tous les clients
+    List<Client> allClients = clientRepository.findAll();
+
+    // 5. Filtrer les clients associés à l'entreprise de l'utilisateur
+    return allClients.stream()
+            .filter(c ->
+                (c.getEntreprise() != null && c.getEntreprise().getId().equals(entreprise.getId())) ||
+                (c.getEntrepriseClient() != null &&
+                 c.getEntrepriseClient().getEntreprise() != null &&
+                 c.getEntrepriseClient().getEntreprise().getId().equals(entreprise.getId()))
+            )
+            .collect(Collectors.toList());
+}
 
     //Methode pour recuperer seulement les entreprise client
     public List<EntrepriseClient> getAllEntrepriseClients(HttpServletRequest request) {
@@ -481,6 +492,6 @@ public class ClientService {
     }
 
   
-  
+  // Pour cas special de permission
             
 }

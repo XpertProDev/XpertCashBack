@@ -22,8 +22,8 @@ import org.springframework.web.multipart.MultipartFile;
 
 import com.xpertcash.DTOs.FactureDTO;
 import com.xpertcash.DTOs.ProduitDTO;
-import com.xpertcash.DTOs.ProduitRequest;
 import com.xpertcash.DTOs.StockHistoryDTO;
+import com.xpertcash.DTOs.PRODUIT.ProduitRequest;
 import com.xpertcash.configuration.CentralAccess;
 import com.xpertcash.configuration.JwtUtil;
 import com.xpertcash.entity.Boutique;
@@ -142,9 +142,11 @@ public class ProduitService {
             RoleType role = utilisateur.getRole().getName();
             // boolean isAdmin = utilisateur.getRole().getName() == RoleType.ADMIN;
              boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
-            boolean hasPermission = utilisateur.getRole().hasPermission(PermissionType.GERER_PRODUITS);
+             boolean hasPermission = utilisateur.getRole().hasPermission(PermissionType.GERER_PRODUITS);
+                boolean hasPermissionGestionFacturation = utilisateur.getRole().hasPermission(PermissionType.GESTION_FACTURATION);
 
-            if (!isAdminOrManager && !hasPermission) {
+
+            if (!isAdminOrManager && !hasPermission && !hasPermissionGestionFacturation) {
                 throw new RuntimeException("Accès refusé : seuls les ADMIN ou les utilisateurs ayant la permission GERER_PRODUITS peuvent ajouter un produit.");
             }
 
@@ -1417,50 +1419,84 @@ public class ProduitService {
     }
 
     // Méthode pour récupérer tous les produits de toutes les boutiques d'une entreprise
-    // Méthode pour récupérer tous les produits de toutes les boutiques d'une entreprise (excluant les produits supprimés)
-public List<ProduitDTO> getProduitsParEntreprise(Long entrepriseId) {
-    // Récupérer tous les produits de l'entreprise
+    public List<ProduitDTO> getProduitsParEntreprise(Long entrepriseId, HttpServletRequest request) {
+    // 1. Extraire l'utilisateur à partir du token
+    String token = request.getHeader("Authorization");
+    if (token == null || !token.startsWith("Bearer ")) {
+        throw new RuntimeException("Token JWT manquant ou mal formaté");
+    }
+
+    Long userId;
+    try {
+        userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
+    } catch (Exception e) {
+        throw new RuntimeException("Erreur lors de l'extraction de l'ID utilisateur", e);
+    }
+
+    User user = usersRepository.findById(userId)
+            .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
+
+    Entreprise entreprise = user.getEntreprise();
+    if (entreprise == null) {
+        throw new RuntimeException("Aucune entreprise associée à cet utilisateur");
+    }
+
+    // 2. Vérification des droits
+    boolean isAdminOrManager = CentralAccess.isAdminOrManagerOfEntreprise(user, entreprise.getId());
+    boolean hasPermissionGestionProduits = user.getRole().hasPermission(PermissionType.GERER_PRODUITS);
+    boolean hasPermissionGestionFacturation = user.getRole().hasPermission(PermissionType.GESTION_FACTURATION);
+
+    if (!isAdminOrManager && !hasPermissionGestionProduits && !hasPermissionGestionFacturation) {
+        throw new RuntimeException("Accès refusé : vous n'avez pas les droits nécessaires pour consulter les produits.");
+    }
+
+    // 3. Vérifier que l'utilisateur a bien accès à l'entreprise demandée
+    if (!entreprise.getId().equals(entrepriseId)) {
+        throw new RuntimeException("Accès refusé : vous ne pouvez pas accéder aux produits d'une autre entreprise.");
+    }
+
+    // 4. Récupérer les produits de l'entreprise
     List<Produit> produits = produitRepository.findByEntrepriseId(entrepriseId);
 
-    // Regrouper les produits par codeGenerique
+    // 5. Regrouper les produits par codeGenerique
     Map<String, ProduitDTO> produitsUniques = new HashMap<>();
 
     for (Produit produit : produits) {
-        // Exclure les produits supprimés et boutiques désactivées
+        // Exclure les produits supprimés ou inactifs
         if (Boolean.TRUE.equals(produit.getDeleted())) {
             continue; // Ignorer produit supprimé
         }
 
-        if (produit.getBoutique() != null && produit.getBoutique().isActif()) {
+        // Vérifier si la boutique est active
+        Boutique boutique = produit.getBoutique();
+        if (boutique != null && boutique.isActif()) {
             String codeGenerique = produit.getCodeGenerique();
+            ProduitDTO produitDTO = produitsUniques.computeIfAbsent(codeGenerique, k -> {
+                ProduitDTO dto = convertToProduitDTO(produit);
+                dto.setBoutiques(new ArrayList<>());  // Initialiser la liste des boutiques
+                dto.setQuantite(0);  // Initialiser la quantité totale à 0
+                return dto;
+            });
 
-            // Vérifier si ce produit unique existe déjà dans la map
-            if (!produitsUniques.containsKey(codeGenerique)) {
-                ProduitDTO produitDTO = convertToProduitDTO(produit);
-                produitDTO.setBoutiques(new ArrayList<>()); // Initialiser la liste des boutiques
-                produitDTO.setQuantite(0); // Initialiser la quantité totale à 0
-                produitsUniques.put(codeGenerique, produitDTO);
-            }
-
-            // Ajouter la boutique et sa quantité
-            Boutique boutique = produit.getBoutique();
+            // Ajouter les informations de la boutique
             Map<String, Object> boutiqueInfo = new HashMap<>();
             boutiqueInfo.put("nom", boutique.getNomBoutique());
             boutiqueInfo.put("id", boutique.getId());
             boutiqueInfo.put("typeBoutique", boutique.getTypeBoutique());
             boutiqueInfo.put("quantite", produit.getQuantite());
 
-            produitsUniques.get(codeGenerique).getBoutiques().add(boutiqueInfo);
+            // Ajouter la boutique à la liste des boutiques
+            produitDTO.getBoutiques().add(boutiqueInfo);
 
-            // Additionner la quantité totale
-            produitsUniques.get(codeGenerique).setQuantite(
-                produitsUniques.get(codeGenerique).getQuantite() + produit.getQuantite()
-            );
+            // Ajouter la quantité au total
+            produitDTO.setQuantite(produitDTO.getQuantite() + produit.getQuantite());
         }
     }
 
+    // 6. Retourner la liste des produits regroupés
     return new ArrayList<>(produitsUniques.values());
 }
+
 
     public Map<String, Object> importProduitsFromExcel(
             InputStream inputStream,

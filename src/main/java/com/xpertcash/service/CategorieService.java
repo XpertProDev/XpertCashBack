@@ -1,13 +1,28 @@
 package com.xpertcash.service;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import com.xpertcash.DTOs.CategorieResponseDTO;
+import com.xpertcash.DTOs.Boutique.BoutiqueResponse;
+import com.xpertcash.DTOs.PRODUIT.ProduitDetailsResponseDTO;
+import com.xpertcash.configuration.CentralAccess;
+import com.xpertcash.configuration.JwtUtil;
+import com.xpertcash.entity.Boutique;
 import com.xpertcash.entity.Categorie;
+import com.xpertcash.entity.Entreprise;
+import com.xpertcash.entity.PermissionType;
+import com.xpertcash.entity.Produit;
+import com.xpertcash.entity.User;
 import com.xpertcash.repository.CategorieRepository;
+import com.xpertcash.repository.EntrepriseRepository;
+import com.xpertcash.repository.ProduitRepository;
+import com.xpertcash.repository.UsersRepository;
 
 import jakarta.servlet.http.HttpServletRequest;
 
@@ -16,22 +31,115 @@ public class CategorieService {
     @Autowired
     private CategorieRepository categorieRepository;
 
-     // Ajouter une nouvelle catégorie (seul ADMIN peut le faire)
-    public Categorie createCategorie(String nom) {
-        if (categorieRepository.existsByNom(nom)) {
-            throw new RuntimeException("Cette catégorie existe déjà !");
-        }
+    @Autowired
+    private UsersRepository usersRepository;
 
-        Categorie categorie = new Categorie();
-        categorie.setNom(nom);
-        categorie.setCreatedAt(LocalDateTime.now());
-        return categorieRepository.save(categorie);
+    @Autowired
+    private ProduitRepository produitRepository;
+
+    @Autowired EntrepriseRepository entrepriseRepository;
+
+    @Autowired
+    private JwtUtil jwtUtil;
+
+     // Ajouter une nouvelle catégorie (seul ADMIN peut le faire)
+  public Categorie createCategorie(String nom, Long entrepriseId) {
+    if (categorieRepository.existsByNom(nom)) {
+        throw new RuntimeException("Cette catégorie existe déjà !");
     }
+
+    Categorie categorie = new Categorie();
+    categorie.setNom(nom);
+    categorie.setCreatedAt(LocalDateTime.now());
+    
+    // Récupérer l'entreprise par son ID et l'assigner à la catégorie
+    Entreprise entreprise = entrepriseRepository.findById(entrepriseId)
+            .orElseThrow(() -> new RuntimeException("Entreprise non trouvée"));
+
+    categorie.setEntreprise(entreprise); // Assurer que cette méthode existe dans l'entité Categorie
+
+    return categorieRepository.save(categorie);
+}
+
 
     // Récupérer toutes les catégories
-    public List<Categorie> getAllCategories() {
-        return categorieRepository.findAll();
+  public List<CategorieResponseDTO> getCategoriesWithProduitCount(HttpServletRequest request) {
+    String token = request.getHeader("Authorization");
+    if (token == null || !token.startsWith("Bearer ")) {
+        throw new RuntimeException("Token JWT manquant ou mal formaté");
     }
+
+    Long userId;
+    try {
+        userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
+    } catch (Exception e) {
+        throw new RuntimeException("Erreur lors de l'extraction de l'ID utilisateur", e);
+    }
+
+    User user = usersRepository.findById(userId)
+            .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
+
+    Entreprise entreprise = user.getEntreprise();
+    if (entreprise == null) {
+        throw new RuntimeException("Aucune entreprise associée à cet utilisateur");
+    }
+
+    // 2. Vérification des droits
+    boolean isAdminOrManager = CentralAccess.isAdminOrManagerOfEntreprise(user, entreprise.getId());
+    boolean hasPermissionGestionProduits = user.getRole().hasPermission(PermissionType.GERER_PRODUITS);
+
+    if (!isAdminOrManager && !hasPermissionGestionProduits) {
+        throw new RuntimeException("Accès refusé : vous n'avez pas les droits nécessaires pour consulter les catégories.");
+    }
+
+    // 3. Récupérer toutes les catégories
+    List<Categorie> allCategories = categorieRepository.findAll();
+
+    // 4. Créer une liste de DTOs de catégorie
+    List<CategorieResponseDTO> categorieResponseDTOs = new ArrayList<>();
+
+    for (Categorie categorie : allCategories) {
+        // Compter le nombre de produits associés à cette catégorie pour l'entreprise spécifique
+        long produitCount = produitRepository.countByCategorieIdAndEntrepriseId(categorie.getId(), entreprise.getId());
+        categorie.setProduitCount(produitCount);
+
+        // Convertir les produits associés en DTO ProduitDetailsResponseDTO
+        List<ProduitDetailsResponseDTO> produitDTOs = produitRepository.findByCategorieIdAndEntrepriseId(categorie.getId(), entreprise.getId())
+                .stream()
+                .map(produit -> new ProduitDetailsResponseDTO(
+                        produit.getId(),
+                        produit.getNom(),
+                        produit.getPrixVente(),
+                        produit.getPrixAchat(),
+                        produit.getQuantite(),
+                        produit.getSeuilAlert(),
+                        produit.getCategorie().getId(),
+                        produit.getUniteDeMesure().getId(),
+                        produit.getCodeBare(),
+                        produit.getPhoto(),
+                        produit.getEnStock(),
+                        produit.getCategorie().getNom(),
+                        produit.getUniteDeMesure().getNom(),
+                        produit.getTypeProduit().name(),
+                        produit.getCreatedAt(),
+                        produit.getLastUpdated(),
+                        produit.getDatePreemption(),
+                        produit.getBoutique() != null ? produit.getBoutique().getId() : null,
+                        produit.getBoutique() != null ? produit.getBoutique().getNomBoutique() : null
+                ))
+                .collect(Collectors.toList());
+
+        // Créer un DTO de catégorie et ajouter les produits en DTO
+        CategorieResponseDTO categorieDTO = new CategorieResponseDTO(categorie);
+        categorieDTO.setProduits(produitDTOs);
+
+        // Ajouter à la réponse
+        categorieResponseDTOs.add(categorieDTO);
+    }
+
+    return categorieResponseDTOs;
+}
+
 
      // Supprimer une catégorie
      public void deleteCategorie(Long id) {

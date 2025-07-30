@@ -75,6 +75,7 @@ public class RoleService {
             Role managerRole = new Role();
             managerRole.setName(RoleType.MANAGER);
             managerRole.setPermissions(Arrays.asList(
+                permissionMap.get(PermissionType.GERER_PRODUITS),
                 permissionMap.get(PermissionType.GERER_UTILISATEURS),
                 permissionMap.get(PermissionType.VENDRE_PRODUITS),
                 permissionMap.get(PermissionType.GESTION_FACTURATION),
@@ -84,8 +85,9 @@ public class RoleService {
                 permissionMap.get(PermissionType.VOIR_FLUX_COMPTABLE),
                 permissionMap.get(PermissionType.GERER_FOURNISSEURS)
 
-
             ));
+
+
 
             Role utilisateurRole = new Role();
             utilisateurRole.setName(RoleType.UTILISATEUR);

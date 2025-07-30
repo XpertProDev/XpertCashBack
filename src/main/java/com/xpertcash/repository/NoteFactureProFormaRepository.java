@@ -12,5 +12,10 @@ import com.xpertcash.entity.NoteFactureProForma;
 public interface NoteFactureProFormaRepository extends JpaRepository<NoteFactureProForma, Long>{
      List<NoteFactureProForma> findByFacture(FactureProForma facture);
 
+     void deleteByFacture(FactureProForma facture);
+
+
+
+
 
 }

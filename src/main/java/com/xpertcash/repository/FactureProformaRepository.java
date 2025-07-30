@@ -11,8 +11,10 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import com.xpertcash.entity.Boutique;
+import com.xpertcash.entity.Facture;
 import com.xpertcash.entity.FactureProForma;
 import com.xpertcash.entity.FactureReelle;
+import com.xpertcash.entity.User;
 import com.xpertcash.entity.Enum.StatutFactureProForma;
 
 @Repository
@@ -70,7 +72,11 @@ public interface FactureProformaRepository extends JpaRepository<FactureProForma
     List<FactureProForma> findByEntrepriseIdAndDateCreationBetween(Long entrepriseId, LocalDateTime start, LocalDateTime end);
 
 
-    
+    List<FactureProForma> findByUtilisateurCreateur_Id(Long userId);
+
+
+     boolean existsByApprobateursAndEntrepriseId(User approbateur, Long entrepriseId);
+
 
 
     

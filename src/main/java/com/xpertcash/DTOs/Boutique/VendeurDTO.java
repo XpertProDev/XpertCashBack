@@ -8,7 +8,8 @@ import lombok.Data;
 @Data
 @AllArgsConstructor
 public class VendeurDTO {
-     private String nomComplet;
+    private long Id;
+    private String nomComplet;
     private String email;
     private String phone;
     private String pays;

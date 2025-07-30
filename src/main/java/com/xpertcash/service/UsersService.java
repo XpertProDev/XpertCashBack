@@ -19,6 +19,7 @@ import com.xpertcash.entity.Module.EntrepriseModuleEssai;
 import com.xpertcash.exceptions.BusinessException;
 import com.xpertcash.repository.BoutiqueRepository;
 import com.xpertcash.repository.EntrepriseRepository;
+import com.xpertcash.repository.FactureProformaRepository;
 import com.xpertcash.repository.PermissionRepository;
 import com.xpertcash.repository.RoleRepository;
 import com.xpertcash.repository.UsersRepository;
@@ -95,6 +96,9 @@ public class UsersService {
 
     @Autowired
     private ModuleRepository moduleRepository;
+
+    @Autowired
+    private FactureProformaRepository factureProformaRepository;
 
     @Autowired
     public UsersService(UsersRepository usersRepository, JwtConfig jwtConfig, BCryptPasswordEncoder passwordEncoder) {
@@ -599,42 +603,66 @@ public UserDTO assignPermissionsToUser(Long userId, Map<PermissionType, Boolean>
 
     //Suprim UserToEntreprise 
     @Transactional
-    public void deleteUserFromEntreprise(HttpServletRequest request, Long userId) {
-        String token = request.getHeader("Authorization");
-        if (token == null || !token.startsWith("Bearer ")) {
-            throw new RuntimeException("Token JWT manquant ou mal formaté");
-        }
-
-        token = token.replace("Bearer ", "");
-
-        Long adminId;
-        try {
-            adminId = jwtUtil.extractUserId(token);
-        } catch (Exception e) {
-            throw new RuntimeException("Erreur lors de l'extraction de l'ID de l'admin depuis le token", e);
-        }
-
-        User admin = usersRepository.findById(adminId)
-                .orElseThrow(() -> new RuntimeException("Admin non trouvé"));
-
-        if (admin.getRole() == null || !admin.getRole().getName().equals(RoleType.ADMIN)) {
-            throw new RuntimeException("Seul un ADMIN peut supprimer des utilisateurs !");
-        }
-
-        if (admin.getEntreprise() == null) {
-            throw new RuntimeException("L'Admin n'a pas d'entreprise associée.");
-        }
-
-        User userToDelete = usersRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("Utilisateur à supprimer non trouvé"));
-
-        // Vérifier que l'utilisateur appartient bien à la même entreprise que l'admin
-        if (!userToDelete.getEntreprise().equals(admin.getEntreprise())) {
-            throw new RuntimeException("Vous ne pouvez supprimer que les utilisateurs de votre entreprise.");
-        }
-
-        usersRepository.delete(userToDelete);
+public void deleteUserFromEntreprise(HttpServletRequest request, Long userId) {
+    String token = request.getHeader("Authorization");
+    if (token == null || !token.startsWith("Bearer ")) {
+        throw new RuntimeException("Token JWT manquant ou mal formaté");
     }
+
+    token = token.replace("Bearer ", "");
+
+    Long adminId;
+    try {
+        adminId = jwtUtil.extractUserId(token);
+    } catch (Exception e) {
+        throw new RuntimeException("Erreur lors de l'extraction de l'ID de l'admin depuis le token", e);
+    }
+
+    User admin = usersRepository.findById(adminId)
+            .orElseThrow(() -> new RuntimeException("Admin non trouvé"));
+
+    if (admin.getRole() == null) {
+        throw new RuntimeException("Rôle de l'utilisateur non défini");
+    }
+
+    RoleType role = admin.getRole().getName();
+    if (role != RoleType.ADMIN && role != RoleType.MANAGER) {
+        throw new RuntimeException("Seuls les utilisateurs avec le rôle ADMIN ou MANAGER peuvent supprimer des utilisateurs.");
+    }
+
+    if (admin.getEntreprise() == null) {
+        throw new RuntimeException("L'Admin n'a pas d'entreprise associée.");
+    }
+
+    User userToDelete = usersRepository.findById(userId)
+            .orElseThrow(() -> new RuntimeException("Utilisateur à supprimer non trouvé"));
+
+    // Empêcher de se supprimer soi-même
+    if (adminId.equals(userId)) {
+        throw new RuntimeException("Vous ne pouvez pas supprimer votre propre compte.");
+    }
+
+    // Empêcher qu’un manager supprime un admin
+    if (role == RoleType.MANAGER && userToDelete.getRole().getName() == RoleType.ADMIN) {
+        throw new RuntimeException("Un Manager ne peut pas supprimer un Admin.");
+    }
+
+    // Vérifier que l'utilisateur appartient à la même entreprise
+    if (!userToDelete.getEntreprise().equals(admin.getEntreprise())) {
+        throw new RuntimeException("Vous ne pouvez supprimer que les utilisateurs de votre entreprise.");
+    }
+
+    // Vérification des factures liées
+    List<FactureProForma> facturesLiees = factureProformaRepository.findByUtilisateurCreateur_Id(userId);
+    if (!facturesLiees.isEmpty()) {
+        throw new RuntimeException("Impossible de supprimer cet utilisateur : il est lié à des factures.");
+    }
+
+   
+
+    usersRepository.delete(userToDelete);
+}
+
 
     // Pour la modification de utilisateur
    @Transactional

@@ -54,12 +54,11 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
         configuration.setAllowedOrigins(List.of(
-                // "http://localhost:4200",
+                "http://localhost:4200",
                 "http://192.168.1.8:4200",
-                // "https://tchakeda.com",
-                // "https://www.tchakeda.com"
                 "https://tchakeda.com",
-                "https://www.tchakeda.com"
+                "https://www.tchakeda.com",
+                "https://xpertcash.tchakeda.com"
         ));
         configuration.setAllowedMethods(List.of("GET","POST","PUT","PATCH","DELETE","OPTIONS"));
         configuration.setAllowedHeaders(List.of(

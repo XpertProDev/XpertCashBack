@@ -176,50 +176,53 @@ public void supprimerFactureReelleLiee(FactureProForma proforma) {
 
 
    // Méthode pour lister les factures réelles
-public List<FactureReelleDTO> listerMesFacturesReelles(HttpServletRequest request) {
+  public List<FactureReelleDTO> listerMesFacturesReelles(HttpServletRequest request) {
     // 🔐 Récupération et validation du token
     String token = request.getHeader("Authorization");
     if (token == null || !token.startsWith("Bearer ")) {
-        throw new RuntimeException("Token JWT manquant ou mal formaté");
+        throw new SecurityException("Token JWT manquant ou mal formaté");
     }
 
     Long userId;
     try {
+        // Extraction de l'ID utilisateur depuis le token JWT
         userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
     } catch (Exception e) {
-        throw new RuntimeException("Erreur lors de l'extraction de l'utilisateur", e);
+        throw new SecurityException("Erreur lors de l'extraction de l'utilisateur depuis le token", e);
     }
 
     // 👤 Utilisateur courant
     User utilisateur = usersRepository.findById(userId)
-            .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
+            .orElseThrow(() -> new SecurityException("Utilisateur introuvable ou non authentifié"));
 
-    // 🏢 Vérification de l'entreprise
+    // 🏢 Vérification de l'entreprise à laquelle appartient l'utilisateur
     Entreprise entreprise = utilisateur.getEntreprise();
     if (entreprise == null) {
-        throw new RuntimeException("L'utilisateur n'est associé à aucune entreprise");
+        throw new SecurityException("L'utilisateur n'est associé à aucune entreprise");
     }
 
-    // 🔐 Vérification des permissions
-    boolean isAdmin = CentralAccess.isAdminOfEntreprise(utilisateur, entreprise.getId());
-    boolean hasPermission = utilisateur.getRole().hasPermission(PermissionType.GESTION_FACTURATION);
+    // 🔐 Vérification des permissions : Admin, Manager, ou Gestion Facturation
+    boolean isAdminOrManager = CentralAccess.isSelfOrAdminOrManager(utilisateur, entreprise.getId());
+    boolean hasPermission = utilisateur.getRole().hasPermission(PermissionType.COMPTABILITE);
 
     // 📦 Vérification de l'activation du module
-    moduleActivationService.verifierAccesModulePourEntreprise(entreprise, "GESTION_FACTURATION");
-
-    // 🔍 Récupération des factures
-    List<FactureReelle> factures;
-    if (isAdmin || hasPermission) {
-        // Peut voir toutes les factures de l’entreprise
-        factures = factureReelleRepository.findByEntrepriseOrderByDateCreationDesc(entreprise);
-    } else {
-        // Peut voir uniquement ses propres factures
-        factures = factureReelleRepository.findByEntrepriseAndUtilisateurCreateurOrderByDateCreationDesc(
-                entreprise, utilisateur
-        );
+    try {
+        moduleActivationService.verifierAccesModulePourEntreprise(entreprise, "GESTION_FACTURATION");
+    } catch (Exception e) {
+        throw new SecurityException("Le module de gestion des factures n'est pas activé pour cette entreprise", e);
     }
 
-    // 🔄 Transformation en DTO
+    // 🔍 Récupération des factures : Seules les personnes autorisées (Admin, Manager, ou ayant Permission Gestion Facturation)
+    List<FactureReelle> factures;
+    if (isAdminOrManager || hasPermission) {
+        // L'utilisateur peut voir toutes les factures de l’entreprise
+        factures = factureReelleRepository.findByEntrepriseOrderByDateCreationDesc(entreprise);
+    } else {
+        // Si l'utilisateur n'a pas les permissions, on lève une exception
+        throw new SecurityException("Accès interdit : Vous n'avez pas les permissions nécessaires pour voir ces factures.");
+    }
+
+    // 🔄 Transformation des factures en DTO
     return factures.stream()
             .map(facture -> {
                 BigDecimal totalFacture = BigDecimal.valueOf(facture.getTotalFacture());
@@ -232,40 +235,54 @@ public List<FactureReelleDTO> listerMesFacturesReelles(HttpServletRequest reques
 }
 
     // Trier les facture par mois/année
-    public ResponseEntity<?> filtrerFacturesParMoisEtAnnee(Integer mois, Integer annee, HttpServletRequest request) {
-        // Extraire l'utilisateur à partir du token
-        String token = request.getHeader("Authorization");
-        if (token == null || !token.startsWith("Bearer ")) {
-            throw new RuntimeException("Token JWT manquant ou mal formaté");
-        }
+   public ResponseEntity<?> filtrerFacturesParMoisEtAnnee(Integer mois, Integer annee, HttpServletRequest request) {
+    // 🔐 Extraction et validation du token JWT
+    String token = request.getHeader("Authorization");
+    if (token == null || !token.startsWith("Bearer ")) {
+        throw new SecurityException("Token JWT manquant ou mal formaté");
+    }
 
-        Long userId;
-        try {
-            userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
-        } catch (Exception e) {
-            throw new RuntimeException("Erreur lors de l'extraction de l'ID utilisateur", e);
-        }
+    Long userId;
+    try {
+        // Extraction de l'ID utilisateur depuis le token JWT
+        userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
+    } catch (Exception e) {
+        throw new SecurityException("Erreur lors de l'extraction de l'ID utilisateur depuis le token", e);
+    }
 
-        // Récupérer l'utilisateur
-        User user = usersRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
+    // 👤 Récupération de l'utilisateur
+    User user = usersRepository.findById(userId)
+            .orElseThrow(() -> new SecurityException("Utilisateur introuvable"));
 
-        Long entrepriseId = user.getEntreprise().getId();
+    // 🏢 Vérification de l'entreprise
+    Long entrepriseId = user.getEntreprise().getId();
+    if (user.getEntreprise() == null) {
+        throw new SecurityException("Utilisateur non associé à une entreprise");
+    }
 
-        // Récupérer les factures selon les filtres
-        List<FactureReelle> factures;
+    // 🔐 Vérification des permissions : Admin, Manager, ou Gestion Facturation
+    boolean isAdminOrManager = CentralAccess.isSelfOrAdminOrManager(user, entrepriseId);
+    boolean hasPermission = user.getRole().hasPermission(PermissionType.COMPTABILITE);
 
-        if (mois != null && annee != null) {
-            factures = factureReelleRepository.findByMonthAndYearAndEntreprise(mois, annee, entrepriseId);
-        } else if (mois != null) {
-            factures = factureReelleRepository.findByMonthAndEntreprise(mois, entrepriseId);
-        } else if (annee != null) {
-            factures = factureReelleRepository.findByYearAndEntreprise(annee, entrepriseId);
-        } else {
-            factures = factureReelleRepository.findByEntrepriseId(entrepriseId);
-        }
+    // Si l'utilisateur n'a pas les permissions nécessaires, on refuse l'accès
+    if (!(isAdminOrManager || hasPermission)) {
+        throw new SecurityException("Accès interdit : Vous n'avez pas les permissions nécessaires pour filtrer les factures.");
+    }
 
-            // 4. Mapper vers DTO et nettoyer
+    // 🔍 Récupération des factures selon les filtres mois et année
+    List<FactureReelle> factures;
+
+    if (mois != null && annee != null) {
+        factures = factureReelleRepository.findByMonthAndYearAndEntreprise(mois, annee, entrepriseId);
+    } else if (mois != null) {
+        factures = factureReelleRepository.findByMonthAndEntreprise(mois, entrepriseId);
+    } else if (annee != null) {
+        factures = factureReelleRepository.findByYearAndEntreprise(annee, entrepriseId);
+    } else {
+        factures = factureReelleRepository.findByEntrepriseId(entrepriseId);
+    }
+
+    // 4. Mapper vers DTO et nettoyer
     List<FactureReelleDTO> factureDTOs = factures.stream().map(facture -> {
         BigDecimal totalFacture = BigDecimal.valueOf(facture.getTotalFacture());
         BigDecimal totalPaye = paiementRepository.sumMontantsByFactureReelle(facture.getId());
@@ -274,14 +291,14 @@ public List<FactureReelleDTO> listerMesFacturesReelles(HttpServletRequest reques
         BigDecimal montantRestant = totalFacture.subtract(totalPaye);
         FactureReelleDTO dto = new FactureReelleDTO(facture, montantRestant);
 
-        // On ignior les champs inutiles
-        // dto.setUtilisateur(null);
+        // On ignore les champs inutiles
         dto.setEntrepriseClient(null);
         dto.setClient(null);
         dto.setLignesFacture(null);
 
+        // Récupérer le nom du client ou de l'entreprise cliente
         if (facture.getClient() != null) {
-        dto.setNomClient(facture.getClient().getNomComplet());
+            dto.setNomClient(facture.getClient().getNomComplet());
         } else if (facture.getEntrepriseClient() != null) {
             dto.setNomEntrepriseClient(facture.getEntrepriseClient().getNom());
         }
@@ -294,8 +311,7 @@ public List<FactureReelleDTO> listerMesFacturesReelles(HttpServletRequest reques
     }
 
     return ResponseEntity.ok(factureDTOs);
-
-    }
+}
 
     // Methode Get facture reel by id
     public FactureReelleDTO getFactureReelleById(Long factureId, HttpServletRequest request) {

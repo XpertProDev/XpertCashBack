@@ -329,6 +329,7 @@ public List<String> retirerVendeurDesBoutiques(HttpServletRequest request, Long 
             User user = userBoutique.getUser();
             LocalDateTime assignedAt = userBoutique.getAssignedAt();
             return new VendeurDTO(
+                    user.getId(),
                     user.getNomComplet(),
                     user.getEmail(),
                     user.getPhone(),

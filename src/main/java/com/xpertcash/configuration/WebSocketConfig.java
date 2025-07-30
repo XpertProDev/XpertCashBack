@@ -39,7 +39,12 @@ class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     public void registerStompEndpoints(StompEndpointRegistry registry) {
         registry.addEndpoint("/ws")
                 // .setAllowedOriginPatterns("*")
-                .setAllowedOrigins("https://tchakeda.com", "https://www.tchakeda.com, http://192.168.1.8:4200")
+                .setAllowedOrigins(
+     "https://xpertcash.tchakeda.com",
+                "https://tchakeda.com",
+                "https://www.tchakeda.com",
+                "http://192.168.1.8:4200"
+                )
                 .withSockJS();
     }
 
