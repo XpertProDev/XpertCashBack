@@ -34,5 +34,4 @@ public class CategorieResponseDTO {
         this.produits = produits;
     }
 
-    // Getters et setters
 }
