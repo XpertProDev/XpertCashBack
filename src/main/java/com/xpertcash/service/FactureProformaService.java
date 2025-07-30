@@ -760,7 +760,7 @@ public void supprimerFactureProforma(Long factureId, String token) {
    
 
     //Methode pour recuperer les factures pro forma dune entreprise
-    public List<Map<String, Object>> getFacturesParEntrepriseParUtilisateur(Long userIdRequete, HttpServletRequest request) {
+ public List<Map<String, Object>> getFacturesParEntrepriseParUtilisateur(Long userIdRequete, HttpServletRequest request) {
     // 🔐 Extraire le token JWT et récupérer l'utilisateur courant
     String token = request.getHeader("Authorization");
     if (token == null || !token.startsWith("Bearer ")) {
@@ -784,15 +784,25 @@ public void supprimerFactureProforma(Long factureId, String token) {
     }
 
     boolean isAdmin = currentUser.getRole().getName() == RoleType.ADMIN;
+    boolean isManager = currentUser.getRole().getName() == RoleType.MANAGER;
     boolean hasPermission = currentUser.getRole().hasPermission(PermissionType.GESTION_FACTURATION);
+    
+    // Vérification si l'utilisateur est un approbateur dans l'entreprise
+    boolean isApprover = factureProformaRepository.existsByApprobateursAndEntrepriseId(currentUser, entrepriseCourante.getId());
 
-    List<FactureProForma> factures;
+    List<FactureProForma> factures = new ArrayList<>();
 
-    if (isAdmin || hasPermission) {
-        // 👑 Admin ou autorisé : accès à toutes les factures de l’entreprise
+    if (isAdmin || isManager) {
+        // 👑 Admin ou Manager : accès à toutes les factures de l’entreprise
         factures = factureProformaRepository.findByEntrepriseId(entrepriseCourante.getId());
+    } else if (hasPermission || isApprover) {
+        // Utilisateur avec la permission GESTION_FACTURATION ou approbateur : accès aux factures qu'il a créées ou approuvées
+        factures = factureProformaRepository.findByEntrepriseId(entrepriseCourante.getId()).stream()
+            .filter(facture -> facture.getUtilisateurCreateur().getId().equals(userIdCourant) 
+                            || facture.getApprobateurs().contains(currentUser))
+            .collect(Collectors.toList());
     } else {
-        // 👤 Sinon : accès uniquement à ses propres factures
+        // 👤 Autres utilisateurs : accès uniquement aux factures qu'ils ont créées
         if (!Objects.equals(userIdCourant, userIdRequete)) {
             throw new RuntimeException("Vous ne pouvez voir que vos propres factures.");
         }
@@ -825,6 +835,8 @@ public void supprimerFactureProforma(Long factureId, String token) {
         .collect(Collectors.toList());
 }
 
+//Trie:
+   
     // Methode pour recuperer une facture pro forma par son id
     public FactureProForma getFactureProformaById(Long id, HttpServletRequest request) {
         String token = request.getHeader("Authorization");
@@ -1039,9 +1051,9 @@ public void supprimerFactureProforma(Long factureId, String token) {
 
 
     //Trier
-    public List<Map<String, Object>> getFacturesParPeriode(Long userIdRequete, HttpServletRequest request,
+   public List<Map<String, Object>> getFacturesParPeriode(Long userIdRequete, HttpServletRequest request,
                                                        String typePeriode, LocalDate dateDebut, LocalDate dateFin) {
-    // Authentification comme dans ta méthode précédente
+    // 🔐 Extraire le token JWT et récupérer l'utilisateur courant
     String token = request.getHeader("Authorization");
     if (token == null || !token.startsWith("Bearer ")) {
         throw new RuntimeException("Token JWT manquant ou mal formaté");
@@ -1056,12 +1068,14 @@ public void supprimerFactureProforma(Long factureId, String token) {
     Entreprise entrepriseCourante = currentUser.getEntreprise();
     Entreprise entrepriseCible = targetUser.getEntreprise();
 
+    // 🏢 Vérification d'appartenance à la même entreprise
     if (entrepriseCourante == null || entrepriseCible == null
         || !entrepriseCourante.getId().equals(entrepriseCible.getId())) {
         throw new RuntimeException("Opération interdite : utilisateurs de différentes entreprises.");
     }
 
     boolean isAdmin = currentUser.getRole().getName() == RoleType.ADMIN;
+    boolean isManager = currentUser.getRole().getName() == RoleType.MANAGER;
     boolean hasPermission = currentUser.getRole().hasPermission(PermissionType.GESTION_FACTURATION);
 
     LocalDateTime dateStart;
@@ -1091,10 +1105,28 @@ public void supprimerFactureProforma(Long factureId, String token) {
             throw new RuntimeException("Type de période invalide.");
     }
 
+    // Récupérer toutes les factures dans la période
     List<FactureProForma> factures = factureProformaRepository.findByEntrepriseIdAndDateCreationBetween(
         entrepriseCourante.getId(), dateStart, dateEnd
     );
 
+    // Filtrage des factures selon les rôles et permissions
+    if (isAdmin || isManager) {
+        // 👑 Admin ou Manager : accès à toutes les factures de l’entreprise
+    } else if (hasPermission) {
+        // Utilisateur avec la permission GESTION_FACTURATION : accès limité aux factures qu'il a créées ou approuvées
+        factures = factures.stream()
+            .filter(facture -> facture.getUtilisateurCreateur().getId().equals(userIdCourant) 
+                            || facture.getApprobateurs().contains(currentUser))
+            .collect(Collectors.toList());
+    } else {
+        // 👤 Autres utilisateurs : accès uniquement aux factures qu'ils ont créées
+        factures = factures.stream()
+            .filter(facture -> facture.getUtilisateurCreateur().getId().equals(userIdCourant))
+            .collect(Collectors.toList());
+    }
+
+    // ✅ Trier et transformer en liste de map
     return factures.stream()
         .sorted(Comparator.comparing(FactureProForma::getDateCreation).reversed())
         .map(facture -> {

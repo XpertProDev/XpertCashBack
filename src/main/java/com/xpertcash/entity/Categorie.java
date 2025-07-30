@@ -2,6 +2,7 @@ package com.xpertcash.entity;
 
 import java.time.LocalDateTime;
 
+
 import jakarta.persistence.*;
 import lombok.Data;
 
@@ -12,7 +13,9 @@ public class Categorie {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
     private String nom;
+     private long produitCount;
 
     private LocalDateTime createdAt;
+
 
 }

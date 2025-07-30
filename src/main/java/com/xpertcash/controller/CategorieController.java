@@ -73,10 +73,21 @@ public class CategorieController {
 
 
         // Récupérer toutes les catégories
-    @GetMapping("/allCategory")
-    public ResponseEntity<List<Categorie>> getAllCategories() {
-        return ResponseEntity.ok(categorieService.getAllCategories());
+        @GetMapping("/allCategory")
+    public ResponseEntity<List<Categorie>> getAllCategories(HttpServletRequest request) {
+        try {
+            List<Categorie> categoriesAvecProduitCount = categorieService.getCategoriesWithProduitCount(request);
+
+            return ResponseEntity.ok(categoriesAvecProduitCount);
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(null);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                                .body(null);
+        }
     }
+
+    
 
     // Supprimer une catégorie
     @DeleteMapping("/deleteCategory/{id}")

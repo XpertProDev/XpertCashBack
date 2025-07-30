@@ -176,60 +176,60 @@ public void supprimerFactureReelleLiee(FactureProForma proforma) {
 
 
    // Méthode pour lister les factures réelles
-public List<FactureReelleDTO> listerMesFacturesReelles(HttpServletRequest request) {
-    // 🔐 Récupération et validation du token
-    String token = request.getHeader("Authorization");
-    if (token == null || !token.startsWith("Bearer ")) {
-        throw new RuntimeException("Token JWT manquant ou mal formaté");
+    public List<FactureReelleDTO> listerMesFacturesReelles(HttpServletRequest request) {
+        // 🔐 Récupération et validation du token
+        String token = request.getHeader("Authorization");
+        if (token == null || !token.startsWith("Bearer ")) {
+            throw new RuntimeException("Token JWT manquant ou mal formaté");
+        }
+
+        Long userId;
+        try {
+            userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
+        } catch (Exception e) {
+            throw new RuntimeException("Erreur lors de l'extraction de l'utilisateur", e);
+        }
+
+        // 👤 Utilisateur courant
+        User utilisateur = usersRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
+
+        // 🏢 Vérification de l'entreprise
+        Entreprise entreprise = utilisateur.getEntreprise();
+        if (entreprise == null) {
+            throw new RuntimeException("L'utilisateur n'est associé à aucune entreprise");
+        }
+
+        // 🔐 Vérification des permissions
+        boolean isAdminOrManager = CentralAccess.isSelfOrAdminOrManager(utilisateur, entreprise.getId());
+        boolean hasPermission = utilisateur.getRole().hasPermission(PermissionType.GESTION_FACTURATION);
+
+        // 📦 Vérification de l'activation du module
+        moduleActivationService.verifierAccesModulePourEntreprise(entreprise, "GESTION_FACTURATION");
+
+        // 🔍 Récupération des factures
+        List<FactureReelle> factures;
+        if (isAdminOrManager || hasPermission) {
+            // Peut voir toutes les factures de l’entreprise
+            factures = factureReelleRepository.findByEntrepriseOrderByDateCreationDesc(entreprise);
+        } else {
+            // Peut voir uniquement ses propres factures
+            factures = factureReelleRepository.findByEntrepriseAndUtilisateurCreateurOrderByDateCreationDesc(
+                    entreprise, utilisateur
+            );
+        }
+
+        // 🔄 Transformation en DTO
+        return factures.stream()
+                .map(facture -> {
+                    BigDecimal totalFacture = BigDecimal.valueOf(facture.getTotalFacture());
+                    BigDecimal totalPaye = paiementRepository.sumMontantsByFactureReelle(facture.getId());
+                    if (totalPaye == null) totalPaye = BigDecimal.ZERO;
+                    BigDecimal montantRestant = totalFacture.subtract(totalPaye);
+                    return new FactureReelleDTO(facture, montantRestant);
+                })
+                .collect(Collectors.toList());
     }
-
-    Long userId;
-    try {
-        userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
-    } catch (Exception e) {
-        throw new RuntimeException("Erreur lors de l'extraction de l'utilisateur", e);
-    }
-
-    // 👤 Utilisateur courant
-    User utilisateur = usersRepository.findById(userId)
-            .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
-
-    // 🏢 Vérification de l'entreprise
-    Entreprise entreprise = utilisateur.getEntreprise();
-    if (entreprise == null) {
-        throw new RuntimeException("L'utilisateur n'est associé à aucune entreprise");
-    }
-
-    // 🔐 Vérification des permissions
-    boolean isAdmin = CentralAccess.isAdminOfEntreprise(utilisateur, entreprise.getId());
-    boolean hasPermission = utilisateur.getRole().hasPermission(PermissionType.GESTION_FACTURATION);
-
-    // 📦 Vérification de l'activation du module
-    moduleActivationService.verifierAccesModulePourEntreprise(entreprise, "GESTION_FACTURATION");
-
-    // 🔍 Récupération des factures
-    List<FactureReelle> factures;
-    if (isAdmin || hasPermission) {
-        // Peut voir toutes les factures de l’entreprise
-        factures = factureReelleRepository.findByEntrepriseOrderByDateCreationDesc(entreprise);
-    } else {
-        // Peut voir uniquement ses propres factures
-        factures = factureReelleRepository.findByEntrepriseAndUtilisateurCreateurOrderByDateCreationDesc(
-                entreprise, utilisateur
-        );
-    }
-
-    // 🔄 Transformation en DTO
-    return factures.stream()
-            .map(facture -> {
-                BigDecimal totalFacture = BigDecimal.valueOf(facture.getTotalFacture());
-                BigDecimal totalPaye = paiementRepository.sumMontantsByFactureReelle(facture.getId());
-                if (totalPaye == null) totalPaye = BigDecimal.ZERO;
-                BigDecimal montantRestant = totalFacture.subtract(totalPaye);
-                return new FactureReelleDTO(facture, montantRestant);
-            })
-            .collect(Collectors.toList());
-}
 
     // Trier les facture par mois/année
     public ResponseEntity<?> filtrerFacturesParMoisEtAnnee(Integer mois, Integer annee, HttpServletRequest request) {

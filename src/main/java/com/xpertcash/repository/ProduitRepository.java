@@ -65,6 +65,10 @@ public interface ProduitRepository extends JpaRepository<Produit, Long> {
 
     List<Produit> findByBoutiqueIdAndDeletedFalseOrDeletedIsNull(Long boutiqueId);
 
+    @Query("SELECT COUNT(p) FROM Produit p WHERE p.categorie.id = :categorieId AND p.boutique.entreprise.id = :entrepriseId")
+long countByCategorieIdAndEntrepriseId(@Param("categorieId") Long categorieId, @Param("entrepriseId") Long entrepriseId);
+
+
 
 
 

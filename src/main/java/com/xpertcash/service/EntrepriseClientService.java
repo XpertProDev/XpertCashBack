@@ -71,8 +71,10 @@ public class EntrepriseClientService {
     // 🔒 Vérifier les droits
     boolean isAdminOrManager = CentralAccess.isAdminOrManagerOfEntreprise(user, entreprise.getId());
     boolean hasPermissionGestionClient = user.getRole().hasPermission(PermissionType.GERER_CLIENTS);
+    boolean hasPermissionGestionFacturation = user.getRole().hasPermission(PermissionType.GESTION_FACTURATION);
 
-    if (!isAdminOrManager && !hasPermissionGestionClient) {
+
+    if (!isAdminOrManager && !hasPermissionGestionClient && !hasPermissionGestionFacturation) {
         throw new RuntimeException("Accès refusé : vous n'avez pas les permissions pour créer une entreprise cliente.");
     }
 
@@ -178,12 +180,14 @@ public class EntrepriseClientService {
     if (entreprise == null) {
         throw new RuntimeException("Aucune entreprise associée à cet utilisateur");
     }
-
+ 
     // 🔒 Autorisation
     boolean isAdminOrManager = CentralAccess.isAdminOrManagerOfEntreprise(user, entreprise.getId());
     boolean hasPermissionGestionClient = user.getRole().hasPermission(PermissionType.GERER_CLIENTS);
+    boolean hasPermissionGestionFacturation = user.getRole().hasPermission(PermissionType.GESTION_FACTURATION);
 
-    if (!isAdminOrManager && !hasPermissionGestionClient) {
+
+    if (!isAdminOrManager && !hasPermissionGestionClient  && !hasPermissionGestionFacturation) {
         throw new RuntimeException("Accès refusé : vous n'avez pas les droits pour voir les entreprises clientes.");
     }
 
