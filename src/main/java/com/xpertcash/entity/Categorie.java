@@ -1,7 +1,9 @@
 package com.xpertcash.entity;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
+import com.xpertcash.DTOs.PRODUIT.ProduitDetailsResponseDTO;
 
 import jakarta.persistence.*;
 import lombok.Data;
@@ -16,6 +18,8 @@ public class Categorie {
      private long produitCount;
 
     private LocalDateTime createdAt;
+    @OneToMany(mappedBy = "categorie")
+    private List<Produit> produits;
 
 
 }

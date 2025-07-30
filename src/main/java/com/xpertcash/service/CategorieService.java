@@ -1,16 +1,23 @@
 package com.xpertcash.service;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import com.xpertcash.DTOs.CategorieResponseDTO;
+import com.xpertcash.DTOs.Boutique.BoutiqueResponse;
+import com.xpertcash.DTOs.PRODUIT.ProduitDetailsResponseDTO;
 import com.xpertcash.configuration.CentralAccess;
 import com.xpertcash.configuration.JwtUtil;
+import com.xpertcash.entity.Boutique;
 import com.xpertcash.entity.Categorie;
 import com.xpertcash.entity.Entreprise;
 import com.xpertcash.entity.PermissionType;
+import com.xpertcash.entity.Produit;
 import com.xpertcash.entity.User;
 import com.xpertcash.repository.CategorieRepository;
 import com.xpertcash.repository.ProduitRepository;
@@ -45,7 +52,7 @@ public class CategorieService {
     }
 
     // Récupérer toutes les catégories
-    public List<Categorie> getCategoriesWithProduitCount(HttpServletRequest request) {
+  public List<CategorieResponseDTO> getCategoriesWithProduitCount(HttpServletRequest request) {
     // 1. Extraire l'utilisateur à partir du token
     String token = request.getHeader("Authorization");
     if (token == null || !token.startsWith("Bearer ")) {
@@ -67,7 +74,7 @@ public class CategorieService {
         throw new RuntimeException("Aucune entreprise associée à cet utilisateur");
     }
 
-    // 2. Vérification des droits : Assurer que l'utilisateur est Admin ou Manager
+    // 2. Vérification des droits
     boolean isAdminOrManager = CentralAccess.isAdminOrManagerOfEntreprise(user, entreprise.getId());
     boolean hasPermissionGestionProduits = user.getRole().hasPermission(PermissionType.GERER_PRODUITS);
 
@@ -75,16 +82,52 @@ public class CategorieService {
         throw new RuntimeException("Accès refusé : vous n'avez pas les droits nécessaires pour consulter les catégories.");
     }
 
-    // 3. Récupérer toutes les catégories de l'entreprise
+    // 3. Récupérer toutes les catégories
     List<Categorie> allCategories = categorieRepository.findAll();
 
-    // 4. Pour chaque catégorie, compter le nombre de produits associés
+    // 4. Créer une liste de DTOs de catégorie
+    List<CategorieResponseDTO> categorieResponseDTOs = new ArrayList<>();
+
     for (Categorie categorie : allCategories) {
+        // Compter le nombre de produits associés à cette catégorie pour l'entreprise spécifique
         long produitCount = produitRepository.countByCategorieIdAndEntrepriseId(categorie.getId(), entreprise.getId());
         categorie.setProduitCount(produitCount);
+
+        // Convertir les produits associés en DTO ProduitDetailsResponseDTO
+        List<ProduitDetailsResponseDTO> produitDTOs = produitRepository.findByCategorieIdAndEntrepriseId(categorie.getId(), entreprise.getId())
+                .stream()
+                .map(produit -> new ProduitDetailsResponseDTO(
+                        produit.getId(),
+                        produit.getNom(),
+                        produit.getPrixVente(),
+                        produit.getPrixAchat(),
+                        produit.getQuantite(),
+                        produit.getSeuilAlert(),
+                        produit.getCategorie().getId(),
+                        produit.getUniteDeMesure().getId(),
+                        produit.getCodeBare(),
+                        produit.getPhoto(),
+                        produit.getEnStock(),
+                        produit.getCategorie().getNom(),
+                        produit.getUniteDeMesure().getNom(),
+                        produit.getTypeProduit().name(),
+                        produit.getCreatedAt(),
+                        produit.getLastUpdated(),
+                        produit.getDatePreemption(),
+                        produit.getBoutique() != null ? produit.getBoutique().getId() : null,
+                        produit.getBoutique() != null ? produit.getBoutique().getNomBoutique() : null
+                ))
+                .collect(Collectors.toList());
+
+        // Créer un DTO de catégorie et ajouter les produits en DTO
+        CategorieResponseDTO categorieDTO = new CategorieResponseDTO(categorie);
+        categorieDTO.setProduits(produitDTOs);
+
+        // Ajouter à la réponse
+        categorieResponseDTOs.add(categorieDTO);
     }
 
-    return allCategories;
+    return categorieResponseDTOs;
 }
 
 

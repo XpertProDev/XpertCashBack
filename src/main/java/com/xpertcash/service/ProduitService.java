@@ -22,8 +22,8 @@ import org.springframework.web.multipart.MultipartFile;
 
 import com.xpertcash.DTOs.FactureDTO;
 import com.xpertcash.DTOs.ProduitDTO;
-import com.xpertcash.DTOs.ProduitRequest;
 import com.xpertcash.DTOs.StockHistoryDTO;
+import com.xpertcash.DTOs.PRODUIT.ProduitRequest;
 import com.xpertcash.configuration.CentralAccess;
 import com.xpertcash.configuration.JwtUtil;
 import com.xpertcash.entity.Boutique;

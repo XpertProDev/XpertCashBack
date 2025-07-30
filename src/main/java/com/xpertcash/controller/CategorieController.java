@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.xpertcash.DTOs.CategorieResponseDTO;
 import com.xpertcash.entity.Categorie;
 import com.xpertcash.entity.Unite;
 import com.xpertcash.repository.CategorieRepository;
@@ -73,20 +74,23 @@ public class CategorieController {
 
 
         // Récupérer toutes les catégories
-        @GetMapping("/allCategory")
-    public ResponseEntity<List<Categorie>> getAllCategories(HttpServletRequest request) {
-        try {
-            List<Categorie> categoriesAvecProduitCount = categorieService.getCategoriesWithProduitCount(request);
+   @GetMapping("/allCategory")
+public ResponseEntity<List<CategorieResponseDTO>> getAllCategories(HttpServletRequest request) {
+    try {
+        // Appeler la méthode de service qui retourne des CategorieResponseDTO
+        List<CategorieResponseDTO> categoriesAvecProduitCount = categorieService.getCategoriesWithProduitCount(request);
 
-            return ResponseEntity.ok(categoriesAvecProduitCount);
-        } catch (RuntimeException e) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(null);
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                                .body(null);
-        }
+        // Renvoyer la réponse avec un statut OK et les catégories en DTO
+        return ResponseEntity.ok(categoriesAvecProduitCount);
+    } catch (RuntimeException e) {
+        // En cas d'erreur d'autorisation (accès refusé)
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(null);
+    } catch (Exception e) {
+        // En cas d'erreur serveur interne
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                             .body(null);
     }
-
+}
     
 
     // Supprimer une catégorie
