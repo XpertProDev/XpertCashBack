@@ -19,11 +19,14 @@ import com.xpertcash.DTOs.Boutique.BoutiqueResponseVendeur;
 import com.xpertcash.DTOs.Boutique.VendeurDTO;
 import com.xpertcash.configuration.JwtUtil;
 import com.xpertcash.entity.Boutique;
+import com.xpertcash.entity.Permission;
+import com.xpertcash.entity.PermissionType;
 import com.xpertcash.entity.Role;
 import com.xpertcash.entity.User;
 import com.xpertcash.entity.UserBoutique;
 import com.xpertcash.entity.Enum.RoleType;
 import com.xpertcash.repository.BoutiqueRepository;
+import com.xpertcash.repository.PermissionRepository;
 import com.xpertcash.repository.RoleRepository;
 import com.xpertcash.repository.UserBoutiqueRepository;
 import com.xpertcash.repository.UsersRepository;
@@ -50,6 +53,9 @@ public class UserBoutiqueService {
 
     @Autowired
     private RoleService roleService;
+
+    @Autowired
+    private PermissionRepository permissionRepository;
 
 @Transactional
 public List<String> assignerVendeurAuxBoutiques(HttpServletRequest request, Long userId, List<Long> boutiqueIds) {
@@ -100,13 +106,46 @@ public List<String> assignerVendeurAuxBoutiques(HttpServletRequest request, Long
         }
     }
 
+    // ✅ [NOUVEAU] Vérification et modification du rôle en fonction des permissions existantes
+    Role currentRole = user.getRole();
 
-        // ✅ [NOUVEAU] Assigner le rôle VENDEUR si nécessaire
-    if (user.getRole() == null || user.getRole().getName() != RoleType.VENDEUR) {
+    // Si l'utilisateur a le rôle "UTILISATEUR"
+    if (currentRole != null && currentRole.getName() == RoleType.UTILISATEUR) {
+        // Vérifier si l'utilisateur a des permissions existantes
+        if (currentRole.getPermissions().isEmpty()) {
+            // Si aucune permission, on lui assigne le rôle VENDEUR et la permission "VENDRE_PRODUITS"
+            Role vendeurRole = roleService.getOrCreateVendeurRole();
+
+            // Ajouter la permission "VENDRE_PRODUITS" dans ses permissions
+            Permission ventePermission = permissionRepository.findByType(PermissionType.VENDRE_PRODUITS)
+                    .orElseThrow(() -> new RuntimeException("Permission 'VENDRE_PRODUITS' non trouvée"));
+
+            vendeurRole.getPermissions().add(ventePermission);
+            user.setRole(vendeurRole);
+            usersRepository.save(user);
+            resultMessages.add("Rôle VENDEUR attribué à l'utilisateur avec la permission 'VENDRE_PRODUITS'.");
+        } else {
+            // Si l'utilisateur a des permissions, on ne change pas son rôle et on lui ajoute "VENDRE_PRODUITS" s'il ne l'a pas déjà
+            if (!currentRole.getPermissions().stream()
+                    .anyMatch(permission -> permission.getType() == PermissionType.VENDRE_PRODUITS)) {
+                Permission ventePermission = permissionRepository.findByType(PermissionType.VENDRE_PRODUITS)
+                        .orElseThrow(() -> new RuntimeException("Permission 'VENDRE_PRODUITS' non trouvée"));
+
+                currentRole.getPermissions().add(ventePermission);
+                roleRepository.save(currentRole); // Sauvegarder les modifications du rôle
+                resultMessages.add("Permission 'VENDRE_PRODUITS' ajoutée au rôle UTILISATEUR.");
+            }
+        }
+    } else if (currentRole == null || currentRole.getName() != RoleType.VENDEUR) {
+        // Si l'utilisateur n'a pas de rôle, ou a un rôle qui n'est pas "VENDEUR", on assigne le rôle VENDEUR
         Role vendeurRole = roleService.getOrCreateVendeurRole();
+        Permission ventePermission = permissionRepository.findByType(PermissionType.VENDRE_PRODUITS)
+                .orElseThrow(() -> new RuntimeException("Permission 'VENDRE_PRODUITS' non trouvée"));
+
+        vendeurRole.getPermissions().add(ventePermission);
         user.setRole(vendeurRole);
         usersRepository.save(user);
-        resultMessages.add("Rôle VENDEUR attribué à l'utilisateur.");
+        resultMessages.add("Rôle VENDEUR attribué avec la permission 'VENDRE_PRODUITS'.");
     }
 
     // Assigner l'utilisateur aux boutiques
@@ -128,90 +167,106 @@ public List<String> assignerVendeurAuxBoutiques(HttpServletRequest request, Long
         resultMessages.add("Utilisateur affecté à la boutique : " + boutique.getNomBoutique());
     }
 
-
     return resultMessages;
 }
 
 @Transactional
-    public List<String> retirerVendeurDesBoutiques(HttpServletRequest request, Long userId, List<Long> boutiqueIds) {
-        List<String> resultMessages = new ArrayList<>();
+public List<String> retirerVendeurDesBoutiques(HttpServletRequest request, Long userId, List<Long> boutiqueIds) {
+    List<String> resultMessages = new ArrayList<>();
 
-        // 🔐 Vérification du token JWT
-        String token = request.getHeader("Authorization");
-        if (token == null || !token.startsWith("Bearer ")) {
-            throw new RuntimeException("Token JWT manquant ou mal formaté");
+    // 🔐 Vérification du token JWT
+    String token = request.getHeader("Authorization");
+    if (token == null || !token.startsWith("Bearer ")) {
+        throw new RuntimeException("Token JWT manquant ou mal formaté");
+    }
+
+    Long adminId;
+    try {
+        adminId = jwtUtil.extractUserId(token.substring(7));
+    } catch (Exception e) {
+        throw new RuntimeException("Erreur lors de l'extraction de l'ID utilisateur depuis le token", e);
+    }
+
+    // Récupérer l'utilisateur connecté (admin ou manager)
+    User admin = usersRepository.findById(adminId)
+            .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+
+    if (admin.getEntreprise() == null) {
+        throw new RuntimeException("L'utilisateur connecté n'appartient à aucune entreprise.");
+    }
+
+    // Récupérer l'entreprise de l'admin (qui doit être la même pour les boutiques)
+    Long entrepriseIdAdmin = admin.getEntreprise().getId();
+
+    // Vérification des droits d'accès (Admin ou Manager)
+    RoleType role = admin.getRole().getName();
+    boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
+    if (!isAdminOrManager) {
+        throw new RuntimeException("Vous n'avez pas les droits pour retirer des utilisateurs des boutiques.");
+    }
+
+    // Vérifie si l'utilisateur existe
+    User user = usersRepository.findById(userId)
+            .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+
+    // Vérifier que l'utilisateur et les boutiques appartiennent à la même entreprise
+    List<Boutique> boutiques = boutiqueRepository.findAllById(boutiqueIds);
+    if (boutiques.size() != boutiqueIds.size()) {
+        throw new RuntimeException("Certaines boutiques n'ont pas été trouvées.");
+    }
+
+    // Vérifier que toutes les boutiques appartiennent à l'entreprise de l'admin
+    for (Boutique boutique : boutiques) {
+        if (!boutique.getEntreprise().getId().equals(entrepriseIdAdmin)) {
+            throw new RuntimeException("La boutique " + boutique.getNomBoutique() + " n'appartient pas à votre entreprise.");
         }
+    }
 
-        Long adminId;
-        try {
-            adminId = jwtUtil.extractUserId(token.substring(7));
-        } catch (Exception e) {
-            throw new RuntimeException("Erreur lors de l'extraction de l'ID utilisateur depuis le token", e);
+    // Retirer l'utilisateur de chaque boutique
+    for (Boutique boutique : boutiques) {
+        Optional<UserBoutique> existingAssignment = userBoutiqueRepository
+                .findByUserIdAndBoutiqueId(userId, boutique.getId());
+
+        if (existingAssignment.isPresent()) {
+            // Si l'affectation existe, on la supprime
+            userBoutiqueRepository.delete(existingAssignment.get());
+            resultMessages.add("Utilisateur retiré de la boutique : " + boutique.getNomBoutique());
+        } else {
+            resultMessages.add("L'utilisateur n'est pas affecté à la boutique : " + boutique.getNomBoutique());
         }
+    }
 
-        // Récupérer l'utilisateur connecté (admin ou manager)
-        User admin = usersRepository.findById(adminId)
-                .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+    // Vérifier si l'utilisateur n'est plus vendeur dans aucune boutique
+    List<UserBoutique> remainingAssignments = userBoutiqueRepository.findByUserId(userId);
+    if (remainingAssignments.isEmpty()) {
+        // Si l'utilisateur n'est plus affecté à aucune boutique, on retire la permission "VENDRE_PRODUITS"
+        Role vendeurRole = user.getRole();
 
-        if (admin.getEntreprise() == null) {
-            throw new RuntimeException("L'utilisateur connecté n'appartient à aucune entreprise.");
-        }
+        if (vendeurRole != null && vendeurRole.getPermissions() != null) {
+            // Retirer la permission "VENDRE_PRODUITS" de la liste des permissions
+            boolean permissionRemoved = vendeurRole.getPermissions().removeIf(permission -> permission.getType() == PermissionType.VENDRE_PRODUITS);
 
-        // Récupérer l'entreprise de l'admin (qui doit être la même pour les boutiques)
-        Long entrepriseIdAdmin = admin.getEntreprise().getId();
+            // Sauvegarder les modifications si la permission a été retirée
+            if (permissionRemoved) {
+                roleRepository.save(vendeurRole);
+                resultMessages.add("Permission 'VENDRE_PRODUITS' retirée du rôle VENDEUR.");
+            }
 
-        // Vérification des droits d'accès (Admin ou Manager)
-        RoleType role = admin.getRole().getName();
-        boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
-        if (!isAdminOrManager) {
-            throw new RuntimeException("Vous n'avez pas les droits pour retirer des utilisateurs des boutiques.");
-        }
+            // Si après avoir retiré cette permission, il n'y a plus de permissions, rétrograder au rôle UTILISATEUR
+            if (vendeurRole.getPermissions().isEmpty()) {
+                // Retirer l'utilisateur du rôle VENDEUR
+                Role utilisateurRole = roleRepository.findByName(RoleType.UTILISATEUR)
+                        .orElseThrow(() -> new RuntimeException("Rôle UTILISATEUR non trouvé"));
 
-        // Vérifie si l'utilisateur existe
-        User user = usersRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
-
-        // Vérifier que l'utilisateur et les boutiques appartiennent à la même entreprise
-        List<Boutique> boutiques = boutiqueRepository.findAllById(boutiqueIds);
-        if (boutiques.size() != boutiqueIds.size()) {
-            throw new RuntimeException("Certaines boutiques n'ont pas été trouvées.");
-        }
-
-        // Vérifier que toutes les boutiques appartiennent à l'entreprise de l'admin
-        for (Boutique boutique : boutiques) {
-            if (!boutique.getEntreprise().getId().equals(entrepriseIdAdmin)) {
-                throw new RuntimeException("La boutique " + boutique.getNomBoutique() + " n'appartient pas à votre entreprise.");
+                // Affecter le rôle UTILISATEUR
+                user.setRole(utilisateurRole);
+                usersRepository.save(user);  // Sauvegarde l'utilisateur avec son nouveau rôle
+                resultMessages.add("Utilisateur rétrogradé au rôle UTILISATEUR car il n'a plus de permission 'VENDRE_PRODUITS'.");
             }
         }
+    }
 
-        // Retirer l'utilisateur de chaque boutique
-        for (Boutique boutique : boutiques) {
-            Optional<UserBoutique> existingAssignment = userBoutiqueRepository
-                    .findByUserIdAndBoutiqueId(userId, boutique.getId());
-
-            if (existingAssignment.isPresent()) {
-                // Si l'affectation existe, on la supprime
-                userBoutiqueRepository.delete(existingAssignment.get());
-                resultMessages.add("Utilisateur retiré de la boutique : " + boutique.getNomBoutique());
-            } else {
-                resultMessages.add("L'utilisateur n'est pas affecté à la boutique : " + boutique.getNomBoutique());
-            }
-        }
-
-        // Vérifier si l'utilisateur n'est plus vendeur dans aucune boutique
-        List<UserBoutique> remainingAssignments = userBoutiqueRepository.findByUserId(userId);
-        if (remainingAssignments.isEmpty()) {
-            // Si l'utilisateur n'est plus affecté à aucune boutique, on le retire du rôle VENDEUR
-            Role utilisateurRole = roleRepository.findByName(RoleType.UTILISATEUR)
-                    .orElseThrow(() -> new RuntimeException("Rôle UTILISATEUR non trouvé"));
-            
-            // On retire tous les rôles et permissions
-            user.setRole(utilisateurRole);
-            usersRepository.save(user);
-            resultMessages.add("Rôle de l'utilisateur mis à jour vers UTILISATEUR car il n'est plus vendeur dans aucune boutique.");
-        }
-
-        return resultMessages;
+    return resultMessages;
 }
 
 
