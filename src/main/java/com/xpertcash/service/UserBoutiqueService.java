@@ -24,6 +24,7 @@ import com.xpertcash.entity.User;
 import com.xpertcash.entity.UserBoutique;
 import com.xpertcash.entity.Enum.RoleType;
 import com.xpertcash.repository.BoutiqueRepository;
+import com.xpertcash.repository.RoleRepository;
 import com.xpertcash.repository.UserBoutiqueRepository;
 import com.xpertcash.repository.UsersRepository;
 
@@ -43,6 +44,9 @@ public class UserBoutiqueService {
 
     @Autowired
     private JwtUtil jwtUtil;  
+
+    @Autowired
+    private RoleRepository roleRepository;
 
     @Autowired
     private RoleService roleService;
@@ -128,75 +132,88 @@ public List<String> assignerVendeurAuxBoutiques(HttpServletRequest request, Long
     return resultMessages;
 }
 
-
 @Transactional
-public List<String> retirerVendeurDesBoutiques(HttpServletRequest request, Long userId, List<Long> boutiqueIds) {
-    List<String> resultMessages = new ArrayList<>();
+    public List<String> retirerVendeurDesBoutiques(HttpServletRequest request, Long userId, List<Long> boutiqueIds) {
+        List<String> resultMessages = new ArrayList<>();
 
-    // 🔐 Vérification du token JWT
-    String token = request.getHeader("Authorization");
-    if (token == null || !token.startsWith("Bearer ")) {
-        throw new RuntimeException("Token JWT manquant ou mal formaté");
-    }
-
-    Long adminId;
-    try {
-        adminId = jwtUtil.extractUserId(token.substring(7));
-    } catch (Exception e) {
-        throw new RuntimeException("Erreur lors de l'extraction de l'ID utilisateur depuis le token", e);
-    }
-
-    // Récupérer l'utilisateur connecté (admin ou manager)
-    User admin = usersRepository.findById(adminId)
-            .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
-
-    if (admin.getEntreprise() == null) {
-        throw new RuntimeException("L'utilisateur connecté n'appartient à aucune entreprise.");
-    }
-
-    // Récupérer l'entreprise de l'admin (qui doit être la même pour les boutiques)
-    Long entrepriseIdAdmin = admin.getEntreprise().getId();
-
-    // Vérification des droits d'accès (Admin ou Manager)
-    RoleType role = admin.getRole().getName();
-    boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
-    if (!isAdminOrManager) {
-        throw new RuntimeException("Vous n'avez pas les droits pour retirer des utilisateurs des boutiques.");
-    }
-
-    // Vérifie si l'utilisateur existe
-    User user = usersRepository.findById(userId)
-            .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
-
-    // Vérifier que l'utilisateur et les boutiques appartiennent à la même entreprise
-    List<Boutique> boutiques = boutiqueRepository.findAllById(boutiqueIds);
-    if (boutiques.size() != boutiqueIds.size()) {
-        throw new RuntimeException("Certaines boutiques n'ont pas été trouvées.");
-    }
-
-    // Vérifier que toutes les boutiques appartiennent à l'entreprise de l'admin
-    for (Boutique boutique : boutiques) {
-        if (!boutique.getEntreprise().getId().equals(entrepriseIdAdmin)) {
-            throw new RuntimeException("La boutique " + boutique.getNomBoutique() + " n'appartient pas à votre entreprise.");
+        // 🔐 Vérification du token JWT
+        String token = request.getHeader("Authorization");
+        if (token == null || !token.startsWith("Bearer ")) {
+            throw new RuntimeException("Token JWT manquant ou mal formaté");
         }
-    }
 
-    // Retirer l'utilisateur de chaque boutique
-    for (Boutique boutique : boutiques) {
-        Optional<UserBoutique> existingAssignment = userBoutiqueRepository
-                .findByUserIdAndBoutiqueId(userId, boutique.getId());
-
-        if (existingAssignment.isPresent()) {
-            // Si l'affectation existe, on la supprime
-            userBoutiqueRepository.delete(existingAssignment.get());
-            resultMessages.add("Utilisateur retiré de la boutique : " + boutique.getNomBoutique());
-        } else {
-            resultMessages.add("L'utilisateur n'est pas affecté à la boutique : " + boutique.getNomBoutique());
+        Long adminId;
+        try {
+            adminId = jwtUtil.extractUserId(token.substring(7));
+        } catch (Exception e) {
+            throw new RuntimeException("Erreur lors de l'extraction de l'ID utilisateur depuis le token", e);
         }
-    }
 
-    return resultMessages; // Renvoie la liste des messages
+        // Récupérer l'utilisateur connecté (admin ou manager)
+        User admin = usersRepository.findById(adminId)
+                .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+
+        if (admin.getEntreprise() == null) {
+            throw new RuntimeException("L'utilisateur connecté n'appartient à aucune entreprise.");
+        }
+
+        // Récupérer l'entreprise de l'admin (qui doit être la même pour les boutiques)
+        Long entrepriseIdAdmin = admin.getEntreprise().getId();
+
+        // Vérification des droits d'accès (Admin ou Manager)
+        RoleType role = admin.getRole().getName();
+        boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
+        if (!isAdminOrManager) {
+            throw new RuntimeException("Vous n'avez pas les droits pour retirer des utilisateurs des boutiques.");
+        }
+
+        // Vérifie si l'utilisateur existe
+        User user = usersRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+
+        // Vérifier que l'utilisateur et les boutiques appartiennent à la même entreprise
+        List<Boutique> boutiques = boutiqueRepository.findAllById(boutiqueIds);
+        if (boutiques.size() != boutiqueIds.size()) {
+            throw new RuntimeException("Certaines boutiques n'ont pas été trouvées.");
+        }
+
+        // Vérifier que toutes les boutiques appartiennent à l'entreprise de l'admin
+        for (Boutique boutique : boutiques) {
+            if (!boutique.getEntreprise().getId().equals(entrepriseIdAdmin)) {
+                throw new RuntimeException("La boutique " + boutique.getNomBoutique() + " n'appartient pas à votre entreprise.");
+            }
+        }
+
+        // Retirer l'utilisateur de chaque boutique
+        for (Boutique boutique : boutiques) {
+            Optional<UserBoutique> existingAssignment = userBoutiqueRepository
+                    .findByUserIdAndBoutiqueId(userId, boutique.getId());
+
+            if (existingAssignment.isPresent()) {
+                // Si l'affectation existe, on la supprime
+                userBoutiqueRepository.delete(existingAssignment.get());
+                resultMessages.add("Utilisateur retiré de la boutique : " + boutique.getNomBoutique());
+            } else {
+                resultMessages.add("L'utilisateur n'est pas affecté à la boutique : " + boutique.getNomBoutique());
+            }
+        }
+
+        // Vérifier si l'utilisateur n'est plus vendeur dans aucune boutique
+        List<UserBoutique> remainingAssignments = userBoutiqueRepository.findByUserId(userId);
+        if (remainingAssignments.isEmpty()) {
+            // Si l'utilisateur n'est plus affecté à aucune boutique, on le retire du rôle VENDEUR
+            Role utilisateurRole = roleRepository.findByName(RoleType.UTILISATEUR)
+                    .orElseThrow(() -> new RuntimeException("Rôle UTILISATEUR non trouvé"));
+            
+            // On retire tous les rôles et permissions
+            user.setRole(utilisateurRole);
+            usersRepository.save(user);
+            resultMessages.add("Rôle de l'utilisateur mis à jour vers UTILISATEUR car il n'est plus vendeur dans aucune boutique.");
+        }
+
+        return resultMessages;
 }
+
 
 
     // Methode pour récupérer toutes les boutiques d'un utilisateur
