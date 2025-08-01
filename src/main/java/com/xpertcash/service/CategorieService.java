@@ -2,7 +2,9 @@ package com.xpertcash.service;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -92,52 +94,60 @@ public class CategorieService {
         throw new RuntimeException("Accès refusé : vous n'avez pas les droits nécessaires pour consulter les catégories.");
     }
 
-    // 3. Récupérer toutes les catégories
-    List<Categorie> allCategories = categorieRepository.findAll();
+   // 3. Récupérer toutes les catégories
+List<Categorie> allCategories = categorieRepository.findAll();
 
-    // 4. Créer une liste de DTOs de catégorie
-    List<CategorieResponseDTO> categorieResponseDTOs = new ArrayList<>();
+// 4. Créer une liste de DTOs de catégorie
+List<CategorieResponseDTO> categorieResponseDTOs = new ArrayList<>();
 
-    for (Categorie categorie : allCategories) {
-        // Compter le nombre de produits associés à cette catégorie pour l'entreprise spécifique
-        long produitCount = produitRepository.countByCategorieIdAndEntrepriseId(categorie.getId(), entreprise.getId());
-        categorie.setProduitCount(produitCount);
+for (Categorie categorie : allCategories) {
+    // Compter le nombre de produits associés à cette catégorie pour l'entreprise spécifique
+    long produitCount = produitRepository.countByCategorieIdAndEntrepriseId(categorie.getId(), entreprise.getId());
+    categorie.setProduitCount(produitCount);
 
-        // Convertir les produits associés en DTO ProduitDetailsResponseDTO
-        List<ProduitDetailsResponseDTO> produitDTOs = produitRepository.findByCategorieIdAndEntrepriseId(categorie.getId(), entreprise.getId())
-                .stream()
-                .map(produit -> new ProduitDetailsResponseDTO(
-                        produit.getId(),
-                        produit.getNom(),
-                        produit.getPrixVente(),
-                        produit.getPrixAchat(),
-                        produit.getQuantite(),
-                        produit.getSeuilAlert(),
-                        produit.getCategorie().getId(),
-                        produit.getUniteDeMesure().getId(),
-                        produit.getCodeBare(),
-                        produit.getPhoto(),
-                        produit.getEnStock(),
-                        produit.getCategorie().getNom(),
-                        produit.getUniteDeMesure().getNom(),
-                        produit.getTypeProduit().name(),
-                        produit.getCreatedAt(),
-                        produit.getLastUpdated(),
-                        produit.getDatePreemption(),
-                        produit.getBoutique() != null ? produit.getBoutique().getId() : null,
-                        produit.getBoutique() != null ? produit.getBoutique().getNomBoutique() : null
-                ))
-                .collect(Collectors.toList());
+    // Récupérer les produits associés à la catégorie et à l'entreprise
+List<ProduitDetailsResponseDTO> produitDTOs = produitRepository.findByCategorieIdAndEntrepriseId(categorie.getId(), entreprise.getId())
+        .stream()
+        .map(produit -> {
+            // Vérification si l'unité de mesure est non nulle avant d'y accéder
+            Long uniteId = produit.getUniteDeMesure() != null ? produit.getUniteDeMesure().getId() : null;
+            String uniteNom = produit.getUniteDeMesure() != null ? produit.getUniteDeMesure().getNom() : "Non spécifiée";
 
-        // Créer un DTO de catégorie et ajouter les produits en DTO
-        CategorieResponseDTO categorieDTO = new CategorieResponseDTO(categorie);
-        categorieDTO.setProduits(produitDTOs);
+            return new ProduitDetailsResponseDTO(
+                    produit.getId(),
+                    produit.getNom(),
+                    produit.getPrixVente(),
+                    produit.getPrixAchat(),
+                    produit.getQuantite(),
+                    produit.getSeuilAlert(),
+                    produit.getCategorie().getId(),
+                    uniteId,
+                    produit.getCodeBare(),
+                    produit.getPhoto(),
+                    produit.getEnStock(),
+                    produit.getCategorie().getNom(),
+                    uniteNom,
+                    produit.getTypeProduit().name(),
+                    produit.getCreatedAt(),
+                    produit.getLastUpdated(),
+                    produit.getDatePreemption(),
+                    produit.getBoutique() != null ? produit.getBoutique().getId() : null,
+                    produit.getBoutique() != null ? produit.getBoutique().getNomBoutique() : null
+            );
+        })
+        .collect(Collectors.toList());
 
-        // Ajouter à la réponse
-        categorieResponseDTOs.add(categorieDTO);
-    }
+    // Créer un DTO de catégorie et ajouter les produits en DTO
+    CategorieResponseDTO categorieDTO = new CategorieResponseDTO(categorie);
+    categorieDTO.setProduits(produitDTOs);
 
-    return categorieResponseDTOs;
+    // Ajouter à la réponse
+    categorieResponseDTOs.add(categorieDTO);
+}
+
+// Retourner la liste des catégories avec les produits associés
+return categorieResponseDTOs;
+
 }
 
 

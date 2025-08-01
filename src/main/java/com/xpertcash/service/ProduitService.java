@@ -39,6 +39,7 @@ import com.xpertcash.entity.StockHistory;
 import com.xpertcash.entity.StockProduitFournisseur;
 import com.xpertcash.entity.Unite;
 import com.xpertcash.entity.User;
+import com.xpertcash.entity.UserBoutique;
 import com.xpertcash.entity.Enum.RoleType;
 import com.xpertcash.entity.Enum.TypeProduit;
 import jakarta.servlet.http.HttpServletRequest;
@@ -101,6 +102,9 @@ public class ProduitService {
 
     @Autowired
     private LigneFactureProformaRepository ligneFactureProformaRepository;
+
+    @Autowired
+    private UserBoutiqueRepository userBoutiqueRepository;
 
 
 
@@ -1151,9 +1155,9 @@ public class ProduitService {
     }
 
     // Lister Produit par boutique (excluant les produits dans la corbeille)
-   // Lister Produit par boutique (excluant les produits dans la corbeille)
- public List<ProduitDTO> getProduitsParStock(Long boutiqueId, HttpServletRequest request) {
-    // 🔐 Extraction utilisateur depuis token JWT
+    @Transactional
+public List<ProduitDTO> getProduitsParStock(Long boutiqueId, HttpServletRequest request) {
+    // 🔐 Extraction utilisateur depuis le token JWT
     String token = request.getHeader("Authorization");
     if (token == null || !token.startsWith("Bearer ")) {
         throw new RuntimeException("Token JWT manquant ou mal formaté");
@@ -1171,31 +1175,44 @@ public class ProduitService {
         throw new RuntimeException("Cette boutique est désactivée, ses produits ne sont pas accessibles !");
     }
 
+    // Vérification si la boutique appartient à l'utilisateur (ou l'entreprise de l'utilisateur)
     Long entrepriseId = boutique.getEntreprise().getId();
     if (!entrepriseId.equals(user.getEntreprise().getId())) {
         throw new RuntimeException("Accès interdit : cette boutique ne vous appartient pas");
     }
 
     // 🔒 Vérifications CentralAccess & permissions
-     RoleType role = user.getRole().getName();
+    RoleType role = user.getRole().getName();
     boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
     boolean hasPermission = user.getRole().hasPermission(PermissionType.GERER_PRODUITS)
                         || user.getRole().hasPermission(PermissionType.VENDRE_PRODUITS)
                         || user.getRole().hasPermission(PermissionType.APPROVISIONNER_STOCK)
                         || user.getRole().hasPermission(PermissionType.GERER_BOUTIQUE);
 
-    if (!isAdminOrManager && !hasPermission ) {
+    if (!isAdminOrManager && !hasPermission) {
         throw new RuntimeException("Accès interdit : vous n'avez pas les droits pour consulter les produits.");
     }
 
-    // Récupérer uniquement les produits non supprimés via repository (à créer)
+    // Vérification si l'utilisateur a bien accès à cette boutique
+    boolean isVendeur = user.getRole().getName() == RoleType.VENDEUR;
+    if (isVendeur) {
+        // Si c'est un vendeur, il doit être affecté à cette boutique
+       Optional<UserBoutique> userBoutique = userBoutiqueRepository.findByUserIdAndBoutiqueId(userId, boutiqueId);
+       if (!userBoutique.isPresent()) {
+            throw new RuntimeException("Vous n'êtes pas affecté à cette boutique, vous ne pouvez pas voir ses produits.");
+        }
+    }
+
+    // Récupérer uniquement les produits actifs (non supprimés) pour cette boutique
     List<Produit> produitsActifs = produitRepository.findByBoutiqueIdAndDeletedFalseOrDeletedIsNull(boutiqueId);
 
-    // Convertir en DTO, par exemple via un mapper ou méthode utilitaire
+    // Convertir en DTO
     return produitsActifs.stream()
             .map(this::convertToProduitDTO)
             .collect(Collectors.toList());
 }
+
+   
 
     /**
      * Récupère et mappe les produits d'une boutique

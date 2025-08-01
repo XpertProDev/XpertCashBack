@@ -199,23 +199,38 @@ public class RoleService {
 
 
     //Methode public pour les vendeur
-    public Role getOrCreateVendeurRole() {
+  public Role getOrCreateVendeurRole() {
+    // Vérifie si le rôle VENDEUR existe déjà
     Optional<Role> existingRole = roleRepository.findByName(RoleType.VENDEUR);
     if (existingRole.isPresent()) {
+        System.out.println("Le rôle VENDEUR existe déjà, récupération du rôle existant.");
         return existingRole.get();
     }
 
     // Sinon on le crée
+    System.out.println("Le rôle VENDEUR n'existe pas, création du rôle...");
+    
     Map<PermissionType, Permission> permissionMap = permissionRepository.findAll().stream()
             .collect(Collectors.toMap(Permission::getType, p -> p));
 
+    // Vérifie que la permission VENDRE_PRODUITS existe dans permissionMap
+    Permission vendreProduitsPermission = permissionMap.get(PermissionType.VENDRE_PRODUITS);
+    if (vendreProduitsPermission == null) {
+        throw new RuntimeException("Permission VENDRE_PRODUITS non trouvée dans le repository.");
+    }
+
+    System.out.println("Permission 'VENDRE_PRODUITS' trouvée : " + vendreProduitsPermission);
+
     Role venteRole = new Role();
     venteRole.setName(RoleType.VENDEUR);
-    venteRole.setPermissions(Collections.singletonList(
-        permissionMap.get(PermissionType.VENDRE_PRODUITS)
-    ));
+    venteRole.setPermissions(Collections.singletonList(vendreProduitsPermission));
 
-    return roleRepository.save(venteRole);
+    // Sauvegarde du rôle
+    Role savedRole = roleRepository.save(venteRole);
+    System.out.println("Rôle VENDEUR sauvegardé avec les permissions : " + savedRole.getPermissions());
+    
+    return savedRole;
 }
+
 
 }
