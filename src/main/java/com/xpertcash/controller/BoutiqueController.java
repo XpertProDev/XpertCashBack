@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.xpertcash.DTOs.ProduitDTO;
 import com.xpertcash.DTOs.TransfertDTO;
 import com.xpertcash.DTOs.Boutique.BoutiqueResponse;
 import com.xpertcash.entity.Boutique;
@@ -240,12 +241,12 @@ public ResponseEntity<Map<String, String>> ajouterBoutique(
 
 
     @GetMapping("/boutique/{id}/produits")
-    public ResponseEntity<List<Produit>> getProduitsParBoutique(
-            HttpServletRequest request,
-            @PathVariable Long id) {
-        List<Produit> produits = boutiqueService.getProduitsParBoutique(request, id);
-        return ResponseEntity.ok(produits);
-    }
+ public ResponseEntity<List<ProduitDTO>> getProduitsParBoutique(
+        HttpServletRequest request,
+        @PathVariable Long id) {
+    List<ProduitDTO> produitsDTO = boutiqueService.getProduitsParBoutique(request, id);
+    return ResponseEntity.ok(produitsDTO);
+}
 
     @GetMapping("/transferts")
     public ResponseEntity<Object> getTransferts(
