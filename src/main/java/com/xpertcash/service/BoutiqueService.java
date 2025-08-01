@@ -2,6 +2,7 @@ package com.xpertcash.service;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -15,6 +16,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.xpertcash.DTOs.ProduitDTO;
 import com.xpertcash.configuration.CentralAccess;
 import com.xpertcash.configuration.JwtUtil;
 import com.xpertcash.entity.Boutique;
@@ -455,7 +457,7 @@ public class BoutiqueService {
     }
 
    
-    public List<Produit> getProduitsParBoutique(HttpServletRequest request, Long boutiqueId) {
+   public List<ProduitDTO> getProduitsParBoutique(HttpServletRequest request, Long boutiqueId) {
         // 🔐 Vérifier la présence et le format du token JWT
         String token = request.getHeader("Authorization");
         if (token == null || !token.startsWith("Bearer ")) {
@@ -498,10 +500,51 @@ public class BoutiqueService {
             throw new RuntimeException("Cette boutique est désactivée, ses produits ne sont pas accessibles !");
         }
 
-        // ✅ Retourner les produits non supprimés via le repository
-        return produitRepository.findByBoutiqueIdAndNotDeleted(boutiqueId);
+        // ✅ Récupérer les produits non supprimés via le repository
+        List<Produit> produits = produitRepository.findByBoutiqueIdAndNotDeleted(boutiqueId);
+
+        // Mapper les produits en ProduitDTO
+        List<ProduitDTO> produitsDTO = produits.stream().map(produit -> {
+            ProduitDTO produitDTO = new ProduitDTO();
+            produitDTO.setId(produit.getId());
+            produitDTO.setNom(produit.getNom());
+            produitDTO.setPrixVente(produit.getPrixVente());
+            produitDTO.setPrixAchat(produit.getPrixAchat());
+            produitDTO.setQuantite(produit.getQuantite());
+            produitDTO.setSeuilAlert(produit.getSeuilAlert());
+            produitDTO.setDescription(produit.getDescription());
+            produitDTO.setCodeGenerique(produit.getCodeGenerique());
+            produitDTO.setCodeBare(produit.getCodeBare());
+            produitDTO.setPhoto(produit.getPhoto());
+            produitDTO.setEnStock(produit.getEnStock());
+            produitDTO.setCreatedAt(produit.getCreatedAt());
+            produitDTO.setLastUpdated(produit.getLastUpdated());
+            produitDTO.setDatePreemption(produit.getDatePreemption());
+             produitDTO.setTypeProduit(produit.getTypeProduit().name());
+
+            // Mapper la catégorie
+            if (produit.getCategorie() != null) {
+                produitDTO.setNomCategorie(produit.getCategorie().getNom());
+                produitDTO.setCategorieId(produit.getCategorie().getId());
+            }
+
+            // Mapper l'unité si elle existe
+            if (produit.getUniteDeMesure() != null) {
+                produitDTO.setNomUnite(produit.getUniteDeMesure().getNom());
+                produitDTO.setUniteId(produit.getUniteDeMesure().getId());
+            }
+
+            // Ajouter la boutique associée
+            Map<String, Object> boutiqueMap = new HashMap<>();
+            boutiqueMap.put("id", boutique.getId());
+            boutiqueMap.put("nom", boutique.getNomBoutique());
+            produitDTO.setBoutiques(Collections.singletonList(boutiqueMap));
+
+            return produitDTO;
+        }).collect(Collectors.toList());
+
+        return produitsDTO;
     }
- 
     // Methode pour descativer une boutique
      public Boutique desactiverBoutique(Long boutiqueId, HttpServletRequest request) {
     // 🔐 Vérification du token JWT

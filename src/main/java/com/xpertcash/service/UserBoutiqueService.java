@@ -19,11 +19,15 @@ import com.xpertcash.DTOs.Boutique.BoutiqueResponseVendeur;
 import com.xpertcash.DTOs.Boutique.VendeurDTO;
 import com.xpertcash.configuration.JwtUtil;
 import com.xpertcash.entity.Boutique;
+import com.xpertcash.entity.Permission;
+import com.xpertcash.entity.PermissionType;
 import com.xpertcash.entity.Role;
 import com.xpertcash.entity.User;
 import com.xpertcash.entity.UserBoutique;
 import com.xpertcash.entity.Enum.RoleType;
 import com.xpertcash.repository.BoutiqueRepository;
+import com.xpertcash.repository.PermissionRepository;
+import com.xpertcash.repository.RoleRepository;
 import com.xpertcash.repository.UserBoutiqueRepository;
 import com.xpertcash.repository.UsersRepository;
 
@@ -45,7 +49,13 @@ public class UserBoutiqueService {
     private JwtUtil jwtUtil;  
 
     @Autowired
+    private RoleRepository roleRepository;
+
+    @Autowired
     private RoleService roleService;
+
+    @Autowired
+    private PermissionRepository permissionRepository;
 
 @Transactional
 public List<String> assignerVendeurAuxBoutiques(HttpServletRequest request, Long userId, List<Long> boutiqueIds) {
@@ -96,13 +106,46 @@ public List<String> assignerVendeurAuxBoutiques(HttpServletRequest request, Long
         }
     }
 
+    // ✅ [NOUVEAU] Vérification et modification du rôle en fonction des permissions existantes
+    Role currentRole = user.getRole();
 
-        // ✅ [NOUVEAU] Assigner le rôle VENDEUR si nécessaire
-    if (user.getRole() == null || user.getRole().getName() != RoleType.VENDEUR) {
+    // Si l'utilisateur a le rôle "UTILISATEUR"
+    if (currentRole != null && currentRole.getName() == RoleType.UTILISATEUR) {
+        // Vérifier si l'utilisateur a des permissions existantes
+        if (currentRole.getPermissions().isEmpty()) {
+            // Si aucune permission, on lui assigne le rôle VENDEUR et la permission "VENDRE_PRODUITS"
+            Role vendeurRole = roleService.getOrCreateVendeurRole();
+
+            // Ajouter la permission "VENDRE_PRODUITS" dans ses permissions
+            Permission ventePermission = permissionRepository.findByType(PermissionType.VENDRE_PRODUITS)
+                    .orElseThrow(() -> new RuntimeException("Permission 'VENDRE_PRODUITS' non trouvée"));
+
+            vendeurRole.getPermissions().add(ventePermission);
+            user.setRole(vendeurRole);
+            usersRepository.save(user);
+            resultMessages.add("Rôle VENDEUR attribué à l'utilisateur avec la permission 'VENDRE_PRODUITS'.");
+        } else {
+            // Si l'utilisateur a des permissions, on ne change pas son rôle et on lui ajoute "VENDRE_PRODUITS" s'il ne l'a pas déjà
+            if (!currentRole.getPermissions().stream()
+                    .anyMatch(permission -> permission.getType() == PermissionType.VENDRE_PRODUITS)) {
+                Permission ventePermission = permissionRepository.findByType(PermissionType.VENDRE_PRODUITS)
+                        .orElseThrow(() -> new RuntimeException("Permission 'VENDRE_PRODUITS' non trouvée"));
+
+                currentRole.getPermissions().add(ventePermission);
+                roleRepository.save(currentRole); // Sauvegarder les modifications du rôle
+                resultMessages.add("Permission 'VENDRE_PRODUITS' ajoutée au rôle UTILISATEUR.");
+            }
+        }
+    } else if (currentRole == null || currentRole.getName() != RoleType.VENDEUR) {
+        // Si l'utilisateur n'a pas de rôle, ou a un rôle qui n'est pas "VENDEUR", on assigne le rôle VENDEUR
         Role vendeurRole = roleService.getOrCreateVendeurRole();
+        Permission ventePermission = permissionRepository.findByType(PermissionType.VENDRE_PRODUITS)
+                .orElseThrow(() -> new RuntimeException("Permission 'VENDRE_PRODUITS' non trouvée"));
+
+        vendeurRole.getPermissions().add(ventePermission);
         user.setRole(vendeurRole);
         usersRepository.save(user);
-        resultMessages.add("Rôle VENDEUR attribué à l'utilisateur.");
+        resultMessages.add("Rôle VENDEUR attribué avec la permission 'VENDRE_PRODUITS'.");
     }
 
     // Assigner l'utilisateur aux boutiques
@@ -124,10 +167,8 @@ public List<String> assignerVendeurAuxBoutiques(HttpServletRequest request, Long
         resultMessages.add("Utilisateur affecté à la boutique : " + boutique.getNomBoutique());
     }
 
-
     return resultMessages;
 }
-
 
 @Transactional
 public List<String> retirerVendeurDesBoutiques(HttpServletRequest request, Long userId, List<Long> boutiqueIds) {
@@ -195,8 +236,39 @@ public List<String> retirerVendeurDesBoutiques(HttpServletRequest request, Long 
         }
     }
 
-    return resultMessages; // Renvoie la liste des messages
+    // Vérifier si l'utilisateur n'est plus vendeur dans aucune boutique
+    List<UserBoutique> remainingAssignments = userBoutiqueRepository.findByUserId(userId);
+    if (remainingAssignments.isEmpty()) {
+        // Si l'utilisateur n'est plus affecté à aucune boutique, on retire la permission "VENDRE_PRODUITS"
+        Role vendeurRole = user.getRole();
+
+        if (vendeurRole != null && vendeurRole.getPermissions() != null) {
+            // Retirer la permission "VENDRE_PRODUITS" de la liste des permissions
+            boolean permissionRemoved = vendeurRole.getPermissions().removeIf(permission -> permission.getType() == PermissionType.VENDRE_PRODUITS);
+
+            // Sauvegarder les modifications si la permission a été retirée
+            if (permissionRemoved) {
+                roleRepository.save(vendeurRole);
+                resultMessages.add("Permission 'VENDRE_PRODUITS' retirée du rôle VENDEUR.");
+            }
+
+            // Si après avoir retiré cette permission, il n'y a plus de permissions, rétrograder au rôle UTILISATEUR
+            if (vendeurRole.getPermissions().isEmpty()) {
+                // Retirer l'utilisateur du rôle VENDEUR
+                Role utilisateurRole = roleRepository.findByName(RoleType.UTILISATEUR)
+                        .orElseThrow(() -> new RuntimeException("Rôle UTILISATEUR non trouvé"));
+
+                // Affecter le rôle UTILISATEUR
+                user.setRole(utilisateurRole);
+                usersRepository.save(user);  // Sauvegarde l'utilisateur avec son nouveau rôle
+                resultMessages.add("Utilisateur rétrogradé au rôle UTILISATEUR car il n'a plus de permission 'VENDRE_PRODUITS'.");
+            }
+        }
+    }
+
+    return resultMessages;
 }
+
 
 
     // Methode pour récupérer toutes les boutiques d'un utilisateur
