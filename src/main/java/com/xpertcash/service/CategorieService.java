@@ -22,6 +22,7 @@ import com.xpertcash.entity.PermissionType;
 import com.xpertcash.entity.Produit;
 import com.xpertcash.entity.User;
 import com.xpertcash.entity.UserBoutique;
+import com.xpertcash.entity.Enum.TypeProduit;
 import com.xpertcash.repository.CategorieRepository;
 import com.xpertcash.repository.EntrepriseRepository;
 import com.xpertcash.repository.ProduitRepository;
@@ -116,6 +117,10 @@ public class CategorieService {
         List<ProduitDetailsResponseDTO> produitDTOs = produitRepository.findByCategorieIdAndEntrepriseId(categorie.getId(), entreprise.getId())
                 .stream()
                 .filter(produit -> {
+                     // Exclure les produits supprimés ou inactifs
+                    if (Boolean.TRUE.equals(produit.getDeleted()) ) {
+                        return false; // Ignorer les produits supprimés ou inactifs
+                    }
                     // Si c'est un vendeur, filtrer les produits selon la boutique assignée
                     if (isVendeur && produit.getBoutique() != null) {
                         // Récupérer les boutiques assignées à l'utilisateur
@@ -125,7 +130,7 @@ public class CategorieService {
                             return produit.getBoutique().getId().equals(userBoutiques.get(0).getBoutique().getId());
                         }
                     }
-                    return true; // Si Admin ou Manager, afficher tous les produits
+                    return !produit.getTypeProduit().equals(TypeProduit.SERVICE);
                 })
                 .map(produit -> {
                     // Vérification si l'unité de mesure est non nulle avant d'y accéder
