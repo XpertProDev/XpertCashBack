@@ -1,0 +1,31 @@
+package com.xpertcash.DTOs.VENTE;
+
+import lombok.Data;
+import java.time.LocalDateTime;
+import java.util.List;
+
+@Data
+public class VenteResponse {
+    private Long venteId;
+    private Long boutiqueId;
+    private Long vendeurId;
+    private LocalDateTime dateVente;
+    private Double montantTotal;
+    private String description;
+    private String nomVendeur;
+    private String nomBoutique;
+    private String clientNom;
+    private String clientNumero;
+    private String modePaiement;
+    private Double montantPaye;
+    private List<LigneVenteDTO> lignes;
+
+    @Data
+    public static class LigneVenteDTO {
+        private Long produitId;
+        private String nomProduit;
+        private Integer quantite;
+        private Double prixUnitaire;
+        private Double montantLigne;
+    }
+}
