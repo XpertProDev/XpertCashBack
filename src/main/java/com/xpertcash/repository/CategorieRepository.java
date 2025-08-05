@@ -12,4 +12,10 @@ public interface CategorieRepository extends JpaRepository<Categorie, Long>{
     Optional<Categorie> findByNom(String nom);
     boolean existsByNom(String nom);
 
+    Categorie findByNomAndEntrepriseId(String nom, Long entrepriseId);
+
+
+
+    
+
 }
