@@ -19,4 +19,5 @@ public class JwtConfig {
     public SecretKey getSecretKey() {
         return secretKey;
     }
+    
 }

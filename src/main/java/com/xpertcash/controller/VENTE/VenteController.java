@@ -4,6 +4,9 @@ import com.xpertcash.DTOs.VENTE.VenteRequest;
 import com.xpertcash.DTOs.VENTE.VenteResponse;
 import com.xpertcash.service.VENTE.VenteService;
 import jakarta.servlet.http.HttpServletRequest;
+
+import java.util.List;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -34,14 +37,21 @@ public class VenteController {
     }
 
     @GetMapping("/vente/boutique/{boutiqueId}")
-    public ResponseEntity<java.util.List<VenteResponse>> getVentesByBoutique(@PathVariable Long boutiqueId) {
-        java.util.List<VenteResponse> ventes = venteService.getVentesByBoutique(boutiqueId);
+        public ResponseEntity<List<VenteResponse>> getVentesByBoutique(
+            @PathVariable Long boutiqueId,
+            HttpServletRequest request
+    ) {
+        List<VenteResponse> ventes = venteService.getVentesByBoutique(boutiqueId, request);
         return ResponseEntity.ok(ventes);
     }
 
+
     @GetMapping("/vente/vendeur/{vendeurId}")
-    public ResponseEntity<java.util.List<VenteResponse>> getVentesByVendeur(@PathVariable Long vendeurId) {
-        java.util.List<VenteResponse> ventes = venteService.getVentesByVendeur(vendeurId);
-        return ResponseEntity.ok(ventes);
-    }
+   public ResponseEntity<List<VenteResponse>> getVentesByVendeur(
+        @PathVariable Long vendeurId,
+        HttpServletRequest request
+        ) {
+            List<VenteResponse> ventes = venteService.getVentesByVendeur(vendeurId, request);
+            return ResponseEntity.ok(ventes);
+        }
 }

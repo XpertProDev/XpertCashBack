@@ -8,9 +8,9 @@ import org.springframework.transaction.annotation.Transactional;
 import jakarta.servlet.http.HttpServletRequest;
 import com.xpertcash.configuration.JwtUtil;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 import com.xpertcash.entity.Enum.RoleType;
-import com.xpertcash.entity.PermissionType;
 
 @Service
 public class CaisseService {
@@ -25,11 +25,25 @@ public class CaisseService {
     @Autowired
     private JwtUtil jwtUtil;
 
-    @Transactional
+        private User getUserFromRequest(HttpServletRequest request) {
+        String token = request.getHeader("Authorization");
+        if (token == null || !token.startsWith("Bearer ")) {
+            throw new RuntimeException("Token JWT manquant ou mal formaté");
+        }
+        String jwtToken = token.substring(7);
+        Long userId = jwtUtil.extractUserId(jwtToken);
+        return usersRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+    }
+
+
+   @Transactional
     public Caisse ouvrirCaisse(Long boutiqueId, Double montantInitial, HttpServletRequest request) {
         User user = getUserFromRequest(request);
+
         Boutique boutique = boutiqueRepository.findById(boutiqueId)
                 .orElseThrow(() -> new RuntimeException("Boutique introuvable"));
+
         // Sécurité : rôle ou permission
         RoleType role = user.getRole().getName();
         boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
@@ -37,19 +51,18 @@ public class CaisseService {
         if (!isAdminOrManager && !hasPermission) {
             throw new RuntimeException("Vous n'avez pas les droits nécessaires pour ouvrir une caisse !");
         }
+
         // Vérification d'appartenance à l'entreprise
         if (!boutique.getEntreprise().getId().equals(user.getEntreprise().getId())) {
             throw new RuntimeException("Accès interdit : cette boutique n'appartient pas à votre entreprise.");
         }
+
         // Vérifier qu'il n'y a pas déjà une caisse ouverte pour ce vendeur/boutique
-        Optional<Caisse> caisseActive = caisseRepository.findAll().stream()
-            .filter(c -> c.getVendeur().getId().equals(user.getId()) &&
-                         c.getBoutique().getId().equals(boutiqueId) &&
-                         c.getStatut() == StatutCaisse.OUVERTE)
-            .findFirst();
-        if (caisseActive.isPresent()) {
+        if (caisseRepository.existsByBoutiqueIdAndVendeurIdAndStatut(boutiqueId, user.getId(), StatutCaisse.OUVERTE)) {
             throw new RuntimeException("Une caisse est déjà ouverte pour ce vendeur dans cette boutique.");
         }
+
+        // Création d'une nouvelle caisse (historique)
         Caisse caisse = new Caisse();
         caisse.setBoutique(boutique);
         caisse.setVendeur(user);
@@ -57,15 +70,18 @@ public class CaisseService {
         caisse.setMontantCourant(montantInitial != null ? montantInitial : 0.0);
         caisse.setStatut(StatutCaisse.OUVERTE);
         caisse.setDateOuverture(LocalDateTime.now());
-        caisseRepository.save(caisse);
-        return caisse;
+
+        return caisseRepository.save(caisse);
     }
 
     @Transactional
     public Caisse fermerCaisse(Long caisseId, HttpServletRequest request) {
         User user = getUserFromRequest(request);
-        Caisse caisse = caisseRepository.findById(caisseId)
-                .orElseThrow(() -> new RuntimeException("Caisse introuvable"));
+
+        // On charge la caisse seulement si elle est OUVERTE
+        Caisse caisse = caisseRepository.findByIdAndStatut(caisseId, StatutCaisse.OUVERTE)
+                .orElseThrow(() -> new RuntimeException("Caisse introuvable ou déjà fermée."));
+
         // Sécurité : rôle ou permission
         RoleType role = user.getRole().getName();
         boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
@@ -73,51 +89,109 @@ public class CaisseService {
         if (!isAdminOrManager && !hasPermission) {
             throw new RuntimeException("Vous n'avez pas les droits nécessaires pour fermer une caisse !");
         }
+
         // Vérification d'appartenance à l'entreprise
         if (!caisse.getBoutique().getEntreprise().getId().equals(user.getEntreprise().getId())) {
             throw new RuntimeException("Accès interdit : cette boutique n'appartient pas à votre entreprise.");
         }
-        if (!caisse.getVendeur().getId().equals(user.getId())) {
+
+        // Autorisation : seul le vendeur ou un admin/manager peut fermer
+        if (!isAdminOrManager && !caisse.getVendeur().getId().equals(user.getId())) {
             throw new RuntimeException("Vous n'êtes pas autorisé à fermer cette caisse.");
         }
-        if (caisse.getStatut() == StatutCaisse.FERMEE) {
-            throw new RuntimeException("Cette caisse est déjà fermée.");
-        }
+
+        // Mise à jour du statut et date fermeture
         caisse.setStatut(StatutCaisse.FERMEE);
         caisse.setDateFermeture(LocalDateTime.now());
         caisseRepository.save(caisse);
-        // Ajouter un mouvement de fermeture
+
+        // Enregistrement d'un mouvement de fermeture
         MouvementCaisse mouvement = new MouvementCaisse();
         mouvement.setCaisse(caisse);
         mouvement.setTypeMouvement(TypeMouvementCaisse.FERMETURE);
         mouvement.setMontant(caisse.getMontantCourant());
         mouvement.setDateMouvement(LocalDateTime.now());
-        mouvement.setDescription("Fermeture de caisse");
+        mouvement.setDescription("Fermeture de la caisse");
         mouvementCaisseRepository.save(mouvement);
+
         return caisse;
     }
 
+  
+    //Get caisse ouvert
     public Optional<Caisse> getCaisseActive(Long boutiqueId, HttpServletRequest request) {
+    User user = getUserFromRequest(request);
+
+    Boutique boutique = boutiqueRepository.findById(boutiqueId)
+            .orElseThrow(() -> new RuntimeException("Boutique introuvable"));
+
+    // Sécurité : rôle ou permission
+    RoleType role = user.getRole().getName();
+    boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
+    boolean hasPermission = user.getRole().hasPermission(PermissionType.VENDRE_PRODUITS);
+    if (!isAdminOrManager && !hasPermission) {
+        throw new RuntimeException("Vous n'avez pas les droits nécessaires pour consulter la caisse !");
+    }
+
+    // Vérification d'appartenance à l'entreprise
+    if (!boutique.getEntreprise().getId().equals(user.getEntreprise().getId())) {
+        throw new RuntimeException("Accès interdit : cette boutique n'appartient pas à votre entreprise.");
+    }
+
+    // Requête optimisée
+    return caisseRepository.findFirstByBoutiqueIdAndVendeurIdAndStatut(
+            boutiqueId,
+            user.getId(),
+            StatutCaisse.OUVERTE
+    );
+}
+
+
+    //Get tout les caisse ouvert
+    public List<Caisse> getCaissesActivesBoutique(Long boutiqueId, HttpServletRequest request) {
+    User user = getUserFromRequest(request);
+    Boutique boutique = boutiqueRepository.findById(boutiqueId)
+            .orElseThrow(() -> new RuntimeException("Boutique introuvable"));
+
+    // Sécurité : rôle ou permission
+    RoleType role = user.getRole().getName();
+    boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
+    if (!isAdminOrManager) {
+        throw new RuntimeException("Vous n'avez pas les droits nécessaires pour consulter les caisses !");
+    }
+
+    // Vérification d'appartenance à l'entreprise
+    if (!boutique.getEntreprise().getId().equals(user.getEntreprise().getId())) {
+        throw new RuntimeException("Accès interdit : cette boutique n'appartient pas à votre entreprise.");
+    }
+
+    // Récupération optimisée depuis la base
+    return caisseRepository.findByBoutiqueIdAndStatut(boutiqueId, StatutCaisse.OUVERTE);
+}
+
+
+    //Get tout les caisse
+    public List<Caisse> getToutesLesCaisses(Long boutiqueId, HttpServletRequest request) {
         User user = getUserFromRequest(request);
+        
         Boutique boutique = boutiqueRepository.findById(boutiqueId)
                 .orElseThrow(() -> new RuntimeException("Boutique introuvable"));
-        // Sécurité : rôle ou permission
-        RoleType role = user.getRole().getName();
-        boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
-        boolean hasPermission = user.getRole().hasPermission(PermissionType.VENDRE_PRODUITS);
-        if (!isAdminOrManager && !hasPermission) {
-            throw new RuntimeException("Vous n'avez pas les droits nécessaires pour consulter la caisse !");
-        }
+
         // Vérification d'appartenance à l'entreprise
         if (!boutique.getEntreprise().getId().equals(user.getEntreprise().getId())) {
             throw new RuntimeException("Accès interdit : cette boutique n'appartient pas à votre entreprise.");
         }
-        return caisseRepository.findAll().stream()
-            .filter(c -> c.getVendeur().getId().equals(user.getId()) &&
-                         c.getBoutique().getId().equals(boutiqueId) &&
-                         c.getStatut() == StatutCaisse.OUVERTE)
-            .findFirst();
+
+        // Sécurité : rôle ou permission
+        RoleType role = user.getRole().getName();
+        boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
+    if (!isAdminOrManager) {
+            throw new RuntimeException("Vous n'avez pas les droits nécessaires pour consulter les caisses !");
+        }
+
+        return caisseRepository.findByBoutiqueId(boutiqueId);
     }
+
 
     @Transactional
     public void ajouterMouvement(Caisse caisse, TypeMouvementCaisse type, Double montant, String description, Vente vente, ModePaiement modePaiement, Double montantPaye) {
@@ -140,14 +214,7 @@ public class CaisseService {
         caisseRepository.save(caisse);
     }
 
-    private User getUserFromRequest(HttpServletRequest request) {
-        String token = request.getHeader("Authorization");
-        if (token == null || !token.startsWith("Bearer ")) {
-            throw new RuntimeException("Token JWT manquant ou mal formaté");
-        }
-        String jwtToken = token.substring(7);
-        Long userId = jwtUtil.extractUserId(jwtToken);
-        return usersRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
-    }
+
+
+
 }

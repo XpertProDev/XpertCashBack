@@ -2,6 +2,7 @@ package com.xpertcash.service.VENTE;
 
 import com.xpertcash.DTOs.VENTE.VenteRequest;
 import com.xpertcash.DTOs.VENTE.VenteResponse;
+import com.xpertcash.composant.Utilitaire;
 import com.xpertcash.entity.*;
 import com.xpertcash.repository.*;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -12,12 +13,14 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
+
 import com.xpertcash.entity.Enum.RoleType;
 import jakarta.servlet.http.HttpServletRequest;
-import com.xpertcash.entity.PermissionType;
+
 import com.xpertcash.configuration.JwtUtil;
+import com.xpertcash.service.UsersService;
 import com.xpertcash.service.VENTE.CaisseService;
-import com.xpertcash.entity.TypeMouvementCaisse;
 
 @Service
 public class VenteService {
@@ -41,6 +44,9 @@ public class VenteService {
     private JwtUtil jwtUtil;
     @Autowired
     private CaisseService caisseService;
+
+    @Autowired
+    private Utilitaire utilitaire;
 
     @Transactional
     public VenteResponse enregistrerVente(VenteRequest request, HttpServletRequest httpRequest) {
@@ -190,27 +196,56 @@ public class VenteService {
         return responses;
     }
 
-    public List<VenteResponse> getVentesByBoutique(Long boutiqueId) {
-        List<Vente> ventes = venteRepository.findAll();
-        List<VenteResponse> responses = new ArrayList<>();
-        for (Vente vente : ventes) {
-            if (vente.getBoutique() != null && vente.getBoutique().getId().equals(boutiqueId)) {
-                responses.add(toVenteResponse(vente));
-            }
+ public List<VenteResponse> getVentesByBoutique(Long boutiqueId, HttpServletRequest request) {
+    // 1️⃣ Récupération de l'utilisateur connecté
+    User user = utilitaire.getAuthenticatedUser(request);
+
+    utilitaire.validateAdminOrManagerAccess(boutiqueId, user);
+
+    List<Vente> ventes = venteRepository.findByBoutiqueId(boutiqueId);
+
+    return ventes.stream()
+            .map(this::toVenteResponse)
+            .collect(Collectors.toList());
+}
+
+
+public List<VenteResponse> getVentesByVendeur(Long vendeurId, HttpServletRequest request) {
+    // 1️⃣ Récupération de l'utilisateur connecté
+    User user = utilitaire.getAuthenticatedUser(request);
+
+    // 2️⃣ Récupération du vendeur ciblé
+    User vendeur = usersRepository.findById(vendeurId)
+            .orElseThrow(() -> new RuntimeException("Vendeur introuvable"));
+
+    // 3️⃣ Sécurité
+    RoleType role = user.getRole().getName();
+    boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
+
+    if (!isAdminOrManager) {
+        // Si c'est un vendeur, il ne peut voir que ses propres ventes
+        if (!user.getId().equals(vendeurId)) {
+            throw new RuntimeException("Vous n'avez pas les droits nécessaires pour consulter les ventes de ce vendeur !");
         }
-        return responses;
     }
 
-    public List<VenteResponse> getVentesByVendeur(Long vendeurId) {
-        List<Vente> ventes = venteRepository.findAll();
-        List<VenteResponse> responses = new ArrayList<>();
-        for (Vente vente : ventes) {
-            if (vente.getVendeur() != null && vente.getVendeur().getId().equals(vendeurId)) {
-                responses.add(toVenteResponse(vente));
-            }
-        }
-        return responses;
+    // 4️⃣ Vérification que le vendeur appartient à la même entreprise
+    if (!vendeur.getEntreprise().getId().equals(user.getEntreprise().getId())) {
+        throw new RuntimeException("Accès interdit : ce vendeur n'appartient pas à votre entreprise.");
     }
+
+    // 5️⃣ Récupération optimisée
+    List<Vente> ventes = venteRepository.findByVendeurId(vendeurId);
+
+    // 6️⃣ Transformation en DTO
+    List<VenteResponse> responses = new ArrayList<>();
+    for (Vente vente : ventes) {
+        responses.add(toVenteResponse(vente));
+    }
+
+    return responses;
+}
+
 
     private VenteResponse toVenteResponse(Vente vente) {
         VenteResponse response = new VenteResponse();
@@ -241,4 +276,5 @@ public class VenteService {
         response.setNomBoutique(vente.getBoutique() != null ? vente.getBoutique().getNomBoutique() : null);
         return response;
     }
+
 }
