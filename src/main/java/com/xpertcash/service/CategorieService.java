@@ -178,9 +178,43 @@ public class CategorieService {
 
 
      // Supprimer une catégorie
-     public void deleteCategorie(Long id) {
-        categorieRepository.deleteById(id);
+    public void supprimerCategorieSiVide(Long categorieId, HttpServletRequest request) {
+    // 1. Extraire l'ID utilisateur depuis le token JWT
+    String token = request.getHeader("Authorization");
+    if (token == null || !token.startsWith("Bearer ")) {
+        throw new RuntimeException("Token JWT manquant ou mal formaté");
     }
+
+    Long userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
+    User user = usersRepository.findById(userId)
+            .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
+
+    // 2. Vérifier l'appartenance à une entreprise
+    Entreprise entreprise = user.getEntreprise();
+    if (entreprise == null) {
+        throw new RuntimeException("Aucune entreprise associée à cet utilisateur");
+    }
+
+    // 3. Vérifier les droits d'accès
+    boolean isAdminOrManager = CentralAccess.isAdminOrManagerOfEntreprise(user, entreprise.getId());
+    if (!isAdminOrManager) {
+        throw new RuntimeException("Accès refusé : seuls les administrateurs ou managers peuvent supprimer une catégorie.");
+    }
+
+    // 4. Vérifier que la catégorie existe
+    Categorie categorie = categorieRepository.findById(categorieId)
+            .orElseThrow(() -> new RuntimeException("Catégorie introuvable"));
+
+    // 5. Vérifier qu'elle est bien liée à la même entreprise (par les produits)
+    long produitCount = produitRepository.countByCategorieIdAndEntrepriseId(categorieId, entreprise.getId());
+    if (produitCount > 0) {
+        throw new RuntimeException("Impossible de supprimer une catégorie contenant des produits.");
+    }
+
+    // 6. Supprimer la catégorie
+    categorieRepository.delete(categorie);
+}
+
 
     // Mettre à jour categorie
     public Categorie updateCategorie(HttpServletRequest request, Long categorieId, Categorie categorieDetails) {

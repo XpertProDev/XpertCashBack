@@ -107,6 +107,9 @@ public class UsersService {
         this.passwordEncoder = passwordEncoder;
     }
 
+
+
+
   
     @Transactional
     public User registerUsers(String nomComplet, String email, String password, String phone, String pays, String nomEntreprise, String nomBoutique) {

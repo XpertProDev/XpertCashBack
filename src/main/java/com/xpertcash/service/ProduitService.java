@@ -192,10 +192,23 @@ public class ProduitService {
                 }
 
                 // Récupérer la catégorie et unité
-                Categorie categorie = (produitRequest.getCategorieId() != null) ?
-                        categorieRepository.findById(produitRequest.getCategorieId())
-                                .orElseThrow(() -> new RuntimeException("Catégorie non trouvée")) : null;
+                Categorie categorie;
+                if (produitRequest.getCategorieId() != null) {
+                    categorie = categorieRepository.findById(produitRequest.getCategorieId())
+                            .orElseThrow(() -> new RuntimeException("Catégorie non trouvée"));
+                } else {
+                    // Vérifier si "Sans Catégorie" existe déjà pour l'entreprise
+                    categorie = categorieRepository.findByNomAndEntrepriseId("Sans Catégorie", entrepriseId);
+                    if (categorie == null) {
+                        categorie = new Categorie();
+                        categorie.setNom("Sans Catégorie");
+                        categorie.setEntreprise(entreprise);
+                        categorie.setCreatedAt(LocalDateTime.now());
+                        categorie = categorieRepository.save(categorie);
+                    }
+                }
 
+                
                 Unite unite = (produitRequest.getUniteId() != null) ?
                         uniteRepository.findById(produitRequest.getUniteId())
                                 .orElseThrow(() -> new RuntimeException("Unité de mesure non trouvée")) : null;

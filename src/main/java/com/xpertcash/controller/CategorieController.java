@@ -119,10 +119,19 @@ public ResponseEntity<List<CategorieResponseDTO>> getAllCategories(HttpServletRe
 
     // Supprimer une catégorie
     @DeleteMapping("/deleteCategory/{id}")
-    public ResponseEntity<String> deleteCategorie(@PathVariable Long id) {
-        categorieService.deleteCategorie(id);
-        return ResponseEntity.ok("Catégorie supprimée avec succès !");
+    public ResponseEntity<?> supprimerCategorieSiVide(
+            @PathVariable("id") Long categorieId,
+            HttpServletRequest request) {
+        try {
+            categorieService.supprimerCategorieSiVide(categorieId, request);
+            return ResponseEntity.ok("Catégorie supprimée avec succès.");
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Erreur lors de la suppression.");
+        }
     }
+
 
     //Update Categorie
     @PutMapping("/updateCategorie/{categorieId}")

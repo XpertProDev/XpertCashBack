@@ -1,0 +1,30 @@
+package com.xpertcash.entity;
+
+import lombok.Data;
+import jakarta.persistence.*;
+import java.time.LocalDateTime;
+
+@Data
+@Entity
+public class Caisse {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    private Double montantInitial;
+    private Double montantCourant;
+
+    @Enumerated(EnumType.STRING)
+    private StatutCaisse statut; // OUVERTE, FERMEE
+
+    private LocalDateTime dateOuverture;
+    private LocalDateTime dateFermeture;
+
+    @ManyToOne
+    @JoinColumn(name = "vendeur_id")
+    private User vendeur;
+
+    @ManyToOne
+    @JoinColumn(name = "boutique_id")
+    private Boutique boutique;
+}
