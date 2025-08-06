@@ -130,36 +130,35 @@ public class CategorieService {
                             return produit.getBoutique().getId().equals(userBoutiques.get(0).getBoutique().getId());
                         }
                     }
-                    return !produit.getTypeProduit().equals(TypeProduit.SERVICE);
+                    return !TypeProduit.SERVICE.equals(produit.getTypeProduit());
                 })
                 .map(produit -> {
-                    // Vérification si l'unité de mesure est non nulle avant d'y accéder
-                    Long uniteId = produit.getUniteDeMesure() != null ? produit.getUniteDeMesure().getId() : null;
-                    String uniteNom = produit.getUniteDeMesure() != null ? produit.getUniteDeMesure().getNom() : "Non spécifiée";
+    Long uniteId = produit.getUniteDeMesure() != null ? produit.getUniteDeMesure().getId() : null;
+    String uniteNom = produit.getUniteDeMesure() != null ? produit.getUniteDeMesure().getNom() : "Non spécifiée";
 
-                    // Retourner un DTO de produit
-                    return new ProduitDetailsResponseDTO(
-                            produit.getId(),
-                            produit.getNom(),
-                            produit.getPrixVente(),
-                            produit.getPrixAchat(),
-                            produit.getQuantite(),
-                            produit.getSeuilAlert(),
-                            produit.getCategorie().getId(),
-                            uniteId,
-                            produit.getCodeBare(),
-                            produit.getPhoto(),
-                            produit.getEnStock(),
-                            produit.getCategorie().getNom(),
-                            uniteNom,
-                            produit.getTypeProduit().name(),
-                            produit.getCreatedAt(),
-                            produit.getLastUpdated(),
-                            produit.getDatePreemption(),
-                            produit.getBoutique() != null ? produit.getBoutique().getId() : null,
-                            produit.getBoutique() != null ? produit.getBoutique().getNomBoutique() : null
-                    );
-                })
+    return new ProduitDetailsResponseDTO(
+        produit.getId(),
+        produit.getNom(),
+        produit.getPrixVente(),
+        produit.getPrixAchat(),
+        produit.getQuantite(),
+        produit.getSeuilAlert(),
+        produit.getCategorie().getId(),
+        uniteId,
+        produit.getCodeBare(),
+        produit.getPhoto(),
+        produit.getEnStock(),
+        produit.getCategorie().getNom(),
+        uniteNom,
+        produit.getTypeProduit() != null ? produit.getTypeProduit().name() : null,
+        produit.getCreatedAt(),
+        produit.getLastUpdated(),
+        produit.getDatePreemption(),
+        produit.getBoutique() != null ? produit.getBoutique().getId() : null,
+        produit.getBoutique() != null ? produit.getBoutique().getNomBoutique() : null
+    );
+})
+
                 .collect(Collectors.toList());
 
         // Créer un DTO de catégorie avec les produits associés
