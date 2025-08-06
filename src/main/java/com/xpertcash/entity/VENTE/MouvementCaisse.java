@@ -1,8 +1,11 @@
-package com.xpertcash.entity;
+package com.xpertcash.entity.VENTE;
 
 import lombok.Data;
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
+
+import com.xpertcash.entity.Caisse;
+import com.xpertcash.entity.ModePaiement;
 
 @Data
 @Entity

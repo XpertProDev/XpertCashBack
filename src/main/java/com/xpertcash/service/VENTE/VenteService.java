@@ -5,6 +5,10 @@ import com.xpertcash.DTOs.VENTE.VenteResponse;
 import com.xpertcash.composant.Utilitaire;
 import com.xpertcash.entity.*;
 import com.xpertcash.repository.*;
+import com.xpertcash.repository.VENTE.VenteHistoriqueRepository;
+import com.xpertcash.repository.VENTE.VenteProduitRepository;
+import com.xpertcash.repository.VENTE.VenteRepository;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -16,6 +20,11 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 import com.xpertcash.entity.Enum.RoleType;
+import com.xpertcash.entity.VENTE.TypeMouvementCaisse;
+import com.xpertcash.entity.VENTE.Vente;
+import com.xpertcash.entity.VENTE.VenteHistorique;
+import com.xpertcash.entity.VENTE.VenteProduit;
+
 import jakarta.servlet.http.HttpServletRequest;
 
 import com.xpertcash.configuration.JwtUtil;
