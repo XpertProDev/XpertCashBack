@@ -135,4 +135,13 @@ public class CaisseController {
         return ResponseEntity.ok(dtos);
     }
 
+    @GetMapping("/vendeur/{vendeurId}")
+    public ResponseEntity<List<CaisseResponseDTO>> getCaissesByVendeur(
+            @PathVariable Long vendeurId,
+            HttpServletRequest request
+    ) {
+        List<CaisseResponseDTO> caisses = caisseService.getCaissesByVendeur(vendeurId, request);
+        return ResponseEntity.ok(caisses);
+    }
+
 }

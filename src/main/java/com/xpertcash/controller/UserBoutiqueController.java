@@ -49,11 +49,12 @@ public class UserBoutiqueController {
             return ResponseEntity.ok(response);
 
         } catch (RuntimeException e) {
-            // En cas d'erreur, renvoyer une réponse détaillée
+            e.printStackTrace(); // voir dans la console l'origine exacte
             response.put("status", "error");
-            response.put("message", e.getMessage());
+            response.put("message", e.getMessage() != null ? e.getMessage() : e.toString());
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
         }
+
     }
 
 
