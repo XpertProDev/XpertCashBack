@@ -106,43 +106,56 @@ public List<String> assignerVendeurAuxBoutiques(HttpServletRequest request, Long
         }
     }
 
-    // ✅ [NOUVEAU] Vérification et modification du rôle en fonction des permissions existantes
+    // ✅ Vérification et modification du rôle en fonction des permissions existantes
     Role currentRole = user.getRole();
 
-    // Si l'utilisateur a le rôle "UTILISATEUR"
     if (currentRole != null && currentRole.getName() == RoleType.UTILISATEUR) {
-        // Vérifier si l'utilisateur a des permissions existantes
         if (currentRole.getPermissions().isEmpty()) {
-            // Si aucune permission, on lui assigne le rôle VENDEUR et la permission "VENDRE_PRODUITS"
             Role vendeurRole = roleService.getOrCreateVendeurRole();
 
-            // Ajouter la permission "VENDRE_PRODUITS" dans ses permissions
             Permission ventePermission = permissionRepository.findByType(PermissionType.VENDRE_PRODUITS)
                     .orElseThrow(() -> new RuntimeException("Permission 'VENDRE_PRODUITS' non trouvée"));
 
-            vendeurRole.getPermissions().add(ventePermission);
+            // Copier et modifier la liste des permissions
+            List<Permission> updatedPermissions = new ArrayList<>(vendeurRole.getPermissions());
+            if (!updatedPermissions.contains(ventePermission)) {
+                updatedPermissions.add(ventePermission);
+            }
+            vendeurRole.setPermissions(updatedPermissions);
+            roleRepository.save(vendeurRole);
+
             user.setRole(vendeurRole);
             usersRepository.save(user);
             resultMessages.add("Rôle VENDEUR attribué à l'utilisateur avec la permission 'VENDRE_PRODUITS'.");
         } else {
-            // Si l'utilisateur a des permissions, on ne change pas son rôle et on lui ajoute "VENDRE_PRODUITS" s'il ne l'a pas déjà
             if (!currentRole.getPermissions().stream()
                     .anyMatch(permission -> permission.getType() == PermissionType.VENDRE_PRODUITS)) {
                 Permission ventePermission = permissionRepository.findByType(PermissionType.VENDRE_PRODUITS)
                         .orElseThrow(() -> new RuntimeException("Permission 'VENDRE_PRODUITS' non trouvée"));
 
-                currentRole.getPermissions().add(ventePermission);
-                roleRepository.save(currentRole); // Sauvegarder les modifications du rôle
+                List<Permission> updatedPermissions = new ArrayList<>(currentRole.getPermissions());
+                if (!updatedPermissions.contains(ventePermission)) {
+                    updatedPermissions.add(ventePermission);
+                }
+                currentRole.setPermissions(updatedPermissions);
+                roleRepository.save(currentRole);
+
                 resultMessages.add("Permission 'VENDRE_PRODUITS' ajoutée au rôle UTILISATEUR.");
             }
         }
     } else if (currentRole == null || currentRole.getName() != RoleType.VENDEUR) {
-        // Si l'utilisateur n'a pas de rôle, ou a un rôle qui n'est pas "VENDEUR", on assigne le rôle VENDEUR
         Role vendeurRole = roleService.getOrCreateVendeurRole();
+
         Permission ventePermission = permissionRepository.findByType(PermissionType.VENDRE_PRODUITS)
                 .orElseThrow(() -> new RuntimeException("Permission 'VENDRE_PRODUITS' non trouvée"));
 
-        vendeurRole.getPermissions().add(ventePermission);
+        List<Permission> updatedPermissions = new ArrayList<>(vendeurRole.getPermissions());
+        if (!updatedPermissions.contains(ventePermission)) {
+            updatedPermissions.add(ventePermission);
+        }
+        vendeurRole.setPermissions(updatedPermissions);
+        roleRepository.save(vendeurRole);
+
         user.setRole(vendeurRole);
         usersRepository.save(user);
         resultMessages.add("Rôle VENDEUR attribué avec la permission 'VENDRE_PRODUITS'.");
@@ -154,7 +167,6 @@ public List<String> assignerVendeurAuxBoutiques(HttpServletRequest request, Long
                 .findByUserIdAndBoutiqueId(userId, boutique.getId());
 
         if (existingAssignment.isPresent()) {
-            // L'utilisateur est déjà affecté à la boutique, on l'ajoute à la liste des messages
             resultMessages.add("Utilisateur déjà affecté à la boutique : " + boutique.getNomBoutique());
             continue;
         }
@@ -169,6 +181,8 @@ public List<String> assignerVendeurAuxBoutiques(HttpServletRequest request, Long
 
     return resultMessages;
 }
+
+
 
 @Transactional
 public List<String> retirerVendeurDesBoutiques(HttpServletRequest request, Long userId, List<Long> boutiqueIds) {
