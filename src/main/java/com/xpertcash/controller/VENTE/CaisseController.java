@@ -157,8 +157,17 @@ public class CaisseController {
             // Message clair si aucune caisse n'a été trouvée
             return ResponseEntity.ok("Aucune caisse trouvée pour ce vendeur dans cette boutique.");
         }
-
         return ResponseEntity.ok(caisseOpt.get());
     }
+
+    // Suivre Fluidité dargent encour dactivite
+    @GetMapping("/macaisse/actuelle/{boutiqueId}")
+    public ResponseEntity<CaisseResponseDTO> getEtatActuelCaisse(
+            @PathVariable Long boutiqueId,
+            HttpServletRequest request) {
+        CaisseResponseDTO dto = caisseService.getEtatActuelCaisse(boutiqueId, request);
+        return ResponseEntity.ok(dto);
+    }
+
 
 }

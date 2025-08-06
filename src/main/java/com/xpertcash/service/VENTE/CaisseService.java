@@ -217,7 +217,7 @@ public Caisse fermerCaisse(Long caisseId, HttpServletRequest request) {
         return caisseRepository.findByBoutiqueId(boutiqueId);
     }
 
-    // Les vendeur get sa derniere caisse a lui
+    // Le vendeur get sa derniere caisse a lui
     public Optional<CaisseResponseDTO> getDerniereCaisseVendeur(Long boutiqueId, HttpServletRequest request) {
     User user = getUserFromRequest(request);
 
@@ -258,6 +258,46 @@ public Caisse fermerCaisse(Long caisseId, HttpServletRequest request) {
         return dto;
     });
 }
+
+    // Suivre la "fluidité d’argent" en cours d’activité.
+    public CaisseResponseDTO getEtatActuelCaisse(Long boutiqueId, HttpServletRequest request) {
+    User user = getUserFromRequest(request);
+
+    Boutique boutique = boutiqueRepository.findById(boutiqueId)
+        .orElseThrow(() -> new RuntimeException("Boutique introuvable"));
+
+    // Vérif rôle/permission
+    RoleType role = user.getRole().getName();
+    boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
+    boolean hasPermission = user.getRole().hasPermission(PermissionType.VENDRE_PRODUITS);
+    if (!isAdminOrManager && !hasPermission) {
+        throw new RuntimeException("Vous n'avez pas les droits nécessaires pour consulter la caisse !");
+    }
+
+    if (!boutique.getEntreprise().getId().equals(user.getEntreprise().getId())) {
+        throw new RuntimeException("Accès interdit : cette boutique n'appartient pas à votre entreprise.");
+    }
+
+    Caisse caisse = caisseRepository.findFirstByBoutiqueIdAndVendeurIdOrderByDateOuvertureDesc(
+        boutiqueId, user.getId())
+        .orElseThrow(() -> new RuntimeException("Aucune caisse trouvée pour ce vendeur"));
+
+    return mapToCaisseResponseDTO(caisse);
+}
+    public CaisseResponseDTO mapToCaisseResponseDTO(Caisse caisse) {
+        CaisseResponseDTO dto = new CaisseResponseDTO();
+        dto.setId(caisse.getId());
+        dto.setMontantInitial(caisse.getMontantInitial());
+        dto.setMontantCourant(caisse.getMontantCourant());
+        dto.setStatut(caisse.getStatut().name());
+        dto.setDateOuverture(caisse.getDateOuverture());
+        dto.setDateFermeture(caisse.getDateFermeture());
+        dto.setVendeurId(caisse.getVendeur().getId());
+        dto.setNomVendeur(caisse.getVendeur().getNomComplet());
+        dto.setBoutiqueId(caisse.getBoutique().getId());
+        dto.setNomBoutique(caisse.getBoutique().getNomBoutique());
+        return dto;
+    }
 
 
 
