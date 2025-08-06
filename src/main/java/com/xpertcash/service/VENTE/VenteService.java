@@ -211,19 +211,15 @@ public class VenteService {
 
 
 public List<VenteResponse> getVentesByVendeur(Long vendeurId, HttpServletRequest request) {
-        // 1️⃣ Récupération de l'utilisateur connecté
         User user = utilitaire.getAuthenticatedUser(request);
 
-        // 2️⃣ Récupération du vendeur ciblé
         User vendeur = usersRepository.findById(vendeurId)
                 .orElseThrow(() -> new RuntimeException("Vendeur introuvable"));
 
-        // 3️⃣ Sécurité
         RoleType role = user.getRole().getName();
         boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
 
         if (!isAdminOrManager) {
-            // Si c'est un vendeur, il ne peut voir que ses propres ventes
             if (!user.getId().equals(vendeurId)) {
                 throw new RuntimeException("Vous n'avez pas les droits nécessaires pour consulter les ventes de ce vendeur !");
             }
