@@ -6,8 +6,12 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import jakarta.servlet.http.HttpServletRequest;
+
+import com.xpertcash.DTOs.VENTE.CaisseResponseDTO;
+import com.xpertcash.composant.Utilitaire;
 import com.xpertcash.configuration.JwtUtil;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import com.xpertcash.entity.Enum.RoleType;
@@ -24,6 +28,8 @@ public class CaisseService {
     private BoutiqueRepository boutiqueRepository;
     @Autowired
     private JwtUtil jwtUtil;
+    @Autowired
+    private Utilitaire utilitaire;
 
         private User getUserFromRequest(HttpServletRequest request) {
         String token = request.getHeader("Authorization");
@@ -213,6 +219,55 @@ public class CaisseService {
         }
         caisseRepository.save(caisse);
     }
+
+
+    // Get caisses d'un vendeur
+    public List<CaisseResponseDTO> getCaissesByVendeur(Long vendeurId, HttpServletRequest request) {
+    // 1️⃣ Récupération de l'utilisateur connecté
+    User user = utilitaire.getAuthenticatedUser(request);
+
+    // 2️⃣ Récupération du vendeur ciblé
+    User vendeur = usersRepository.findById(vendeurId)
+            .orElseThrow(() -> new RuntimeException("Vendeur introuvable"));
+
+    // 3️⃣ Sécurité : Admin et Manager peuvent voir toutes les caisses du vendeur
+    RoleType role = user.getRole().getName();
+    boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
+
+    if (!isAdminOrManager) {
+        // Si c'est un vendeur, il ne peut voir que ses propres caisses
+        if (!user.getId().equals(vendeurId)) {
+            throw new RuntimeException("Vous n'avez pas les droits nécessaires pour consulter les caisses de ce vendeur !");
+        }
+    }
+
+    // 4️⃣ Vérification que le vendeur appartient à la même entreprise
+    if (!vendeur.getEntreprise().getId().equals(user.getEntreprise().getId())) {
+        throw new RuntimeException("Accès interdit : ce vendeur n'appartient pas à votre entreprise.");
+    }
+
+    // 5️⃣ Récupération de toutes les caisses (ouvertes et fermées) du vendeur
+    List<Caisse> caisses = caisseRepository.findByVendeurId(vendeurId);
+
+    // 6️⃣ Transformation en DTO
+    List<CaisseResponseDTO> responses = new ArrayList<>();
+    for (Caisse caisse : caisses) {
+        CaisseResponseDTO dto = new CaisseResponseDTO();
+        dto.setId(caisse.getId());
+        dto.setMontantInitial(caisse.getMontantInitial());
+        dto.setMontantCourant(caisse.getMontantCourant());
+        dto.setStatut(caisse.getStatut().name());
+        dto.setDateOuverture(caisse.getDateOuverture());
+        dto.setDateFermeture(caisse.getDateFermeture());
+        dto.setVendeurId(caisse.getVendeur() != null ? caisse.getVendeur().getId() : null);
+        dto.setNomVendeur(caisse.getVendeur() != null ? caisse.getVendeur().getNomComplet() : null);
+        dto.setBoutiqueId(caisse.getBoutique() != null ? caisse.getBoutique().getId() : null);
+        dto.setNomBoutique(caisse.getBoutique() != null ? caisse.getBoutique().getNomBoutique() : null);
+        responses.add(dto);
+    }
+
+    return responses;
+}
 
 
 

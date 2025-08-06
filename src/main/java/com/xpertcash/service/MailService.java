@@ -1,6 +1,4 @@
 package com.xpertcash.service;
-
-
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
 import jakarta.mail.util.ByteArrayDataSource;
@@ -20,13 +18,9 @@ import java.util.function.Function;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ByteArrayResource;
-import org.springframework.core.io.FileSystemResource;
-import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
-
-import com.xpertcash.entity.FactureProForma;
 import org.springframework.web.multipart.MultipartFile;
 
 
@@ -40,7 +34,7 @@ public class MailService {
     private String from;
 
     public void sendActivationLinkEmail(String to, String code, String personalCode) throws MessagingException {
-        String baseUrl = "https://xpertcash.tchakeda.com"; // Adaptez cette URL à votre environnement
+        String baseUrl = "https://xpertcash.tchakeda.com";
         String activationUrl = baseUrl + "/api/auth/activate?email=" + to + "&code=" + code;
 
         String subject = "Activation de votre compte";
@@ -160,7 +154,7 @@ public class MailService {
                     <p><strong>Code PIN :</strong> %s</p>
                 </div>
                 <p style="margin-top: 8px;">Nous vous recommandons de changer votre mot de passe dès votre première connexion.</p>
-                <a href="https://xpertcash.tchakeda.com/login" style="display: inline-block; padding: 12px 20px; background-color: #007bff; color: white; text-decoration: none; border-radius: 5px; font-weight: bold; margin-top: 10px;">
+                <a href="https://tchakeda.com/connexion" style="display: inline-block; padding: 12px 20px; background-color: #007bff; color: white; text-decoration: none; border-radius: 5px; font-weight: bold; margin-top: 10px;">
                     Se connecter
                 </a>
                 <p style="font-size: 10px; color: #777;">L'équipe Tchakeda</p>
