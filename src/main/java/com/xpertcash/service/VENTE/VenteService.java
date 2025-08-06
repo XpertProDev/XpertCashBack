@@ -211,39 +211,39 @@ public class VenteService {
 
 
 public List<VenteResponse> getVentesByVendeur(Long vendeurId, HttpServletRequest request) {
-    // 1️⃣ Récupération de l'utilisateur connecté
-    User user = utilitaire.getAuthenticatedUser(request);
+        // 1️⃣ Récupération de l'utilisateur connecté
+        User user = utilitaire.getAuthenticatedUser(request);
 
-    // 2️⃣ Récupération du vendeur ciblé
-    User vendeur = usersRepository.findById(vendeurId)
-            .orElseThrow(() -> new RuntimeException("Vendeur introuvable"));
+        // 2️⃣ Récupération du vendeur ciblé
+        User vendeur = usersRepository.findById(vendeurId)
+                .orElseThrow(() -> new RuntimeException("Vendeur introuvable"));
 
-    // 3️⃣ Sécurité
-    RoleType role = user.getRole().getName();
-    boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
+        // 3️⃣ Sécurité
+        RoleType role = user.getRole().getName();
+        boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
 
-    if (!isAdminOrManager) {
-        // Si c'est un vendeur, il ne peut voir que ses propres ventes
-        if (!user.getId().equals(vendeurId)) {
-            throw new RuntimeException("Vous n'avez pas les droits nécessaires pour consulter les ventes de ce vendeur !");
+        if (!isAdminOrManager) {
+            // Si c'est un vendeur, il ne peut voir que ses propres ventes
+            if (!user.getId().equals(vendeurId)) {
+                throw new RuntimeException("Vous n'avez pas les droits nécessaires pour consulter les ventes de ce vendeur !");
+            }
         }
-    }
 
-    // 4️⃣ Vérification que le vendeur appartient à la même entreprise
-    if (!vendeur.getEntreprise().getId().equals(user.getEntreprise().getId())) {
-        throw new RuntimeException("Accès interdit : ce vendeur n'appartient pas à votre entreprise.");
-    }
+        // 4️⃣ Vérification que le vendeur appartient à la même entreprise
+        if (!vendeur.getEntreprise().getId().equals(user.getEntreprise().getId())) {
+            throw new RuntimeException("Accès interdit : ce vendeur n'appartient pas à votre entreprise.");
+        }
 
-    // 5️⃣ Récupération optimisée
-    List<Vente> ventes = venteRepository.findByVendeurId(vendeurId);
+        // 5️⃣ Récupération optimisée
+        List<Vente> ventes = venteRepository.findByVendeurId(vendeurId);
 
-    // 6️⃣ Transformation en DTO
-    List<VenteResponse> responses = new ArrayList<>();
-    for (Vente vente : ventes) {
-        responses.add(toVenteResponse(vente));
-    }
+        // 6️⃣ Transformation en DTO
+        List<VenteResponse> responses = new ArrayList<>();
+        for (Vente vente : ventes) {
+            responses.add(toVenteResponse(vente));
+        }
 
-    return responses;
+        return responses;
 }
 
 
