@@ -12,5 +12,5 @@ public class VenteRequest {
     private String clientNom;
     private String clientNumero;
     private String modePaiement;
-    private Double montantPaye;
+    // private Double montantPaye;
 }

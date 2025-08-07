@@ -43,7 +43,7 @@ class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
      "https://xpertcash.tchakeda.com",
                 "https://tchakeda.com",
                 "https://www.tchakeda.com",
-                "http://192.168.1.2:4200"
+                "http://192.168.1.5:4200"
                 )
                 .withSockJS();
     }
