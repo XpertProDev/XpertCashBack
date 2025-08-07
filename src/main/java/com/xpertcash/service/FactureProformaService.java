@@ -13,6 +13,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
+
+import com.xpertcash.DTOs.FactureProFormaDTO;
 import com.xpertcash.configuration.CentralAccess;
 import com.xpertcash.configuration.JwtUtil;
 import com.xpertcash.entity.Client;
@@ -838,52 +840,52 @@ public void supprimerFactureProforma(Long factureId, String token) {
 //Trie:
    
     // Methode pour recuperer une facture pro forma par son id
-    public FactureProForma getFactureProformaById(Long id, HttpServletRequest request) {
-        String token = request.getHeader("Authorization");
-        if (token == null || !token.startsWith("Bearer ")) {
-            throw new RuntimeException("Token JWT manquant ou mal formaté");
-        }
-    
-          Long userId;
-            try {
-                userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
-            } catch (Exception e) {
-                throw new RuntimeException("Erreur lors de l'extraction de l'ID utilisateur depuis le token", e);
-            }
-    
-         User utilisateur = usersRepository.findById(userId)
+    // Méthode privée pour récupérer l'entité FactureProForma avec contrôle d'accès
+public FactureProForma getFactureProformaEntityById(Long id, HttpServletRequest request) {
+    String token = request.getHeader("Authorization");
+    if (token == null || !token.startsWith("Bearer ")) {
+        throw new RuntimeException("Token JWT manquant ou mal formaté");
+    }
+
+    Long userId;
+    try {
+        userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
+    } catch (Exception e) {
+        throw new RuntimeException("Erreur lors de l'extraction de l'ID utilisateur depuis le token", e);
+    }
+
+    User utilisateur = usersRepository.findById(userId)
         .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
 
-        FactureProForma facture = factureProformaRepository.findById(id)
-            .orElseThrow(() -> new RuntimeException("Facture Proforma introuvable avec l'ID : " + id));
-        
-        Entreprise entrepriseUtilisateur = utilisateur.getEntreprise();
-        Entreprise entrepriseFacture = facture.getEntreprise();
+    FactureProForma facture = factureProformaRepository.findById(id)
+        .orElseThrow(() -> new RuntimeException("Facture Proforma introuvable avec l'ID : " + id));
 
-        // 🔒 Vérifier l'appartenance à la même entreprise
-        if (entrepriseUtilisateur == null || entrepriseFacture == null ||
-            !entrepriseUtilisateur.getId().equals(entrepriseFacture.getId())) {
-            throw new RuntimeException("Accès refusé : cette facture ne vous appartient pas.");
-        }
+    Entreprise entrepriseUtilisateur = utilisateur.getEntreprise();
+    Entreprise entrepriseFacture = facture.getEntreprise();
 
-        boolean isAdmin = utilisateur.getRole().getName() == RoleType.ADMIN;
-        boolean hasPermission = utilisateur.getRole().hasPermission(PermissionType.GESTION_FACTURATION);
+    if (entrepriseUtilisateur == null || entrepriseFacture == null ||
+        !entrepriseUtilisateur.getId().equals(entrepriseFacture.getId())) {
+        throw new RuntimeException("Accès refusé : cette facture ne vous appartient pas.");
+    }
 
-        boolean isCreateurFacture = facture.getUtilisateurCreateur() != null &&
+    boolean isAdmin = utilisateur.getRole().getName() == RoleType.ADMIN;
+    boolean hasPermission = utilisateur.getRole().hasPermission(PermissionType.GESTION_FACTURATION);
+    boolean isCreateurFacture = facture.getUtilisateurCreateur() != null &&
                                 facture.getUtilisateurCreateur().getId().equals(utilisateur.getId());
 
-
-        // 🔐 Accès autorisé si admin, permission, ou créateur de la facture
-        if (!(isAdmin || hasPermission || isCreateurFacture)) {
-            throw new RuntimeException("Accès refusé : vous n'avez pas les droits pour consulter cette facture.");
-        }
-            
-       
-    
-        System.out.println("✅ Facture récupérée par l'utilisateur ID: " + userId);
-        return facture;
+    if (!(isAdmin || hasPermission || isCreateurFacture)) {
+        throw new RuntimeException("Accès refusé : vous n'avez pas les droits pour consulter cette facture.");
     }
-    
+
+    return facture;
+}
+
+// Méthode publique pour récupérer le DTO (utilisée par l'API)
+public FactureProFormaDTO getFactureProformaById(Long id, HttpServletRequest request) {
+    FactureProForma facture = getFactureProformaEntityById(id, request);
+    return new FactureProFormaDTO(facture);
+}
+
     //Methode pour modifier note d'une facture pro forma que user lui meme a creer
     @Transactional
     public FactureProForma modifierNoteFacture(Long factureId, Long noteId, String nouveauContenu, HttpServletRequest request) {

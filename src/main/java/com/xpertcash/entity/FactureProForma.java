@@ -4,6 +4,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonManagedReference;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.xpertcash.entity.Enum.StatutFactureProForma;
 
@@ -25,6 +26,9 @@ public class FactureProForma {
 
     @Column(name = "date_creation", nullable = false)
     private LocalDateTime dateCreation;
+    private LocalDateTime dateCreationPro;
+
+
     private LocalDate dateFacture;
     private String description;
     private LocalDateTime dateApprobation;
@@ -76,6 +80,7 @@ public class FactureProForma {
 
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "utilisateur_createur_id")
+    @JsonManagedReference
     @JsonIgnoreProperties({"personalCode", "phone", "photo", "createdAt", "activationCode", "activatedLien", "enabledLien", "lastActivity", "locked", "pays", "role"})
     private User utilisateurCreateur;
 

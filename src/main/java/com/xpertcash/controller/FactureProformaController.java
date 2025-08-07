@@ -25,6 +25,8 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+
+import com.xpertcash.DTOs.FactureProFormaDTO;
 import com.xpertcash.configuration.JwtUtil;
 import com.xpertcash.entity.Entreprise;
 import com.xpertcash.entity.FactureProForma;
@@ -152,7 +154,8 @@ public class FactureProformaController {
             logger.info("Corps (taille): {}", body.length());
             logger.info("Pièces jointes: {}", attachments != null ? attachments.length : 0);
 
-            FactureProForma facture = factureProformaService.getFactureProformaById(id, httpRequest);
+           FactureProForma facture = factureProformaService.getFactureProformaEntityById(id, httpRequest);
+
 
             // Validation du statut
             if (facture.getStatut() != StatutFactureProForma.ENVOYE ||
@@ -201,11 +204,12 @@ public class FactureProformaController {
 
 
     // Endpoint Get bye id
-    @GetMapping("/factureProforma/{id}")
-    public ResponseEntity<FactureProForma> getFactureProformaById(@PathVariable Long id, HttpServletRequest request) {
-        FactureProForma facture = factureProformaService.getFactureProformaById(id, request);
-        return ResponseEntity.ok(facture);
+   @GetMapping("/factureProforma/{id}")
+    public ResponseEntity<FactureProFormaDTO> getFactureProformaById(@PathVariable Long id, HttpServletRequest request) {
+        FactureProFormaDTO factureDTO = factureProformaService.getFactureProformaById(id, request);
+        return ResponseEntity.ok(factureDTO);
     }
+
     
      //Endpoint pour recuperer les notes d'une facture pro forma
      @GetMapping("/factures/{id}/notes")

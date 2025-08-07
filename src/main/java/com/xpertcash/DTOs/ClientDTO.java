@@ -15,7 +15,7 @@ import lombok.NoArgsConstructor;
 
 public class ClientDTO {
     private Long id;
-    private String nom;
+    private String nomComplet;
     private String adresse;
     private String poste;
     private String email;
@@ -26,7 +26,7 @@ public class ClientDTO {
 
     public ClientDTO(Client client) {
         this.id = client.getId();
-        this.nom = client.getNomComplet();
+        this.nomComplet = client.getNomComplet();
         this.adresse = client.getAdresse();
         this.poste = client.getPoste();
         this.email = client.getEmail();

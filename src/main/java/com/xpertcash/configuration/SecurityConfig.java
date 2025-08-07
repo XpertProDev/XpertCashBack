@@ -18,59 +18,47 @@ import java.util.List;
 @EnableWebSecurity
 public class SecurityConfig {
 
-    @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-        http
-                // 1) CORS
-                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-                // 2) CSRF
-                .csrf(csrf -> csrf
-                        // on stocke le token dans un cookie lisible par JS
-                        .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
-                        // on ignore CSRF pour WS et pour toute l'API d'auth
-                        .ignoringRequestMatchers(
-                                // new AntPathRequestMatcher("/ws/**"),
-                                new AntPathRequestMatcher("/api/auth/**")
-                        )
-                )
-                // 3) Autorisations
-                .authorizeHttpRequests(auth -> auth
-                        // on autorise ces endpoints sans auth
-                        .requestMatchers("/csrf").permitAll()
-                        .requestMatchers("/api/auth/**").permitAll()
-                        // tout le reste est ouvert (ou vous pouvez restreindre)
-                        .anyRequest().permitAll()
-                );
-
-        return http.build();
-    }
-
+  
     @Bean
     public BCryptPasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
     }
 
     @Bean
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+        http
+            // Configuration CORS
+            .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+            // Configuration CSRF
+            .csrf(csrf -> csrf
+                .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
+                .ignoringRequestMatchers(new AntPathRequestMatcher("/api/auth/**"))
+            )
+            // Configuration des autorisations
+            .authorizeRequests()
+            .requestMatchers("/csrf", "/api/auth/**").permitAll()
+            .anyRequest().permitAll();
+
+        return http.build();
+    }
+
+    @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
         configuration.setAllowedOrigins(List.of(
-                "http://localhost:4200",
-                "http://192.168.1.5:4200",
+                "http://localhost:4200", 
+                "http://192.168.1.6:4200", 
                 "https://tchakeda.com",
-                "https://www.tchakeda.com",
+                "https://www.tchakeda.com", 
                 "https://xpertcash.tchakeda.com"
         ));
-        configuration.setAllowedMethods(List.of("GET","POST","PUT","PATCH","DELETE","OPTIONS"));
-        configuration.setAllowedHeaders(List.of(
-                "Authorization",
-                "Content-Type",
-                "X-XSRF-TOKEN"    // nécessaire pour le header CSRF Angular
-        ));
+        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
+        configuration.setAllowedHeaders(List.of("Authorization", "Content-Type", "X-XSRF-TOKEN"));
         configuration.setAllowCredentials(true);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        // appliqué à toutes les routes
         source.registerCorsConfiguration("/**", configuration);
         return source;
     }
+   
 }

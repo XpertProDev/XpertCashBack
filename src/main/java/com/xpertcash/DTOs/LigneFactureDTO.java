@@ -1,6 +1,7 @@
 package com.xpertcash.DTOs;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import com.xpertcash.entity.LigneFactureProforma;
 import com.xpertcash.entity.LigneFactureReelle;
 
 import lombok.AllArgsConstructor;
@@ -14,7 +15,7 @@ import lombok.NoArgsConstructor;
 
 public class LigneFactureDTO {
     private Long id;
-    private String produitNom;
+   private ProduitDTO produit;
     private String ligneDescription;
     private int quantite;
     private double prixUnitaire;
@@ -23,11 +24,26 @@ public class LigneFactureDTO {
     // ✅ Constructeur depuis l'entité LigneFactureReelle
     public LigneFactureDTO(LigneFactureReelle ligneFacture) {
         this.id = ligneFacture.getId();
-        this.produitNom = ligneFacture.getProduit() != null ? ligneFacture.getProduit().getNom() : null;
+       this.produit = (ligneFacture.getProduit() != null) 
+        ? new ProduitDTO(ligneFacture.getProduit()) 
+        : null;
+
         this.ligneDescription = ligneFacture.getLigneDescription() != null ? ligneFacture.getLigneDescription() : null;
         this.quantite = ligneFacture.getQuantite();
         this.prixUnitaire = ligneFacture.getPrixUnitaire();
         this.montantTotal = ligneFacture.getMontantTotal();
     }
+
+    // ✅ Constructeur depuis l'entité LigneFactureProforma
+public LigneFactureDTO(LigneFactureProforma ligneFacture) {
+    this.id = ligneFacture.getId();
+    this.produit = ligneFacture.getProduit() != null ? new ProduitDTO(ligneFacture.getProduit()) : null;
+    this.ligneDescription = ligneFacture.getLigneDescription();
+    this.quantite = ligneFacture.getQuantite();
+    this.prixUnitaire = ligneFacture.getPrixUnitaire();
+    this.montantTotal = ligneFacture.getMontantTotal();
+}
+
+
 }
 
