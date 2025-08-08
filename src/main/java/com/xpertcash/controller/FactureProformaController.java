@@ -93,14 +93,14 @@ public class FactureProformaController {
     
     // Endpoint pour modifier une facture pro forma
     @PutMapping("/updatefacture/{factureId}")
-    public ResponseEntity<FactureProForma> updateFacture(
+    public ResponseEntity<FactureProFormaDTO> updateFacture(
             @PathVariable Long factureId,
             @RequestParam(required = false) Double remisePourcentage,
             @RequestParam(required = false) Boolean appliquerTVA,
             @RequestParam(required = false) List<Long> idsApprobateurs,
             @RequestBody FactureProForma modifications, HttpServletRequest request) {
     
-        FactureProForma factureModifiee = factureProformaService.modifierFacture(factureId, remisePourcentage, appliquerTVA, modifications,idsApprobateurs, request);
+        FactureProFormaDTO factureModifiee = factureProformaService.modifierFacture(factureId, remisePourcentage, appliquerTVA, modifications,idsApprobateurs, request);
         return ResponseEntity.ok(factureModifiee);
     }
     
@@ -352,33 +352,35 @@ public class FactureProformaController {
 
 
     // Endpoint pour trier
-    @GetMapping("/mes-factures/par-periode")
-    public ResponseEntity<List<Map<String, Object>>> getFacturesParPeriode(
-            @RequestParam(name = "type") String typePeriode,
-            @RequestParam(name = "dateDebut", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateDebut,
-            @RequestParam(name = "dateFin", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateFin,
-            HttpServletRequest request
-    ) {
-        String token = request.getHeader("Authorization");
-        if (token == null || !token.startsWith("Bearer ")) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(null);
-        }
-
-        Long userId;
-        try {
-            userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(null);
-        }
-
-        try {
-            List<Map<String, Object>> factures = factureProformaService.getFacturesParPeriode(
-                    userId, request, typePeriode, dateDebut, dateFin);
-            return ResponseEntity.ok(factures);
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
-        }
+   @GetMapping("/mes-factures/par-periode")
+public ResponseEntity<List<FactureProFormaDTO>> getFacturesParPeriode(
+        @RequestParam(name = "type") String typePeriode,
+        @RequestParam(name = "dateDebut", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateDebut,
+        @RequestParam(name = "dateFin", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateFin,
+        HttpServletRequest request
+) {
+    String token = request.getHeader("Authorization");
+    if (token == null || !token.startsWith("Bearer ")) {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(null);
     }
+
+    Long userId;
+    try {
+        userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
+    } catch (Exception e) {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(null);
+    }
+
+    try {
+        // Appel de la méthode pour récupérer les factures sous forme de DTO
+        List<FactureProFormaDTO> facturesDTO = factureProformaService.getFacturesParPeriode(
+                userId, request, typePeriode, dateDebut, dateFin
+        );
+        return ResponseEntity.ok(facturesDTO); // Retourner les factures sous forme de DTO
+    } catch (Exception e) {
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
+    }
+}
 
 
 }

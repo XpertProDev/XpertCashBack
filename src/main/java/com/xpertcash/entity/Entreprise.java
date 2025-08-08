@@ -12,6 +12,7 @@ import java.util.Set;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonManagedReference;
 import com.xpertcash.entity.Module.AppModule;
 
 @Entity
@@ -96,7 +97,7 @@ public class Entreprise {
     private User admin;
 
     @OneToMany(mappedBy = "entreprise", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    @JsonIgnoreProperties({"entreprise"})
+    @JsonManagedReference
     private List<FactureProForma> facturesProforma = new ArrayList<>();
 
     @ManyToMany(fetch = FetchType.EAGER)

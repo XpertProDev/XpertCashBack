@@ -53,7 +53,7 @@ public class FactureProFormaDTO {
         this.numeroFacture = facture.getNumeroFacture();
         this.description = facture.getDescription();
         this.dateCreation = facture.getDateCreation();
-        this.dateCreationPro = facture.getDateCreationPro();
+        this.dateCreationPro = facture.getDateCreation();
 
         
         this.totalFacture = facture.getTotalFacture();
