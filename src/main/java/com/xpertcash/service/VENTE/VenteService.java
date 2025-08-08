@@ -5,6 +5,10 @@ import com.xpertcash.DTOs.VENTE.VenteResponse;
 import com.xpertcash.composant.Utilitaire;
 import com.xpertcash.entity.*;
 import com.xpertcash.repository.*;
+import com.xpertcash.repository.VENTE.VenteHistoriqueRepository;
+import com.xpertcash.repository.VENTE.VenteProduitRepository;
+import com.xpertcash.repository.VENTE.VenteRepository;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -16,6 +20,11 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 import com.xpertcash.entity.Enum.RoleType;
+import com.xpertcash.entity.VENTE.TypeMouvementCaisse;
+import com.xpertcash.entity.VENTE.Vente;
+import com.xpertcash.entity.VENTE.VenteHistorique;
+import com.xpertcash.entity.VENTE.VenteProduit;
+
 import jakarta.servlet.http.HttpServletRequest;
 
 import com.xpertcash.configuration.JwtUtil;
@@ -211,19 +220,15 @@ public class VenteService {
 
 
 public List<VenteResponse> getVentesByVendeur(Long vendeurId, HttpServletRequest request) {
-        // 1️⃣ Récupération de l'utilisateur connecté
         User user = utilitaire.getAuthenticatedUser(request);
 
-        // 2️⃣ Récupération du vendeur ciblé
         User vendeur = usersRepository.findById(vendeurId)
                 .orElseThrow(() -> new RuntimeException("Vendeur introuvable"));
 
-        // 3️⃣ Sécurité
         RoleType role = user.getRole().getName();
         boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
 
         if (!isAdminOrManager) {
-            // Si c'est un vendeur, il ne peut voir que ses propres ventes
             if (!user.getId().equals(vendeurId)) {
                 throw new RuntimeException("Vous n'avez pas les droits nécessaires pour consulter les ventes de ce vendeur !");
             }

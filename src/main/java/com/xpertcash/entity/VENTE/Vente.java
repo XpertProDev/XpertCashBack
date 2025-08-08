@@ -1,4 +1,4 @@
-package com.xpertcash.entity;
+package com.xpertcash.entity.VENTE;
 
 import lombok.Data;
 import jakarta.persistence.Entity;
@@ -14,6 +14,10 @@ import jakarta.persistence.EnumType;
 
 import java.time.LocalDateTime;
 import java.util.List;
+
+import com.xpertcash.entity.Boutique;
+import com.xpertcash.entity.ModePaiement;
+import com.xpertcash.entity.User;
 
 @Data
 @Entity

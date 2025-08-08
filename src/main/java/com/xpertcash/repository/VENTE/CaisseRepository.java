@@ -1,7 +1,7 @@
-package com.xpertcash.repository;
+package com.xpertcash.repository.VENTE;
 
 import com.xpertcash.entity.Caisse;
-import com.xpertcash.entity.StatutCaisse;
+import com.xpertcash.entity.VENTE.StatutCaisse;
 
 import java.util.List;
 import java.util.Optional;
@@ -20,6 +20,9 @@ public interface CaisseRepository extends JpaRepository<Caisse, Long> {
 
     List<Caisse> findByBoutiqueId(Long boutiqueId);
     List<Caisse> findByVendeurId(Long vendeurId);
+
+    Optional<Caisse> findTopByBoutiqueIdAndVendeurIdOrderByDateOuvertureDesc(Long boutiqueId, Long vendeurId);
+
 
 
 }

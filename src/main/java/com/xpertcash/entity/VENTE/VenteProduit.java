@@ -1,6 +1,9 @@
-package com.xpertcash.entity;
+package com.xpertcash.entity.VENTE;
 
 import lombok.Data;
+
+import com.xpertcash.entity.Produit;
+
 import jakarta.persistence.*;
 
 @Data

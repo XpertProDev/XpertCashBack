@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -142,6 +143,22 @@ public class CaisseController {
     ) {
         List<CaisseResponseDTO> caisses = caisseService.getCaissesByVendeur(vendeurId, request);
         return ResponseEntity.ok(caisses);
+    }
+
+
+    @GetMapping("/caisse/derniere/{boutiqueId}")
+    public ResponseEntity<?> getDerniereCaisseVendeur(
+            @PathVariable Long boutiqueId,
+            HttpServletRequest request) {
+
+        Optional<CaisseResponseDTO> caisseOpt = caisseService.getDerniereCaisseVendeur(boutiqueId, request);
+
+        if (caisseOpt.isEmpty()) {
+            // Message clair si aucune caisse n'a été trouvée
+            return ResponseEntity.ok("Aucune caisse trouvée pour ce vendeur dans cette boutique.");
+        }
+
+        return ResponseEntity.ok(caisseOpt.get());
     }
 
 }

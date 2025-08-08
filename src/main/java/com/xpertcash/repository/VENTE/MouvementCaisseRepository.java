@@ -1,7 +1,8 @@
-package com.xpertcash.repository;
+package com.xpertcash.repository.VENTE;
 
-import com.xpertcash.entity.MouvementCaisse;
 import org.springframework.data.jpa.repository.JpaRepository;
+
+import com.xpertcash.entity.VENTE.MouvementCaisse;
 
 public interface MouvementCaisseRepository extends JpaRepository<MouvementCaisse, Long> {
 }

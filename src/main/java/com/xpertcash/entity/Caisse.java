@@ -4,6 +4,8 @@ import lombok.Data;
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
 
+import com.xpertcash.entity.VENTE.StatutCaisse;
+
 @Data
 @Entity
 public class Caisse {

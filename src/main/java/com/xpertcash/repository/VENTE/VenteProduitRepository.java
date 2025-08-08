@@ -1,7 +1,8 @@
-package com.xpertcash.repository;
+package com.xpertcash.repository.VENTE;
 
-import com.xpertcash.entity.VenteProduit;
 import org.springframework.data.jpa.repository.JpaRepository;
+
+import com.xpertcash.entity.VENTE.VenteProduit;
 
 public interface VenteProduitRepository extends JpaRepository<VenteProduit, Long> {
 }
