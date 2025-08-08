@@ -1,5 +1,7 @@
 package com.xpertcash.DTOs;
 
+import java.util.List;
+
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.xpertcash.entity.LigneFactureProforma;
 import com.xpertcash.entity.LigneFactureReelle;
@@ -20,6 +22,7 @@ public class LigneFactureDTO {
     private int quantite;
     private double prixUnitaire;
     private double montantTotal;
+    private List<LigneFactureDTO> ligneFactureProforma;
 
     // ✅ Constructeur depuis l'entité LigneFactureReelle
     public LigneFactureDTO(LigneFactureReelle ligneFacture) {
@@ -44,6 +47,13 @@ public LigneFactureDTO(LigneFactureProforma ligneFacture) {
     this.montantTotal = ligneFacture.getMontantTotal();
 }
 
+public List<LigneFactureDTO> getLigneFactureProforma() {
+        return ligneFactureProforma;
+    }
+
+    public void setLigneFactureProforma(List<LigneFactureDTO> ligneFactureProforma) {
+        this.ligneFactureProforma = ligneFactureProforma;
+    }
 
 }
 

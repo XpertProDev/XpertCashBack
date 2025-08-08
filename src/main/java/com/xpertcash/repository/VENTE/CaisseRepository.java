@@ -25,6 +25,8 @@ public interface CaisseRepository extends JpaRepository<Caisse, Long> {
 
     Optional<Caisse> findFirstByBoutiqueIdAndVendeurIdOrderByDateOuvertureDesc(Long boutiqueId, Long vendeurId);
 
+    Optional<Caisse> findByVendeurIdAndStatut(Long vendeurId, StatutCaisse statut);
+
 
 
 }

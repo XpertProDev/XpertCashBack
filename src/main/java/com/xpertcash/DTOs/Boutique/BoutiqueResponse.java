@@ -21,4 +21,5 @@ public class BoutiqueResponse {
     private TypeBoutique typeBoutique;
     
     
+    
 }

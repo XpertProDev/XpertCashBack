@@ -352,7 +352,7 @@ public class FactureProformaController {
 
 
     // Endpoint pour trier
-   @GetMapping("/mes-factures/par-periode")
+@GetMapping("/mes-factures/par-periode")
 public ResponseEntity<List<FactureProFormaDTO>> getFacturesParPeriode(
         @RequestParam(name = "type") String typePeriode,
         @RequestParam(name = "dateDebut", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateDebut,
@@ -366,18 +366,20 @@ public ResponseEntity<List<FactureProFormaDTO>> getFacturesParPeriode(
 
     Long userId;
     try {
+        // Extraire l'ID de l'utilisateur à partir du token JWT
         userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
     } catch (Exception e) {
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(null);
     }
 
     try {
-        // Appel de la méthode pour récupérer les factures sous forme de DTO
+        // Appeler le service pour obtenir les factures en fonction de la période
         List<FactureProFormaDTO> facturesDTO = factureProformaService.getFacturesParPeriode(
-                userId, request, typePeriode, dateDebut, dateFin
-        );
-        return ResponseEntity.ok(facturesDTO); // Retourner les factures sous forme de DTO
+                userId, request, typePeriode, dateDebut, dateFin);
+        
+        return ResponseEntity.ok(facturesDTO);  // Retourner la liste des DTOs
     } catch (Exception e) {
+        // Gérer les exceptions
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
     }
 }
