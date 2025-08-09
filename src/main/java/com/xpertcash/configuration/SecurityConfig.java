@@ -18,7 +18,7 @@ import java.util.List;
 @EnableWebSecurity
 public class SecurityConfig {
 
-
+  
     @Bean
     public BCryptPasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
@@ -27,17 +27,17 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-                // Configuration CORS
-                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-                // Configuration CSRF
-                .csrf(csrf -> csrf
-                        .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
-                        .ignoringRequestMatchers(new AntPathRequestMatcher("/api/auth/**"))
-                )
-                // Configuration des autorisations
-                .authorizeRequests()
-                .requestMatchers("/csrf", "/api/auth/**").permitAll()
-                .anyRequest().permitAll();
+            // Configuration CORS
+            .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+            // Configuration CSRF
+            .csrf(csrf -> csrf
+                .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
+                .ignoringRequestMatchers(new AntPathRequestMatcher("/api/auth/**"))
+            )
+            // Configuration des autorisations
+            .authorizeRequests()
+            .requestMatchers("/csrf", "/api/auth/**").permitAll()
+            .anyRequest().permitAll();
 
         return http.build();
     }
@@ -46,10 +46,10 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
         configuration.setAllowedOrigins(List.of(
-                "http://localhost:4200",
+                "http://localhost:4200", 
                 "http://192.168.1.9:4200",
                 "https://tchakeda.com",
-                "https://www.tchakeda.com",
+                "https://www.tchakeda.com", 
                 "https://xpertcash.tchakeda.com"
         ));
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
@@ -60,5 +60,5 @@ public class SecurityConfig {
         source.registerCorsConfiguration("/**", configuration);
         return source;
     }
-
+   
 }
