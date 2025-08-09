@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Map;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.xpertcash.entity.Produit;
 
 import jakarta.persistence.Column;
 import jakarta.validation.constraints.NotNull;
@@ -76,5 +77,30 @@ public class ProduitDTO {
         this.boutiqueId = boutiqueId;
     }
         
+
+    public ProduitDTO(Produit produit) {
+    this.id = produit.getId();
+    this.nom = produit.getNom();
+    this.prixVente = produit.getPrixVente();
+    this.prixAchat = produit.getPrixAchat();
+    this.quantite = produit.getQuantite();
+    this.seuilAlert = produit.getSeuilAlert();
+    this.categorieId = produit.getCategorie() != null ? produit.getCategorie().getId() : null;
+    this.uniteId = produit.getUniteDeMesure() != null ? produit.getUniteDeMesure().getId() : null;
+    this.codeBare = produit.getCodeBare();
+    this.codeGenerique = produit.getCodeGenerique();
+    this.description = produit.getDescription();
+    this.photo = produit.getPhoto();
+    this.enStock = produit.getEnStock();
+    this.nomCategorie = produit.getCategorie() != null ? produit.getCategorie().getNom() : null;
+    this.nomUnite = produit.getUniteDeMesure() != null ? produit.getUniteDeMesure().getNom() : null;
+    this.typeProduit = produit.getTypeProduit().name();
+    this.createdAt = produit.getCreatedAt();
+    this.lastUpdated = produit.getLastUpdated();
+    this.datePreemption = produit.getDatePreemption();
+    this.boutiqueId = produit.getBoutique() != null ? produit.getBoutique().getId() : null;
+    // this.boutiques = produit.getBoutiques();
+}
+
     
 }

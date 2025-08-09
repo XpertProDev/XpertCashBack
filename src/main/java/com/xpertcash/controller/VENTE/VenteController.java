@@ -18,7 +18,7 @@ public class VenteController {
     @Autowired
     private VenteService venteService;
 
-    @PostMapping("/enregistrer")
+    @PostMapping("/vente/enregistrer")
     public ResponseEntity<VenteResponse> enregistrerVente(@RequestBody VenteRequest request, HttpServletRequest httpRequest) {
         VenteResponse response = venteService.enregistrerVente(request, httpRequest);
         return ResponseEntity.ok(response);

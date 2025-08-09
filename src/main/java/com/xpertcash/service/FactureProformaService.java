@@ -13,6 +13,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
+
+import com.xpertcash.DTOs.FactureProFormaDTO;
 import com.xpertcash.configuration.CentralAccess;
 import com.xpertcash.configuration.JwtUtil;
 import com.xpertcash.entity.Client;
@@ -312,7 +314,7 @@ public class FactureProformaService {
 
     // Méthode pour modifier une facture pro forma
     @Transactional
-    public FactureProForma modifierFacture(Long factureId, Double remisePourcentage, Boolean appliquerTVA, FactureProForma modifications, List<Long> idsApprobateurs, HttpServletRequest request) {
+    public FactureProFormaDTO modifierFacture(Long factureId, Double remisePourcentage, Boolean appliquerTVA, FactureProForma modifications, List<Long> idsApprobateurs, HttpServletRequest request) {
         // 🔐 Récupération de la facture
         FactureProForma facture = factureProformaRepository.findById(factureId)
                 .orElseThrow(() -> new RuntimeException("Facture non trouvée !"));
@@ -410,7 +412,7 @@ public class FactureProformaService {
                     "La facture a été annulée. La facture réelle associée a été supprimée."
             );
 
-            return factureProformaRepository.save(facture);
+            return new FactureProFormaDTO(facture);
         }
 
         // 🔁 Application des modifications normales
@@ -708,7 +710,7 @@ public class FactureProformaService {
         }
 
 
-        return factureProformaRepository.save(facture);
+        return new FactureProFormaDTO(facture);
     }
 
     //Supression dune facture proforma en brouillon
@@ -838,60 +840,8 @@ public void supprimerFactureProforma(Long factureId, String token) {
 //Trie:
    
     // Methode pour recuperer une facture pro forma par son id
-    public FactureProForma getFactureProformaById(Long id, HttpServletRequest request) {
-        String token = request.getHeader("Authorization");
-        if (token == null || !token.startsWith("Bearer ")) {
-            throw new RuntimeException("Token JWT manquant ou mal formaté");
-        }
-    
-          Long userId;
-            try {
-                userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
-            } catch (Exception e) {
-                throw new RuntimeException("Erreur lors de l'extraction de l'ID utilisateur depuis le token", e);
-            }
-    
-         User utilisateur = usersRepository.findById(userId)
-        .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
-
-        FactureProForma facture = factureProformaRepository.findById(id)
-            .orElseThrow(() -> new RuntimeException("Facture Proforma introuvable avec l'ID : " + id));
-        
-        Entreprise entrepriseUtilisateur = utilisateur.getEntreprise();
-        Entreprise entrepriseFacture = facture.getEntreprise();
-
-        // 🔒 Vérifier l'appartenance à la même entreprise
-        if (entrepriseUtilisateur == null || entrepriseFacture == null ||
-            !entrepriseUtilisateur.getId().equals(entrepriseFacture.getId())) {
-            throw new RuntimeException("Accès refusé : cette facture ne vous appartient pas.");
-        }
-
-        boolean isAdmin = utilisateur.getRole().getName() == RoleType.ADMIN;
-        boolean hasPermission = utilisateur.getRole().hasPermission(PermissionType.GESTION_FACTURATION);
-
-        boolean isCreateurFacture = facture.getUtilisateurCreateur() != null &&
-                                facture.getUtilisateurCreateur().getId().equals(utilisateur.getId());
-
-
-        // 🔐 Accès autorisé si admin, permission, ou créateur de la facture
-        if (!(isAdmin || hasPermission || isCreateurFacture)) {
-            throw new RuntimeException("Accès refusé : vous n'avez pas les droits pour consulter cette facture.");
-        }
-            
-       
-    
-        System.out.println("✅ Facture récupérée par l'utilisateur ID: " + userId);
-        return facture;
-    }
-    
-    //Methode pour modifier note d'une facture pro forma que user lui meme a creer
-    @Transactional
-    public FactureProForma modifierNoteFacture(Long factureId, Long noteId, String nouveauContenu, HttpServletRequest request) {
-        // Récupération de la facture
-        FactureProForma facture = factureProformaRepository.findById(factureId)
-                .orElseThrow(() -> new RuntimeException("Facture non trouvée !"));
-
-        // Vérification du token JWT 
+    // Méthode privée pour récupérer l'entité FactureProForma avec contrôle d'accès
+    public FactureProForma getFactureProformaEntityById(Long id, HttpServletRequest request) {
         String token = request.getHeader("Authorization");
         if (token == null || !token.startsWith("Bearer ")) {
             throw new RuntimeException("Token JWT manquant ou mal formaté");
@@ -901,35 +851,87 @@ public void supprimerFactureProforma(Long factureId, String token) {
         try {
             userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
         } catch (Exception e) {
-            throw new RuntimeException("Erreur lors de l'extraction de l'ID de l'utilisateur depuis le token", e);
+            throw new RuntimeException("Erreur lors de l'extraction de l'ID utilisateur depuis le token", e);
         }
 
-        User user = usersRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("Utilisateur introuvable !"));
+        User utilisateur = usersRepository.findById(userId)
+            .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
 
-        // Récupération de la note à modifier
-        NoteFactureProForma note = noteFactureProFormaRepository.findById(noteId)
-                .orElseThrow(() -> new RuntimeException("Note introuvable avec l'ID : " + noteId));
+        FactureProForma facture = factureProformaRepository.findById(id)
+            .orElseThrow(() -> new RuntimeException("Facture Proforma introuvable avec l'ID : " + id));
 
-        // Vérification que la note appartient bien à la facture
-        if (!note.getFacture().getId().equals(factureId)) {
-            throw new RuntimeException("Cette note n'appartient pas à la facture spécifiée !");
+        Entreprise entrepriseUtilisateur = utilisateur.getEntreprise();
+        Entreprise entrepriseFacture = facture.getEntreprise();
+
+        if (entrepriseUtilisateur == null || entrepriseFacture == null ||
+            !entrepriseUtilisateur.getId().equals(entrepriseFacture.getId())) {
+            throw new RuntimeException("Accès refusé : cette facture ne vous appartient pas.");
         }
 
-        // Vérification que l'utilisateur est le créateur de la note
-        if (!note.getAuteur().getId().equals(user.getId())) {
-            throw new RuntimeException("Vous n'êtes pas autorisé à modifier cette note !");
+        boolean isAdmin = utilisateur.getRole().getName() == RoleType.ADMIN;
+        boolean hasPermission = utilisateur.getRole().hasPermission(PermissionType.GESTION_FACTURATION);
+        boolean isCreateurFacture = facture.getUtilisateurCreateur() != null &&
+                                    facture.getUtilisateurCreateur().getId().equals(utilisateur.getId());
+
+        if (!(isAdmin || hasPermission || isCreateurFacture)) {
+            throw new RuntimeException("Accès refusé : vous n'avez pas les droits pour consulter cette facture.");
         }
 
-        // Mise à jour du contenu de la note
-        note.setContenu(nouveauContenu);
-        note.setDateDerniereModification(LocalDateTime.now());
-        note.setModifiee(true);
-        note.setAuteur(user);
-
-        noteFactureProFormaRepository.save(note);
-        return factureProformaRepository.save(facture);
+        return facture;
     }
+
+// Méthode publique pour récupérer le DTO (utilisée par l'API)
+public FactureProFormaDTO getFactureProformaById(Long id, HttpServletRequest request) {
+    FactureProForma facture = getFactureProformaEntityById(id, request);
+    return new FactureProFormaDTO(facture);
+}
+
+    //Methode pour modifier note d'une facture pro forma que user lui meme a creer
+        @Transactional
+        public FactureProFormaDTO modifierNoteFacture(Long factureId, Long noteId, String nouveauContenu, HttpServletRequest request) {
+            // Récupération de la facture
+            FactureProForma facture = factureProformaRepository.findById(factureId)
+                    .orElseThrow(() -> new RuntimeException("Facture non trouvée !"));
+
+            // Vérification du token JWT 
+            String token = request.getHeader("Authorization");
+            if (token == null || !token.startsWith("Bearer ")) {
+                throw new RuntimeException("Token JWT manquant ou mal formaté");
+            }
+
+            Long userId;
+            try {
+                userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
+            } catch (Exception e) {
+                throw new RuntimeException("Erreur lors de l'extraction de l'ID de l'utilisateur depuis le token", e);
+            }
+
+            User user = usersRepository.findById(userId)
+                    .orElseThrow(() -> new RuntimeException("Utilisateur introuvable !"));
+
+            // Récupération de la note à modifier
+            NoteFactureProForma note = noteFactureProFormaRepository.findById(noteId)
+                    .orElseThrow(() -> new RuntimeException("Note introuvable avec l'ID : " + noteId));
+
+            // Vérification que la note appartient bien à la facture
+            if (!note.getFacture().getId().equals(factureId)) {
+                throw new RuntimeException("Cette note n'appartient pas à la facture spécifiée !");
+            }
+
+            // Vérification que l'utilisateur est le créateur de la note
+            if (!note.getAuteur().getId().equals(user.getId())) {
+                throw new RuntimeException("Vous n'êtes pas autorisé à modifier cette note !");
+            }
+
+            // Mise à jour du contenu de la note
+            note.setContenu(nouveauContenu);
+            note.setDateDerniereModification(LocalDateTime.now());
+            note.setModifiee(true);
+            note.setAuteur(user);
+
+            noteFactureProFormaRepository.save(note);
+            return new FactureProFormaDTO(facture);
+        }
 
     //Generate
     private String genererNumeroNotePourFacture(FactureProForma facture) {
@@ -953,7 +955,7 @@ public void supprimerFactureProforma(Long factureId, String token) {
   
    // Methode pour supprimer une note d'une facture pro forma que user lui meme a creer
    @Transactional
-    public FactureProForma supprimerNoteFacture(Long factureId, Long noteId, HttpServletRequest request) {
+    public FactureProFormaDTO supprimerNoteFacture(Long factureId, Long noteId, HttpServletRequest request) {
         FactureProForma facture = factureProformaRepository.findById(factureId)
                 .orElseThrow(() -> new RuntimeException("Facture non trouvée !"));
 
@@ -1005,7 +1007,9 @@ public void supprimerFactureProforma(Long factureId, String token) {
         );
 
         // Retourner la facture mise à jour
-        return factureProformaRepository.save(facture);
+        // return factureProformaRepository.save(facture);
+        return new FactureProFormaDTO(facture);
+
     }
 
     //Methode get note dune facture by id
@@ -1051,7 +1055,7 @@ public void supprimerFactureProforma(Long factureId, String token) {
 
 
     //Trier
-   public List<Map<String, Object>> getFacturesParPeriode(Long userIdRequete, HttpServletRequest request,
+    public List<FactureProFormaDTO> getFacturesParPeriode(Long userIdRequete, HttpServletRequest request,
                                                        String typePeriode, LocalDate dateDebut, LocalDate dateFin) {
     // 🔐 Extraire le token JWT et récupérer l'utilisateur courant
     String token = request.getHeader("Authorization");
@@ -1126,29 +1130,12 @@ public void supprimerFactureProforma(Long factureId, String token) {
             .collect(Collectors.toList());
     }
 
-    // ✅ Trier et transformer en liste de map
+    // ✅ Trier et transformer les factures en DTO
     return factures.stream()
         .sorted(Comparator.comparing(FactureProForma::getDateCreation).reversed())
-        .map(facture -> {
-            Map<String, Object> map = new HashMap<>();
-            map.put("id", facture.getId());
-            map.put("numeroFacture", facture.getNumeroFacture());
-            map.put("dateCreation", facture.getDateCreation());
-            map.put("description", facture.getDescription());
-            map.put("totalHT", facture.getTotalHT());
-            map.put("remise", facture.getRemise());
-            map.put("tva", facture.isTva());
-            map.put("totalFacture", facture.getTotalFacture());
-            map.put("statut", facture.getStatut());
-            map.put("ligneFactureProforma", facture.getLignesFacture());
-            map.put("client", facture.getClient() != null ? facture.getClient().getNomComplet() : null);
-            map.put("entrepriseClient", facture.getEntrepriseClient() != null ? facture.getEntrepriseClient().getNom() : null);
-            map.put("entreprise", facture.getEntreprise() != null ? facture.getEntreprise().getNomEntreprise() : null);
-            map.put("dateRelance", facture.getDateRelance());
-            map.put("notifie", facture.isNotifie());
-            return map;
-        })
+        .map(facture -> new FactureProFormaDTO(facture)) // Transformation en DTO
         .collect(Collectors.toList());
 }
 
+   
 }

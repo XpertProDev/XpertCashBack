@@ -25,6 +25,8 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+
+import com.xpertcash.DTOs.FactureProFormaDTO;
 import com.xpertcash.configuration.JwtUtil;
 import com.xpertcash.entity.Entreprise;
 import com.xpertcash.entity.FactureProForma;
@@ -91,14 +93,14 @@ public class FactureProformaController {
     
     // Endpoint pour modifier une facture pro forma
     @PutMapping("/updatefacture/{factureId}")
-    public ResponseEntity<FactureProForma> updateFacture(
+    public ResponseEntity<FactureProFormaDTO> updateFacture(
             @PathVariable Long factureId,
             @RequestParam(required = false) Double remisePourcentage,
             @RequestParam(required = false) Boolean appliquerTVA,
             @RequestParam(required = false) List<Long> idsApprobateurs,
             @RequestBody FactureProForma modifications, HttpServletRequest request) {
     
-        FactureProForma factureModifiee = factureProformaService.modifierFacture(factureId, remisePourcentage, appliquerTVA, modifications,idsApprobateurs, request);
+        FactureProFormaDTO factureModifiee = factureProformaService.modifierFacture(factureId, remisePourcentage, appliquerTVA, modifications,idsApprobateurs, request);
         return ResponseEntity.ok(factureModifiee);
     }
     
@@ -152,7 +154,8 @@ public class FactureProformaController {
             logger.info("Corps (taille): {}", body.length());
             logger.info("Pièces jointes: {}", attachments != null ? attachments.length : 0);
 
-            FactureProForma facture = factureProformaService.getFactureProformaById(id, httpRequest);
+           FactureProForma facture = factureProformaService.getFactureProformaEntityById(id, httpRequest);
+
 
             // Validation du statut
             if (facture.getStatut() != StatutFactureProForma.ENVOYE ||
@@ -201,11 +204,12 @@ public class FactureProformaController {
 
 
     // Endpoint Get bye id
-    @GetMapping("/factureProforma/{id}")
-    public ResponseEntity<FactureProForma> getFactureProformaById(@PathVariable Long id, HttpServletRequest request) {
-        FactureProForma facture = factureProformaService.getFactureProformaById(id, request);
-        return ResponseEntity.ok(facture);
+   @GetMapping("/factureProforma/{id}")
+    public ResponseEntity<FactureProFormaDTO> getFactureProformaById(@PathVariable Long id, HttpServletRequest request) {
+        FactureProFormaDTO factureDTO = factureProformaService.getFactureProformaById(id, request);
+        return ResponseEntity.ok(factureDTO);
     }
+
     
      //Endpoint pour recuperer les notes d'une facture pro forma
      @GetMapping("/factures/{id}/notes")
@@ -348,33 +352,35 @@ public class FactureProformaController {
 
 
     // Endpoint pour trier
-    @GetMapping("/mes-factures/par-periode")
-    public ResponseEntity<List<Map<String, Object>>> getFacturesParPeriode(
-            @RequestParam(name = "type") String typePeriode,
-            @RequestParam(name = "dateDebut", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateDebut,
-            @RequestParam(name = "dateFin", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateFin,
-            HttpServletRequest request
-    ) {
-        String token = request.getHeader("Authorization");
-        if (token == null || !token.startsWith("Bearer ")) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(null);
-        }
-
-        Long userId;
-        try {
-            userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(null);
-        }
-
-        try {
-            List<Map<String, Object>> factures = factureProformaService.getFacturesParPeriode(
-                    userId, request, typePeriode, dateDebut, dateFin);
-            return ResponseEntity.ok(factures);
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
-        }
+   @GetMapping("/mes-factures/par-periode")
+public ResponseEntity<List<FactureProFormaDTO>> getFacturesParPeriode(
+        @RequestParam(name = "type") String typePeriode,
+        @RequestParam(name = "dateDebut", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateDebut,
+        @RequestParam(name = "dateFin", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateFin,
+        HttpServletRequest request
+) {
+    String token = request.getHeader("Authorization");
+    if (token == null || !token.startsWith("Bearer ")) {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(null);
     }
+
+    Long userId;
+    try {
+        userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
+    } catch (Exception e) {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(null);
+    }
+
+    try {
+        // Appel de la méthode pour récupérer les factures sous forme de DTO
+        List<FactureProFormaDTO> facturesDTO = factureProformaService.getFacturesParPeriode(
+                userId, request, typePeriode, dateDebut, dateFin
+        );
+        return ResponseEntity.ok(facturesDTO); // Retourner les factures sous forme de DTO
+    } catch (Exception e) {
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
+    }
+}
 
 
 }

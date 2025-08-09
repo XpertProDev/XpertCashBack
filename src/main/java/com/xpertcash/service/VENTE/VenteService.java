@@ -172,7 +172,8 @@ public class VenteService {
             }
         }
         vente.setModePaiement(modePaiement);
-        vente.setMontantPaye(request.getMontantPaye());
+        // vente.setMontantPaye(request.getMontantPaye());
+        vente.setMontantPaye(montantTotal); // on ignore le montant saisi manuellement
 
         // Encaissement : ajouter le montant de la vente à la caisse
         caisseService.ajouterMouvement(
@@ -182,7 +183,8 @@ public class VenteService {
             "Encaissement vente ID " + vente.getId(),
             vente,
             modePaiement,
-            request.getMontantPaye()
+            // request.getMontantPaye()
+            montantTotal // on enregistre ce qu’on a réellement vendu
         );
 
         // Construction de la réponse

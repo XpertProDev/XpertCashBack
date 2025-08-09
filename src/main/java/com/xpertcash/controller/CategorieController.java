@@ -98,22 +98,22 @@ public ResponseEntity<Object> createCategorie(@RequestBody Map<String, String> p
 
 
         // Récupérer toutes les catégories
-@GetMapping("/allCategory")
-public ResponseEntity<List<CategorieResponseDTO>> getAllCategories(HttpServletRequest request) {
-    try {
-        List<CategorieResponseDTO> categoriesAvecProduitCount = categorieService.getCategoriesWithProduitCount(request);
+        @GetMapping("/allCategory")
+        public ResponseEntity<List<CategorieResponseDTO>> getAllCategories(HttpServletRequest request) {
+            try {
+                List<CategorieResponseDTO> categoriesAvecProduitCount = categorieService.getCategoriesWithProduitCount(request);
 
-        return ResponseEntity.ok(categoriesAvecProduitCount);
-        
-    } catch (RuntimeException e) {
-        System.err.println("Erreur lors de la récupération des catégories : " + e.getMessage());
-        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(null);
-        
-    } catch (Exception e) {
-        System.err.println("Erreur interne lors de la récupération des catégories : " + e.getMessage());
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
-    }
-}
+                return ResponseEntity.ok(categoriesAvecProduitCount);
+                
+            } catch (RuntimeException e) {
+                System.err.println("Erreur lors de la récupération des catégories : " + e.getMessage());
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(null);
+                
+            } catch (Exception e) {
+                System.err.println("Erreur interne lors de la récupération des catégories : " + e.getMessage());
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
+            }
+        }
 
     
 

@@ -3,6 +3,8 @@ package com.xpertcash.entity;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+
+import com.fasterxml.jackson.annotation.JsonBackReference;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.xpertcash.entity.Enum.StatutFactureProForma;
@@ -71,7 +73,7 @@ public class FactureProForma {
 
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "entreprise_id")
-    @JsonIgnoreProperties({"facturesProforma", "identifiantEntreprise", "utilisateurs", "adresse", "boutiques", "createdAt", "logo", "admin"})
+    @JsonBackReference
     private Entreprise entreprise;
 
     @ManyToOne(fetch = FetchType.EAGER)
