@@ -11,12 +11,10 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.xpertcash.DTOs.VENTE.VersementComptableDTO;
 import com.xpertcash.entity.VENTE.StatutVersement;
-import com.xpertcash.entity.VENTE.VersementComptable;
 import com.xpertcash.service.VENTE.VersementComptableService;
 
 import jakarta.servlet.http.HttpServletRequest;
