@@ -18,7 +18,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
+import com.xpertcash.DTOs.ClientDTO;
+import com.xpertcash.DTOs.EntrepriseClientDTO;
 import com.xpertcash.DTOs.FactureReelleDTO;
+import com.xpertcash.DTOs.LigneFactureDTO;
 import com.xpertcash.DTOs.PaiementDTO;
 import com.xpertcash.configuration.CentralAccess;
 import com.xpertcash.configuration.JwtUtil;
@@ -233,7 +236,7 @@ public void supprimerFactureReelleLiee(FactureProForma proforma) {
             })
             .collect(Collectors.toList());
 }
-
+ 
     // Trier les facture par mois/année
    public ResponseEntity<?> filtrerFacturesParMoisEtAnnee(Integer mois, Integer annee, HttpServletRequest request) {
     // 🔐 Extraction et validation du token JWT
@@ -635,80 +638,99 @@ public FactureProForma annulerFactureReelle(FactureReelle modifications, HttpSer
 
 //Trier
 
-public List<Map<String, Object>> getFacturesParPeriode(Long userIdRequete, HttpServletRequest request,
-                                                           String typePeriode, LocalDate dateDebut, LocalDate dateFin) {
-        String token = request.getHeader("Authorization");
-        if (token == null || !token.startsWith("Bearer ")) {
-            throw new RuntimeException("Token JWT manquant ou mal formaté");
-        }
-
-        Long userIdCourant = jwtUtil.extractUserId(token.replace("Bearer ", ""));
-        User currentUser = usersRepository.findById(userIdCourant)
-                .orElseThrow(() -> new RuntimeException("Utilisateur courant introuvable"));
-        User targetUser = usersRepository.findById(userIdRequete)
-                .orElseThrow(() -> new RuntimeException("Utilisateur cible non trouvé"));
-
-        Entreprise entrepriseCourante = currentUser.getEntreprise();
-        Entreprise entrepriseCible = targetUser.getEntreprise();
-
-        if (entrepriseCourante == null || entrepriseCible == null
-            || !entrepriseCourante.getId().equals(entrepriseCible.getId())) {
-            throw new RuntimeException("Opération interdite : utilisateurs de différentes entreprises.");
-        }
-
-        
-
-        LocalDateTime dateStart;
-        LocalDateTime dateEnd;
-
-        switch (typePeriode.toLowerCase()) {
-            case "jour":
-                dateStart = LocalDate.now().atStartOfDay();
-                dateEnd = dateStart.plusDays(1);
-                break;
-            case "mois":
-                dateStart = LocalDate.now().withDayOfMonth(1).atStartOfDay();
-                dateEnd = dateStart.plusMonths(1);
-                break;
-            case "annee":
-                dateStart = LocalDate.now().withDayOfYear(1).atStartOfDay();
-                dateEnd = dateStart.plusYears(1);
-                break;
-            case "personnalise":
-                if (dateDebut == null || dateFin == null) {
-                    throw new RuntimeException("Dates de début et de fin requises pour une période personnalisée.");
-                }
-                dateStart = dateDebut.atStartOfDay();
-                dateEnd = dateFin.plusDays(1).atStartOfDay();
-                break;
-            default:
-                throw new RuntimeException("Type de période invalide.");
-        }
-
-        List<FactureReelle> factures = factureReelleRepository.findByEntrepriseIdAndDateCreationBetween(
-                entrepriseCourante.getId(), dateStart.toLocalDate(), dateEnd.toLocalDate()
-        );
-
-        return factures.stream()
-            .sorted(Comparator.comparing(FactureReelle::getDateCreation).reversed())
-            .map(facture -> {
-                Map<String, Object> map = new HashMap<>();
-                map.put("id", facture.getId());
-                map.put("numeroFacture", facture.getNumeroFacture());
-                map.put("dateCreation", facture.getDateCreation());
-                map.put("description", facture.getDescription());
-                map.put("totalHT", facture.getTotalHT());
-                map.put("remise", facture.getRemise());
-                map.put("tva", facture.isTva());
-                map.put("totalFacture", facture.getTotalFacture());
-                map.put("statut", facture.getStatut());
-                map.put("ligneFactureProforma", facture.getLignesFacture());
-                map.put("client", facture.getClient() != null ? facture.getClient().getNomComplet() : null);
-                map.put("entrepriseClient", facture.getEntrepriseClient() != null ? facture.getEntrepriseClient().getNom() : null);
-                map.put("entreprise", facture.getEntreprise() != null ? facture.getEntreprise().getNomEntreprise() : null);
-                return map;
-            })
-            .collect(Collectors.toList());
+public List<FactureReelleDTO> getFacturesParPeriode(Long userIdRequete, HttpServletRequest request,
+                                                     String typePeriode, LocalDate dateDebut, LocalDate dateFin) {
+    String token = request.getHeader("Authorization"); 
+    if (token == null || !token.startsWith("Bearer ")) {
+        throw new RuntimeException("Token JWT manquant ou mal formaté");
     }
+
+    Long userIdCourant = jwtUtil.extractUserId(token.replace("Bearer ", ""));
+    User currentUser = usersRepository.findById(userIdCourant)
+            .orElseThrow(() -> new RuntimeException("Utilisateur courant introuvable"));
+    User targetUser = usersRepository.findById(userIdRequete)
+            .orElseThrow(() -> new RuntimeException("Utilisateur cible non trouvé"));
+
+    Entreprise entrepriseCourante = currentUser.getEntreprise();
+    Entreprise entrepriseCible = targetUser.getEntreprise();
+
+    if (entrepriseCourante == null || entrepriseCible == null
+        || !entrepriseCourante.getId().equals(entrepriseCible.getId())) {
+        throw new RuntimeException("Opération interdite : utilisateurs de différentes entreprises.");
+    }
+
+    LocalDateTime dateStart;
+    LocalDateTime dateEnd;
+
+    switch (typePeriode.toLowerCase()) {
+        case "jour":
+            dateStart = LocalDate.now().atStartOfDay();
+            dateEnd = dateStart.plusDays(1);
+            break;
+        case "mois":
+            dateStart = LocalDate.now().withDayOfMonth(1).atStartOfDay();
+            dateEnd = dateStart.plusMonths(1);
+            break;
+        case "annee":
+            dateStart = LocalDate.now().withDayOfYear(1).atStartOfDay();
+            dateEnd = dateStart.plusYears(1);
+            break;
+        case "personnalise":
+            if (dateDebut == null || dateFin == null) {
+                throw new RuntimeException("Dates de début et de fin requises pour une période personnalisée.");
+            }
+            dateStart = dateDebut.atStartOfDay();
+            dateEnd = dateFin.plusDays(1).atStartOfDay();
+            break;
+        default:
+            throw new RuntimeException("Type de période invalide.");
+    }
+
+    List<FactureReelle> factures = factureReelleRepository.findByEntrepriseIdAndDateCreationBetween(
+            entrepriseCourante.getId(), dateStart.toLocalDate(), dateEnd.toLocalDate()
+    );
+
+    // Log pour vérifier les données récupérées
+    System.out.println("Factures récupérées: " + factures);
+
+    return factures.stream()
+        .sorted(Comparator.comparing(FactureReelle::getDateCreation).reversed())
+        .map(facture -> {
+            // Crée un DTO pour chaque facture
+            FactureReelleDTO factureDTO = new FactureReelleDTO();
+
+            // Remplir les champs du DTO avec les données de la facture
+            factureDTO.setId(facture.getId());
+            factureDTO.setNumeroFacture(facture.getNumeroFacture());
+            factureDTO.setDateCreation(facture.getDateCreation());
+            factureDTO.setDescription(facture.getDescription());
+            factureDTO.setTotalHT(facture.getTotalHT());
+            factureDTO.setRemise(facture.getRemise());
+            factureDTO.setTva(facture.isTva());
+            factureDTO.setTotalFacture(facture.getTotalFacture());
+
+            // Log pour vérifier les lignes de facture
+            if (facture.getLignesFacture() != null && !facture.getLignesFacture().isEmpty()) {
+                System.out.println("Lignes de facture pour la facture " + facture.getNumeroFacture() + ": " + facture.getLignesFacture());
+            } else {
+                System.out.println("Aucune ligne de facture pour la facture " + facture.getNumeroFacture());
+            }
+
+            // Convertir les lignes de facture en DTO
+            factureDTO.setLigneFactureProforma(facture.getLignesFacture() != null && !facture.getLignesFacture().isEmpty() ?
+                facture.getLignesFacture().stream()
+                    .map(LigneFactureDTO::new)  // Transformation des lignes de facture en DTOs
+                    .collect(Collectors.toList()) : null);
+
+            // Convertir le client en DTO (si le client existe)
+            factureDTO.setClient(facture.getClient() != null ? new ClientDTO(facture.getClient()) : null);
+
+            // Convertir l'entreprise client en DTO (si l'entreprise client existe)
+            factureDTO.setEntrepriseClient(facture.getEntrepriseClient() != null ? new EntrepriseClientDTO(facture.getEntrepriseClient()) : null);
+
+            return factureDTO; // Retourne le DTO créé
+        })
+        .collect(Collectors.toList());
+}
 
 }

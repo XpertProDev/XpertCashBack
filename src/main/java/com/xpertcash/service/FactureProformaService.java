@@ -14,7 +14,10 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 
+import com.xpertcash.DTOs.ClientDTO;
+import com.xpertcash.DTOs.EntrepriseClientDTO;
 import com.xpertcash.DTOs.FactureProFormaDTO;
+import com.xpertcash.DTOs.LigneFactureDTO;
 import com.xpertcash.configuration.CentralAccess;
 import com.xpertcash.configuration.JwtUtil;
 import com.xpertcash.entity.Client;
@@ -1053,12 +1056,12 @@ public FactureProFormaDTO getFactureProformaById(Long id, HttpServletRequest req
     return factureProformaRepository.findByClientIdOrEntrepriseClientId(clientId, entrepriseClientId);
 }
 
-
+ 
     //Trier
-    public List<FactureProFormaDTO> getFacturesParPeriode(Long userIdRequete, HttpServletRequest request,
+public List<FactureProFormaDTO> getFacturesParPeriode(Long userIdRequete, HttpServletRequest request,
                                                        String typePeriode, LocalDate dateDebut, LocalDate dateFin) {
     // 🔐 Extraire le token JWT et récupérer l'utilisateur courant
-    String token = request.getHeader("Authorization");
+    String token = request.getHeader("Authorization"); 
     if (token == null || !token.startsWith("Bearer ")) {
         throw new RuntimeException("Token JWT manquant ou mal formaté");
     }
@@ -1130,12 +1133,36 @@ public FactureProFormaDTO getFactureProformaById(Long id, HttpServletRequest req
             .collect(Collectors.toList());
     }
 
-    // ✅ Trier et transformer les factures en DTO
+    // ✅ Trier et transformer en liste de DTOs
     return factures.stream()
         .sorted(Comparator.comparing(FactureProForma::getDateCreation).reversed())
-        .map(facture -> new FactureProFormaDTO(facture)) // Transformation en DTO
+        .map(facture -> {
+            FactureProFormaDTO dto = new FactureProFormaDTO();  // Créer un DTO pour chaque facture
+            dto.setId(facture.getId());
+            dto.setNumeroFacture(facture.getNumeroFacture());
+            dto.setDateCreation(facture.getDateCreation());
+            dto.setDescription(facture.getDescription());
+            dto.setTotalHT(facture.getTotalHT());
+            dto.setRemise(facture.getRemise());
+            dto.setTva(facture.isTva());
+            dto.setTotalFacture(facture.getTotalFacture());
+            dto.setStatut(facture.getStatut());
+            dto.setLigneFactureProforma(facture.getLignesFacture().stream()
+                .map(ligne -> new LigneFactureDTO(ligne)) // Transformer en DTO LigneFacture
+                .collect(Collectors.toList()));
+            
+            // Adapter l'attribution des valeurs
+            dto.setClient(facture.getClient() != null ? new ClientDTO(facture.getClient()) : null);
+            dto.setEntrepriseClient(facture.getEntrepriseClient() != null ? new EntrepriseClientDTO(facture.getEntrepriseClient()) : null);
+            
+            
+            // Gérer "dateRelance" et "notifie" si ces méthodes existent dans le DTO
+            dto.setDateRelance(facture.getDateRelance());
+            dto.setNotifie(facture.isNotifie());
+
+            return dto;
+        })
         .collect(Collectors.toList());
 }
 
-   
 }

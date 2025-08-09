@@ -9,6 +9,7 @@ import java.util.stream.Collectors;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.xpertcash.DTOs.USER.UserRequest;
 import com.xpertcash.entity.FactureReelle;
+import com.xpertcash.entity.Enum.StatutFactureProForma;
 import com.xpertcash.entity.Enum.StatutPaiementFacture;
 
 import lombok.AllArgsConstructor;
@@ -35,6 +36,15 @@ public class FactureReelleDTO {
     private double remise;
     private Double tauxRemise;
     private boolean tva;
+
+   private StatutFactureProForma statut;
+    private List<LigneFactureDTO> ligneFactureProforma;
+
+    
+
+
+    private double totalHT;
+
     private StatutPaiementFacture statutPaiement;
     // private UserRequest utilisateur;
     private EntrepriseClientDTO entrepriseClient;
@@ -58,6 +68,15 @@ public class FactureReelleDTO {
         this.tauxRemise = facture.getTauxRemise();
         this.tva = facture.isTva();
         this.statutPaiement = facture.getStatutPaiement();
+        this.entrepriseClient = (facture.getEntrepriseClient() != null) ? new EntrepriseClientDTO(facture.getEntrepriseClient()) : null;
+        this.client = (facture.getClient() != null) ? new ClientDTO(facture.getClient()) : null;
+        if (facture.getEntrepriseClient() != null) {
+            this.nomEntrepriseClient = facture.getEntrepriseClient().getNom();
+        }
+
+        if (facture.getClient() != null) {
+            this.nomClient = facture.getClient().getNomComplet();
+        }
         /*this.utilisateur = (facture.getUtilisateurCreateur() != null) ? new UserRequest(facture.getUtilisateurCreateur()) : null;*/
         this.entrepriseClient = (facture.getEntrepriseClient() != null) ? new EntrepriseClientDTO(facture.getEntrepriseClient()) : null;
         this.client = (facture.getClient() != null) ? new ClientDTO(facture.getClient()) : null;
@@ -76,8 +95,16 @@ public class FactureReelleDTO {
             this.nomClient = facture.getClient().getNomComplet();
         }
 
+        
     }
 
+    public List<LigneFactureDTO> getLigneFactureProforma() {
+        return ligneFactureProforma;
+    }
+
+    public void setLigneFactureProforma(List<LigneFactureDTO> ligneFactureProforma) {
+        this.ligneFactureProforma = ligneFactureProforma;
+    }
 
     
 

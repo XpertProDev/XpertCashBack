@@ -92,15 +92,15 @@ public class CaisseService {
         return caisseRepository.save(caisse);
     }
 
-   @Transactional
-public Caisse fermerCaisse(Long caisseId, HttpServletRequest request) {
-    User user = getUserFromRequest(request);
+@Transactional
+public Caisse fermerCaisse(HttpServletRequest request) {
+    User user = getUserFromRequest(request); // Récupérer l'utilisateur connecté à partir de la requête
 
-    // 1️⃣ Charger la caisse ouverte
-    Caisse caisse = caisseRepository.findByIdAndStatut(caisseId, StatutCaisse.OUVERTE)
-            .orElseThrow(() -> new RuntimeException("Caisse introuvable ou déjà fermée."));
+    // 1️⃣ Récupérer la caisse ouverte pour cet utilisateur
+    Caisse caisse = caisseRepository.findByVendeurIdAndStatut(user.getId(), StatutCaisse.OUVERTE)
+            .orElseThrow(() -> new RuntimeException("Aucune caisse ouverte pour cet utilisateur ou la caisse est déjà fermée."));
 
-    // 2️⃣ Sécurité
+    // 2️⃣ Sécurité : Vérification des droits d'accès de l'utilisateur
     RoleType role = user.getRole().getName();
     boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
     boolean hasPermission = user.getRole().hasPermission(PermissionType.VENDRE_PRODUITS);
@@ -116,12 +116,12 @@ public Caisse fermerCaisse(Long caisseId, HttpServletRequest request) {
         throw new RuntimeException("Vous n'êtes pas autorisé à fermer cette caisse.");
     }
 
-    // 3️⃣ Mise à jour de la caisse
+    // 3️⃣ Mise à jour de la caisse (fermeture)
     caisse.setStatut(StatutCaisse.FERMEE);
     caisse.setDateFermeture(LocalDateTime.now());
     caisseRepository.save(caisse);
 
-    // 4️⃣ Mouvement de fermeture
+    // 4️⃣ Mouvement de fermeture (enregistrement du mouvement dans la caisse)
     MouvementCaisse mouvement = new MouvementCaisse();
     mouvement.setCaisse(caisse);
     mouvement.setTypeMouvement(TypeMouvementCaisse.FERMETURE);
@@ -135,7 +135,7 @@ public Caisse fermerCaisse(Long caisseId, HttpServletRequest request) {
     versement.setCaisse(caisse);
     versement.setMontant(caisse.getMontantCourant());
     versement.setDateVersement(LocalDateTime.now());
-    versement.setStatut(StatutVersement.EN_ATTENTE); // Enum à créer
+    versement.setStatut(StatutVersement.EN_ATTENTE); // En attente
     versement.setCreePar(user);
     versementComptableRepository.save(versement);
 

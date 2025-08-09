@@ -21,7 +21,6 @@ import com.xpertcash.DTOs.PaiementDTO;
 import com.xpertcash.configuration.JwtUtil;
 import com.xpertcash.entity.FactureProForma;
 import com.xpertcash.entity.FactureReelle;
-import com.xpertcash.entity.Enum.StatutPaiementFacture;
 import com.xpertcash.repository.UsersRepository;
 import com.xpertcash.service.FactureReelleService;
 
@@ -143,6 +142,7 @@ public ResponseEntity<?> getFacturesParPeriode(
         @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateFin,
         HttpServletRequest request
 ) {
+    // Vérification du token JWT
     String token = request.getHeader("Authorization");
     if (token == null || !token.startsWith("Bearer ")) {
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of(
@@ -162,18 +162,22 @@ public ResponseEntity<?> getFacturesParPeriode(
     }
 
     try {
-        List<Map<String, Object>> factures = factureReelleService.getFacturesParPeriode(
+        // Appel du service pour obtenir les factures sous forme de DTO
+        List<FactureReelleDTO> facturesDTO = factureReelleService.getFacturesParPeriode(
                 userId, request, typePeriode, dateDebut, dateFin
         );
-        return ResponseEntity.ok(factures);
+
+        // Renvoi de la liste de FactureReelleDTO en réponse
+        return ResponseEntity.ok(facturesDTO);
     } catch (Exception e) {
-        e.printStackTrace(); // Log technique pour le développeur
+        e.printStackTrace(); // Log pour le développeur
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
                 "status", 500,
                 "message", "Une erreur interne est survenue : " + e.getMessage()
         ));
     }
 }
+    
 
 
 }

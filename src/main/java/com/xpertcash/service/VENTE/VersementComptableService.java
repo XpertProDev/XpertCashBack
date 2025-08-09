@@ -83,24 +83,32 @@ public class VersementComptableService {
 
         // 📥 Récupérer tous les versements de cette boutique
        return versementComptableRepository.findByCaisse_BoutiqueId(boutiqueId).stream()
-    .map(v -> {
-        VersementComptableDTO dto = new VersementComptableDTO();
-        dto.setId(v.getId());
-        dto.setMontantVerse(v.getMontant());
-        dto.setMontantInitialCaisse(v.getCaisse().getMontantInitial());
-        dto.setMontantCourantCaisse(v.getCaisse().getMontantCourant());
-        dto.setDateVersement(v.getDateVersement());
-        dto.setStatut(v.getStatut().name());
-        dto.setCaisseId(v.getCaisse().getId());
-        dto.setBoutiqueId(v.getCaisse().getBoutique().getId());
-        dto.setNomBoutique(v.getCaisse().getBoutique().getNomBoutique());
-        dto.setNomVendeur(v.getCreePar().getNomComplet());
-        dto.setNomComptable(v.getValidePar().getNomComplet());
-        dto.setDateValidation(v.getDateValidation());
+        .map(v -> {
+            VersementComptableDTO dto = new VersementComptableDTO();
+            dto.setId(v.getId());
+            dto.setMontantVerse(v.getMontant());
+            dto.setMontantInitialCaisse(v.getCaisse().getMontantInitial());
+            dto.setMontantCourantCaisse(v.getCaisse().getMontantCourant());
+            dto.setDateVersement(v.getDateVersement());
+            dto.setStatut(v.getStatut().name());
+            dto.setCaisseId(v.getCaisse().getId());
+            dto.setBoutiqueId(v.getCaisse().getBoutique().getId());
+            dto.setNomBoutique(v.getCaisse().getBoutique().getNomBoutique());
+            dto.setNomVendeur(v.getCreePar().getNomComplet());
 
+            // Gérer le cas où ValidePar est null
+            if (v.getValidePar() != null) {
+                dto.setNomComptable(v.getValidePar().getNomComplet());
+                dto.setDateValidation(v.getDateValidation());
+            } else {
+                // Valeur par défaut pour "NomComptable" si ValidePar est null
+                dto.setNomComptable("Non validé");
+                dto.setDateValidation(null);
+            }
 
-        return dto;
-    })
+            return dto;
+        })
+
     .collect(Collectors.toList());
 
     }
