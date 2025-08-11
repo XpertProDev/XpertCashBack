@@ -27,5 +27,6 @@ public class VenteResponse {
         private Integer quantite;
         private Double prixUnitaire;
         private Double montantLigne;
+        private Double remise;
     }
 }

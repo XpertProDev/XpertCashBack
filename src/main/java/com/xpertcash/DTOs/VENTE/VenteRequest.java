@@ -12,5 +12,6 @@ public class VenteRequest {
     private String clientNom;
     private String clientNumero;
     private String modePaiement;
+    private Map<Long, Double> remises;
     // private Double montantPaye;
 }

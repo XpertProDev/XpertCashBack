@@ -61,143 +61,163 @@ public class VenteService {
     @Autowired
     private Utilitaire utilitaire;
 
-     @Autowired
-    private BCryptPasswordEncoder passwordEncoder;
 
     @Transactional
-    public VenteResponse enregistrerVente(VenteRequest request, HttpServletRequest httpRequest) {
-        // 🔐 Extraction et vérification du token JWT
-        String token = httpRequest.getHeader("Authorization");
-        if (token == null || !token.startsWith("Bearer ")) {
-            throw new RuntimeException("Token JWT manquant ou mal formaté");
-        }
-        String jwtToken = token.substring(7);
-
-        Long userId;
-        try {
-            userId = jwtUtil.extractUserId(jwtToken);
-        } catch (Exception e) {
-            throw new RuntimeException("Erreur lors de l'extraction de l'ID utilisateur depuis le token", e);
-        }
-
-        User user = usersRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
-
-        // 🔐 Vérification des droits
-        RoleType role = user.getRole().getName();
-        boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
-        boolean hasPermission = user.getRole().hasPermission(PermissionType.VENDRE_PRODUITS);
-        if (!isAdminOrManager && !hasPermission) {
-            throw new RuntimeException("Vous n'avez pas les droits nécessaires pour effectuer une vente !");
-        }
-
-        // 🔐 Vérification de la boutique
-        Boutique boutique = boutiqueRepository.findById(request.getBoutiqueId())
-                .orElseThrow(() -> new RuntimeException("Boutique introuvable"));
-        if (!boutique.isActif()) {
-            throw new RuntimeException("La boutique est désactivée, opération non autorisée.");
-        }
-        Long entrepriseId = boutique.getEntreprise().getId();
-        if (!entrepriseId.equals(user.getEntreprise().getId())) {
-            throw new RuntimeException("Accès interdit : cette boutique n'appartient pas à votre entreprise.");
-        }
-
-        // Vérifier qu'une caisse OUVERTE existe pour ce vendeur/boutique
-        Caisse caisse = caisseService.getCaisseActive(boutique.getId(), httpRequest)
-            .orElseThrow(() -> new RuntimeException("Aucune caisse ouverte pour ce vendeur dans cette boutique. Veuillez ouvrir une caisse avant de vendre."));
-
-        // Le vendeur est l'utilisateur connecté
-        User vendeur = user;
-
-        Vente vente = new Vente();
-        vente.setBoutique(boutique);
-        vente.setVendeur(vendeur);
-        vente.setDateVente(java.time.LocalDateTime.now());
-        vente.setDescription(request.getDescription());
-        vente.setClientNom(request.getClientNom());
-        vente.setClientNumero(request.getClientNumero());
-
-        List<VenteProduit> lignes = new ArrayList<>();
-        double montantTotal = 0.0;
-        for (Map.Entry<Long, Integer> entry : request.getProduitsQuantites().entrySet()) {
-            Produit produit = produitRepository.findById(entry.getKey())
-                    .orElseThrow(() -> new RuntimeException("Produit non trouvé"));
-            Integer quantiteVendue = entry.getValue();
-            double prixUnitaire = produit.getPrixVente();
-            double montantLigne = prixUnitaire * quantiteVendue;
-            montantTotal += montantLigne;
-
-            // Mise à jour du stock
-            Stock stock = stockRepository.findByProduit(produit);
-            if (stock == null || stock.getStockActuel() < quantiteVendue) {
-                throw new RuntimeException("Stock insuffisant pour le produit: " + produit.getNom());
-            }
-            stock.setStockActuel(stock.getStockActuel() - quantiteVendue);
-            stockRepository.save(stock);
-            // Mise à jour de la quantité du produit
-            if (produit.getQuantite() != null) {
-                produit.setQuantite(produit.getQuantite() - quantiteVendue);
-                produitRepository.save(produit);
-            }
-
-            VenteProduit ligne = new VenteProduit();
-            ligne.setVente(vente);
-            ligne.setProduit(produit);
-            ligne.setQuantite(quantiteVendue);
-            ligne.setPrixUnitaire(prixUnitaire);
-            ligne.setMontantLigne(montantLigne);
-            lignes.add(ligne);
-        }
-        vente.setMontantTotal(montantTotal);
-        vente.setProduits(lignes);
-        venteRepository.save(vente);
-        venteProduitRepository.saveAll(lignes);
-
-        // Historique de vente
-        VenteHistorique historique = new VenteHistorique();
-        historique.setVente(vente);
-        historique.setDateAction(java.time.LocalDateTime.now());
-        historique.setAction("ENREGISTREMENT_VENTE");
-        historique.setDetails("Vente enregistrée par le vendeur " + vendeur.getNomComplet());
-        venteHistoriqueRepository.save(historique);
-
-        // Génération de la facture de vente
-        FactureVente facture = new FactureVente();
-        facture.setVente(vente);
-        facture.setNumeroFacture("FV-" + vente.getId() + "-" + System.currentTimeMillis());
-        facture.setDateEmission(java.time.LocalDateTime.now());
-        facture.setMontantTotal(montantTotal);
-        factureVenteRepository.save(facture);
-
-        // Gestion du mode de paiement et du montant payé
-        ModePaiement modePaiement = null;
-        if (request.getModePaiement() != null) {
-            try {
-                modePaiement = ModePaiement.valueOf(request.getModePaiement());
-            } catch (IllegalArgumentException e) {
-                throw new RuntimeException("Mode de paiement invalide : " + request.getModePaiement());
-            }
-        }
-        vente.setModePaiement(modePaiement);
-        // vente.setMontantPaye(request.getMontantPaye());
-        vente.setMontantPaye(montantTotal); // on ignore le montant saisi manuellement
-
-        // Encaissement : ajouter le montant de la vente à la caisse
-        caisseService.ajouterMouvement(
-            caisse,
-            TypeMouvementCaisse.VENTE,
-            montantTotal,
-            "Encaissement vente ID " + vente.getId(),
-            vente,
-            modePaiement,
-            // request.getMontantPaye()
-            montantTotal // on enregistre ce qu’on a réellement vendu
-        );
-
-        // Construction de la réponse
-        VenteResponse response = toVenteResponse(vente);
-        return response;
+public VenteResponse enregistrerVente(VenteRequest request, HttpServletRequest httpRequest) {
+    // 🔐 Extraction et vérification du token JWT
+    String token = httpRequest.getHeader("Authorization");
+    if (token == null || !token.startsWith("Bearer ")) {
+        throw new RuntimeException("Token JWT manquant ou mal formaté");
     }
+    String jwtToken = token.substring(7);
+
+    Long userId;
+    try {
+        userId = jwtUtil.extractUserId(jwtToken);
+    } catch (Exception e) {
+        throw new RuntimeException("Erreur lors de l'extraction de l'ID utilisateur depuis le token", e);
+    }
+
+    User user = usersRepository.findById(userId)
+            .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+
+    // 🔐 Vérification des droits
+    RoleType role = user.getRole().getName();
+    boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
+    boolean hasPermission = user.getRole().hasPermission(PermissionType.VENDRE_PRODUITS);
+    if (!isAdminOrManager && !hasPermission) {
+        throw new RuntimeException("Vous n'avez pas les droits nécessaires pour effectuer une vente !");
+    }
+
+    // 🔐 Vérification de la boutique
+    Boutique boutique = boutiqueRepository.findById(request.getBoutiqueId())
+            .orElseThrow(() -> new RuntimeException("Boutique introuvable"));
+    if (!boutique.isActif()) {
+        throw new RuntimeException("La boutique est désactivée, opération non autorisée.");
+    }
+    Long entrepriseId = boutique.getEntreprise().getId();
+    if (!entrepriseId.equals(user.getEntreprise().getId())) {
+        throw new RuntimeException("Accès interdit : cette boutique n'appartient pas à votre entreprise.");
+    }
+
+    // Vérifier qu'une caisse OUVERTE existe pour ce vendeur/boutique
+    Caisse caisse = caisseService.getCaisseActive(boutique.getId(), httpRequest)
+        .orElseThrow(() -> new RuntimeException("Aucune caisse ouverte pour ce vendeur dans cette boutique. Veuillez ouvrir une caisse avant de vendre."));
+
+    // Le vendeur est l'utilisateur connecté
+    User vendeur = user;
+
+    Vente vente = new Vente();
+    vente.setBoutique(boutique);
+    vente.setVendeur(vendeur);
+    vente.setDateVente(java.time.LocalDateTime.now());
+    vente.setDescription(request.getDescription());
+    vente.setClientNom(request.getClientNom());
+    vente.setClientNumero(request.getClientNumero());
+
+    List<VenteProduit> lignes = new ArrayList<>();
+    double montantTotal = 0.0;
+
+    // On parcourt chaque produit vendu
+    for (Map.Entry<Long, Integer> entry : request.getProduitsQuantites().entrySet()) {
+        Long produitId = entry.getKey();
+        Integer quantiteVendue = entry.getValue();
+
+        Produit produit = produitRepository.findById(produitId)
+                .orElseThrow(() -> new RuntimeException("Produit non trouvé"));
+
+        double prixUnitaire = produit.getPrixVente();
+
+        // Récupérer la remise (%) pour ce produit si fournie, sinon 0
+        double remisePct = 0.0;
+        if (request.getRemises() != null && request.getRemises().containsKey(produitId)) {
+            remisePct = request.getRemises().get(produitId);
+        }
+
+        // Calcul du prix unitaire après remise
+        double prixApresRemise = prixUnitaire * (1 - remisePct / 100.0);
+
+        // Calcul du montant de la ligne (quantité * prix unitaire après remise)
+        double montantLigne = prixApresRemise * quantiteVendue;
+
+        montantTotal += montantLigne;
+
+        // Mise à jour du stock
+        Stock stock = stockRepository.findByProduit(produit);
+        if (stock == null || stock.getStockActuel() < quantiteVendue) {
+            throw new RuntimeException("Stock insuffisant pour le produit: " + produit.getNom());
+        }
+        stock.setStockActuel(stock.getStockActuel() - quantiteVendue);
+        stockRepository.save(stock);
+
+        // Mise à jour quantité produit (optionnel)
+        if (produit.getQuantite() != null) {
+            produit.setQuantite(produit.getQuantite() - quantiteVendue);
+            produitRepository.save(produit);
+        }
+
+        // Création de la ligne de vente avec remise
+        VenteProduit ligne = new VenteProduit();
+        ligne.setVente(vente);
+        ligne.setProduit(produit);
+        ligne.setQuantite(quantiteVendue);
+        ligne.setPrixUnitaire(prixUnitaire);
+        ligne.setRemise(remisePct);  // Pense à ajouter ce champ double remise dans VenteProduit
+        ligne.setMontantLigne(montantLigne);
+        lignes.add(ligne);
+    }
+
+    vente.setMontantTotal(montantTotal);
+    vente.setProduits(lignes);
+
+    venteRepository.save(vente);
+    venteProduitRepository.saveAll(lignes);
+
+    // Historique de vente
+    VenteHistorique historique = new VenteHistorique();
+    historique.setVente(vente);
+    historique.setDateAction(java.time.LocalDateTime.now());
+    historique.setAction("ENREGISTREMENT_VENTE");
+    historique.setDetails("Vente enregistrée par le vendeur " + vendeur.getNomComplet());
+    venteHistoriqueRepository.save(historique);
+
+    // Génération de la facture de vente
+    FactureVente facture = new FactureVente();
+    facture.setVente(vente);
+    facture.setNumeroFacture("FV-" + vente.getId() + "-" + System.currentTimeMillis());
+    facture.setDateEmission(java.time.LocalDateTime.now());
+    facture.setMontantTotal(montantTotal);
+    factureVenteRepository.save(facture);
+
+    // Gestion du mode de paiement et du montant payé
+    ModePaiement modePaiement = null;
+    if (request.getModePaiement() != null) {
+        try {
+            modePaiement = ModePaiement.valueOf(request.getModePaiement());
+        } catch (IllegalArgumentException e) {
+            throw new RuntimeException("Mode de paiement invalide : " + request.getModePaiement());
+        }
+    }
+    vente.setModePaiement(modePaiement);
+
+    // On ignore le montant saisi manuellement, on prend le montant calculé
+    vente.setMontantPaye(montantTotal);
+
+    // Encaissement : ajouter le montant de la vente à la caisse
+    caisseService.ajouterMouvement(
+        caisse,
+        TypeMouvementCaisse.VENTE,
+        montantTotal,
+        "Encaissement vente ID " + vente.getId(),
+        vente,
+        modePaiement,
+        montantTotal // on enregistre ce qu’on a réellement vendu
+    );
+
+    // Construction de la réponse
+    VenteResponse response = toVenteResponse(vente);
+    return response;
+}
 
     //Remboursement
     @Transactional
@@ -240,9 +260,6 @@ public class VenteService {
                 throw new RuntimeException("Code PIN du responsable invalide");
             }
 
-
-
-       
         // Gérer remboursement total si produitsQuantites est null
         Map<Long, Integer> produitsQuantites = request.getProduitsQuantites();
         if (produitsQuantites == null) {
@@ -315,7 +332,6 @@ public class VenteService {
         // Retourner la vente mise à jour ou un DTO personnalisé (à adapter)
         return toVenteResponse(vente);
     }
-
 
 
     public VenteResponse getVenteById(Long id) {
@@ -401,6 +417,7 @@ public List<VenteResponse> getVentesByVendeur(Long vendeurId, HttpServletRequest
                 dto.setQuantite(ligne.getQuantite());
                 dto.setPrixUnitaire(ligne.getPrixUnitaire());
                 dto.setMontantLigne(ligne.getMontantLigne());
+                dto.setRemise(ligne.getRemise());
                 lignesDTO.add(dto);
             }
         }
