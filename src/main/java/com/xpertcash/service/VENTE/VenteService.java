@@ -115,56 +115,73 @@ public VenteResponse enregistrerVente(VenteRequest request, HttpServletRequest h
     vente.setClientNom(request.getClientNom());
     vente.setClientNumero(request.getClientNumero());
 
-    List<VenteProduit> lignes = new ArrayList<>();
-    double montantTotal = 0.0;
+    double montantTotalSansRemise = 0.0;
+List<VenteProduit> lignes = new ArrayList<>();
 
-    // On parcourt chaque produit vendu
-    for (Map.Entry<Long, Integer> entry : request.getProduitsQuantites().entrySet()) {
-        Long produitId = entry.getKey();
-        Integer quantiteVendue = entry.getValue();
+// Vérification : ne pas avoir remise globale ET remises par ligne simultanément
+if (request.getRemiseGlobale() != null && request.getRemiseGlobale() > 0
+        && request.getRemises() != null && !request.getRemises().isEmpty()) {
+    throw new RuntimeException("Vous ne pouvez pas appliquer une remise globale et des remises par ligne en même temps.");
+}
 
-        Produit produit = produitRepository.findById(produitId)
-                .orElseThrow(() -> new RuntimeException("Produit non trouvé"));
+// Création des lignes de vente (avec remise ligne uniquement si pas remise globale)
+for (Map.Entry<Long, Integer> entry : request.getProduitsQuantites().entrySet()) {
+    Long produitId = entry.getKey();
+    Integer quantiteVendue = entry.getValue();
 
-        double prixUnitaire = produit.getPrixVente();
+    Produit produit = produitRepository.findById(produitId)
+            .orElseThrow(() -> new RuntimeException("Produit non trouvé"));
 
-        // Récupérer la remise (%) pour ce produit si fournie, sinon 0
-        double remisePct = 0.0;
-        if (request.getRemises() != null && request.getRemises().containsKey(produitId)) {
-            remisePct = request.getRemises().get(produitId);
+    double prixUnitaire = produit.getPrixVente();
+
+    double remisePct = 0.0;
+    // Appliquer remise par ligne uniquement si pas de remise globale
+    if ((request.getRemises() != null && request.getRemises().containsKey(produitId))
+            && (request.getRemiseGlobale() == null || request.getRemiseGlobale() == 0)) {
+        remisePct = request.getRemises().get(produitId);
+    }
+
+    double prixApresRemise = prixUnitaire * (1 - remisePct / 100.0);
+    double montantLigne = prixApresRemise * quantiteVendue;
+
+    montantTotalSansRemise += montantLigne;
+
+    VenteProduit ligne = new VenteProduit();
+    ligne.setVente(vente);
+    ligne.setProduit(produit);
+    ligne.setQuantite(quantiteVendue);
+    ligne.setPrixUnitaire(prixUnitaire);
+    ligne.setRemise(remisePct);
+    ligne.setMontantLigne(montantLigne);
+    lignes.add(ligne);
+}
+
+    double montantTotal = montantTotalSansRemise;
+
+    // Si remise globale, on la répartit sur les lignes
+    if (request.getRemiseGlobale() != null && request.getRemiseGlobale() > 0) {
+        double remiseGlobalePct = request.getRemiseGlobale();
+        vente.setRemiseGlobale(remiseGlobalePct);
+
+        for (VenteProduit ligne : lignes) {
+            double proportion = ligne.getMontantLigne() / montantTotalSansRemise;
+            double montantRemiseLigne = montantTotalSansRemise * (remiseGlobalePct / 100.0) * proportion;
+            double nouveauMontantLigne = ligne.getMontantLigne() - montantRemiseLigne;
+            ligne.setMontantLigne(nouveauMontantLigne);
+
+            // Mise à jour du prix unitaire avec remise globale répartie
+            double prixUnitaireAvecRemiseGlobale = nouveauMontantLigne / ligne.getQuantite();
+            ligne.setPrixUnitaire(prixUnitaireAvecRemiseGlobale);
+
+            // On considère que la remise ligne est nulle si remise globale
+            ligne.setRemise(0.0);
         }
+        // Recalcul du total après remise globale répartie
+        montantTotal = lignes.stream().mapToDouble(VenteProduit::getMontantLigne).sum();
 
-        // Calcul du prix unitaire après remise
-        double prixApresRemise = prixUnitaire * (1 - remisePct / 100.0);
-
-        // Calcul du montant de la ligne (quantité * prix unitaire après remise)
-        double montantLigne = prixApresRemise * quantiteVendue;
-
-        montantTotal += montantLigne;
-
-        // Mise à jour du stock
-        Stock stock = stockRepository.findByProduit(produit);
-        if (stock == null || stock.getStockActuel() < quantiteVendue) {
-            throw new RuntimeException("Stock insuffisant pour le produit: " + produit.getNom());
-        }
-        stock.setStockActuel(stock.getStockActuel() - quantiteVendue);
-        stockRepository.save(stock);
-
-        // Mise à jour quantité produit (optionnel)
-        if (produit.getQuantite() != null) {
-            produit.setQuantite(produit.getQuantite() - quantiteVendue);
-            produitRepository.save(produit);
-        }
-
-        // Création de la ligne de vente avec remise
-        VenteProduit ligne = new VenteProduit();
-        ligne.setVente(vente);
-        ligne.setProduit(produit);
-        ligne.setQuantite(quantiteVendue);
-        ligne.setPrixUnitaire(prixUnitaire);
-        ligne.setRemise(remisePct);  // Pense à ajouter ce champ double remise dans VenteProduit
-        ligne.setMontantLigne(montantLigne);
-        lignes.add(ligne);
+    } else {
+        // Pas de remise globale
+        vente.setRemiseGlobale(0.0);
     }
 
     vente.setMontantTotal(montantTotal);
@@ -172,6 +189,7 @@ public VenteResponse enregistrerVente(VenteRequest request, HttpServletRequest h
 
     venteRepository.save(vente);
     venteProduitRepository.saveAll(lignes);
+
 
     // Historique de vente
     VenteHistorique historique = new VenteHistorique();
@@ -417,10 +435,12 @@ public List<VenteResponse> getVentesByVendeur(Long vendeurId, HttpServletRequest
                 dto.setQuantite(ligne.getQuantite());
                 dto.setPrixUnitaire(ligne.getPrixUnitaire());
                 dto.setMontantLigne(ligne.getMontantLigne());
-                dto.setRemise(ligne.getRemise());
+               dto.setRemise(ligne.getRemise());
                 lignesDTO.add(dto);
+
             }
         }
+        response.setRemiseGlobale(vente.getRemiseGlobale());
         response.setLignes(lignesDTO);
         response.setNomVendeur(vente.getVendeur() != null ? vente.getVendeur().getNomComplet() : null);
         response.setNomBoutique(vente.getBoutique() != null ? vente.getBoutique().getNomBoutique() : null);

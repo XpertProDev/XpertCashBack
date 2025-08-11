@@ -1,6 +1,8 @@
 package com.xpertcash.DTOs.VENTE;
 
 import lombok.Data;
+
+import java.util.HashMap;
 import java.util.Map;
 
 @Data
@@ -12,6 +14,7 @@ public class VenteRequest {
     private String clientNom;
     private String clientNumero;
     private String modePaiement;
-    private Map<Long, Double> remises;
+    private Map<Long, Double> remises = new HashMap<>();
+    private Double remiseGlobale = 0.0;
     // private Double montantPaye;
 }

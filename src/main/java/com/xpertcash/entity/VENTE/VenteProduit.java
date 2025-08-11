@@ -26,7 +26,9 @@ public class VenteProduit {
     private Integer quantite;
     private Double prixUnitaire;
     private Double montantLigne;
-    private Double remise;
+    private double remise = 0.0;
+
+    
     
 
 }
