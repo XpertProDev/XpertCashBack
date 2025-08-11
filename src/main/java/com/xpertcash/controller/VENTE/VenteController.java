@@ -1,5 +1,6 @@
 package com.xpertcash.controller.VENTE;
 
+import com.xpertcash.DTOs.VENTE.RemboursementRequest;
 import com.xpertcash.DTOs.VENTE.VenteRequest;
 import com.xpertcash.DTOs.VENTE.VenteResponse;
 import com.xpertcash.service.VENTE.VenteService;
@@ -23,6 +24,15 @@ public class VenteController {
         VenteResponse response = venteService.enregistrerVente(request, httpRequest);
         return ResponseEntity.ok(response);
     }
+
+    //Remboursement
+    @PostMapping("/vente/rembourser")
+    public ResponseEntity<VenteResponse> rembourserVente(@RequestBody RemboursementRequest request, HttpServletRequest httpRequest) {
+        VenteResponse response = venteService.rembourserVente(request, httpRequest);
+        return ResponseEntity.ok(response);
+    }
+
+
 
     @GetMapping("/vente/{id}")
     public ResponseEntity<VenteResponse> getVenteById(@PathVariable Long id) {
