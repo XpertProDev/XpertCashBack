@@ -39,9 +39,11 @@ public class CaisseController {
     }
 
     @PostMapping("/fermer")
-    public ResponseEntity<CaisseResponseDTO> fermerCaisse(HttpServletRequest request) {
-        Caisse caisse = caisseService.fermerCaisse(request); // Appel sans caisseId explicitement
+    public ResponseEntity<CaisseResponseDTO> fermerCaisse(@RequestBody CaisseResponseDTO caisseResponseDTO, HttpServletRequest request) {
+        Long boutiqueId = caisseResponseDTO.getBoutiqueId();
+        Caisse caisse = caisseService.fermerCaisse(boutiqueId, request);
 
+        // Créer un DTO pour renvoyer les informations de la caisse fermée
         CaisseResponseDTO dto = new CaisseResponseDTO();
         dto.setId(caisse.getId());
         dto.setMontantInitial(caisse.getMontantInitial());
@@ -56,7 +58,6 @@ public class CaisseController {
 
         return ResponseEntity.ok(dto);
     }
-
 
     @PostMapping("/active")
     public ResponseEntity<?> getCaisseActive(

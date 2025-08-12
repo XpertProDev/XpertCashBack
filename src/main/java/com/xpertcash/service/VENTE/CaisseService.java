@@ -93,12 +93,13 @@ public class CaisseService {
     }
 
 @Transactional
-public Caisse fermerCaisse(HttpServletRequest request) {
+public Caisse fermerCaisse(Long boutiqueId, HttpServletRequest request) {
     User user = getUserFromRequest(request); // Récupérer l'utilisateur connecté à partir de la requête
 
-    // 1️⃣ Récupérer la caisse ouverte pour cet utilisateur
-    Caisse caisse = caisseRepository.findByVendeurIdAndStatut(user.getId(), StatutCaisse.OUVERTE)
-            .orElseThrow(() -> new RuntimeException("Aucune caisse ouverte pour cet utilisateur ou la caisse est déjà fermée."));
+    // 1️⃣ Récupérer la caisse ouverte pour cet utilisateur et cette boutique
+    Caisse caisse = caisseRepository.findByVendeurIdAndStatutAndBoutiqueId(
+            user.getId(), StatutCaisse.OUVERTE, boutiqueId)
+            .orElseThrow(() -> new RuntimeException("Aucune caisse ouverte pour cet utilisateur dans cette boutique ou la caisse est déjà fermée."));
 
     // 2️⃣ Sécurité : Vérification des droits d'accès de l'utilisateur
     RoleType role = user.getRole().getName();
