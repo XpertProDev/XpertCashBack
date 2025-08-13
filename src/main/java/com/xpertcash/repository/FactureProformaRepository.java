@@ -10,10 +10,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
-import com.xpertcash.entity.Boutique;
-import com.xpertcash.entity.Facture;
 import com.xpertcash.entity.FactureProForma;
-import com.xpertcash.entity.FactureReelle;
 import com.xpertcash.entity.User;
 import com.xpertcash.entity.Enum.StatutFactureProForma;
 

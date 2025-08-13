@@ -2,8 +2,6 @@ package com.xpertcash.DTOs;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.xpertcash.entity.Client;
-
-import jakarta.persistence.Column;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;

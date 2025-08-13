@@ -10,8 +10,6 @@ import java.util.List;
 import java.util.Random;
 import java.util.Set;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonManagedReference;
 import com.xpertcash.entity.Module.AppModule;
 

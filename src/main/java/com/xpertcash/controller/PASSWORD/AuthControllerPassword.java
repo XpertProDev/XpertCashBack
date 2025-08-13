@@ -4,7 +4,6 @@ import java.util.Collections;
 import java.util.Map;
 
 import com.xpertcash.entity.PASSWORD.PasswordResetToken;
-import org.eclipse.angus.mail.util.MailConnectException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;

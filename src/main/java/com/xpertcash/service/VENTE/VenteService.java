@@ -11,7 +11,6 @@ import com.xpertcash.repository.VENTE.VenteProduitRepository;
 import com.xpertcash.repository.VENTE.VenteRepository;
 
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,8 +31,6 @@ import com.xpertcash.entity.VENTE.VenteProduit;
 import jakarta.servlet.http.HttpServletRequest;
 
 import com.xpertcash.configuration.JwtUtil;
-import com.xpertcash.service.UsersService;
-import com.xpertcash.service.VENTE.CaisseService;
 
 @Service
 public class VenteService {
@@ -435,8 +432,9 @@ public List<VenteResponse> getVentesByVendeur(Long vendeurId, HttpServletRequest
                 dto.setQuantite(ligne.getQuantite());
                 dto.setPrixUnitaire(ligne.getPrixUnitaire());
                 dto.setMontantLigne(ligne.getMontantLigne());
-               dto.setRemise(ligne.getRemise());
+                dto.setRemise(ligne.getRemise());
                 lignesDTO.add(dto);
+                
 
             }
         }
