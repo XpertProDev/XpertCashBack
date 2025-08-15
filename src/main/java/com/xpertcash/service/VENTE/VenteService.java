@@ -28,6 +28,7 @@ import com.xpertcash.entity.VENTE.TypeMouvementCaisse;
 import com.xpertcash.entity.VENTE.Vente;
 import com.xpertcash.entity.VENTE.VenteHistorique;
 import com.xpertcash.entity.VENTE.VenteProduit;
+import com.xpertcash.entity.VENTE.VenteStatus;
 
 import jakarta.servlet.http.HttpServletRequest;
 
@@ -255,7 +256,7 @@ for (Map.Entry<Long, Integer> entry : request.getProduitsQuantites().entrySet())
 
     //Remboursement
    @Transactional
-public VenteResponse rembourserVente(RemboursementRequest request, HttpServletRequest httpRequest) {
+    public VenteResponse rembourserVente(RemboursementRequest request, HttpServletRequest httpRequest) {
     String token = httpRequest.getHeader("Authorization");
     if (token == null || !token.startsWith("Bearer ")) {
         throw new RuntimeException("Token JWT manquant ou mal formaté");
@@ -368,6 +369,10 @@ public VenteResponse rembourserVente(RemboursementRequest request, HttpServletRe
     historique.setDetails("Remboursement effectué par " + user.getNomComplet() + ", raison: " + request.getMotif());
     historique.setMontant(montantRembourse);
     venteHistoriqueRepository.save(historique);
+
+    // Mettre à jour le status de la vente
+    vente.setStatus(VenteStatus.REMBOURSEE);
+    venteRepository.save(vente);
 
     return toVenteResponse(vente);
 }
