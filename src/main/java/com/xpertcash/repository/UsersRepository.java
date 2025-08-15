@@ -33,7 +33,7 @@ public interface UsersRepository extends JpaRepository<User, Long> {
     
 
     boolean existsByPersonalCode(String personalCode);
-//    List<User> findByBoutiqueIdAndRole_Name(Long boutiqueId, RoleType roleName);
+    //List<User> findByBoutiqueIdAndRole_Name(Long boutiqueId, RoleType roleName);
 
     Optional<User> findByEntrepriseIdAndRole_NameIn(Long entrepriseId, List<RoleType> roles);
 
