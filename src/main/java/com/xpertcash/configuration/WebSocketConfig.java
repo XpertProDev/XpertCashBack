@@ -28,29 +28,41 @@ class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
         this.jwtUtil = jwtUtil;
     }
 
-   @Override
-    public void registerStompEndpoints(StompEndpointRegistry registry) {
-        // registry.addEndpoint("/ws")
-        //         .setAllowedOriginPatterns("*")
-        //         .withSockJS();
-
-        // new
-        registry.addEndpoint("/ws")
-        .setAllowedOrigins(
-            "http://localhost:4200",
-            "http://192.168.1.6:4200",
-            "https://tchakeda.com",
-            "https://www.tchakeda.com",
-            "https://xpertcash.tchakeda.com"
-        )
-        .withSockJS();
-        // fin
-    }
-
     @Override
     public void configureMessageBroker(MessageBrokerRegistry config) {
         config.enableSimpleBroker("/topic", "/queue");
         config.setApplicationDestinationPrefixes("/app");
         config.setUserDestinationPrefix("/user");
+    }
+
+    @Override
+    public void registerStompEndpoints(StompEndpointRegistry registry) {
+        registry.addEndpoint("/ws")
+                .setAllowedOriginPatterns("*")
+                .withSockJS();
+    }
+
+    @Override
+    public void configureClientInboundChannel(ChannelRegistration registration) {
+        registration.interceptors(new ChannelInterceptor() {
+            @Override
+            public Message<?> preSend(Message<?> message, MessageChannel channel) {
+                StompHeaderAccessor accessor = MessageHeaderAccessor.getAccessor(
+                        message, StompHeaderAccessor.class);
+
+                if (StompCommand.CONNECT.equals(accessor.getCommand())) {
+                    String bearer = accessor.getFirstNativeHeader("Authorization");
+                    if (bearer != null && bearer.startsWith("Bearer ")) {
+                        String token = bearer.substring(7);
+                        // Maintenant jwtUtil est disponible
+                        Long userId = jwtUtil.extractUserId(token);
+                        Principal user = new UsernamePasswordAuthenticationToken(
+                                userId.toString(), null, List.of());
+                        accessor.setUser(user);
+                    }
+                }
+                return message;
+            }
+        });
     }
 }

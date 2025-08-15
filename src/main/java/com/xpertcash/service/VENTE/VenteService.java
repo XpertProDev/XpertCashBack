@@ -129,10 +129,26 @@ for (Map.Entry<Long, Integer> entry : request.getProduitsQuantites().entrySet())
     Produit produit = produitRepository.findById(produitId)
             .orElseThrow(() -> new RuntimeException("Produit non trouvé"));
 
-    double prixUnitaire = produit.getPrixVente();
+    // Vérifier et mettre à jour le stock
+    Stock stock = stockRepository.findByProduit(produit);
+    if (stock == null) {
+        throw new RuntimeException("Stock non trouvé pour le produit " + produit.getNom());
+    }
+    if (stock.getStockActuel() < quantiteVendue) {
+        throw new RuntimeException("Stock insuffisant pour le produit " + produit.getNom());
+    }
+    stock.setStockActuel(stock.getStockActuel() - quantiteVendue);
+    stockRepository.save(stock);
 
+    // Mettre à jour quantité dans Produit si utilisée
+    if (produit.getQuantite() != null) {
+        produit.setQuantite(produit.getQuantite() - quantiteVendue);
+        produitRepository.save(produit);
+    }
+
+    // Calcul des montants
+    double prixUnitaire = produit.getPrixVente();
     double remisePct = 0.0;
-    // Appliquer remise par ligne uniquement si pas de remise globale
     if ((request.getRemises() != null && request.getRemises().containsKey(produitId))
             && (request.getRemiseGlobale() == null || request.getRemiseGlobale() == 0)) {
         remisePct = request.getRemises().get(produitId);
