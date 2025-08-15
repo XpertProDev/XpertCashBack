@@ -255,127 +255,144 @@ for (Map.Entry<Long, Integer> entry : request.getProduitsQuantites().entrySet())
 }
 
     //Remboursement
-   @Transactional
-    public VenteResponse rembourserVente(RemboursementRequest request, HttpServletRequest httpRequest) {
-    String token = httpRequest.getHeader("Authorization");
-    if (token == null || !token.startsWith("Bearer ")) {
-        throw new RuntimeException("Token JWT manquant ou mal formaté");
-    }
-    Long userId = jwtUtil.extractUserId(token.substring(7));
-    User user = usersRepository.findById(userId)
-        .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
-
-    Vente vente = venteRepository.findById(request.getVenteId())
-        .orElseThrow(() -> new RuntimeException("Vente non trouvée"));
-
-    Caisse caisse = caisseService.getCaisseActive(vente.getBoutique().getId(), httpRequest)
-        .orElseThrow(() -> new RuntimeException("Aucune caisse ouverte pour cette boutique/vendeur"));
-
-    if (request.getRescodePin() == null || request.getRescodePin().isBlank()) {
-        throw new RuntimeException("Vous devez rentrer le code d'un responsable de l'entreprise");
-    }
-    User responsable = usersRepository.findByEntrepriseIdAndRole_NameIn(
-            user.getEntreprise().getId(),
-            Arrays.asList(RoleType.MANAGER, RoleType.ADMIN)
-        ).orElseThrow(() -> new RuntimeException("Aucun responsable trouvé pour cette entreprise"));
-    if (!request.getRescodePin().equals(responsable.getPersonalCode())) {
-        throw new RuntimeException("Code PIN du responsable invalide");
-    }
-
-    Map<Long, Integer> produitsQuantites = request.getProduitsQuantites();
-    if (produitsQuantites == null) {
-        produitsQuantites = new HashMap<>();
-        for (VenteProduit vp : vente.getProduits()) {
-            produitsQuantites.put(vp.getProduit().getId(), vp.getQuantite());
+    @Transactional
+        public VenteResponse rembourserVente(RemboursementRequest request, HttpServletRequest httpRequest) {
+        String token = httpRequest.getHeader("Authorization");
+        if (token == null || !token.startsWith("Bearer ")) {
+            throw new RuntimeException("Token JWT manquant ou mal formaté");
         }
-    }
+        Long userId = jwtUtil.extractUserId(token.substring(7));
+        User user = usersRepository.findById(userId)
+            .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
 
-    List<VenteProduit> lignesRemboursees = new ArrayList<>();
-    double totalSansRemise = vente.getProduits().stream()
-        .mapToDouble(vp -> vp.getPrixUnitaire() * vp.getQuantite())
+        Vente vente = venteRepository.findById(request.getVenteId())
+            .orElseThrow(() -> new RuntimeException("Vente non trouvée"));
+
+        Caisse caisse = caisseService.getCaisseActive(vente.getBoutique().getId(), httpRequest)
+            .orElseThrow(() -> new RuntimeException("Aucune caisse ouverte pour cette boutique/vendeur"));
+
+        if (request.getRescodePin() == null || request.getRescodePin().isBlank()) {
+            throw new RuntimeException("Vous devez rentrer le code d'un responsable de l'entreprise");
+        }
+        User responsable = usersRepository.findByEntrepriseIdAndRole_NameIn(
+                user.getEntreprise().getId(),
+                Arrays.asList(RoleType.MANAGER, RoleType.ADMIN)
+            ).orElseThrow(() -> new RuntimeException("Aucun responsable trouvé pour cette entreprise"));
+        if (!request.getRescodePin().equals(responsable.getPersonalCode())) {
+            throw new RuntimeException("Code PIN du responsable invalide");
+        }
+
+        Map<Long, Integer> produitsQuantites = request.getProduitsQuantites();
+        if (produitsQuantites == null) {
+            produitsQuantites = new HashMap<>();
+            for (VenteProduit vp : vente.getProduits()) {
+                produitsQuantites.put(vp.getProduit().getId(), vp.getQuantite());
+            }
+        }
+
+        List<VenteProduit> lignesRemboursees = new ArrayList<>();
+        double totalSansRemise = vente.getProduits().stream()
+            .mapToDouble(vp -> vp.getPrixUnitaire() * vp.getQuantite())
+            .sum();
+
+        // Calculer montant exact en centimes pour éviter flottants
+        List<Double> montantsLignes = new ArrayList<>();
+        double montantRembourse = 0.0;
+        int i = 0;
+        int taille = produitsQuantites.size();
+
+        for (Map.Entry<Long, Integer> entry : produitsQuantites.entrySet()) {
+            Long produitId = entry.getKey();
+            Integer quantiteARembourser = entry.getValue();
+
+            VenteProduit vp = venteProduitRepository.findByVenteIdAndProduitId(vente.getId(), produitId)
+                .orElseThrow(() -> new RuntimeException("Produit non trouvé dans la vente"));
+
+            if (quantiteARembourser > vp.getQuantite()) {
+                throw new RuntimeException("Quantité à rembourser supérieure à la quantité vendue pour le produit " + produitId);
+            }
+
+            double prixUnitaire = vp.getPrixUnitaire();
+        double remiseLigne = vp.getRemise();
+            double montantProduit = prixUnitaire * quantiteARembourser * (1 - remiseLigne / 100.0);
+
+            if (vente.getRemiseGlobale() != null && vente.getRemiseGlobale() > 0) {
+                double proportion = (prixUnitaire * quantiteARembourser) / totalSansRemise;
+                montantProduit *= (1 - vente.getRemiseGlobale() / 100.0 * proportion);
+            }
+
+            // Conversion en centimes et arrondi
+            montantProduit = Math.round(montantProduit * 100.0) / 100.0;
+            montantsLignes.add(montantProduit);
+            montantRembourse += montantProduit;
+
+            // Mise à jour stock et produit
+            Produit produit = vp.getProduit();
+            Stock stock = stockRepository.findByProduit(produit);
+            if (stock == null) throw new RuntimeException("Stock non trouvé pour le produit " + produit.getNom());
+            stock.setStockActuel(stock.getStockActuel() + quantiteARembourser);
+            stockRepository.save(stock);
+
+            if (produit.getQuantite() != null) {
+                produit.setQuantite(produit.getQuantite() + quantiteARembourser);
+                produitRepository.save(produit);
+            }
+
+            vp.setQuantite(vp.getQuantite() - quantiteARembourser);
+            venteProduitRepository.save(vp);
+
+            lignesRemboursees.add(vp);
+
+            // Ajuster dernier produit pour corriger arrondi
+            if (i == taille - 1) {
+                double sommeLignes = montantsLignes.stream().mapToDouble(Double::doubleValue).sum();
+                double difference = Math.round(montantRembourse * 100.0) / 100.0 - sommeLignes;
+                montantRembourse += difference;
+            }
+            i++;
+        }
+
+        caisseService.ajouterMouvement(
+            caisse,
+            TypeMouvementCaisse.REMBOURSEMENT,
+            -montantRembourse,
+            "Remboursement vente ID " + vente.getId() + " : " + request.getMotif(),
+            vente,
+            vente.getModePaiement(),
+            -montantRembourse
+        );
+
+        VenteHistorique historique = new VenteHistorique();
+        historique.setVente(vente);
+        historique.setDateAction(LocalDateTime.now());
+        historique.setAction("REMBOURSEMENT_VENTE");
+        historique.setDetails("Remboursement effectué par " + user.getNomComplet() + ", raison: " + request.getMotif());
+        historique.setMontant(montantRembourse);
+        venteHistoriqueRepository.save(historique);
+
+       // Calculer remboursement total pour déterminer le statut
+    double totalRembourse = venteHistoriqueRepository
+        .findByVenteId(vente.getId())
+        .stream()
+        .filter(h -> h.getAction().equals("REMBOURSEMENT_VENTE"))
+        .mapToDouble(VenteHistorique::getMontant)
         .sum();
 
-    // Calculer montant exact en centimes pour éviter flottants
-    List<Double> montantsLignes = new ArrayList<>();
-    double montantRembourse = 0.0;
-    int i = 0;
-    int taille = produitsQuantites.size();
+         double montantVente = vente.getMontantTotal() != null ? vente.getMontantTotal() : 0.0;
 
-    for (Map.Entry<Long, Integer> entry : produitsQuantites.entrySet()) {
-        Long produitId = entry.getKey();
-        Integer quantiteARembourser = entry.getValue();
-
-        VenteProduit vp = venteProduitRepository.findByVenteIdAndProduitId(vente.getId(), produitId)
-            .orElseThrow(() -> new RuntimeException("Produit non trouvé dans la vente"));
-
-        if (quantiteARembourser > vp.getQuantite()) {
-            throw new RuntimeException("Quantité à rembourser supérieure à la quantité vendue pour le produit " + produitId);
-        }
-
-        double prixUnitaire = vp.getPrixUnitaire();
-       double remiseLigne = vp.getRemise();
-        double montantProduit = prixUnitaire * quantiteARembourser * (1 - remiseLigne / 100.0);
-
-        if (vente.getRemiseGlobale() != null && vente.getRemiseGlobale() > 0) {
-            double proportion = (prixUnitaire * quantiteARembourser) / totalSansRemise;
-            montantProduit *= (1 - vente.getRemiseGlobale() / 100.0 * proportion);
-        }
-
-        // Conversion en centimes et arrondi
-        montantProduit = Math.round(montantProduit * 100.0) / 100.0;
-        montantsLignes.add(montantProduit);
-        montantRembourse += montantProduit;
-
-        // Mise à jour stock et produit
-        Produit produit = vp.getProduit();
-        Stock stock = stockRepository.findByProduit(produit);
-        if (stock == null) throw new RuntimeException("Stock non trouvé pour le produit " + produit.getNom());
-        stock.setStockActuel(stock.getStockActuel() + quantiteARembourser);
-        stockRepository.save(stock);
-
-        if (produit.getQuantite() != null) {
-            produit.setQuantite(produit.getQuantite() + quantiteARembourser);
-            produitRepository.save(produit);
-        }
-
-        vp.setQuantite(vp.getQuantite() - quantiteARembourser);
-        venteProduitRepository.save(vp);
-
-        lignesRemboursees.add(vp);
-
-        // Ajuster dernier produit pour corriger arrondi
-        if (i == taille - 1) {
-            double sommeLignes = montantsLignes.stream().mapToDouble(Double::doubleValue).sum();
-            double difference = Math.round(montantRembourse * 100.0) / 100.0 - sommeLignes;
-            montantRembourse += difference;
-        }
-        i++;
+         if (totalRembourse >= montantVente) {
+        vente.setStatus(VenteStatus.REMBOURSEE);
+    } else if (totalRembourse > 0) {
+        vente.setStatus(VenteStatus.PARTIELLEMENT_REMBOURSEE);
+    } else {
+        vente.setStatus(VenteStatus.EN_COURS);
     }
 
-    caisseService.ajouterMouvement(
-        caisse,
-        TypeMouvementCaisse.REMBOURSEMENT,
-        -montantRembourse,
-        "Remboursement vente ID " + vente.getId() + " : " + request.getMotif(),
-        vente,
-        vente.getModePaiement(),
-        -montantRembourse
-    );
+        venteRepository.save(vente);
 
-    VenteHistorique historique = new VenteHistorique();
-    historique.setVente(vente);
-    historique.setDateAction(LocalDateTime.now());
-    historique.setAction("REMBOURSEMENT_VENTE");
-    historique.setDetails("Remboursement effectué par " + user.getNomComplet() + ", raison: " + request.getMotif());
-    historique.setMontant(montantRembourse);
-    venteHistoriqueRepository.save(historique);
 
-    // Mettre à jour le status de la vente
-    vente.setStatus(VenteStatus.REMBOURSEE);
-    venteRepository.save(vente);
-
-    return toVenteResponse(vente);
-}
+        return toVenteResponse(vente);
+    }
 
 
    // Lister tous les remboursements pour l'utilisateur connecté
