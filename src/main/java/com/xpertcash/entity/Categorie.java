@@ -3,7 +3,6 @@ package com.xpertcash.entity;
 import java.time.LocalDateTime;
 import java.util.List;
 
-import com.xpertcash.DTOs.PRODUIT.ProduitDetailsResponseDTO;
 
 import jakarta.persistence.*;
 import lombok.Data;

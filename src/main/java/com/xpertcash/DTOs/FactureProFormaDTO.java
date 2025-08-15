@@ -1,14 +1,10 @@
 package com.xpertcash.DTOs;
-import java.math.BigDecimal;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
-import com.xpertcash.DTOs.USER.UserRequest;
 import com.xpertcash.entity.FactureProForma;
-import com.xpertcash.entity.FactureReelle;
 import com.xpertcash.entity.Enum.StatutFactureProForma;
 import com.xpertcash.entity.Enum.StatutPaiementFacture;
 
