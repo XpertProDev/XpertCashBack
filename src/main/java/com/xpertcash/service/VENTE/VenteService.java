@@ -1,6 +1,7 @@
 package com.xpertcash.service.VENTE;
 
 import com.xpertcash.DTOs.VENTE.RemboursementRequest;
+import com.xpertcash.DTOs.VENTE.RemboursementResponse;
 import com.xpertcash.DTOs.VENTE.VenteRequest;
 import com.xpertcash.DTOs.VENTE.VenteResponse;
 import com.xpertcash.composant.Utilitaire;
@@ -210,6 +211,8 @@ for (Map.Entry<Long, Integer> entry : request.getProduitsQuantites().entrySet())
     historique.setDateAction(java.time.LocalDateTime.now());
     historique.setAction("ENREGISTREMENT_VENTE");
     historique.setDetails("Vente enregistrée par le vendeur " + vendeur.getNomComplet());
+    historique.setMontant(vente.getMontantTotal());
+
     venteHistoriqueRepository.save(historique);
 
     // Génération de la facture de vente
@@ -251,117 +254,167 @@ for (Map.Entry<Long, Integer> entry : request.getProduitsQuantites().entrySet())
 }
 
     //Remboursement
-    @Transactional
-    public VenteResponse rembourserVente(RemboursementRequest request, HttpServletRequest httpRequest) {
-        // Extraction user comme dans ta méthode de vente
-        String token = httpRequest.getHeader("Authorization");
-        if (token == null || !token.startsWith("Bearer ")) {
+   @Transactional
+public VenteResponse rembourserVente(RemboursementRequest request, HttpServletRequest httpRequest) {
+    String token = httpRequest.getHeader("Authorization");
+    if (token == null || !token.startsWith("Bearer ")) {
+        throw new RuntimeException("Token JWT manquant ou mal formaté");
+    }
+    Long userId = jwtUtil.extractUserId(token.substring(7));
+    User user = usersRepository.findById(userId)
+        .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+
+    Vente vente = venteRepository.findById(request.getVenteId())
+        .orElseThrow(() -> new RuntimeException("Vente non trouvée"));
+
+    Caisse caisse = caisseService.getCaisseActive(vente.getBoutique().getId(), httpRequest)
+        .orElseThrow(() -> new RuntimeException("Aucune caisse ouverte pour cette boutique/vendeur"));
+
+    if (request.getRescodePin() == null || request.getRescodePin().isBlank()) {
+        throw new RuntimeException("Vous devez rentrer le code d'un responsable de l'entreprise");
+    }
+    User responsable = usersRepository.findByEntrepriseIdAndRole_NameIn(
+            user.getEntreprise().getId(),
+            Arrays.asList(RoleType.MANAGER, RoleType.ADMIN)
+        ).orElseThrow(() -> new RuntimeException("Aucun responsable trouvé pour cette entreprise"));
+    if (!request.getRescodePin().equals(responsable.getPersonalCode())) {
+        throw new RuntimeException("Code PIN du responsable invalide");
+    }
+
+    Map<Long, Integer> produitsQuantites = request.getProduitsQuantites();
+    if (produitsQuantites == null) {
+        produitsQuantites = new HashMap<>();
+        for (VenteProduit vp : vente.getProduits()) {
+            produitsQuantites.put(vp.getProduit().getId(), vp.getQuantite());
+        }
+    }
+
+    List<VenteProduit> lignesRemboursees = new ArrayList<>();
+    double totalSansRemise = vente.getProduits().stream()
+        .mapToDouble(vp -> vp.getPrixUnitaire() * vp.getQuantite())
+        .sum();
+
+    // Calculer montant exact en centimes pour éviter flottants
+    List<Double> montantsLignes = new ArrayList<>();
+    double montantRembourse = 0.0;
+    int i = 0;
+    int taille = produitsQuantites.size();
+
+    for (Map.Entry<Long, Integer> entry : produitsQuantites.entrySet()) {
+        Long produitId = entry.getKey();
+        Integer quantiteARembourser = entry.getValue();
+
+        VenteProduit vp = venteProduitRepository.findByVenteIdAndProduitId(vente.getId(), produitId)
+            .orElseThrow(() -> new RuntimeException("Produit non trouvé dans la vente"));
+
+        if (quantiteARembourser > vp.getQuantite()) {
+            throw new RuntimeException("Quantité à rembourser supérieure à la quantité vendue pour le produit " + produitId);
+        }
+
+        double prixUnitaire = vp.getPrixUnitaire();
+       double remiseLigne = vp.getRemise();
+        double montantProduit = prixUnitaire * quantiteARembourser * (1 - remiseLigne / 100.0);
+
+        if (vente.getRemiseGlobale() != null && vente.getRemiseGlobale() > 0) {
+            double proportion = (prixUnitaire * quantiteARembourser) / totalSansRemise;
+            montantProduit *= (1 - vente.getRemiseGlobale() / 100.0 * proportion);
+        }
+
+        // Conversion en centimes et arrondi
+        montantProduit = Math.round(montantProduit * 100.0) / 100.0;
+        montantsLignes.add(montantProduit);
+        montantRembourse += montantProduit;
+
+        // Mise à jour stock et produit
+        Produit produit = vp.getProduit();
+        Stock stock = stockRepository.findByProduit(produit);
+        if (stock == null) throw new RuntimeException("Stock non trouvé pour le produit " + produit.getNom());
+        stock.setStockActuel(stock.getStockActuel() + quantiteARembourser);
+        stockRepository.save(stock);
+
+        if (produit.getQuantite() != null) {
+            produit.setQuantite(produit.getQuantite() + quantiteARembourser);
+            produitRepository.save(produit);
+        }
+
+        vp.setQuantite(vp.getQuantite() - quantiteARembourser);
+        venteProduitRepository.save(vp);
+
+        lignesRemboursees.add(vp);
+
+        // Ajuster dernier produit pour corriger arrondi
+        if (i == taille - 1) {
+            double sommeLignes = montantsLignes.stream().mapToDouble(Double::doubleValue).sum();
+            double difference = Math.round(montantRembourse * 100.0) / 100.0 - sommeLignes;
+            montantRembourse += difference;
+        }
+        i++;
+    }
+
+    caisseService.ajouterMouvement(
+        caisse,
+        TypeMouvementCaisse.REMBOURSEMENT,
+        -montantRembourse,
+        "Remboursement vente ID " + vente.getId() + " : " + request.getMotif(),
+        vente,
+        vente.getModePaiement(),
+        -montantRembourse
+    );
+
+    VenteHistorique historique = new VenteHistorique();
+    historique.setVente(vente);
+    historique.setDateAction(LocalDateTime.now());
+    historique.setAction("REMBOURSEMENT_VENTE");
+    historique.setDetails("Remboursement effectué par " + user.getNomComplet() + ", raison: " + request.getMotif());
+    historique.setMontant(montantRembourse);
+    venteHistoriqueRepository.save(historique);
+
+    return toVenteResponse(vente);
+}
+
+
+   // Lister tous les remboursements pour l'utilisateur connecté
+    public List<RemboursementResponse> getMesRemboursements(String jwtToken) {
+        // 🔐 Vérification et extraction de l'utilisateur
+        if (jwtToken == null || !jwtToken.startsWith("Bearer ")) {
             throw new RuntimeException("Token JWT manquant ou mal formaté");
         }
-        Long userId = jwtUtil.extractUserId(token.substring(7));
+        Long userId = jwtUtil.extractUserId(jwtToken.substring(7));
         User user = usersRepository.findById(userId)
-            .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+                .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
 
-        // Vérif droits etc. à adapter selon ton contexte
-
-        Vente vente = venteRepository.findById(request.getVenteId())
-            .orElseThrow(() -> new RuntimeException("Vente non trouvée"));
-
-        Caisse caisse = caisseService.getCaisseActive(vente.getBoutique().getId(), httpRequest)
-            .orElseThrow(() -> new RuntimeException("Aucune caisse ouverte pour cette boutique/vendeur"));
-
-
-            // Vérifier que le code PIN est bien envoyé
-            if (request.getRescodePin() == null || request.getRescodePin().isBlank()) {
-                throw new RuntimeException(
-                    "Vous devez rentrer le code d'un responsable (manager ou admin) de cette entreprise"
-                );
-            }
-
-            // Chercher un responsable (manager ou admin) de la même entreprise
-            User responsable = usersRepository.findByEntrepriseIdAndRole_NameIn(
-                    user.getEntreprise().getId(),
-                    Arrays.asList(RoleType.MANAGER, RoleType.ADMIN)
-                ).orElseThrow(() -> new RuntimeException(
-                    "Aucun responsable (manager ou admin) trouvé pour cette entreprise"
-                ));
-
-            // Vérifier que le PIN correspond
-            if (!request.getRescodePin().equals(responsable.getPersonalCode())) {
-                throw new RuntimeException("Code PIN du responsable invalide");
-            }
-
-        // Gérer remboursement total si produitsQuantites est null
-        Map<Long, Integer> produitsQuantites = request.getProduitsQuantites();
-        if (produitsQuantites == null) {
-            produitsQuantites = new HashMap<>();
-            for (VenteProduit vp : vente.getProduits()) {
-                produitsQuantites.put(vp.getProduit().getId(), vp.getQuantite());
-            }
+        // 🔐 Vérification des droits
+        RoleType role = user.getRole().getName();
+        boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
+        boolean hasPermission = user.getRole().hasPermission(PermissionType.VENDRE_PRODUITS);
+        if (!isAdminOrManager && !hasPermission) {
+            throw new RuntimeException("Vous n'avez pas les droits nécessaires pour voir les remboursements !");
         }
 
-        // On va calculer le montant remboursé
-        double montantRembourse = 0.0;
-        List<VenteProduit> lignesRemboursees = new ArrayList<>();
+        // 🔐 Récupérer toutes les ventes du vendeur
+        List<Vente> ventes = venteRepository.findByVendeur(user);
 
-        for (Map.Entry<Long, Integer> entry : produitsQuantites.entrySet()) {
-            Long produitId = entry.getKey();
-            Integer quantiteARembourser = entry.getValue();
+        // 🔐 Filtrer uniquement les ventes de l'entreprise de l'utilisateur
+        ventes = ventes.stream()
+                .filter(v -> v.getBoutique().getEntreprise().getId().equals(user.getEntreprise().getId()))
+                .collect(Collectors.toList());
 
-            VenteProduit venteProduit = venteProduitRepository.findByVenteIdAndProduitId(vente.getId(), produitId)
-                .orElseThrow(() -> new RuntimeException("Produit non trouvé dans la vente"));
+        // Chercher tous les historiques de remboursement pour ces ventes
+        List<VenteHistorique> remboursements = ventes.stream()
+                .flatMap(v -> venteHistoriqueRepository.findByVenteAndAction(v, "REMBOURSEMENT_VENTE").stream())
+                .collect(Collectors.toList());
 
-            if (quantiteARembourser > venteProduit.getQuantite()) {
-                throw new RuntimeException("Quantité à rembourser supérieure à la quantité vendue pour le produit " + produitId);
-            }
-
-            // Calcul montant partiel remboursé
-            double montantLigneRembourse = venteProduit.getPrixUnitaire() * quantiteARembourser;
-            montantRembourse += montantLigneRembourse;
-
-            // Mise à jour du stock
-            Produit produit = venteProduit.getProduit();
-            Stock stock = stockRepository.findByProduit(produit);
-            if (stock == null) {
-                throw new RuntimeException("Stock non trouvé pour le produit " + produit.getNom());
-            }
-            stock.setStockActuel(stock.getStockActuel() + quantiteARembourser);
-            stockRepository.save(stock);
-
-            // Mise à jour quantité dans Produit si besoin
-            if (produit.getQuantite() != null) {
-                produit.setQuantite(produit.getQuantite() + quantiteARembourser);
-                produitRepository.save(produit);
-            }
-
-            // Mise à jour quantité vendue (optionnel)
-            venteProduit.setQuantite(venteProduit.getQuantite() - quantiteARembourser);
-            venteProduitRepository.save(venteProduit);
-
-            lignesRemboursees.add(venteProduit);
+        // Mapper en DTO
+        List<RemboursementResponse> response = new ArrayList<>();
+        for (VenteHistorique vh : remboursements) {
+            RemboursementResponse dto = new RemboursementResponse();
+            dto.setDateRemboursement(vh.getDateAction());
+            dto.setDetails(vh.getDetails());
+            dto.setMontant(vh.getMontant());
+            response.add(dto);
         }
 
-        // Enregistrer le remboursement comme un mouvement de caisse négatif
-        caisseService.ajouterMouvement(
-            caisse,
-            TypeMouvementCaisse.REMBOURSEMENT,
-            -montantRembourse,
-            "Remboursement vente ID " + vente.getId() + " : " + request.getMotif(),
-            vente,
-            vente.getModePaiement(),
-            -montantRembourse
-        );
-
-        // Enregistrer historique remboursement
-        VenteHistorique historique = new VenteHistorique();
-        historique.setVente(vente);
-        historique.setDateAction(LocalDateTime.now());
-        historique.setAction("REMBOURSEMENT_VENTE");
-        historique.setDetails("Remboursement effectué par " + user.getNomComplet() + ", raison: " + request.getMotif());
-        venteHistoriqueRepository.save(historique);
-
-        // Retourner la vente mise à jour ou un DTO personnalisé (à adapter)
-        return toVenteResponse(vente);
+        return response;
     }
 
 

@@ -1,6 +1,7 @@
 package com.xpertcash.controller.VENTE;
 
 import com.xpertcash.DTOs.VENTE.RemboursementRequest;
+import com.xpertcash.DTOs.VENTE.RemboursementResponse;
 import com.xpertcash.DTOs.VENTE.VenteRequest;
 import com.xpertcash.DTOs.VENTE.VenteResponse;
 import com.xpertcash.service.VENTE.VenteService;
@@ -31,6 +32,17 @@ public class VenteController {
         VenteResponse response = venteService.rembourserVente(request, httpRequest);
         return ResponseEntity.ok(response);
     }
+
+        // Lister les remboursements d'une vente
+        @GetMapping("/mes/remboursements")
+        public ResponseEntity<List<RemboursementResponse>> getMesRemboursements(
+                HttpServletRequest httpRequest) {
+            String jwtToken = httpRequest.getHeader("Authorization");
+            List<RemboursementResponse> remboursements = venteService.getMesRemboursements(jwtToken);
+            return ResponseEntity.ok(remboursements);
+        }
+
+
 
 
 

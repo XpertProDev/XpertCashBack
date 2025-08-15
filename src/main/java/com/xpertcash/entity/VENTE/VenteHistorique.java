@@ -18,4 +18,5 @@ public class VenteHistorique {
     private LocalDateTime dateAction;
     private String action;
     private String details;
+    private Double montant;
 }

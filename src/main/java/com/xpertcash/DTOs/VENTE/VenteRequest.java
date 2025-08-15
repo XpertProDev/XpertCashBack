@@ -16,5 +16,4 @@ public class VenteRequest {
     private String modePaiement;
     private Map<Long, Double> remises = new HashMap<>();
     private Double remiseGlobale = 0.0;
-    // private Double montantPaye;
 }
