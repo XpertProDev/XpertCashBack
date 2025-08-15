@@ -55,7 +55,6 @@ public class EntrepriseController {
         return ResponseEntity.ok(dto);
     }
 
-  
     
     @PatchMapping(value = "/updateEntreprise/{entrepriseId}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE) 
     public ResponseEntity<?> updateEntreprise(

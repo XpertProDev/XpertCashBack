@@ -19,6 +19,8 @@ public class VenteResponse {
     private String modePaiement;
     private Double montantPaye;
     private List<LigneVenteDTO> lignes;
+    private Double remiseGlobale;
+
 
     @Data
     public static class LigneVenteDTO {
@@ -27,5 +29,7 @@ public class VenteResponse {
         private Integer quantite;
         private Double prixUnitaire;
         private Double montantLigne;
+        private Double remise;
+
     }
 }

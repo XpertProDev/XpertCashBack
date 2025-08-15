@@ -2,6 +2,8 @@ package com.xpertcash.entity.VENTE;
 
 import lombok.Data;
 
+import java.util.Map;
+
 import com.xpertcash.entity.Produit;
 
 import jakarta.persistence.*;
@@ -24,4 +26,9 @@ public class VenteProduit {
     private Integer quantite;
     private Double prixUnitaire;
     private Double montantLigne;
+    private double remise = 0.0;
+
+    
+    
+
 }

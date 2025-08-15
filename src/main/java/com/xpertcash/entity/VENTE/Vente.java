@@ -43,6 +43,8 @@ public class Vente {
     private String clientNom;
     private String clientNumero;
 
+    private Double remiseGlobale;
+
     @Enumerated(EnumType.STRING)
     private ModePaiement modePaiement;
     private Double montantPaye;
