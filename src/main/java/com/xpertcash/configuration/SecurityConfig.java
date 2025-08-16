@@ -56,7 +56,8 @@ public class SecurityConfig {
                 "http://localhost:4200",
                 "http://192.168.1.8:4200",
                 "https://tchakeda.com",
-                "https://www.tchakeda.com"
+                "https://www.tchakeda.com",
+                "https://xpertcash.tchakeda.com"
         ));
         configuration.setAllowedMethods(List.of("GET","POST","PUT","PATCH","DELETE","OPTIONS"));
         configuration.setAllowedHeaders(List.of(
