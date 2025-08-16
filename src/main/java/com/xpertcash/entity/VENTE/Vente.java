@@ -51,4 +51,7 @@ public class Vente {
 
     @OneToMany(mappedBy = "vente", cascade = CascadeType.ALL)
     private List<VenteProduit> produits;
+
+    @Enumerated(EnumType.STRING)
+    private VenteStatus status;
 }

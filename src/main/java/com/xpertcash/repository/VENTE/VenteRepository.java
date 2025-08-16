@@ -7,6 +7,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import com.xpertcash.entity.Entreprise;
+import com.xpertcash.entity.User;
 import com.xpertcash.entity.VENTE.Vente;
 
 public interface VenteRepository extends JpaRepository<Vente, Long> {
@@ -23,4 +25,10 @@ public interface VenteRepository extends JpaRepository<Vente, Long> {
     );
 
     List<Vente> findByVendeurId(Long vendeurId);
+
+    // Récupère toutes les ventes d'un vendeur
+    List<Vente> findByVendeur(User vendeur);
+
+    // Si besoin : récupérer les ventes d'un vendeur pour une entreprise spécifique
+    List<Vente> findByVendeurAndBoutique_Entreprise(User vendeur, Entreprise entreprise);
 }

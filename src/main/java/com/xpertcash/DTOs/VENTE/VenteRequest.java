@@ -9,12 +9,11 @@ import java.util.Map;
 public class VenteRequest {
     private Long boutiqueId;
     private Long vendeurId;
-    private Map<Long, Integer> produitsQuantites; // produitId -> quantite
+    private Map<Long, Integer> produitsQuantites;
     private String description;
     private String clientNom;
     private String clientNumero;
     private String modePaiement;
     private Map<Long, Double> remises = new HashMap<>();
     private Double remiseGlobale = 0.0;
-    // private Double montantPaye;
 }
