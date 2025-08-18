@@ -4,6 +4,7 @@ import com.xpertcash.DTOs.EntrepriseDTO;
 import com.xpertcash.DTOs.UpdateUserRequest;
 import com.xpertcash.DTOs.Boutique.BoutiqueResponse;
 import com.xpertcash.DTOs.USER.PermissionDTO;
+import com.xpertcash.DTOs.USER.RegisterResponse;
 import com.xpertcash.DTOs.USER.RoleDTO;
 import com.xpertcash.DTOs.USER.UserDTO;
 import com.xpertcash.DTOs.USER.UserRequest;
@@ -111,8 +112,10 @@ public class UsersService {
 
 
   
-    @Transactional
-    public User registerUsers(String nomComplet, String email, String password, String phone, String pays, String nomEntreprise, String nomBoutique) {
+   @Transactional(noRollbackFor = MessagingException.class)
+    public RegisterResponse registerUsers(String nomComplet, String email, String password, String phone, String pays, String nomEntreprise, String nomBoutique) {
+        RegisterResponse response = new RegisterResponse();
+
         // Vérification des données déjà existantes
         if (usersRepository.findByEmail(email).isPresent()) {
             throw new RuntimeException("Cet email est déjà utilisé. L'utilisateur existe déjà.");
@@ -141,13 +144,7 @@ public class UsersService {
         // Générer le code PIN d'activation
         String activationCode = String.format("%04d", new Random().nextInt(10000));
     
-        // Envoi de l'email d'activation avec le code PIN AVANT l'enregistrement
-        try {
-            mailService.sendActivationLinkEmail(email, activationCode, personalCode);
-        } catch (MessagingException e) {
-            System.err.println("Erreur lors de l'envoi de l'email d'activation : " + e.getMessage());
-            throw new RuntimeException("L'inscription a échoué. Veuillez vérifier votre connexion Internet ou réessayer plus tard.");
-        }
+
     
         // Si l'email est bien envoyé, on continue l'enregistrement
     
@@ -238,9 +235,23 @@ public class UsersService {
         // Assigner l'utilisateur admin à l'entreprise
         entreprise.setAdmin(user);
         entrepriseRepository.save(entreprise);
-    
-        // Retourner l'utilisateur créé
-        return user;
+
+         // Essayer d'envoyer l'email, mais ne pas rollback si ça échoue
+        try {
+            mailService.sendActivationLinkEmail(email, activationCode, personalCode);
+            response.setSuccess(true);
+            response.setMessage("Compte créé avec succès. Un email d’activation vous a été envoyé.");
+        } catch (Exception e) { 
+            System.err.println("⚠️ Erreur lors de l'envoi de l'email : " + e.getMessage());
+            response.setSuccess(true);
+            response.setMessage("Compte créé avec succès. Un email d’activation vous a été envoyé.");
+
+        }
+
+
+        response.setUser(user);
+        return response;
+
     }
 
     //Admin name
@@ -324,7 +335,27 @@ public class UsersService {
         }
 
 
-    
+    //Resent Mail
+    @Transactional
+    public void resendActivationEmail(String email) {
+        // Vérifier que l'utilisateur existe
+        User user = usersRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("Utilisateur introuvable avec cet email."));
+
+        // Vérifier si le compte est déjà activé
+        if (user.isActivatedLien()) {
+            throw new RuntimeException("Ce compte est déjà activé.");
+        }
+
+        // Essayer d’envoyer l’email d’activation
+        try {
+            mailService.sendActivationLinkEmail(user.getEmail(), user.getActivationCode(), user.getPersonalCode());
+        } catch (MessagingException e) {
+            System.err.println("Erreur lors du renvoi de l'email : " + e.getMessage());
+            throw new RuntimeException("Impossible d’envoyer l’email pour le moment.");
+        }
+    }
+
 
 
     // Activation du compte via le lien d'activation (email + code PIN)
@@ -758,39 +789,59 @@ public void deleteUserFromEntreprise(HttpServletRequest request, Long userId) {
     return user;
 }
 
+    //Get user info
     public UserRequest getInfo(Long userId) {
-    User user = usersRepository.findById(userId)
-            .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+        User user = usersRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
 
-    Entreprise entreprise = user.getEntreprise();
+        Entreprise entreprise = user.getEntreprise();
 
-    List<BoutiqueResponse> boutiqueResponses = entreprise
-            .getBoutiques()
-            .stream()
-            .map(b -> new BoutiqueResponse(
-                    b.getId(),
-                    b.getNomBoutique(),
-                    b.getAdresse(),
-                    b.getTelephone(),
-                    b.getEmail(),
-                    b.getCreatedAt(),
-                    b.isActif(),
-                    b.getTypeBoutique())
-            )
-            .collect(Collectors.toList());
+        List<BoutiqueResponse> boutiqueResponses;
+        String roleType = user.getRole().getName().name();
 
-    // Récupérer la liste des permissions sous forme de noms
-        List<String> permissions = user.getRole().getPermissions().stream()
-            .map(permission -> permission.getType().name())
-            .collect(Collectors.toList());
-   
+        if (roleType.equals("VENDEUR")) {
+            // Boutiques assignées au vendeur
+            boutiqueResponses = user.getUserBoutiques()
+                    .stream()
+                    .map(b -> new BoutiqueResponse(
+                            b.getId(),
+                            b.getBoutique().getNomBoutique(),
+                            b.getBoutique().getAdresse(),
+                            b.getBoutique().getTelephone(),
+                            b.getBoutique().getEmail(),
+                            b.getBoutique().getCreatedAt(),
+                            b.getBoutique().isActif(),
+                            b.getBoutique().getTypeBoutique()
+                    ))
+                    .collect(Collectors.toList());
+        } else {
+            // ADMIN ou MANAGER : toutes les boutiques de l'entreprise
+            boutiqueResponses = entreprise.getBoutiques()
+                    .stream()
+                    .map(b -> new BoutiqueResponse(
+                            b.getId(),
+                            b.getNomBoutique(),
+                            b.getAdresse(),
+                            b.getTelephone(),
+                            b.getEmail(),
+                            b.getCreatedAt(),
+                            b.isActif(),
+                            b.getTypeBoutique()
+                    ))
+                    .collect(Collectors.toList());
+        }
 
-    return new UserRequest(
-        user, entreprise, boutiqueResponses, permissions
-        );
-}
+        // Permissions
+        List<String> permissions = user.getRole().getPermissions()
+                .stream()
+                .map(permission -> permission.getType().name())
+                .collect(Collectors.toList());
 
-    // Pour la récupération de tous les utilisateurs d'une entreprise
+        return new UserRequest(user, entreprise, boutiqueResponses, permissions);
+    }
+
+
+// Pour la récupération de tous les utilisateurs d'une entreprise
  public List<UserDTO> getAllUsersOfEntreprise(HttpServletRequest request) {
     // Extraction du token JWT
     String token = request.getHeader("Authorization");

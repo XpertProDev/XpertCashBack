@@ -2,6 +2,8 @@ package com.xpertcash.controller;
 
 //import com.xpertcash.DTOs.RegistrationResponse;
 import com.xpertcash.DTOs.UpdateUserRequest;
+import com.xpertcash.DTOs.USER.RegisterResponse;
+import com.xpertcash.DTOs.USER.ResendActivationRequest;
 import com.xpertcash.DTOs.USER.RoleDTO;
 import com.xpertcash.DTOs.USER.UserDTO;
 import com.xpertcash.DTOs.USER.UserRequest;
@@ -56,32 +58,30 @@ public class UsersController {
     private UsersRepository usersRepository;
 
     // Inscription
-    @PostMapping("/register")
-    public ResponseEntity<Map<String, String>> register(@RequestBody RegistrationRequest request) {
-        Map<String, String> response = new HashMap<>();
-
-        try {
-            usersService.registerUsers(
-                    request.getNomComplet(),
-                    request.getEmail(),
-                    request.getPassword(),
-                    request.getPhone(),
-                    request.getPays(),
-                    request.getNomEntreprise(),
-                    request.getNomBoutique()
-            );
-
-            response.put("message", "Compte créé avec succès. Un lien d'activation vous a été envoyé par email.");
-            return ResponseEntity.ok(response);
-
-        } catch (RuntimeException e) {
-            System.err.println("Erreur lors de l'inscription : " + e.getMessage());
-
-            response.put("error", "L'inscription a échoué. Veuillez vérifier votre connexion Internet ou réessayer plus tard.");
-            response.put("error", "L'inscription a échoué. Cause: " + e.getMessage());
-            return ResponseEntity.badRequest().body(response);
-        }
+@PostMapping("/register")
+public ResponseEntity<RegisterResponse> register(@RequestBody RegistrationRequest request) {
+    RegisterResponse response = new RegisterResponse();
+    try {
+        response = usersService.registerUsers(
+            request.getNomComplet(),
+            request.getEmail(),
+            request.getPassword(),
+            request.getPhone(),
+            request.getPays(),
+            request.getNomEntreprise(),
+            request.getNomBoutique()
+        );
+        // Ici, response.success est déjà true ou false selon l'envoi de l'email
+        return ResponseEntity.ok(response);
+    } catch (RuntimeException e) {
+        // Erreurs métier (email, téléphone, entreprise déjà existants, rôle manquant, etc.)
+        response.setSuccess(false);
+        response.setMessage("L'inscription a échoué. Cause: " + e.getMessage());
+        response.setUser(null);
+        return ResponseEntity.badRequest().body(response);
     }
+}
+
 
     // Connexion
     @PostMapping("/login")
@@ -95,6 +95,20 @@ public class UsersController {
             errorResponse.put("error", e.getMessage() != null ? e.getMessage() : "Erreur inconnue");
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(errorResponse);
         }
+    }
+
+
+   
+    // Endpoint pour renvoyer l'email d'activation
+    @PostMapping("/resend-activation")
+    public ResponseEntity<Map<String, String>> resendActivation(@RequestBody ResendActivationRequest request) {
+    usersService.resendActivationEmail(request.getEmail());
+
+    Map<String, String> response = new HashMap<>();
+    response.put("message", "Email d’activation renvoyé avec succès.");
+    response.put("email", request.getEmail());
+
+     return ResponseEntity.ok(response);
     }
 
 
