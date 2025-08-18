@@ -31,10 +31,10 @@ public class MailService {
     private JavaMailSender mailSender;
  
     @Value("${spring.mail.username}")
-    private String from;
+    private String from; 
 
     public void sendActivationLinkEmail(String to, String code, String personalCode) throws MessagingException {
-        String baseUrl = "https://xpertcash.tchakeda.com";
+        String baseUrl = "https://xpertcash.tchakeda.com/api/v1";
         String activationUrl = baseUrl + "/api/auth/activate?email=" + to + "&code=" + code;
 
         String subject = "Activation de votre compte";
@@ -64,7 +64,7 @@ public class MailService {
 
 
     public void sendUnlockLinkEmail(String to, String code) throws MessagingException {
-        String baseUrl = "https://xpertcash.tchakeda.com";
+        String baseUrl = "https://xpertcash.tchakeda.com/api/v1";
         String unlockUrl = baseUrl + "/api/auth/unlock?email=" + to + "&code=" + code;
 
         String subject = "Déverrouillage de votre compte";
