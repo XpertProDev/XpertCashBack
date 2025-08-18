@@ -85,7 +85,9 @@ public ResponseEntity<Object> createCategorie(@RequestBody Map<String, String> p
         Categorie savedCategorie = categorieService.createCategorie(nom, entreprise.getId());
 
         // Retourner un message de succès ou un objet simple
-        Map<String, String> response = new HashMap<>();
+        Map<String, Object> response = new HashMap<>();
+        response.put("id", savedCategorie.getId());
+        response.put("nom", savedCategorie.getNom());
         response.put("message", "Catégorie créée avec succès !");
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     } catch (RuntimeException e) {

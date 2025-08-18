@@ -29,7 +29,8 @@ public class SecurityConfig {
                         // on ignore CSRF pour WS et pour toute l'API d'auth
                         .ignoringRequestMatchers(
                                 new AntPathRequestMatcher("/ws/**"),
-                                new AntPathRequestMatcher("/api/auth/**")
+                                new AntPathRequestMatcher("/api/auth/**"),
+                               new AntPathRequestMatcher("/api/v1/api/auth/**")
                         )
                 )
                 // 3) Autorisations
@@ -37,6 +38,7 @@ public class SecurityConfig {
                         // on autorise ces endpoints sans auth
                         .requestMatchers("/csrf").permitAll()
                         .requestMatchers("/api/auth/**").permitAll()
+                        .requestMatchers("/api/v1/api/auth/**").permitAll()
                         // tout le reste est ouvert (ou vous pouvez restreindre)
                         .anyRequest().permitAll()
                 );
@@ -54,7 +56,7 @@ public class SecurityConfig {
         CorsConfiguration configuration = new CorsConfiguration();
         configuration.setAllowedOrigins(List.of(
                 "http://localhost:4200",
-                "http://192.168.1.10:4200",
+                "http://192.168.1.4:4200",
                 "https://tchakeda.com",
                 "https://www.tchakeda.com"
         ));

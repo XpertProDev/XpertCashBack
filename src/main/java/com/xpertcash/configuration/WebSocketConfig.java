@@ -36,11 +36,23 @@ class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     }
 
     @Override
+    // public void registerStompEndpoints(StompEndpointRegistry registry) {
+    //     registry.addEndpoint("/ws")
+    //             .setAllowedOriginPatterns("*")
+    //             .withSockJS();
+    // }
+
     public void registerStompEndpoints(StompEndpointRegistry registry) {
         registry.addEndpoint("/ws")
                 .setAllowedOriginPatterns("*")
                 .withSockJS();
+
+        registry.addEndpoint("/api/v1/ws")
+                .setAllowedOriginPatterns("*")
+                .withSockJS();
     }
+
+
 
     @Override
     public void configureClientInboundChannel(ChannelRegistration registration) {

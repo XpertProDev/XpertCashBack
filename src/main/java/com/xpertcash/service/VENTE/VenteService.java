@@ -201,6 +201,7 @@ for (Map.Entry<Long, Integer> entry : request.getProduitsQuantites().entrySet())
 
     vente.setMontantTotal(montantTotal);
     vente.setProduits(lignes);
+    vente.setStatus(VenteStatus.PAYEE);
 
     venteRepository.save(vente);
     venteProduitRepository.saveAll(lignes);
@@ -343,7 +344,6 @@ for (Map.Entry<Long, Integer> entry : request.getProduitsQuantites().entrySet())
 
             lignesRemboursees.add(vp);
 
-            // Ajuster dernier produit pour corriger arrondi
             if (i == taille - 1) {
                 double sommeLignes = montantsLignes.stream().mapToDouble(Double::doubleValue).sum();
                 double difference = Math.round(montantRembourse * 100.0) / 100.0 - sommeLignes;
@@ -361,7 +361,7 @@ for (Map.Entry<Long, Integer> entry : request.getProduitsQuantites().entrySet())
             vente.getModePaiement(),
             -montantRembourse
         );
-
+ 
         VenteHistorique historique = new VenteHistorique();
         historique.setVente(vente);
         historique.setDateAction(LocalDateTime.now());
