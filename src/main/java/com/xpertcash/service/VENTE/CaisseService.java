@@ -318,10 +318,12 @@ public Caisse fermerCaisse(Long boutiqueId, HttpServletRequest request) {
         mouvementCaisseRepository.save(mouvement);
         // Mettre à jour le montant courant de la caisse
         if (type == TypeMouvementCaisse.VENTE || type == TypeMouvementCaisse.AJOUT) {
-            caisse.setMontantCourant(caisse.getMontantCourant() + montant);
-        } else if (type == TypeMouvementCaisse.RETRAIT) {
-            caisse.setMontantCourant(caisse.getMontantCourant() - montant);
+                caisse.setMontantCourant(caisse.getMontantCourant() + montant);
+            } else if (type == TypeMouvementCaisse.RETRAIT || type == TypeMouvementCaisse.REMBOURSEMENT) {
+                caisse.setMontantCourant(caisse.getMontantCourant() - montant);
         }
+
+
         caisseRepository.save(caisse);
     }
 

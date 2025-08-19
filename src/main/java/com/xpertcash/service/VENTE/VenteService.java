@@ -115,7 +115,7 @@ public VenteResponse enregistrerVente(VenteRequest request, HttpServletRequest h
     vente.setClientNumero(request.getClientNumero());
 
     double montantTotalSansRemise = 0.0;
-List<VenteProduit> lignes = new ArrayList<>();
+    List<VenteProduit> lignes = new ArrayList<>();
 
 // Vérification : ne pas avoir remise globale ET remises par ligne simultanément
 if (request.getRemiseGlobale() != null && request.getRemiseGlobale() > 0
@@ -314,7 +314,7 @@ for (Map.Entry<Long, Integer> entry : request.getProduitsQuantites().entrySet())
             }
 
             double prixUnitaire = vp.getPrixUnitaire();
-        double remiseLigne = vp.getRemise();
+            double remiseLigne = vp.getRemise();
             double montantProduit = prixUnitaire * quantiteARembourser * (1 - remiseLigne / 100.0);
 
             if (vente.getRemiseGlobale() != null && vente.getRemiseGlobale() > 0) {
@@ -355,11 +355,11 @@ for (Map.Entry<Long, Integer> entry : request.getProduitsQuantites().entrySet())
         caisseService.ajouterMouvement(
             caisse,
             TypeMouvementCaisse.REMBOURSEMENT,
-            -montantRembourse,
+            montantRembourse,
             "Remboursement vente ID " + vente.getId() + " : " + request.getMotif(),
             vente,
             vente.getModePaiement(),
-            -montantRembourse
+            montantRembourse
         );
  
         VenteHistorique historique = new VenteHistorique();

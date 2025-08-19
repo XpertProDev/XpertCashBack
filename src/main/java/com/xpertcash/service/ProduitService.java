@@ -1445,6 +1445,8 @@ public List<ProduitDTO> getProduitsParStock(Long boutiqueId, HttpServletRequest 
         dto.setNomCategorie(produit.getCategorie() != null ? produit.getCategorie().getNom() : null);
         dto.setNomUnite(produit.getUniteDeMesure() != null ? produit.getUniteDeMesure().getNom() : null);
         dto.setBoutiqueId(produit.getBoutique() != null ? produit.getBoutique().getId() : null);
+        dto.setDatePreemption(produit.getDatePreemption());
+
         return dto;
     }
 

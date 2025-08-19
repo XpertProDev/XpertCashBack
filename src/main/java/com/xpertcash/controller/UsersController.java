@@ -78,6 +78,7 @@ public class UsersController {
             System.err.println("Erreur lors de l'inscription : " + e.getMessage());
 
             response.put("error", "L'inscription a échoué. Veuillez vérifier votre connexion Internet ou réessayer plus tard.");
+            response.put("error", "L'inscription a échoué. Cause: " + e.getMessage());
             return ResponseEntity.badRequest().body(response);
         }
     }
