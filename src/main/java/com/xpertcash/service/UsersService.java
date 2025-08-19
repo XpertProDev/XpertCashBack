@@ -16,7 +16,6 @@ import com.xpertcash.entity.*;
 import com.xpertcash.entity.Enum.RoleType;
 import com.xpertcash.entity.Enum.TypeBoutique;
 import com.xpertcash.entity.Module.AppModule;
-import com.xpertcash.entity.Module.EntrepriseModuleEssai;
 import com.xpertcash.exceptions.BusinessException;
 import com.xpertcash.repository.BoutiqueRepository;
 import com.xpertcash.repository.EntrepriseRepository;
@@ -24,7 +23,6 @@ import com.xpertcash.repository.FactureProformaRepository;
 import com.xpertcash.repository.PermissionRepository;
 import com.xpertcash.repository.RoleRepository;
 import com.xpertcash.repository.UsersRepository;
-import com.xpertcash.repository.Module.EntrepriseModuleEssaiRepository;
 import com.xpertcash.repository.Module.ModuleRepository;
 import com.xpertcash.service.IMAGES.ImageStorageService;
 import com.xpertcash.service.Module.ModuleActivationService;
@@ -35,7 +33,6 @@ import io.jsonwebtoken.SignatureAlgorithm;
 import jakarta.mail.MessagingException;
 import jakarta.servlet.http.HttpServletRequest;
 
-import lombok.ToString;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -90,8 +87,7 @@ public class UsersService {
    
 
     @Autowired
-    private PermissionRepository permissionRepository; // Injection du PermissionRepository
-
+    private PermissionRepository permissionRepository;
      @Autowired
     private ImageStorageService imageStorageService;
 

@@ -1,19 +1,13 @@
 package com.xpertcash.controller;
-
-//import com.xpertcash.DTOs.RegistrationResponse;
 import com.xpertcash.DTOs.UpdateUserRequest;
 import com.xpertcash.DTOs.USER.RegisterResponse;
 import com.xpertcash.DTOs.USER.ResendActivationRequest;
-import com.xpertcash.DTOs.USER.RoleDTO;
 import com.xpertcash.DTOs.USER.UserDTO;
 import com.xpertcash.DTOs.USER.UserRequest;
-import com.xpertcash.composant.AuthorizationService;
 import com.xpertcash.configuration.JwtConfig;
 import com.xpertcash.configuration.JwtUtil;
-import com.xpertcash.entity.Entreprise;
 import com.xpertcash.entity.PermissionType;
 import com.xpertcash.entity.User;
-import com.xpertcash.entity.UserBoutique;
 import com.xpertcash.repository.UsersRepository;
 import com.xpertcash.DTOs.EntrepriseDTO;
 import com.xpertcash.DTOs.LoginRequest;
@@ -21,9 +15,6 @@ import com.xpertcash.DTOs.RegistrationRequest;
 import com.xpertcash.service.UsersService;
 
 import io.jsonwebtoken.Claims;
-import io.jsonwebtoken.ExpiredJwtException;
-import io.jsonwebtoken.JwtException;
-import io.jsonwebtoken.Jwts;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -38,7 +29,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -49,8 +39,6 @@ public class UsersController {
     @Autowired
     private JwtUtil jwtUtil;
     @Autowired JwtConfig jwtConfig;
-    @Autowired
-    private AuthorizationService authorizationService;
 
     
 

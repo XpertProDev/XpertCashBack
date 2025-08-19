@@ -1,15 +1,11 @@
 package com.xpertcash.service;
 
-import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import com.xpertcash.entity.Categorie;
 import com.xpertcash.entity.Unite;
-import com.xpertcash.entity.User;
 import com.xpertcash.repository.UniteRepository;
 
 import jakarta.servlet.http.HttpServletRequest;

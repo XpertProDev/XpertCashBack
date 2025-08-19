@@ -140,8 +140,9 @@ public class BoutiqueService {
     // 🔐 Vérification des rôles et permissions via CentralAccess
     boolean isAdminOrManager = CentralAccess.isAdminOrManagerOfEntreprise(user, entrepriseId);
     boolean hasPermission = user.getRole().hasPermission(PermissionType.GERER_BOUTIQUE);
+    boolean isVendeur = user.getRole().getName() == RoleType.VENDEUR;
 
-    if (!isAdminOrManager && !hasPermission) {
+    if (!isAdminOrManager && !hasPermission && !isVendeur) {
         throw new RuntimeException("Vous n'avez pas les droits pour consulter les boutiques de cette entreprise !");
     }
 
@@ -520,7 +521,7 @@ public class BoutiqueService {
             produitDTO.setCreatedAt(produit.getCreatedAt());
             produitDTO.setLastUpdated(produit.getLastUpdated());
             produitDTO.setDatePreemption(produit.getDatePreemption());
-             produitDTO.setTypeProduit(produit.getTypeProduit().name());
+            //  produitDTO.setTypeProduit(produit.getTypeProduit().name());
 
             // Mapper la catégorie
             if (produit.getCategorie() != null) {
