@@ -235,10 +235,8 @@ public class ImageStorageService {
 
     public void deleteQrCodeImage(String qrCodeUrl) {
     try {
-        // Extraire le nom de fichier depuis l'URL (/qrUpload/nom.png)
         String fileName = Paths.get(qrCodeUrl).getFileName().toString();
 
-        // Chemin complet vers le fichier dans le dossier /static/qrUpload
         Path qrRootLocation = Paths.get("src/main/resources/static/qrUpload");
         Path imagePath = qrRootLocation.resolve(fileName);
 
