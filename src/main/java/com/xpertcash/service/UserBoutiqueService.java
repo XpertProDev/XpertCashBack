@@ -14,7 +14,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import com.xpertcash.DTOs.Boutique.BoutiqueResponse;
 import com.xpertcash.DTOs.Boutique.BoutiqueResponseVendeur;
 import com.xpertcash.DTOs.Boutique.VendeurDTO;
 import com.xpertcash.configuration.JwtUtil;

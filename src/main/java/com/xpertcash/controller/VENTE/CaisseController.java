@@ -4,7 +4,6 @@ import com.xpertcash.entity.Caisse;
 import com.xpertcash.service.VENTE.CaisseService;
 import com.xpertcash.DTOs.VENTE.CaisseResponseDTO;
 import com.xpertcash.DTOs.VENTE.OuvrirCaisseRequest;
-import com.xpertcash.DTOs.VENTE.FermerCaisseRequest;
 import com.xpertcash.DTOs.VENTE.GetCaisseActiveRequest;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Autowired;

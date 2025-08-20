@@ -132,6 +132,7 @@ public ResponseEntity<Map<String, String>> ajouterBoutique(
                 boutique.isActif(),
                 boutique.getTypeBoutique()
 
+
             );
             return ResponseEntity.ok(response);
         } catch (RuntimeException e) {
