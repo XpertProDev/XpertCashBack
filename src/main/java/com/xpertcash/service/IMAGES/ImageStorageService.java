@@ -201,5 +201,60 @@ public class ImageStorageService {
         }
     }
 
+
+    //code qr
+
+    public String saveQrCodeImage(byte[] qrCodeBytes, String fileNameHint) {
+    try {
+        // Emplacement du QR code dans /static/qrUpload
+        Path qrRootLocation = Paths.get("src/main/resources/static/qrUpload");
+
+        // Vérifie si le dossier existe, sinon le crée
+        if (!Files.exists(qrRootLocation)) {
+            Files.createDirectories(qrRootLocation);
+        }
+
+        // Générer un nom de fichier unique
+        String imageName = UUID.randomUUID().toString() + "_" + fileNameHint + ".png";
+        Path imagePath = qrRootLocation.resolve(imageName);
+
+        // Sauvegarder le fichier
+        Files.write(imagePath, qrCodeBytes);
+
+        String imageUrl = "/qrUpload/" + imageName;
+        System.out.println("✅ QR Code sauvegardé : " + imageUrl);
+
+        // Retourner l’URL du fichier
+        return imageUrl;
+
+    } catch (IOException e) {
+        System.out.println("❌ ERREUR lors de l'enregistrement du QR Code : " + e.getMessage());
+        throw new RuntimeException("Erreur lors de l'enregistrement du QR Code : " + e.getMessage());
+    }
+}
+
+    public void deleteQrCodeImage(String qrCodeUrl) {
+    try {
+        // Extraire le nom de fichier depuis l'URL (/qrUpload/nom.png)
+        String fileName = Paths.get(qrCodeUrl).getFileName().toString();
+
+        // Chemin complet vers le fichier dans le dossier /static/qrUpload
+        Path qrRootLocation = Paths.get("src/main/resources/static/qrUpload");
+        Path imagePath = qrRootLocation.resolve(fileName);
+
+        // Vérifier si le fichier existe avant de supprimer
+        if (Files.exists(imagePath)) {
+            Files.delete(imagePath);
+            System.out.println("✅ QR Code supprimé : " + fileName);
+        } else {
+            System.out.println("⚠️ Fichier QR Code introuvable : " + fileName);
+        }
+
+    } catch (IOException e) {
+        System.err.println("❌ Erreur lors de la suppression du QR Code : " + e.getMessage());
+        throw new RuntimeException("Impossible de supprimer le QR Code : " + e.getMessage(), e);
+    }
+}
+
 }
 

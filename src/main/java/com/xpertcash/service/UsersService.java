@@ -12,6 +12,7 @@ import com.xpertcash.configuration.CentralAccess;
 import com.xpertcash.configuration.JwtConfig;
 import com.xpertcash.configuration.JwtUtil;
 import com.xpertcash.configuration.PasswordGenerator;
+import com.xpertcash.configuration.QRCodeGenerator;
 import com.xpertcash.entity.*;
 import com.xpertcash.entity.Enum.RoleType;
 import com.xpertcash.entity.Enum.TypeBoutique;
@@ -51,6 +52,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Random;
 import java.util.Set;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 import org.springframework.transaction.annotation.Transactional;
@@ -226,6 +228,28 @@ public class UsersService {
         user.setEnabledLien(true);
         user.setLastActivity(LocalDateTime.now());
         user.setLocked(false);
+        
+        // génération du QR Code 
+        try {
+        // Contenu du QR code = juste le personalCode
+        String qrContent = personalCode;
+
+        byte[] qrCodeBytes = QRCodeGenerator.generateQRCode(qrContent, 200, 200);
+
+         String fileName = UUID.randomUUID().toString();
+
+        String qrCodeUrl = imageStorageService.saveQrCodeImage(qrCodeBytes, fileName);
+
+        user.setQrCodeUrl(qrCodeUrl);
+
+    } catch (Exception e) {
+        System.err.println("Erreur génération QR Code: " + e.getMessage());
+    }
+
+
+   
+
+
         usersRepository.save(user);
     
         // Assigner l'utilisateur admin à l'entreprise
@@ -510,6 +534,23 @@ public class UsersService {
                 newUser.setRole(role);
                 newUser.setPhoto(null);
 
+                        
+                // génération du QR Code 
+                        try {
+                        String qrContent = personalCode;
+
+                        byte[] qrCodeBytes = QRCodeGenerator.generateQRCode(qrContent, 200, 200);
+
+                        String fileName = UUID.randomUUID().toString();
+
+                        String qrCodeUrl = imageStorageService.saveQrCodeImage(qrCodeBytes, fileName);
+
+                        newUser.setQrCodeUrl(qrCodeUrl);
+
+                    } catch (Exception e) {
+                    System.err.println("Erreur génération QR Code: " + e.getMessage());
+                }
+
 
                 // Enregistrer l'utilisateur
                 User savedUser = usersRepository.save(newUser);
@@ -688,6 +729,15 @@ public void deleteUserFromEntreprise(HttpServletRequest request, Long userId) {
         throw new RuntimeException("Impossible de supprimer cet utilisateur : il est lié à des factures.");
     }
 
+    // Suppression du QR Code associé
+    if (userToDelete.getQrCodeUrl() != null) {
+        try {
+            imageStorageService.deleteQrCodeImage(userToDelete.getQrCodeUrl());
+        } catch (Exception e) {
+            System.err.println("Erreur lors de la suppression du QR Code : " + e.getMessage());
+            throw new RuntimeException("Impossible de supprimer le QR Code de l'utilisateur.", e);
+        }
+    }
    
 
     usersRepository.delete(userToDelete);

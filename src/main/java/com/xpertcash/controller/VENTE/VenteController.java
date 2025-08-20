@@ -76,4 +76,21 @@ public class VenteController {
             List<VenteResponse> ventes = venteService.getVentesByVendeur(vendeurId, request);
             return ResponseEntity.ok(ventes);
         }
+
+    // Controller pour recuperer montant total des vente 
+    @GetMapping("/vente/montant-total-jour")
+    public ResponseEntity<Double> getMontantTotalVentesDuJour(HttpServletRequest request) {
+        double montantTotal = venteService.getMontantTotalVentesDuJour(request);
+        return ResponseEntity.ok(montantTotal);
+    }
+
+    // Vente du mois
+   @GetMapping("/vente/montant-total-mois")
+    public ResponseEntity<Double> getMontantTotalVentesDuMois(HttpServletRequest request) {
+        double montantTotal = venteService.getMontantTotalVentesDuMois(request);
+        return ResponseEntity.ok(montantTotal);
+    }
+
+
+
 }

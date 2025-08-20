@@ -63,7 +63,7 @@ public class SecurityConfig {
         configuration.setAllowedHeaders(List.of(
                 "Authorization",
                 "Content-Type",
-                "X-XSRF-TOKEN"    // nécessaire pour le header CSRF Angular
+                "X-XSRF-TOKEN"
         ));
         configuration.setAllowCredentials(true);
 

@@ -15,7 +15,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -32,6 +34,7 @@ import com.xpertcash.entity.VENTE.VenteStatus;
 
 import jakarta.servlet.http.HttpServletRequest;
 
+import com.xpertcash.configuration.CentralAccess;
 import com.xpertcash.configuration.JwtUtil;
 
 @Service
@@ -535,5 +538,96 @@ public List<VenteResponse> getVentesByVendeur(Long vendeurId, HttpServletRequest
         response.setNomBoutique(vente.getBoutique() != null ? vente.getBoutique().getNomBoutique() : null);
         return response;
     }
+
+
+    // Methode pour recuperer montant total des vente de mon entreprise et seul admin et manager peuvent y acceder
+  public double getMontantTotalVentesDuJour(HttpServletRequest request) {
+    String token = request.getHeader("Authorization");
+    if (token == null || !token.startsWith("Bearer ")) {
+        throw new RuntimeException("Token JWT manquant ou mal formaté");
+    }
+
+    String jwtToken = token.substring(7);
+
+    Long userId;
+    try {
+        userId = jwtUtil.extractUserId(jwtToken);
+    } catch (Exception e) {
+        throw new RuntimeException("Erreur lors de l'extraction de l'ID utilisateur depuis le token", e);
+    }
+
+    // 👤 Récupération de l'utilisateur
+    User user = usersRepository.findById(userId)
+            .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+
+    if (user.getEntreprise() == null) {
+        throw new RuntimeException("Vous n'êtes associé à aucune entreprise.");
+    }
+
+    Long entrepriseId = user.getEntreprise().getId();
+
+    // 📅 Début et fin de journée
+    LocalDate today = LocalDate.now();
+    LocalDateTime startOfDay = today.atStartOfDay();
+    LocalDateTime endOfDay = today.atTime(LocalTime.MAX);
+
+    // 🔍 Récupération des ventes du jour
+    List<Vente> ventes = venteRepository.findByBoutique_Entreprise_IdAndDateVenteBetween(
+            entrepriseId,
+            startOfDay,
+            endOfDay
+    );
+
+    // 💰 Calcul du montant total
+    return ventes.stream()
+            .mapToDouble(Vente::getMontantTotal)
+            .sum();
+}
+
+    // Vente du mois
+    public double getMontantTotalVentesDuMois(HttpServletRequest request) {
+    String token = request.getHeader("Authorization");
+    if (token == null || !token.startsWith("Bearer ")) {
+        throw new RuntimeException("Token JWT manquant ou mal formaté");
+    }
+
+    String jwtToken = token.substring(7);
+
+    Long userId;
+    try {
+        userId = jwtUtil.extractUserId(jwtToken);
+    } catch (Exception e) {
+        throw new RuntimeException("Erreur lors de l'extraction de l'ID utilisateur depuis le token", e);
+    }
+
+    User user = usersRepository.findById(userId)
+            .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+
+    if (user.getEntreprise() == null) {
+        throw new RuntimeException("Vous n'êtes associé à aucune entreprise.");
+    }
+
+    Long entrepriseId = user.getEntreprise().getId();
+
+    // 📅 Début et fin du mois
+    LocalDate today = LocalDate.now();
+    LocalDate firstDayOfMonth = today.withDayOfMonth(1);
+    LocalDate lastDayOfMonth = today.withDayOfMonth(today.lengthOfMonth());
+
+    LocalDateTime startOfMonth = firstDayOfMonth.atStartOfDay();
+    LocalDateTime endOfMonth = lastDayOfMonth.atTime(LocalTime.MAX);
+
+    // 🔍 Récupération des ventes du mois
+    List<Vente> ventes = venteRepository.findByBoutique_Entreprise_IdAndDateVenteBetween(
+            entrepriseId,
+            startOfMonth,
+            endOfMonth
+    );
+
+    // 💰 Calcul du montant total
+    return ventes.stream()
+            .mapToDouble(Vente::getMontantTotal)
+            .sum();
+}
 
 }

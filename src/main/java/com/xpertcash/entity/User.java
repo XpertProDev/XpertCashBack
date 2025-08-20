@@ -56,6 +56,9 @@ public class User {
     @NotNull(message = "Date de creation de Users")
     @Column(nullable = false)
     private LocalDateTime createdAt;
+    
+    @Column(name = "qr_code_url")
+    private String qrCodeUrl;
 
     private String activationCode;
 
