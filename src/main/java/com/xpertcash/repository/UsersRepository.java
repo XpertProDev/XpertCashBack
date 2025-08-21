@@ -6,6 +6,8 @@ import com.xpertcash.entity.User;
 import com.xpertcash.entity.Enum.RoleType;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -36,6 +38,12 @@ public interface UsersRepository extends JpaRepository<User, Long> {
     //List<User> findByBoutiqueIdAndRole_Name(Long boutiqueId, RoleType roleName);
 
     Optional<User> findByEntrepriseIdAndRole_NameIn(Long entrepriseId, List<RoleType> roles);
+
+   
+     @Query("SELECT COUNT(u) FROM User u WHERE u.entreprise.id = :entrepriseId AND u.role.name <> :excludedRole")
+    long countByEntrepriseIdExcludingRole(@Param("entrepriseId") Long entrepriseId,
+                                          @Param("excludedRole") RoleType excludedRole);
+
 
 
 

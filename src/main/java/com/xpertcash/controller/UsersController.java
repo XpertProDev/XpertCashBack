@@ -307,5 +307,11 @@ public ResponseEntity<UserDTO> assignPermissionsToUser(
             return ResponseEntity.ok(entrepriseDTO);
         }
 
-    
+        // Endpoint pour nombre de utilisateurs dans l'entreprise countUsersInEntreprise
+        @GetMapping("/entreprise/countUsers")
+        public ResponseEntity<Long> countUsersInEntreprise(HttpServletRequest request) {
+            long count = usersService.countUsersInEntreprise(request);
+            return ResponseEntity.ok(count);
+        }
+ 
 }
