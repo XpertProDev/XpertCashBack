@@ -542,23 +542,30 @@ public List<VenteResponse> getVentesByVendeur(Long vendeurId, HttpServletRequest
 
     // Methode pour recuperer montant total des vente de mon entreprise et seul admin et manager peuvent y acceder
     @Transactional(readOnly = true)
-public double getMontantTotalVentesDuJourConnecte(HttpServletRequest request) {
-    String token = request.getHeader("Authorization");
-    if (token == null || !token.startsWith("Bearer ")) {
-        throw new RuntimeException("Token JWT manquant ou mal formaté");
+    public double getMontantTotalVentesDuJourConnecte(HttpServletRequest request) {
+        String token = request.getHeader("Authorization");
+        if (token == null || !token.startsWith("Bearer ")) {
+            throw new RuntimeException("Token JWT manquant ou mal formaté");
+        }
+
+        Long userId = jwtUtil.extractUserId(token.substring(7));
+        User user = usersRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+
+        if (user.getEntreprise() == null) {
+            throw new RuntimeException("Vous n'êtes associé à aucune entreprise.");
+        }
+        Long entrepriseId = user.getEntreprise().getId();
+
+        // Vérification des droits
+        RoleType role = user.getRole().getName();
+        boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
+        if (!isAdminOrManager) {
+            throw new RuntimeException("Vous n'avez pas les droits nécessaires pour accéder à cette information.");
+        }
+
+        return getMontantTotalVentesDuJour(entrepriseId);
     }
-
-    Long userId = jwtUtil.extractUserId(token.substring(7));
-    User user = usersRepository.findById(userId)
-            .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
-
-    if (user.getEntreprise() == null) {
-        throw new RuntimeException("Vous n'êtes associé à aucune entreprise.");
-    }
-
-    Long entrepriseId = user.getEntreprise().getId();
-    return getMontantTotalVentesDuJour(entrepriseId);
-}
 
 @Transactional(readOnly = true)
 public double getMontantTotalVentesDuJour(Long entrepriseId) {
@@ -606,8 +613,16 @@ public double getMontantTotalVentesDuMoisConnecte(HttpServletRequest request) {
     if (user.getEntreprise() == null) {
         throw new RuntimeException("Vous n'êtes associé à aucune entreprise.");
     }
-
     Long entrepriseId = user.getEntreprise().getId();
+
+
+        // Vérification des droits
+        RoleType role = user.getRole().getName();
+        boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
+        if (!isAdminOrManager) {
+            throw new RuntimeException("Vous n'avez pas les droits nécessaires pour accéder à cette information.");
+        }
+
     return getMontantTotalVentesDuMois(entrepriseId);
 }
 
@@ -653,8 +668,17 @@ public double getMontantTotalVentesDuMois(Long entrepriseId) {
         Long userId = jwtUtil.extractUserId(token.substring(7));
         User user = usersRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
-
+        
         Long entrepriseId = user.getEntreprise().getId();
+        
+        
+        // Vérification des droits
+        RoleType role = user.getRole().getName();
+        boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
+        if (!isAdminOrManager) {
+            throw new RuntimeException("Vous n'avez pas les droits nécessaires pour accéder à cette information.");
+        }
+
         return calculerBeneficeNetEntreprise(entrepriseId);
     }
 
@@ -698,8 +722,16 @@ public double getMontantTotalVentesDuMois(Long entrepriseId) {
         Long userId = jwtUtil.extractUserId(token.substring(7));
         User user = usersRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+        
 
         Long entrepriseId = user.getEntreprise().getId();
+
+         // Vérification des droits
+        RoleType role = user.getRole().getName();
+        boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
+        if (!isAdminOrManager) {
+            throw new RuntimeException("Vous n'avez pas les droits nécessaires pour accéder à cette information.");
+        }
 
         LocalDate today = LocalDate.now();
         LocalDateTime startOfDay = today.atStartOfDay();
@@ -725,6 +757,13 @@ public double getMontantTotalVentesDuMois(Long entrepriseId) {
                 .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
 
         Long entrepriseId = user.getEntreprise().getId();
+
+        // Vérification des droits
+        RoleType role = user.getRole().getName();
+        boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
+        if (!isAdminOrManager) {
+            throw new RuntimeException("Vous n'avez pas les droits nécessaires pour accéder à cette information.");
+        }
 
         LocalDate today = LocalDate.now();
         LocalDate firstDayOfMonth = today.withDayOfMonth(1);
@@ -780,6 +819,12 @@ public double calculerBeneficeNetAnnuelConnecte(HttpServletRequest request) {
             .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
 
     Long entrepriseId = user.getEntreprise().getId();
+    // Vérification des droits
+        RoleType role = user.getRole().getName();
+        boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
+        if (!isAdminOrManager) {
+            throw new RuntimeException("Vous n'avez pas les droits nécessaires pour accéder à cette information.");
+        }
     return calculerBeneficeNetAnnuel(entrepriseId);
 }
 
