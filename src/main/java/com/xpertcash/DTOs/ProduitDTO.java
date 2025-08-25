@@ -15,6 +15,10 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+
+
+
+
 @Data
 @JsonIgnoreProperties(ignoreUnknown = true)
 @AllArgsConstructor
@@ -101,6 +105,8 @@ public class ProduitDTO {
     this.boutiqueId = produit.getBoutique() != null ? produit.getBoutique().getId() : null;
     // this.boutiques = produit.getBoutiques();
 }
+
+
 
     
 }

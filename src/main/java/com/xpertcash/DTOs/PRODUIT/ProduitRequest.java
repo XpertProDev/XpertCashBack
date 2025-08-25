@@ -29,7 +29,7 @@ public class ProduitRequest {
     private TypeProduit typeProduit;
     private String nomCategorie;
     private String nomUnite;
-    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "dd-MM-yyyy")
+   @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd")
     private LocalDate datePreemption;
 
 }
