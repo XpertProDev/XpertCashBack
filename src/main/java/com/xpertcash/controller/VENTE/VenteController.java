@@ -49,10 +49,14 @@ public class VenteController {
 
 
     @GetMapping("/vente/{id}")
-    public ResponseEntity<VenteResponse> getVenteById(@PathVariable Long id) {
-        VenteResponse response = venteService.getVenteById(id);
-        return ResponseEntity.ok(response);
-    }
+        public ResponseEntity<VenteResponse> getVenteById(
+                @PathVariable Long id,
+                HttpServletRequest httpRequest
+        ) {
+            VenteResponse response = venteService.getVenteById(id, httpRequest);
+            return ResponseEntity.ok(response);
+        }
+
 
     @GetMapping("/vente")
     public ResponseEntity<java.util.List<VenteResponse>> getAllVentes() {
@@ -100,7 +104,6 @@ public class VenteController {
         double beneficeNet = venteService.calculerBeneficeNetEntrepriseConnecte(request);
         return ResponseEntity.ok(beneficeNet);
     }
-
 
     // Bénéfice net du jour
     @GetMapping("/vente/benefice/jour")

@@ -10,12 +10,14 @@ import jakarta.persistence.CascadeType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.EnumType;
 
 import java.time.LocalDateTime;
 import java.util.List;
 
 import com.xpertcash.entity.Boutique;
+import com.xpertcash.entity.Caisse;
 import com.xpertcash.entity.ModePaiement;
 import com.xpertcash.entity.User;
 
@@ -45,6 +47,9 @@ public class Vente {
 
     private Double remiseGlobale;
 
+    
+
+
     @Enumerated(EnumType.STRING)
     private ModePaiement modePaiement;
     private Double montantPaye;
@@ -54,4 +59,9 @@ public class Vente {
 
     @Enumerated(EnumType.STRING)
     private VenteStatus status;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "caisse_id")
+    private Caisse caisse;
+
 }

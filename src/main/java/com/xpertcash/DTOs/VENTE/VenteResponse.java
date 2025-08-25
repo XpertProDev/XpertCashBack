@@ -4,9 +4,12 @@ import lombok.Data;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import com.xpertcash.entity.Caisse;
+
 @Data
 public class VenteResponse {
     private Long venteId;
+    private Caisse caisse;
     private Long boutiqueId;
     private Long vendeurId;
     private LocalDateTime dateVente;
@@ -20,6 +23,8 @@ public class VenteResponse {
     private Double montantPaye;
     private List<LigneVenteDTO> lignes;
     private Double remiseGlobale;
+    private String numeroFacture;
+
 
 
     @Data
