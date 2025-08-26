@@ -42,6 +42,7 @@ public class UserRequest {
     private List<BoutiqueResponse> boutiques;
     private String personalCode;
     private String photo;
+    private String qrCodeUrl;
     private boolean userActivated;
     private Boolean adminActivated;
     private LocalDateTime adminCreatedAt;
@@ -65,6 +66,7 @@ public class UserRequest {
     this.permissions = permissions;
     this.personalCode = user.getPersonalCode();
     this.photo = user.getPhoto();
+    this.qrCodeUrl = user.getQrCodeUrl();
     this.userActivated = user.isEnabledLien();
 
 
@@ -83,8 +85,8 @@ public class UserRequest {
     this.createdAt = user.getCreatedAt();
     this.phone = user.getPhone();
     this.photo = user.getPhoto();
+    this.qrCodeUrl = user.getQrCodeUrl();
     this.userActivated = user.isEnabledLien();
-
     this.adminActivated = user.getEntreprise().getAdmin().isActivatedLien();
     this.adminCreatedAt = user.getEntreprise().getAdmin().getCreatedAt();
     
@@ -92,6 +94,4 @@ public class UserRequest {
 
 }
 
-
-    // Getters & Setters (génère-les si tu utilises Lombok sinon à la main)
 }
