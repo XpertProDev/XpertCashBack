@@ -126,6 +126,7 @@ public class ProduitService {
             } catch (Exception e) {
                 throw new RuntimeException("Erreur lors de l'extraction de l'ID utilisateur depuis le token", e);
             }
+            
 
             // ✅ Chargement de l'utilisateur connecté
             User utilisateur = usersRepository.findById(utilisateurId)

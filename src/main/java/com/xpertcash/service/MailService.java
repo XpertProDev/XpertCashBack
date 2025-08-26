@@ -91,7 +91,7 @@ public class MailService {
     helper.setText(htmlContent, true);
 
     try {
-        InputStream logoStream = getClass().getClassLoader().getResourceAsStream("assets/logoxpertpro.png");
+        InputStream logoStream = getClass().getClassLoader().getResourceAsStream("assets/tchakeda.png");
         if (logoStream == null) {
             throw new MessagingException("Logo image not found in resources.");
         }

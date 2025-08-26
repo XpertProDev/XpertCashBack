@@ -203,7 +203,6 @@ public class ImageStorageService {
 
 
     //code qr
-
     public String saveQrCodeImage(byte[] qrCodeBytes, String fileNameHint) {
     try {
         // Emplacement du QR code dans /static/qrUpload

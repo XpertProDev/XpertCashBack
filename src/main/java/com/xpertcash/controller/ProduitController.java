@@ -117,29 +117,34 @@ public class ProduitController {
 
 
     // Endpoint Update Produit
-    @PatchMapping(value = "/updateProduit/{produitId}", consumes = { MediaType.MULTIPART_FORM_DATA_VALUE })
-    public ResponseEntity<?> updateProduit(
-            @PathVariable Long produitId,
-            @RequestPart("produit") String produitJson,
-            @RequestPart(value = "image", required = false) MultipartFile imageFile,
-            @RequestParam boolean addToStock,
-            HttpServletRequest request) {
-        try {
-            // Désérialiser l'objet produit JSON reçu
-            ObjectMapper objectMapper = new ObjectMapper();
-            ProduitRequest produitRequest = objectMapper.readValue(produitJson, ProduitRequest.class);
-    
-            // Appel à la méthode du service pour mettre à jour le produit
-            ProduitDTO produitDTO = produitService.updateProduct(produitId, produitRequest, imageFile, addToStock, request);
-    
-            // Retourner la réponse avec le produit mis à jour
-            return ResponseEntity.ok(produitDTO);
-        } catch (Exception e) {
-            e.printStackTrace();
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("error", "Erreur : " + e.getMessage()));
-        }
+   @PatchMapping(value = "/updateProduit/{produitId}", consumes = { MediaType.MULTIPART_FORM_DATA_VALUE })
+public ResponseEntity<?> updateProduit(
+        @PathVariable Long produitId,
+        @RequestPart("produit") String produitJson,
+        @RequestPart(value = "image", required = false) MultipartFile imageFile,
+        @RequestParam boolean addToStock,
+        HttpServletRequest request) {
+    try {
+        // ✅ Créer l'ObjectMapper et activer le module JavaTime pour LocalDate/LocalDateTime
+        ObjectMapper objectMapper = new ObjectMapper();
+        objectMapper.registerModule(new JavaTimeModule());
+        objectMapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+
+        // Désérialiser l'objet produit JSON reçu
+        ProduitRequest produitRequest = objectMapper.readValue(produitJson, ProduitRequest.class);
+
+        // Appel à la méthode du service pour mettre à jour le produit
+        ProduitDTO produitDTO = produitService.updateProduct(produitId, produitRequest, imageFile, addToStock, request);
+
+        // Retourner la réponse avec le produit mis à jour
+        return ResponseEntity.ok(produitDTO);
+    } catch (Exception e) {
+        e.printStackTrace();
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(Map.of("error", "Erreur : " + e.getMessage()));
     }
+}
+
     
         //Endpoint pour Supprime le produit s’il n'est pas en stock
         @DeleteMapping("/corbeille/{produitId}")

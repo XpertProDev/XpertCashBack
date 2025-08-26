@@ -23,6 +23,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 import com.xpertcash.entity.Enum.RoleType;
@@ -63,8 +64,11 @@ public class VenteService {
     @Autowired
     private Utilitaire utilitaire;
 
+    @Autowired
+    private FactureVenteService factureVenteService;
 
-    @Transactional
+
+ @Transactional
 public VenteResponse enregistrerVente(VenteRequest request, HttpServletRequest httpRequest) {
     // 🔐 Extraction et vérification du token JWT
     String token = httpRequest.getHeader("Authorization");
@@ -120,63 +124,73 @@ public VenteResponse enregistrerVente(VenteRequest request, HttpServletRequest h
     double montantTotalSansRemise = 0.0;
     List<VenteProduit> lignes = new ArrayList<>();
 
-// Vérification : ne pas avoir remise globale ET remises par ligne simultanément
-if (request.getRemiseGlobale() != null && request.getRemiseGlobale() > 0
-        && request.getRemises() != null && !request.getRemises().isEmpty()) {
-    throw new RuntimeException("Vous ne pouvez pas appliquer une remise globale et des remises par ligne en même temps.");
-}
-
-// Création des lignes de vente (avec remise ligne uniquement si pas remise globale)
-for (Map.Entry<Long, Integer> entry : request.getProduitsQuantites().entrySet()) {
-    Long produitId = entry.getKey();
-    Integer quantiteVendue = entry.getValue();
-
-    Produit produit = produitRepository.findById(produitId)
-            .orElseThrow(() -> new RuntimeException("Produit non trouvé"));
-
-    // Vérifier et mettre à jour le stock
-    Stock stock = stockRepository.findByProduit(produit);
-    if (stock == null) {
-        throw new RuntimeException("Stock non trouvé pour le produit " + produit.getNom());
-    }
-    if (stock.getStockActuel() < quantiteVendue) {
-        throw new RuntimeException("Stock insuffisant pour le produit " + produit.getNom());
-    }
-    stock.setStockActuel(stock.getStockActuel() - quantiteVendue);
-    stockRepository.save(stock);
-
-    // Mettre à jour quantité dans Produit si utilisée
-    if (produit.getQuantite() != null) {
-        produit.setQuantite(produit.getQuantite() - quantiteVendue);
-        produitRepository.save(produit);
+    // ✅ Vérification remise globale VS remises par ligne
+    if (request.getRemiseGlobale() != null && request.getRemiseGlobale() > 0
+            && request.getRemises() != null && !request.getRemises().isEmpty()) {
+        throw new RuntimeException("Vous ne pouvez pas appliquer une remise globale et des remises par ligne en même temps.");
     }
 
-    // Calcul des montants
-    double prixUnitaire = produit.getPrixVente();
-    double remisePct = 0.0;
-    if ((request.getRemises() != null && request.getRemises().containsKey(produitId))
-            && (request.getRemiseGlobale() == null || request.getRemiseGlobale() == 0)) {
-        remisePct = request.getRemises().get(produitId);
+    // ✅ Charger d'un coup tous les produits nécessaires
+    List<Long> produitIds = new ArrayList<>(request.getProduitsQuantites().keySet());
+    Map<Long, Produit> produits = produitRepository.findAllById(produitIds).stream()
+            .collect(Collectors.toMap(Produit::getId, p -> p));
+
+    // ✅ Charger les stocks avec un verrou pessimiste
+    List<Stock> stocks = stockRepository.findAllByProduitIdInWithLock(produitIds);
+    Map<Long, Stock> stockMap = stocks.stream()
+            .collect(Collectors.toMap(s -> s.getProduit().getId(), s -> s));
+
+    // ✅ Boucle de création des lignes de vente
+    for (Map.Entry<Long, Integer> entry : request.getProduitsQuantites().entrySet()) {
+        Long produitId = entry.getKey();
+        Integer quantiteVendue = entry.getValue();
+
+        Produit produit = produits.get(produitId);
+        if (produit == null) {
+            throw new RuntimeException("Produit non trouvé");
+        }
+
+        Stock stock = stockMap.get(produitId);
+        if (stock == null) {
+            throw new RuntimeException("Stock non trouvé pour le produit " + produit.getNom());
+        }
+
+        // 🔒 Vérifier et mettre à jour le stock (protégé par PESSIMISTIC_WRITE)
+        if (stock.getStockActuel() < quantiteVendue) {
+            throw new RuntimeException("Stock insuffisant pour le produit " + produit.getNom());
+        }
+        stock.setStockActuel(stock.getStockActuel() - quantiteVendue);
+
+        // Mettre à jour quantité dans Produit si utilisée
+        if (produit.getQuantite() != null) {
+            produit.setQuantite(produit.getQuantite() - quantiteVendue);
+        }
+
+        // 💰 Calcul des montants
+        double prixUnitaire = produit.getPrixVente();
+        double remisePct = 0.0;
+        if (request.getRemises() != null && request.getRemises().containsKey(produitId)
+                && (request.getRemiseGlobale() == null || request.getRemiseGlobale() == 0)) {
+            remisePct = request.getRemises().get(produitId);
+        }
+
+        double prixApresRemise = prixUnitaire * (1 - remisePct / 100.0);
+        double montantLigne = prixApresRemise * quantiteVendue;
+        montantTotalSansRemise += montantLigne;
+
+        VenteProduit ligne = new VenteProduit();
+        ligne.setVente(vente);
+        ligne.setProduit(produit);
+        ligne.setQuantite(quantiteVendue);
+        ligne.setPrixUnitaire(prixUnitaire);
+        ligne.setRemise(remisePct);
+        ligne.setMontantLigne(montantLigne);
+        lignes.add(ligne);
     }
-
-    double prixApresRemise = prixUnitaire * (1 - remisePct / 100.0);
-    double montantLigne = prixApresRemise * quantiteVendue;
-
-    montantTotalSansRemise += montantLigne;
-
-    VenteProduit ligne = new VenteProduit();
-    ligne.setVente(vente);
-    ligne.setProduit(produit);
-    ligne.setQuantite(quantiteVendue);
-    ligne.setPrixUnitaire(prixUnitaire);
-    ligne.setRemise(remisePct);
-    ligne.setMontantLigne(montantLigne);
-    lignes.add(ligne);
-}
 
     double montantTotal = montantTotalSansRemise;
 
-    // Si remise globale, on la répartit sur les lignes
+    // ✅ Application de la remise globale si présente
     if (request.getRemiseGlobale() != null && request.getRemiseGlobale() > 0) {
         double remiseGlobalePct = request.getRemiseGlobale();
         vente.setRemiseGlobale(remiseGlobalePct);
@@ -186,29 +200,25 @@ for (Map.Entry<Long, Integer> entry : request.getProduitsQuantites().entrySet())
             double montantRemiseLigne = montantTotalSansRemise * (remiseGlobalePct / 100.0) * proportion;
             double nouveauMontantLigne = ligne.getMontantLigne() - montantRemiseLigne;
             ligne.setMontantLigne(nouveauMontantLigne);
-
-            // Mise à jour du prix unitaire avec remise globale répartie
-            double prixUnitaireAvecRemiseGlobale = nouveauMontantLigne / ligne.getQuantite();
-            ligne.setPrixUnitaire(prixUnitaireAvecRemiseGlobale);
-
-            // On considère que la remise ligne est nulle si remise globale
-            ligne.setRemise(0.0);
+            ligne.setPrixUnitaire(nouveauMontantLigne / ligne.getQuantite());
+            ligne.setRemise(0.0); // ✅ on neutralise la remise ligne
         }
-        // Recalcul du total après remise globale répartie
-        montantTotal = lignes.stream().mapToDouble(VenteProduit::getMontantLigne).sum();
 
+        montantTotal = lignes.stream().mapToDouble(VenteProduit::getMontantLigne).sum();
     } else {
-        // Pas de remise globale
         vente.setRemiseGlobale(0.0);
     }
 
     vente.setMontantTotal(montantTotal);
     vente.setProduits(lignes);
     vente.setStatus(VenteStatus.PAYEE);
+    vente.setMontantPaye(montantTotal);
 
+    // ✅ Persist groupé
     venteRepository.save(vente);
     venteProduitRepository.saveAll(lignes);
-
+    stockRepository.saveAll(stocks);
+    produitRepository.saveAll(produits.values());
 
     // Historique de vente
     VenteHistorique historique = new VenteHistorique();
@@ -217,18 +227,19 @@ for (Map.Entry<Long, Integer> entry : request.getProduitsQuantites().entrySet())
     historique.setAction("ENREGISTREMENT_VENTE");
     historique.setDetails("Vente enregistrée par le vendeur " + vendeur.getNomComplet());
     historique.setMontant(vente.getMontantTotal());
-
     venteHistoriqueRepository.save(historique);
 
-    // Génération de la facture de vente
+    // ✅ Facture (UUID unique)
+    String numeroFacture = factureVenteService.genererNumeroFactureCompact(vente); 
     FactureVente facture = new FactureVente();
     facture.setVente(vente);
-    facture.setNumeroFacture("FV-" + vente.getId() + "-" + System.currentTimeMillis());
+    // facture.setNumeroFacture("FV-" + UUID.randomUUID());
+   facture.setNumeroFacture(numeroFacture);   
     facture.setDateEmission(java.time.LocalDateTime.now());
     facture.setMontantTotal(montantTotal);
     factureVenteRepository.save(facture);
 
-    // Gestion du mode de paiement et du montant payé
+    // Gestion du mode de paiement
     ModePaiement modePaiement = null;
     if (request.getModePaiement() != null) {
         try {
@@ -239,10 +250,7 @@ for (Map.Entry<Long, Integer> entry : request.getProduitsQuantites().entrySet())
     }
     vente.setModePaiement(modePaiement);
 
-    // On ignore le montant saisi manuellement, on prend le montant calculé
-    vente.setMontantPaye(montantTotal);
-
-    // Encaissement : ajouter le montant de la vente à la caisse
+    // ✅ Encaissement : ajouter le montant de la vente à la caisse
     caisseService.ajouterMouvement(
         caisse,
         TypeMouvementCaisse.VENTE,
@@ -250,12 +258,11 @@ for (Map.Entry<Long, Integer> entry : request.getProduitsQuantites().entrySet())
         "Encaissement vente ID " + vente.getId(),
         vente,
         modePaiement,
-        montantTotal // on enregistre ce qu’on a réellement vendu
+        montantTotal
     );
 
-    // Construction de la réponse
-    VenteResponse response = toVenteResponse(vente);
-    return response;
+    // ✅ Réponse finale
+    return toVenteResponse(vente);
 }
 
     //Remboursement
@@ -443,11 +450,39 @@ for (Map.Entry<Long, Integer> entry : request.getProduitsQuantites().entrySet())
     }
 
 
-    public VenteResponse getVenteById(Long id) {
-        Vente vente = venteRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Vente non trouvée"));
-        return toVenteResponse(vente);
+ @Transactional(readOnly = true)
+public VenteResponse getVenteById(Long id, HttpServletRequest httpRequest) {
+    // 🔐 Récupération de l'utilisateur connecté via le token
+    String token = httpRequest.getHeader("Authorization");
+    if (token == null || !token.startsWith("Bearer ")) {
+        throw new RuntimeException("Token JWT manquant ou mal formaté");
     }
+    String jwtToken = token.substring(7);
+
+    Long userId;
+    try {
+        userId = jwtUtil.extractUserId(jwtToken);
+    } catch (Exception e) {
+        throw new RuntimeException("Erreur lors de l'extraction de l'ID utilisateur depuis le token", e);
+    }
+
+    User user = usersRepository.findById(userId)
+            .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+
+    // 🔎 Charger la vente demandée
+    Vente vente = venteRepository.findById(id)
+            .orElseThrow(() -> new RuntimeException("Vente non trouvée"));
+
+    // 🔐 Vérification d’appartenance : la boutique de la vente doit appartenir à l’entreprise de l’utilisateur
+    Long entrepriseVenteId = vente.getBoutique().getEntreprise().getId();
+    if (!entrepriseVenteId.equals(user.getEntreprise().getId())) {
+        throw new RuntimeException("Accès interdit : cette vente n'appartient pas à votre entreprise.");
+    }
+
+    // 🔥 Si OK → on renvoie la réponse
+    return toVenteResponse(vente);
+}
+
 
     public List<VenteResponse> getAllVentes() {
         List<Vente> ventes = venteRepository.findAll();
@@ -508,6 +543,7 @@ public List<VenteResponse> getVentesByVendeur(Long vendeurId, HttpServletRequest
     private VenteResponse toVenteResponse(Vente vente) {
         VenteResponse response = new VenteResponse();
         response.setVenteId(vente.getId());
+        response.setCaisse(vente.getCaisse());
         response.setBoutiqueId(vente.getBoutique() != null ? vente.getBoutique().getId() : null);
         response.setVendeurId(vente.getVendeur() != null ? vente.getVendeur().getId() : null);
         response.setDateVente(vente.getDateVente());
@@ -534,6 +570,13 @@ public List<VenteResponse> getVentesByVendeur(Long vendeurId, HttpServletRequest
         }
         response.setRemiseGlobale(vente.getRemiseGlobale());
         response.setLignes(lignesDTO);
+            // 🧾 Récupération du numéro de facture
+        FactureVente facture = factureVenteRepository.findByVente(vente)
+                .orElse(null);
+        if (facture != null) {
+            response.setNumeroFacture(facture.getNumeroFacture());
+        }
+
         response.setNomVendeur(vente.getVendeur() != null ? vente.getVendeur().getNomComplet() : null);
         response.setNomBoutique(vente.getBoutique() != null ? vente.getBoutique().getNomBoutique() : null);
         return response;
@@ -541,93 +584,335 @@ public List<VenteResponse> getVentesByVendeur(Long vendeurId, HttpServletRequest
 
 
     // Methode pour recuperer montant total des vente de mon entreprise et seul admin et manager peuvent y acceder
-  public double getMontantTotalVentesDuJour(HttpServletRequest request) {
-    String token = request.getHeader("Authorization");
-    if (token == null || !token.startsWith("Bearer ")) {
-        throw new RuntimeException("Token JWT manquant ou mal formaté");
+    @Transactional(readOnly = true)
+    public double getMontantTotalVentesDuJourConnecte(HttpServletRequest request) {
+        String token = request.getHeader("Authorization");
+        if (token == null || !token.startsWith("Bearer ")) {
+            throw new RuntimeException("Token JWT manquant ou mal formaté");
+        }
+
+        Long userId = jwtUtil.extractUserId(token.substring(7));
+        User user = usersRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+
+        if (user.getEntreprise() == null) {
+            throw new RuntimeException("Vous n'êtes associé à aucune entreprise.");
+        }
+        Long entrepriseId = user.getEntreprise().getId();
+
+        // Vérification des droits
+        RoleType role = user.getRole().getName();
+        boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
+        if (!isAdminOrManager) {
+            throw new RuntimeException("Vous n'avez pas les droits nécessaires pour accéder à cette information.");
+        }
+
+        return getMontantTotalVentesDuJour(entrepriseId);
     }
 
-    String jwtToken = token.substring(7);
-
-    Long userId;
-    try {
-        userId = jwtUtil.extractUserId(jwtToken);
-    } catch (Exception e) {
-        throw new RuntimeException("Erreur lors de l'extraction de l'ID utilisateur depuis le token", e);
-    }
-
-    // 👤 Récupération de l'utilisateur
-    User user = usersRepository.findById(userId)
-            .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
-
-    if (user.getEntreprise() == null) {
-        throw new RuntimeException("Vous n'êtes associé à aucune entreprise.");
-    }
-
-    Long entrepriseId = user.getEntreprise().getId();
-
-    // 📅 Début et fin de journée
+@Transactional(readOnly = true)
+public double getMontantTotalVentesDuJour(Long entrepriseId) {
     LocalDate today = LocalDate.now();
     LocalDateTime startOfDay = today.atStartOfDay();
     LocalDateTime endOfDay = today.atTime(LocalTime.MAX);
 
-    // 🔍 Récupération des ventes du jour
     List<Vente> ventes = venteRepository.findByBoutique_Entreprise_IdAndDateVenteBetween(
             entrepriseId,
             startOfDay,
             endOfDay
     );
 
-    // 💰 Calcul du montant total
-    return ventes.stream()
-            .mapToDouble(Vente::getMontantTotal)
-            .sum();
+    double total = 0.0;
+
+    for (Vente vente : ventes) {
+        double montantVente = vente.getMontantTotal() != null ? vente.getMontantTotal() : 0.0;
+
+        // Déduire les remboursements
+        double remboursements = venteHistoriqueRepository
+                .findByVenteId(vente.getId())
+                .stream()
+                .filter(h -> h.getAction().equals("REMBOURSEMENT_VENTE"))
+                .mapToDouble(VenteHistorique::getMontant)
+                .sum();
+
+        total += montantVente - remboursements;
+    }
+
+    return total;
 }
 
     // Vente du mois
-    public double getMontantTotalVentesDuMois(HttpServletRequest request) {
+    @Transactional(readOnly = true)
+public double getMontantTotalVentesDuMoisConnecte(HttpServletRequest request) {
     String token = request.getHeader("Authorization");
     if (token == null || !token.startsWith("Bearer ")) {
         throw new RuntimeException("Token JWT manquant ou mal formaté");
     }
 
-    String jwtToken = token.substring(7);
-
-    Long userId;
-    try {
-        userId = jwtUtil.extractUserId(jwtToken);
-    } catch (Exception e) {
-        throw new RuntimeException("Erreur lors de l'extraction de l'ID utilisateur depuis le token", e);
-    }
-
+    Long userId = jwtUtil.extractUserId(token.substring(7));
     User user = usersRepository.findById(userId)
             .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
 
     if (user.getEntreprise() == null) {
         throw new RuntimeException("Vous n'êtes associé à aucune entreprise.");
     }
-
     Long entrepriseId = user.getEntreprise().getId();
 
-    // 📅 Début et fin du mois
+
+        // Vérification des droits
+        RoleType role = user.getRole().getName();
+        boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
+        if (!isAdminOrManager) {
+            throw new RuntimeException("Vous n'avez pas les droits nécessaires pour accéder à cette information.");
+        }
+
+    return getMontantTotalVentesDuMois(entrepriseId);
+}
+
+@Transactional(readOnly = true)
+public double getMontantTotalVentesDuMois(Long entrepriseId) {
     LocalDate today = LocalDate.now();
-    LocalDate firstDayOfMonth = today.withDayOfMonth(1);
-    LocalDate lastDayOfMonth = today.withDayOfMonth(today.lengthOfMonth());
+    LocalDateTime startOfMonth = today.withDayOfMonth(1).atStartOfDay();
+    LocalDateTime endOfMonth = today.withDayOfMonth(today.lengthOfMonth()).atTime(LocalTime.MAX);
 
-    LocalDateTime startOfMonth = firstDayOfMonth.atStartOfDay();
-    LocalDateTime endOfMonth = lastDayOfMonth.atTime(LocalTime.MAX);
-
-    // 🔍 Récupération des ventes du mois
     List<Vente> ventes = venteRepository.findByBoutique_Entreprise_IdAndDateVenteBetween(
             entrepriseId,
             startOfMonth,
             endOfMonth
     );
 
-    // 💰 Calcul du montant total
-    return ventes.stream()
-            .mapToDouble(Vente::getMontantTotal)
-            .sum();
+    double total = 0.0;
+
+    for (Vente vente : ventes) {
+        double montantVente = vente.getMontantTotal() != null ? vente.getMontantTotal() : 0.0;
+
+        // Déduire les remboursements
+        double remboursements = venteHistoriqueRepository
+                .findByVenteId(vente.getId())
+                .stream()
+                .filter(h -> h.getAction().equals("REMBOURSEMENT_VENTE"))
+                .mapToDouble(VenteHistorique::getMontant)
+                .sum();
+
+        total += montantVente - remboursements;
+    }
+
+    return total;
 }
+
+    // Methode pour connaitre le benefiche net de lentreprise
+    @Transactional(readOnly = true)
+    public double calculerBeneficeNetEntrepriseConnecte(HttpServletRequest request) {
+        String token = request.getHeader("Authorization");
+        if (token == null || !token.startsWith("Bearer ")) {
+            throw new RuntimeException("Token JWT manquant ou mal formaté");
+        }
+
+        Long userId = jwtUtil.extractUserId(token.substring(7));
+        User user = usersRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+        
+        Long entrepriseId = user.getEntreprise().getId();
+        
+        
+        // Vérification des droits
+        RoleType role = user.getRole().getName();
+        boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
+        if (!isAdminOrManager) {
+            throw new RuntimeException("Vous n'avez pas les droits nécessaires pour accéder à cette information.");
+        }
+
+        return calculerBeneficeNetEntreprise(entrepriseId);
+    }
+
+    @Transactional(readOnly = true)
+    public double calculerBeneficeNetEntreprise(Long entrepriseId) {
+        List<Vente> ventes = venteRepository.findByBoutiqueEntrepriseId(entrepriseId);
+        double beneficeNet = 0.0;
+
+        for (Vente vente : ventes) {
+            double beneficeVente = 0.0;
+
+            for (VenteProduit vp : vente.getProduits()) {
+                double prixVente = vp.getMontantLigne();
+                double prixAchat = vp.getProduit().getPrixAchat() * vp.getQuantite();
+                beneficeVente += prixVente - prixAchat;
+            }
+
+            // Déduire les remboursements
+            double remboursements = venteHistoriqueRepository
+                .findByVenteId(vente.getId())
+                .stream()
+                .filter(h -> h.getAction().equals("REMBOURSEMENT_VENTE"))
+                .mapToDouble(VenteHistorique::getMontant)
+                .sum();
+
+            beneficeVente -= remboursements;
+            beneficeNet += beneficeVente;
+        }
+
+        return beneficeNet;
+    }
+    
+    //  Bénéfice net du jour
+    @Transactional(readOnly = true)
+    public double calculerBeneficeNetDuJourConnecte(HttpServletRequest request) {
+        String token = request.getHeader("Authorization");
+        if (token == null || !token.startsWith("Bearer ")) {
+            throw new RuntimeException("Token JWT manquant ou mal formaté");
+        }
+
+        Long userId = jwtUtil.extractUserId(token.substring(7));
+        User user = usersRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+        
+
+        Long entrepriseId = user.getEntreprise().getId();
+
+         // Vérification des droits
+        RoleType role = user.getRole().getName();
+        boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
+        if (!isAdminOrManager) {
+            throw new RuntimeException("Vous n'avez pas les droits nécessaires pour accéder à cette information.");
+        }
+
+        LocalDate today = LocalDate.now();
+        LocalDateTime startOfDay = today.atStartOfDay();
+        LocalDateTime endOfDay = today.atTime(LocalTime.MAX);
+
+        List<Vente> ventes = venteRepository.findByBoutique_Entreprise_IdAndDateVenteBetween(
+                entrepriseId, startOfDay, endOfDay
+        );
+
+        return calculerBeneficeNetVentes(ventes);
+    }
+
+    //Bénéfice net du mois
+    @Transactional(readOnly = true)
+    public double calculerBeneficeNetDuMoisConnecte(HttpServletRequest request) {
+        String token = request.getHeader("Authorization");
+        if (token == null || !token.startsWith("Bearer ")) {
+            throw new RuntimeException("Token JWT manquant ou mal formaté");
+        }
+
+        Long userId = jwtUtil.extractUserId(token.substring(7));
+        User user = usersRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+
+        Long entrepriseId = user.getEntreprise().getId();
+
+        // Vérification des droits
+        RoleType role = user.getRole().getName();
+        boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
+        if (!isAdminOrManager) {
+            throw new RuntimeException("Vous n'avez pas les droits nécessaires pour accéder à cette information.");
+        }
+
+        LocalDate today = LocalDate.now();
+        LocalDate firstDayOfMonth = today.withDayOfMonth(1);
+        LocalDate lastDayOfMonth = today.withDayOfMonth(today.lengthOfMonth());
+
+        LocalDateTime startOfMonth = firstDayOfMonth.atStartOfDay();
+        LocalDateTime endOfMonth = lastDayOfMonth.atTime(LocalTime.MAX);
+
+        List<Vente> ventes = venteRepository.findByBoutique_Entreprise_IdAndDateVenteBetween(
+                entrepriseId, startOfMonth, endOfMonth
+        );
+
+        return calculerBeneficeNetVentes(ventes);
+    }
+
+    private double calculerBeneficeNetVentes(List<Vente> ventes) {
+        double beneficeNet = 0.0;
+
+        for (Vente vente : ventes) {
+            double beneficeVente = 0.0;
+
+            for (VenteProduit vp : vente.getProduits()) {
+                double prixVente = vp.getMontantLigne();
+                double prixAchat = vp.getProduit().getPrixAchat() * vp.getQuantite();
+                beneficeVente += prixVente - prixAchat;
+            }
+
+            // Déduire les remboursements
+            double remboursements = venteHistoriqueRepository
+                .findByVenteId(vente.getId())
+                .stream()
+                .filter(h -> h.getAction().equals("REMBOURSEMENT_VENTE"))
+                .mapToDouble(VenteHistorique::getMontant)
+                .sum();
+
+            beneficeVente -= remboursements;
+            beneficeNet += beneficeVente;
+        }
+
+        return beneficeNet;
+    }
+
+    //Benefice annuel
+    @Transactional(readOnly = true)
+public double calculerBeneficeNetAnnuelConnecte(HttpServletRequest request) {
+    String token = request.getHeader("Authorization");
+    if (token == null || !token.startsWith("Bearer ")) {
+        throw new RuntimeException("Token JWT manquant ou mal formaté");
+    }
+
+    Long userId = jwtUtil.extractUserId(token.substring(7));
+    User user = usersRepository.findById(userId)
+            .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+
+    Long entrepriseId = user.getEntreprise().getId();
+    // Vérification des droits
+        RoleType role = user.getRole().getName();
+        boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
+        if (!isAdminOrManager) {
+            throw new RuntimeException("Vous n'avez pas les droits nécessaires pour accéder à cette information.");
+        }
+    return calculerBeneficeNetAnnuel(entrepriseId);
+}
+
+@Transactional(readOnly = true)
+public double calculerBeneficeNetAnnuel(Long entrepriseId) {
+    LocalDate today = LocalDate.now();
+    LocalDate firstDayOfYear = today.withDayOfYear(1);
+    LocalDate lastDayOfYear = today.withDayOfYear(today.lengthOfYear());
+
+    LocalDateTime startOfYear = firstDayOfYear.atStartOfDay();
+    LocalDateTime endOfYear = lastDayOfYear.atTime(LocalTime.MAX);
+
+    List<Vente> ventes = venteRepository.findByBoutique_Entreprise_IdAndDateVenteBetween(
+            entrepriseId,
+            startOfYear,
+            endOfYear
+    );
+
+    double beneficeNet = 0.0;
+
+    for (Vente vente : ventes) {
+        double beneficeVente = 0.0;
+
+        for (VenteProduit vp : vente.getProduits()) {
+            double prixVente = vp.getMontantLigne();
+            double prixAchat = vp.getProduit().getPrixAchat() * vp.getQuantite();
+            beneficeVente += prixVente - prixAchat;
+        }
+
+        // Déduire les remboursements
+        double remboursements = venteHistoriqueRepository
+                .findByVenteId(vente.getId())
+                .stream()
+                .filter(h -> h.getAction().equals("REMBOURSEMENT_VENTE"))
+                .mapToDouble(VenteHistorique::getMontant)
+                .sum();
+
+        beneficeVente -= remboursements;
+        beneficeNet += beneficeVente;
+    }
+
+    return beneficeNet;
+}
+
+
+
 
 }

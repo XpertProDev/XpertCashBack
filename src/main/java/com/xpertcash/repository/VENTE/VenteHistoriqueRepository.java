@@ -11,4 +11,5 @@ public interface VenteHistoriqueRepository extends JpaRepository<VenteHistorique
     List<VenteHistorique> findByVenteId(Long venteId);
 
      List<VenteHistorique> findByVenteAndAction(Vente vente, String action);
+     
 }
