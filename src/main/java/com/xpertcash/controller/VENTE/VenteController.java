@@ -30,10 +30,27 @@ public class VenteController {
 
     //Remboursement
     @PostMapping("/vente/rembourser")
-    public ResponseEntity<VenteResponse> rembourserVente(@RequestBody RemboursementRequest request, HttpServletRequest httpRequest) {
-        VenteResponse response = venteService.rembourserVente(request, httpRequest);
-        return ResponseEntity.ok(response);
+    public ResponseEntity<?> rembourserVente(@RequestBody RemboursementRequest request, HttpServletRequest httpRequest) {
+        try {
+            VenteResponse response = venteService.rembourserVente(request, httpRequest);
+            return ResponseEntity.ok(Map.of(
+                "status", "success",
+                "message", "Remboursement effectué avec succès",
+                "data", response
+            ));
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(Map.of(
+                "status", "error",
+                "message", e.getMessage()
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(Map.of(
+                "status", "error",
+                "message", "Erreur interne du serveur : " + e.getMessage()
+            ));
+        }
     }
+
 
         // Lister les remboursements d'une vente
         @GetMapping("/mes/remboursements")

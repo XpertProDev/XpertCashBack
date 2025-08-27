@@ -98,7 +98,6 @@ public ResponseEntity<Object> createCategorie(@RequestBody Map<String, String> p
 }
 
 
-
         // Récupérer toutes les catégories
         @GetMapping("/allCategory")
         public ResponseEntity<List<CategorieResponseDTO>> getAllCategories(HttpServletRequest request) {

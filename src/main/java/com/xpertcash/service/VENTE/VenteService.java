@@ -27,6 +27,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 import com.xpertcash.entity.Enum.RoleType;
+import com.xpertcash.entity.VENTE.StatutCaisse;
 import com.xpertcash.entity.VENTE.TypeMouvementCaisse;
 import com.xpertcash.entity.VENTE.Vente;
 import com.xpertcash.entity.VENTE.VenteHistorique;
@@ -267,7 +268,7 @@ public VenteResponse enregistrerVente(VenteRequest request, HttpServletRequest h
 
     //Remboursement
     @Transactional
-        public VenteResponse rembourserVente(RemboursementRequest request, HttpServletRequest httpRequest) {
+    public VenteResponse rembourserVente(RemboursementRequest request, HttpServletRequest httpRequest) {
         String token = httpRequest.getHeader("Authorization");
         if (token == null || !token.startsWith("Bearer ")) {
             throw new RuntimeException("Token JWT manquant ou mal formaté");
@@ -281,6 +282,15 @@ public VenteResponse enregistrerVente(VenteRequest request, HttpServletRequest h
 
         Caisse caisse = caisseService.getCaisseActive(vente.getBoutique().getId(), httpRequest)
             .orElseThrow(() -> new RuntimeException("Aucune caisse ouverte pour cette boutique/vendeur"));
+
+            // ✅ Vérification de la caisse de la vente
+        Caisse caisseVente = vente.getCaisse();
+        if (caisseVente == null) {
+            throw new RuntimeException("Impossible de rembourser, la caisse de la vente est fermée !");
+        }
+        if (caisseVente.getStatut() == StatutCaisse.FERMEE) {
+            throw new RuntimeException("Impossible de rembourser : la caisse dans laquelle la vente a été encaissée est fermée !");
+        }
 
         if (request.getRescodePin() == null || request.getRescodePin().isBlank()) {
             throw new RuntimeException("Vous devez rentrer le code d'un responsable de l'entreprise");

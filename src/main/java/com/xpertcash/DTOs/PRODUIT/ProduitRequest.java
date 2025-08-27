@@ -1,13 +1,7 @@
 package com.xpertcash.DTOs.PRODUIT;
-
-
-
 import java.time.LocalDate;
-
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.xpertcash.entity.Categorie;
-import com.xpertcash.entity.Unite;
 import com.xpertcash.entity.Enum.TypeProduit;
 
 import lombok.Data;

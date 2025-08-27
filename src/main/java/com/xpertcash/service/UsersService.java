@@ -204,7 +204,8 @@ public class UsersService {
         boutique.setCreatedAt(LocalDateTime.now());
         boutique.setTypeBoutique(TypeBoutique.BOUTIQUE);
         boutiqueRepository.save(boutique);
-    
+
+            
         // Créer un stock vide initial
        
     
