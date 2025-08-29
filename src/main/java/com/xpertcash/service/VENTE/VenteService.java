@@ -214,6 +214,7 @@ public VenteResponse enregistrerVente(VenteRequest request, HttpServletRequest h
     vente.setProduits(lignes);
     vente.setStatus(VenteStatus.PAYEE);
     vente.setMontantPaye(montantTotal);
+    vente.setCaisse(caisse);
 
     // ✅ Persist groupé
     venteRepository.save(vente);
@@ -553,7 +554,16 @@ public List<VenteResponse> getVentesByVendeur(Long vendeurId, HttpServletRequest
     private VenteResponse toVenteResponse(Vente vente) {
         VenteResponse response = new VenteResponse();
         response.setVenteId(vente.getId());
-        response.setCaisse(vente.getCaisse());
+         // ✅ Eviter récursion : ne pas renvoyer l’entité caisse entière
+        if (vente.getCaisse() != null) {
+            VenteResponse.CaisseDTO caisseDTO = new VenteResponse.CaisseDTO();
+            caisseDTO.setId(vente.getCaisse().getId());
+            caisseDTO.setMontantCourant(vente.getCaisse().getMontantCourant());
+            caisseDTO.setStatut(vente.getCaisse().getStatut().name());
+            caisseDTO.setDateOuverture(vente.getCaisse().getDateOuverture());
+            caisseDTO.setDateFermeture(vente.getCaisse().getDateFermeture());
+            response.setCaisse(caisseDTO);
+        }
         response.setBoutiqueId(vente.getBoutique() != null ? vente.getBoutique().getId() : null);
         response.setVendeurId(vente.getVendeur() != null ? vente.getVendeur().getId() : null);
         response.setDateVente(vente.getDateVente());

@@ -9,7 +9,7 @@ import com.xpertcash.entity.Caisse;
 @Data
 public class VenteResponse {
     private Long venteId;
-    private Caisse caisse;
+   private CaisseDTO caisse;
     private Long boutiqueId;
     private Long vendeurId;
     private LocalDateTime dateVente;
@@ -36,5 +36,14 @@ public class VenteResponse {
         private Double montantLigne;
         private Double remise;
 
+    }
+
+     @Data
+    public static class CaisseDTO {
+        private Long id;
+        private Double montantCourant;
+        private String statut;
+        private LocalDateTime dateOuverture;
+        private LocalDateTime dateFermeture;
     }
 }
