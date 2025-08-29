@@ -15,5 +15,9 @@ public class VenteRequest {
     private String clientNumero;
     private String modePaiement;
     private Map<Long, Double> remises = new HashMap<>();
+
+    private Long clientId;
+    private Long entrepriseClientId;
+    
     private Double remiseGlobale = 0.0;
 }

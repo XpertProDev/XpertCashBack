@@ -68,6 +68,11 @@ public class VenteService {
     @Autowired
     private FactureVenteService factureVenteService;
 
+    @Autowired
+    private ClientRepository clientRepository;
+    @Autowired
+    private EntrepriseClientRepository entrepriseClientRepository;
+
 
  @Transactional
 public VenteResponse enregistrerVente(VenteRequest request, HttpServletRequest httpRequest) {
@@ -121,6 +126,23 @@ public VenteResponse enregistrerVente(VenteRequest request, HttpServletRequest h
     vente.setDescription(request.getDescription());
     vente.setClientNom(request.getClientNom());
     vente.setClientNumero(request.getClientNumero());
+
+    // ✅ Ici, ajouter la gestion du client
+    if (request.getClientId() != null) {
+        Client client = clientRepository.findById(request.getClientId())
+                .orElseThrow(() -> new RuntimeException("Client introuvable"));
+        vente.setClient(client);
+        vente.setEntrepriseClient(null);
+    } else if (request.getEntrepriseClientId() != null) {
+        EntrepriseClient entrepriseClient = entrepriseClientRepository.findById(request.getEntrepriseClientId())
+                .orElseThrow(() -> new RuntimeException("Entreprise client introuvable"));
+        vente.setEntrepriseClient(entrepriseClient);
+        vente.setClient(null);
+    } else {
+        // Client passant
+        vente.setClient(null);
+        vente.setEntrepriseClient(null);
+    }
 
     double montantTotalSansRemise = 0.0;
     List<VenteProduit> lignes = new ArrayList<>();
