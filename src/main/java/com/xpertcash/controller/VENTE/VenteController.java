@@ -1,5 +1,7 @@
 package com.xpertcash.controller.VENTE;
 
+import com.xpertcash.DTOs.CLIENT.ClientVenteRequest;
+import com.xpertcash.DTOs.CLIENT.VenteParClientResponse;
 import com.xpertcash.DTOs.VENTE.RemboursementRequest;
 import com.xpertcash.DTOs.VENTE.RemboursementResponse;
 import com.xpertcash.DTOs.VENTE.VenteRequest;
@@ -144,5 +146,25 @@ public class VenteController {
     }
 
     
+    // Get achat par client
+ @PostMapping("/par-client")
+public ResponseEntity<List<VenteParClientResponse>> getVentesParClient(
+        @RequestBody ClientVenteRequest request,
+        HttpServletRequest httpRequest) {
+
+    List<VenteParClientResponse> ventes = venteService.getVentesParClient(
+            request.getClientId(),
+            request.getEntrepriseClientId(),
+            httpRequest
+    );
+    return ResponseEntity.ok(ventes);
+}
+
+// Get all achat client
+@GetMapping("/ventes/all-clients")
+public ResponseEntity<List<VenteParClientResponse>> getVentesClientsAffilies(HttpServletRequest httpRequest) {
+    List<VenteParClientResponse> ventes = venteService.getVentesClientsAffilies(httpRequest);
+    return ResponseEntity.ok(ventes);
+}
 
 }

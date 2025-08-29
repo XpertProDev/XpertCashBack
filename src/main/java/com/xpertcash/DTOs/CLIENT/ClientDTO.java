@@ -1,4 +1,4 @@
-package com.xpertcash.DTOs;
+package com.xpertcash.DTOs.CLIENT;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.xpertcash.entity.Client;

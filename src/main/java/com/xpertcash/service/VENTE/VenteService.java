@@ -1,7 +1,9 @@
 package com.xpertcash.service.VENTE;
 
+import com.xpertcash.DTOs.CLIENT.VenteParClientResponse;
 import com.xpertcash.DTOs.VENTE.RemboursementRequest;
 import com.xpertcash.DTOs.VENTE.RemboursementResponse;
+import com.xpertcash.DTOs.VENTE.VenteLigneResponse;
 import com.xpertcash.DTOs.VENTE.VenteRequest;
 import com.xpertcash.DTOs.VENTE.VenteResponse;
 import com.xpertcash.composant.Utilitaire;
@@ -955,6 +957,100 @@ public double calculerBeneficeNetAnnuel(Long entrepriseId) {
 }
 
 
+
+// Methode pour Achat de client 
+
+@Transactional(readOnly = true)
+public List<VenteParClientResponse> getVentesParClient(Long clientId, Long entrepriseClientId, HttpServletRequest request) {
+    User user = utilitaire.getAuthenticatedUser(request);
+
+    if (clientId == null && entrepriseClientId == null) {
+        throw new RuntimeException("Vous devez fournir soit un clientId soit un entrepriseClientId.");
+    }
+
+    List<Vente> ventes;
+
+    if (clientId != null) {
+        Client client = clientRepository.findById(clientId)
+                .orElseThrow(() -> new RuntimeException("Client introuvable"));
+        if (!client.getEntreprise().getId().equals(user.getEntreprise().getId())) {
+            throw new RuntimeException("Accès interdit : ce client n'appartient pas à votre entreprise.");
+        }
+        ventes = venteRepository.findByClientId(clientId);
+    } else {
+        EntrepriseClient entrepriseClient = entrepriseClientRepository.findById(entrepriseClientId)
+                .orElseThrow(() -> new RuntimeException("EntrepriseClient introuvable"));
+        if (!entrepriseClient.getEntreprise().getId().equals(user.getEntreprise().getId())) {
+            throw new RuntimeException("Accès interdit : cette entreprise cliente n'appartient pas à votre entreprise.");
+        }
+        ventes = venteRepository.findByEntrepriseClientId(entrepriseClientId);
+    }
+
+    return ventes.stream()
+            .map(this::toVenteParClientResponse)
+            .collect(Collectors.toList());
+}
+
+// Methode pour Achat de tout client confondu
+
+@Transactional(readOnly = true)
+public List<VenteParClientResponse> getVentesClientsAffilies(HttpServletRequest request) {
+    User user = utilitaire.getAuthenticatedUser(request);
+
+    // Récupère toutes les ventes de l'entreprise
+    List<Vente> ventes = venteRepository.findAllByEntrepriseId(user.getEntreprise().getId());
+
+    // Filtrer seulement les ventes avec client ou entreprise client
+    List<Vente> ventesAffilies = ventes.stream()
+        .filter(v -> (v.getClientNom() != null && v.getClientNumero() != null)
+                  || v.getEntrepriseClient() != null)
+        .collect(Collectors.toList());
+
+    return ventesAffilies.stream()
+            .map(this::toVenteParClientResponse)
+            .collect(Collectors.toList());
+}
+
+
+
+
+
+private VenteParClientResponse toVenteParClientResponse(Vente vente) {
+    VenteParClientResponse dto = new VenteParClientResponse();
+    dto.setVenteId(vente.getId());
+    dto.setCaisseId(vente.getCaisse() != null ? vente.getCaisse().getId() : null);
+    dto.setBoutiqueId(vente.getBoutique() != null ? vente.getBoutique().getId() : null);
+    dto.setVendeurId(vente.getVendeur() != null ? vente.getVendeur().getId() : null);
+    dto.setDateVente(vente.getDateVente());
+    dto.setMontantTotal(vente.getMontantTotal());
+    dto.setDescription(vente.getDescription());
+    dto.setNomVendeur(vente.getVendeur() != null ? vente.getVendeur().getNomComplet() : null);
+    dto.setNomBoutique(vente.getBoutique() != null ? vente.getBoutique().getNomBoutique() : null);
+    dto.setClientNom(vente.getClientNom());
+    dto.setClientNumero(vente.getClientNumero());
+    dto.setModePaiement(vente.getModePaiement());
+    dto.setMontantPaye(vente.getMontantPaye());
+
+    if (vente.getProduits() != null) {
+        List<VenteLigneResponse> lignes = vente.getProduits().stream().map(vp -> {
+            VenteLigneResponse ligne = new VenteLigneResponse();
+            ligne.setProduitId(vp.getProduit() != null ? vp.getProduit().getId() : null);
+            ligne.setNomProduit(vp.getProduit() != null ? vp.getProduit().getNom() : null);
+            ligne.setQuantite(vp.getQuantite());
+            ligne.setPrixUnitaire(vp.getPrixUnitaire());
+            ligne.setMontantLigne(vp.getMontantLigne());
+            ligne.setRemise(vp.getRemise());
+            return ligne;
+        }).collect(Collectors.toList());
+        dto.setLignes(lignes);
+    }
+
+    dto.setRemiseGlobale(vente.getRemiseGlobale());
+    FactureVente facture = factureVenteRepository.findByVente(vente).orElse(null);
+    dto.setNumeroFacture(facture != null ? facture.getNumeroFacture() : null);
+
+    return dto;
+}   
 
 
 }

@@ -14,10 +14,10 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 
-import com.xpertcash.DTOs.ClientDTO;
 import com.xpertcash.DTOs.EntrepriseClientDTO;
 import com.xpertcash.DTOs.FactureProFormaDTO;
 import com.xpertcash.DTOs.LigneFactureDTO;
+import com.xpertcash.DTOs.CLIENT.ClientDTO;
 import com.xpertcash.configuration.CentralAccess;
 import com.xpertcash.configuration.JwtUtil;
 import com.xpertcash.entity.Client;

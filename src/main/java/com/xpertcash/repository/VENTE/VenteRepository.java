@@ -40,6 +40,18 @@ public interface VenteRepository extends JpaRepository<Vente, Long> {
     );
         
     List<Vente> findByBoutiqueEntrepriseId(Long entrepriseId);
+
+   List<Vente> findByClientId(Long clientId);
+   List<Vente> findByEntrepriseClientId(Long entrepriseClientId);
+
+   //findAllByEntrepriseId
+   
+    // Récupère toutes les ventes des boutiques d'une entreprise
+    @Query("SELECT v FROM Vente v WHERE v.boutique.entreprise.id = :entrepriseId")
+    List<Vente> findAllByEntrepriseId(@Param("entrepriseId") Long entrepriseId);
+
+
+    
     
 
 

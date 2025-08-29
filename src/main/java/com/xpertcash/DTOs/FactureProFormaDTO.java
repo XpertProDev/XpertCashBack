@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import com.xpertcash.DTOs.CLIENT.ClientDTO;
 import com.xpertcash.entity.FactureProForma;
 import com.xpertcash.entity.Enum.StatutFactureProForma;
 import com.xpertcash.entity.Enum.StatutPaiementFacture;
