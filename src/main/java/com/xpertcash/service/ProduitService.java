@@ -1171,7 +1171,7 @@ public class ProduitService {
     // Lister Produit par boutique (excluant les produits dans la corbeille)
     @Transactional
 public List<ProduitDTO> getProduitsParStock(Long boutiqueId, HttpServletRequest request) {
-    // 🔐 Extraction utilisateur depuis le token JWT
+    // --- 1. Extraction utilisateur via JWT ---
     String token = request.getHeader("Authorization");
     if (token == null || !token.startsWith("Bearer ")) {
         throw new RuntimeException("Token JWT manquant ou mal formaté");
@@ -1181,21 +1181,20 @@ public List<ProduitDTO> getProduitsParStock(Long boutiqueId, HttpServletRequest 
     User user = usersRepository.findById(userId)
             .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
 
-    // 🔍 Vérification de la boutique
+    // --- 2. Vérification de la boutique ---
     Boutique boutique = boutiqueRepository.findById(boutiqueId)
             .orElseThrow(() -> new RuntimeException("Boutique non trouvée"));
-
     if (!boutique.isActif()) {
         throw new RuntimeException("Cette boutique est désactivée, ses produits ne sont pas accessibles !");
     }
 
-    // Vérification si la boutique appartient à l'utilisateur (ou l'entreprise de l'utilisateur)
+    // --- 3. Vérification d'accès à l'entreprise ---
     Long entrepriseId = boutique.getEntreprise().getId();
     if (!entrepriseId.equals(user.getEntreprise().getId())) {
         throw new RuntimeException("Accès interdit : cette boutique ne vous appartient pas");
     }
 
-    // 🔒 Vérifications CentralAccess & permissions
+    // --- 4. Vérification des droits ---
     RoleType role = user.getRole().getName();
     boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
     boolean hasPermission = user.getRole().hasPermission(PermissionType.GERER_PRODUITS)
@@ -1207,45 +1206,27 @@ public List<ProduitDTO> getProduitsParStock(Long boutiqueId, HttpServletRequest 
         throw new RuntimeException("Accès interdit : vous n'avez pas les droits pour consulter les produits.");
     }
 
-    // Vérification si l'utilisateur a bien accès à cette boutique
-    boolean isVendeur = user.getRole().getName() == RoleType.VENDEUR;
+    // --- 5. Vérification rôle vendeur ---
+    boolean isVendeur = role == RoleType.VENDEUR;
     if (isVendeur) {
-        // Si c'est un vendeur, il doit être affecté à cette boutique
-       Optional<UserBoutique> userBoutique = userBoutiqueRepository.findByUserIdAndBoutiqueId(userId, boutiqueId);
-       if (!userBoutique.isPresent()) {
+        Optional<UserBoutique> userBoutique = userBoutiqueRepository.findByUserIdAndBoutiqueId(userId, boutiqueId);
+        if (!userBoutique.isPresent()) {
             throw new RuntimeException("Vous n'êtes pas affecté à cette boutique, vous ne pouvez pas voir ses produits.");
         }
     }
 
-    // Récupérer uniquement les produits actifs (non supprimés) pour cette boutique
-    List<Produit> produitsActifs = produitRepository.findByBoutiqueIdAndDeletedFalseOrDeletedIsNull(boutiqueId);
+    // --- 6. Récupération des produits actifs (1 seule requête optimisée) ---
+    List<Produit> produitsActifs = produitRepository.findActiveByBoutiqueIdWithRelations(boutiqueId);
 
-    // Convertir en DTO
+    // --- 7. Conversion vers DTO ---
     return produitsActifs.stream()
             .map(this::convertToProduitDTO)
             .collect(Collectors.toList());
 }
 
+
    
 
-    /**
-     * Récupère et mappe les produits d'une boutique
-     */
-    private List<ProduitDTO> recupererProduitsDTO(Long boutiqueId) {
-    List<ProduitDTO> produitsDTO = new ArrayList<>();
-
-    List<Produit> produitsEnStockFalse = produitRepository.findByBoutiqueIdAndEnStockFalseAndDeletedFalseOrDeletedIsNull(boutiqueId);
-    for (Produit produit : produitsEnStockFalse) {
-        produitsDTO.add(convertToProduitDTO(produit));
-    }
-
-    List<Produit> produitsEnStockTrue = produitRepository.findByBoutiqueIdAndEnStockTrueAndDeletedFalseOrDeletedIsNull(boutiqueId);
-    for (Produit produit : produitsEnStockTrue) {
-        produitsDTO.add(convertToProduitDTO(produit));
-    }
-
-    return produitsDTO;
-}
 
     // Méthode pour convertir un Produit en ProduitDTO
         private ProduitDTO convertToProduitDTO(Produit produit) {
@@ -1453,28 +1434,19 @@ public List<ProduitDTO> getProduitsParStock(Long boutiqueId, HttpServletRequest 
 
     // Méthode pour récupérer tous les produits de toutes les boutiques d'une entreprise
     public List<ProduitDTO> getProduitsParEntreprise(Long entrepriseId, HttpServletRequest request) {
-    // 1. Extraire l'utilisateur à partir du token
+    // --- 1. Extraire l'utilisateur via JWT ---
     String token = request.getHeader("Authorization");
     if (token == null || !token.startsWith("Bearer ")) {
         throw new RuntimeException("Token JWT manquant ou mal formaté");
     }
 
-    Long userId;
-    try {
-        userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
-    } catch (Exception e) {
-        throw new RuntimeException("Erreur lors de l'extraction de l'ID utilisateur", e);
-    }
-
+    Long userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
     User user = usersRepository.findById(userId)
             .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
-
     Entreprise entreprise = user.getEntreprise();
-    if (entreprise == null) {
-        throw new RuntimeException("Aucune entreprise associée à cet utilisateur");
-    }
+    if (entreprise == null) throw new RuntimeException("Aucune entreprise associée à cet utilisateur");
 
-    // 2. Vérification des droits
+    // --- 2. Vérification des droits ---
     boolean isAdminOrManager = CentralAccess.isAdminOrManagerOfEntreprise(user, entreprise.getId());
     boolean hasPermissionGestionProduits = user.getRole().hasPermission(PermissionType.GERER_PRODUITS);
     boolean hasPermissionGestionFacturation = user.getRole().hasPermission(PermissionType.GESTION_FACTURATION);
@@ -1483,53 +1455,46 @@ public List<ProduitDTO> getProduitsParStock(Long boutiqueId, HttpServletRequest 
         throw new RuntimeException("Accès refusé : vous n'avez pas les droits nécessaires pour consulter les produits.");
     }
 
-    // 3. Vérifier que l'utilisateur a bien accès à l'entreprise demandée
+    // --- 3. Vérification de l'entreprise ---
     if (!entreprise.getId().equals(entrepriseId)) {
         throw new RuntimeException("Accès refusé : vous ne pouvez pas accéder aux produits d'une autre entreprise.");
     }
 
-    // 4. Récupérer les produits de l'entreprise
-    List<Produit> produits = produitRepository.findByEntrepriseId(entrepriseId);
+    // --- 4. Récupérer tous les produits de l'entreprise avec JOIN FETCH pour les boutiques ---
+    List<Produit> produits = produitRepository.findAllWithBoutiqueByEntrepriseId(entrepriseId);
 
-    // 5. Regrouper les produits par codeGenerique
+    // --- 5. Regrouper par codeGenerique ---
     Map<String, ProduitDTO> produitsUniques = new HashMap<>();
 
     for (Produit produit : produits) {
-        // Exclure les produits supprimés ou inactifs
-        if (Boolean.TRUE.equals(produit.getDeleted())) {
-            continue; // Ignorer produit supprimé
-        }
+        if (Boolean.TRUE.equals(produit.getDeleted())) continue;
 
-        // Vérifier si la boutique est active
         Boutique boutique = produit.getBoutique();
         if (boutique != null && boutique.isActif()) {
             String codeGenerique = produit.getCodeGenerique();
+
             ProduitDTO produitDTO = produitsUniques.computeIfAbsent(codeGenerique, k -> {
                 ProduitDTO dto = convertToProduitDTO(produit);
-                dto.setBoutiques(new ArrayList<>());  // Initialiser la liste des boutiques
-                dto.setQuantite(0);  // Initialiser la quantité totale à 0
+                dto.setBoutiques(new ArrayList<>());
+                dto.setQuantite(0);
                 return dto;
             });
 
-            // Ajouter les informations de la boutique
             Map<String, Object> boutiqueInfo = new HashMap<>();
             boutiqueInfo.put("nom", boutique.getNomBoutique());
             boutiqueInfo.put("id", boutique.getId());
             boutiqueInfo.put("typeBoutique", boutique.getTypeBoutique());
             boutiqueInfo.put("quantite", produit.getQuantite());
 
-            // Ajouter la boutique à la liste des boutiques
             produitDTO.getBoutiques().add(boutiqueInfo);
-
-            // Ajouter la quantité au total
             produitDTO.setQuantite(produitDTO.getQuantite() + produit.getQuantite());
         }
     }
 
-    // 6. Retourner la liste des produits regroupés
     return new ArrayList<>(produitsUniques.values());
 }
 
+  
 
     public Map<String, Object> importProduitsFromExcel(
             InputStream inputStream,

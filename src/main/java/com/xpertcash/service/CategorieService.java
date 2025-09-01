@@ -4,6 +4,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -68,71 +69,100 @@ public class CategorieService {
 
     // Récupérer toutes les catégories et ses produits
     public List<CategorieResponseDTO> getCategoriesWithProduitCount(HttpServletRequest request) {
-    // 1. Récupérer le token JWT de l'en-tête de la requête
-    String token = request.getHeader("Authorization");
-    if (token == null || !token.startsWith("Bearer ")) {
-        throw new RuntimeException("Token JWT manquant ou mal formaté");
-    }
+        // --- JWT & utilisateur inchangé ---
+        String token = request.getHeader("Authorization");
+        if (token == null || !token.startsWith("Bearer ")) {
+            throw new RuntimeException("Token JWT manquant ou mal formaté");
+        }
 
-    Long userId;
-    try {
-        // Extraire l'ID utilisateur du token JWT
-        userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
-    } catch (Exception e) {
-        throw new RuntimeException("Erreur lors de l'extraction de l'ID utilisateur", e);
-    }
+        Long userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
+        User user = usersRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
+        Entreprise entreprise = user.getEntreprise();
+        if (entreprise == null) throw new RuntimeException("Aucune entreprise associée");
 
-    // 2. Trouver l'utilisateur dans la base de données
-    User user = usersRepository.findById(userId)
-            .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
+        boolean isAdminOrManager = CentralAccess.isAdminOrManagerOfEntreprise(user, entreprise.getId());
+        boolean hasPermissionGestionProduits = user.getRole().hasPermission(PermissionType.GERER_PRODUITS);
+        boolean isVendeur = user.getRole().hasPermission(PermissionType.VENDRE_PRODUITS);
 
-    // 3. Récupérer l'entreprise de l'utilisateur
-    Entreprise entreprise = user.getEntreprise();
-    if (entreprise == null) {
-        throw new RuntimeException("Aucune entreprise associée à cet utilisateur");
-    }
+        if (!isAdminOrManager && !hasPermissionGestionProduits && !isVendeur) {
+            throw new RuntimeException("Accès refusé");
+        }
 
-    // 4. Vérification des droits
-    boolean isAdminOrManager = CentralAccess.isAdminOrManagerOfEntreprise(user, entreprise.getId());
-    boolean hasPermissionGestionProduits = user.getRole().hasPermission(PermissionType.GERER_PRODUITS);
-    boolean isVendeur = user.getRole().hasPermission(PermissionType.VENDRE_PRODUITS);  // Vérifier si l'utilisateur est un vendeur
+        // --- Récupérer les catégories et produits ---
+        List<Categorie> allCategories = categorieRepository.findAll();
+        List<Produit> allProduits = produitRepository.findAllWithCategorieAndBoutiqueByEntrepriseId(entreprise.getId());
 
-    if (!isAdminOrManager && !hasPermissionGestionProduits && !isVendeur) {
-        throw new RuntimeException("Accès refusé : vous n'avez pas les droits nécessaires pour consulter les catégories.");
-    }
-
-    // 5. Récupérer toutes les catégories pour l'entreprise
-    List<Categorie> allCategories = categorieRepository.findAll();
-
-    // 6. Créer une liste de DTOs de catégorie
-    List<CategorieResponseDTO> categorieResponseDTOs = new ArrayList<>();
-
-    // 7. Parcourir toutes les catégories et récupérer les produits associés
-    for (Categorie categorie : allCategories) {
-        // Compter le nombre de produits associés à cette catégorie pour l'entreprise spécifique
-        long produitCount = produitRepository.countByCategorieIdAndEntrepriseId(categorie.getId(), entreprise.getId());
-        categorie.setProduitCount(produitCount);
-
-        // Filtrer les produits en fonction du rôle de l'utilisateur
-        List<ProduitDetailsResponseDTO> produitDTOs = produitRepository.findByCategorieIdAndEntrepriseId(categorie.getId(), entreprise.getId())
+        // --- Récupérer le count groupé par catégorie ---
+        Map<Long, Long> produitCountMap = produitRepository.countProduitsParCategorie(entreprise.getId())
                 .stream()
-                .filter(produit -> {
-                     // Exclure les produits supprimés ou inactifs
-                    if (Boolean.TRUE.equals(produit.getDeleted()) ) {
-                        return false; // Ignorer les produits supprimés ou inactifs
-                    }
-                    // Si c'est un vendeur, filtrer les produits selon la boutique assignée
-                    if (isVendeur && produit.getBoutique() != null) {
-                        // Récupérer les boutiques assignées à l'utilisateur
-                        List<UserBoutique> userBoutiques = user.getUserBoutiques();
-                        if (userBoutiques != null && !userBoutiques.isEmpty()) {
-                            // Si la boutique du produit est celle assignée à l'utilisateur, alors l'afficher
-                            return produit.getBoutique().getId().equals(userBoutiques.get(0).getBoutique().getId());
+                .collect(Collectors.toMap(
+                        obj -> (Long) obj[0],
+                        obj -> (Long) obj[1]
+                ));
+
+        // --- Grouper les produits par catégorie ---
+        Map<Long, List<Produit>> produitsParCategorie = allProduits.stream()
+                .collect(Collectors.groupingBy(p -> p.getCategorie().getId()));
+
+        List<CategorieResponseDTO> categorieResponseDTOs = new ArrayList<>();
+        for (Categorie categorie : allCategories) {
+            // set le count directement depuis la DB
+            categorie.setProduitCount(produitCountMap.getOrDefault(categorie.getId(), 0L));
+
+            List<ProduitDetailsResponseDTO> produitDTOs = produitsParCategorie.getOrDefault(categorie.getId(), Collections.emptyList())
+                    .stream()
+                    .filter(produit -> {
+                        if (Boolean.TRUE.equals(produit.getDeleted())) return false;
+                        if (isVendeur && produit.getBoutique() != null) {
+                            List<UserBoutique> userBoutiques = user.getUserBoutiques();
+                            if (userBoutiques != null && !userBoutiques.isEmpty()) {
+                                return produit.getBoutique().getId().equals(userBoutiques.get(0).getBoutique().getId());
+                            }
                         }
-                    }
-                    return !TypeProduit.SERVICE.equals(produit.getTypeProduit());
-                })
-                .map(produit -> {
+                        return !TypeProduit.SERVICE.equals(produit.getTypeProduit());
+                    })
+                    .map(this::toProduitDTO)  // mapping vers DTO dans méthode privée
+                    .collect(Collectors.toList());
+
+            CategorieResponseDTO categorieDTO = new CategorieResponseDTO(categorie);
+            categorieDTO.setProduits(produitDTOs);
+            categorieResponseDTOs.add(categorieDTO);
+        }
+
+        return categorieResponseDTOs;
+    }
+
+    // Méthode privée pour mapping DTO
+    private ProduitDetailsResponseDTO toProduitDTO(Produit produit) {
+        Long uniteId = produit.getUniteDeMesure() != null ? produit.getUniteDeMesure().getId() : null;
+        String uniteNom = produit.getUniteDeMesure() != null ? produit.getUniteDeMesure().getNom() : "Non spécifiée";
+
+        return new ProduitDetailsResponseDTO(
+                produit.getId(),
+                produit.getNom(),
+                produit.getPrixVente(),
+                produit.getPrixAchat(),
+                produit.getQuantite(),
+                produit.getSeuilAlert(),
+                produit.getCategorie().getId(),
+                uniteId,
+                produit.getCodeBare(),
+                produit.getPhoto(),
+                produit.getEnStock(),
+                produit.getCategorie().getNom(),
+                uniteNom,
+                produit.getTypeProduit() != null ? produit.getTypeProduit().name() : null,
+                produit.getCreatedAt(),
+                produit.getLastUpdated(),
+                produit.getDatePreemption(),
+                produit.getBoutique() != null ? produit.getBoutique().getId() : null,
+                produit.getBoutique() != null ? produit.getBoutique().getNomBoutique() : null
+        );
+    }
+
+/* Méthode privée pour mapper un produit vers son DTO
+private ProduitDetailsResponseDTO toProduitDTO(Produit produit) {
     Long uniteId = produit.getUniteDeMesure() != null ? produit.getUniteDeMesure().getId() : null;
     String uniteNom = produit.getUniteDeMesure() != null ? produit.getUniteDeMesure().getNom() : "Non spécifiée";
 
@@ -157,28 +187,14 @@ public class CategorieService {
         produit.getBoutique() != null ? produit.getBoutique().getId() : null,
         produit.getBoutique() != null ? produit.getBoutique().getNomBoutique() : null
     );
-})
-
-                .collect(Collectors.toList());
-
-        // Créer un DTO de catégorie avec les produits associés
-        CategorieResponseDTO categorieDTO = new CategorieResponseDTO(categorie);
-        categorieDTO.setProduits(produitDTOs);
-
-        // Ajouter à la liste de réponses
-        categorieResponseDTOs.add(categorieDTO);
-    }
-
-    // 8. Retourner la liste des catégories avec les produits associés
-    return categorieResponseDTOs;
 }
-
+ */
    
 
 
      // Supprimer une catégorie
-    public void supprimerCategorieSiVide(Long categorieId, HttpServletRequest request) {
-    // 1. Extraire l'ID utilisateur depuis le token JWT
+   public void supprimerCategorieSiVide(Long categorieId, HttpServletRequest request) {
+    // 1. Récupérer l'utilisateur depuis le token
     String token = request.getHeader("Authorization");
     if (token == null || !token.startsWith("Bearer ")) {
         throw new RuntimeException("Token JWT manquant ou mal formaté");
@@ -204,7 +220,8 @@ public class CategorieService {
     Categorie categorie = categorieRepository.findById(categorieId)
             .orElseThrow(() -> new RuntimeException("Catégorie introuvable"));
 
-    // 5. Vérifier qu'elle est bien liée à la même entreprise (par les produits)
+    // 5. Vérifier que la catégorie est bien liée à des produits de l'entreprise
+    // Optimisation : utilisation de la même requête countByCategorieIdAndEntrepriseId
     long produitCount = produitRepository.countByCategorieIdAndEntrepriseId(categorieId, entreprise.getId());
     if (produitCount > 0) {
         throw new RuntimeException("Impossible de supprimer une catégorie contenant des produits.");

@@ -68,12 +68,36 @@ public interface ProduitRepository extends JpaRepository<Produit, Long> {
     @Query("SELECT COUNT(p) FROM Produit p WHERE p.categorie.id = :categorieId AND p.boutique.entreprise.id = :entrepriseId")
 long countByCategorieIdAndEntrepriseId(@Param("categorieId") Long categorieId, @Param("entrepriseId") Long entrepriseId);
 
- @Query("SELECT p FROM Produit p WHERE p.categorie.id = :categorieId AND p.boutique.entreprise.id = :entrepriseId")
-    List<Produit> findByCategorieIdAndEntrepriseId(@Param("categorieId") Long categorieId, 
-                                                   @Param("entrepriseId") Long entrepriseId);
+@Query("SELECT p FROM Produit p WHERE p.boutique.entreprise.id = :entrepriseId")
+List<Produit> findAllByEntrepriseId(@Param("entrepriseId") Long entrepriseId);
 
 
 
+// Récupérer tous les produits d'une entreprise avec leurs catégories et boutiques
+@Query("SELECT p FROM Produit p " +
+       "JOIN FETCH p.categorie c " +
+       "LEFT JOIN FETCH p.boutique b " +
+       "WHERE b.entreprise.id = :entrepriseId OR p.boutique IS NULL")
+List<Produit> findAllWithCategorieAndBoutiqueByEntrepriseId(@Param("entrepriseId") Long entrepriseId);
+
+// Compter les produits par catégorie pour une entreprise
+@Query("SELECT p.categorie.id, COUNT(p) FROM Produit p " +
+       "WHERE p.boutique.entreprise.id = :entrepriseId " +
+       "GROUP BY p.categorie.id")
+List<Object[]> countProduitsParCategorie(@Param("entrepriseId") Long entrepriseId);
+
+
+// Récupérer tous les produits d'une entreprise avec la boutique jointe
+@Query("SELECT p FROM Produit p LEFT JOIN FETCH p.boutique b " +
+       "WHERE b.entreprise.id = :entrepriseId OR b IS NULL")
+List<Produit> findAllWithBoutiqueByEntrepriseId(@Param("entrepriseId") Long entrepriseId);
+
+
+// Récupérer tous les produits actifs d'une boutique avec les relations nécessaires
+@Query("SELECT p FROM Produit p " +
+       "LEFT JOIN FETCH p.boutique b " +
+       "WHERE p.boutique.id = :boutiqueId AND (p.deleted IS NULL OR p.deleted = false)")
+List<Produit> findActiveByBoutiqueIdWithRelations(@Param("boutiqueId") Long boutiqueId);
 
 }
 
