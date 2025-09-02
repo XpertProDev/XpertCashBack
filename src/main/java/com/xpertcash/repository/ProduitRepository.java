@@ -2,6 +2,8 @@ package com.xpertcash.repository;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -85,6 +87,32 @@ List<Produit> findAllWithCategorieAndBoutiqueByEntrepriseId(@Param("entrepriseId
        "WHERE p.boutique.entreprise.id = :entrepriseId " +
        "GROUP BY p.categorie.id")
 List<Object[]> countProduitsParCategorie(@Param("entrepriseId") Long entrepriseId);
+
+// Compter les produits par catégorie pour une liste spécifique de catégories
+@Query("SELECT p.categorie.id, COUNT(p) FROM Produit p " +
+       "WHERE p.boutique.entreprise.id = :entrepriseId " +
+       "AND p.categorie.id IN :categorieIds " +
+       "GROUP BY p.categorie.id")
+List<Object[]> countProduitsParCategorieIds(@Param("entrepriseId") Long entrepriseId, @Param("categorieIds") List<Long> categorieIds);
+
+// Récupérer les produits par une liste de catégories pour une entreprise
+@Query("SELECT p FROM Produit p " +
+       "JOIN FETCH p.categorie c " +
+       "LEFT JOIN FETCH p.boutique b " +
+       "WHERE p.categorie.id IN :categorieIds " +
+       "AND (b.entreprise.id = :entrepriseId OR b IS NULL)")
+List<Produit> findByCategorieIdsAndEntrepriseId(@Param("categorieIds") List<Long> categorieIds, @Param("entrepriseId") Long entrepriseId);
+
+// Récupérer les produits d'une catégorie spécifique avec pagination
+@Query("SELECT p FROM Produit p " +
+       "JOIN FETCH p.categorie c " +
+       "LEFT JOIN FETCH p.boutique b " +
+       "WHERE p.categorie.id = :categorieId " +
+       "AND (b.entreprise.id = :entrepriseId OR b IS NULL)")
+Page<Produit> findByCategorieIdAndEntrepriseIdPaginated(
+    @Param("categorieId") Long categorieId, 
+    @Param("entrepriseId") Long entrepriseId, 
+    Pageable pageable);
 
 
 // Récupérer tous les produits d'une entreprise avec la boutique jointe

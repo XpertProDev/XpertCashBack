@@ -19,6 +19,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.xpertcash.DTOs.CategorieResponseDTO;
+import com.xpertcash.DTOs.CategoriePaginatedResponseDTO;
+import com.xpertcash.DTOs.ProduitPaginatedResponseDTO;
 import com.xpertcash.configuration.JwtUtil;
 import com.xpertcash.entity.Categorie;
 import com.xpertcash.entity.Entreprise;
@@ -98,9 +100,50 @@ public ResponseEntity<Object> createCategorie(@RequestBody Map<String, String> p
 }
 
 
-        // Récupérer toutes les catégories
-        @GetMapping("/allCategory")
+        // Récupérer toutes les catégories avec comptage des produits (sans pagination)
+        @GetMapping("/allCategories")
         public ResponseEntity<List<CategorieResponseDTO>> getAllCategories(HttpServletRequest request) {
+            try {
+                List<CategorieResponseDTO> categoriesAvecProduitCount = categorieService.getAllCategoriesWithProduitCount(request);
+
+                return ResponseEntity.ok(categoriesAvecProduitCount);
+                
+            } catch (RuntimeException e) {
+                System.err.println("Erreur lors de la récupération des catégories : " + e.getMessage());
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(null);
+                
+            } catch (Exception e) {
+                System.err.println("Erreur interne lors de la récupération des catégories : " + e.getMessage());
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
+            }
+        }
+
+        // Récupérer les produits d'une catégorie spécifique avec pagination
+        @GetMapping("/categories/{categorieId}/produits")
+        public ResponseEntity<ProduitPaginatedResponseDTO> getProduitsByCategorie(
+                @PathVariable Long categorieId,
+                @RequestParam(defaultValue = "0") int page,
+                @RequestParam(defaultValue = "20") int size,
+                HttpServletRequest request) {
+            try {
+                ProduitPaginatedResponseDTO produitsPaginated = 
+                    categorieService.getProduitsByCategoriePaginated(categorieId, page, size, request);
+
+                return ResponseEntity.ok(produitsPaginated);
+                
+            } catch (RuntimeException e) {
+                System.err.println("Erreur lors de la récupération des produits de la catégorie : " + e.getMessage());
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(null);
+                
+            } catch (Exception e) {
+                System.err.println("Erreur interne lors de la récupération des produits de la catégorie : " + e.getMessage());
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
+            }
+        }
+
+        // Méthode de compatibilité (maintenue pour l'ancienne API)
+        @GetMapping("/allCategory")
+        public ResponseEntity<List<CategorieResponseDTO>> getAllCategoriesOld(HttpServletRequest request) {
             try {
                 List<CategorieResponseDTO> categoriesAvecProduitCount = categorieService.getCategoriesWithProduitCount(request);
 
@@ -112,6 +155,28 @@ public ResponseEntity<Object> createCategorie(@RequestBody Map<String, String> p
                 
             } catch (Exception e) {
                 System.err.println("Erreur interne lors de la récupération des catégories : " + e.getMessage());
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
+            }
+        }
+
+        // Récupérer toutes les catégories avec pagination (méthode scalable pour SaaS)
+        @GetMapping("/allCategoryPaginated")
+        public ResponseEntity<CategoriePaginatedResponseDTO> getAllCategoriesPaginated(
+                @RequestParam(defaultValue = "0") int page,
+                @RequestParam(defaultValue = "5") int size,
+                HttpServletRequest request) {
+            try {
+                CategoriePaginatedResponseDTO categoriesPaginated = 
+                    categorieService.getCategoriesWithProduitCountPaginated(request, page, size);
+
+                return ResponseEntity.ok(categoriesPaginated);
+                
+            } catch (RuntimeException e) {
+                System.err.println("Erreur lors de la récupération des catégories paginées : " + e.getMessage());
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(null);
+                
+            } catch (Exception e) {
+                System.err.println("Erreur interne lors de la récupération des catégories paginées : " + e.getMessage());
                 return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
             }
         }

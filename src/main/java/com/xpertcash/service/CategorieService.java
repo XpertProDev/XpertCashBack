@@ -3,15 +3,23 @@ package com.xpertcash.service;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
 import com.xpertcash.DTOs.CategorieResponseDTO;
+import com.xpertcash.DTOs.CategoriePaginatedResponseDTO;
+import com.xpertcash.DTOs.ProduitPaginatedResponseDTO;
 import com.xpertcash.DTOs.Boutique.BoutiqueResponse;
 import com.xpertcash.DTOs.PRODUIT.ProduitDetailsResponseDTO;
 import com.xpertcash.configuration.CentralAccess;
@@ -67,8 +75,8 @@ public class CategorieService {
 }
 
 
-    // Récupérer toutes les catégories et ses produits
-    public List<CategorieResponseDTO> getCategoriesWithProduitCount(HttpServletRequest request) {
+    // Récupérer toutes les catégories avec comptage des produits (sans pagination)
+    public List<CategorieResponseDTO> getAllCategoriesWithProduitCount(HttpServletRequest request) {
         // --- JWT & utilisateur inchangé ---
         String token = request.getHeader("Authorization");
         if (token == null || !token.startsWith("Bearer ")) {
@@ -89,9 +97,8 @@ public class CategorieService {
             throw new RuntimeException("Accès refusé");
         }
 
-        // --- Récupérer les catégories et produits ---
-        List<Categorie> allCategories = categorieRepository.findAll();
-        List<Produit> allProduits = produitRepository.findAllWithCategorieAndBoutiqueByEntrepriseId(entreprise.getId());
+        // --- Récupérer toutes les catégories de l'entreprise ---
+        List<Categorie> allCategories = categorieRepository.findByEntrepriseId(entreprise.getId());
 
         // --- Récupérer le count groupé par catégorie ---
         Map<Long, Long> produitCountMap = produitRepository.countProduitsParCategorie(entreprise.getId())
@@ -101,12 +108,149 @@ public class CategorieService {
                         obj -> (Long) obj[1]
                 ));
 
-        // --- Grouper les produits par catégorie ---
-        Map<Long, List<Produit>> produitsParCategorie = allProduits.stream()
-                .collect(Collectors.groupingBy(p -> p.getCategorie().getId()));
-
+        // --- Construire la réponse sans les produits (seulement le comptage) ---
         List<CategorieResponseDTO> categorieResponseDTOs = new ArrayList<>();
         for (Categorie categorie : allCategories) {
+            // set le count directement depuis la DB
+            categorie.setProduitCount(produitCountMap.getOrDefault(categorie.getId(), 0L));
+
+            CategorieResponseDTO categorieDTO = new CategorieResponseDTO(categorie);
+            // Ne pas charger les produits ici - ils seront chargés séparément avec pagination
+            categorieDTO.setProduits(Collections.emptyList());
+            categorieResponseDTOs.add(categorieDTO);
+        }
+
+        return categorieResponseDTOs;
+    }
+
+    // Récupérer les produits d'une catégorie spécifique avec pagination
+    public ProduitPaginatedResponseDTO getProduitsByCategoriePaginated(
+            Long categorieId, 
+            int page, 
+            int size, 
+            HttpServletRequest request) {
+        
+        // --- JWT & utilisateur inchangé ---
+        String token = request.getHeader("Authorization");
+        if (token == null || !token.startsWith("Bearer ")) {
+            throw new RuntimeException("Token JWT manquant ou mal formaté");
+        }
+
+        Long userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
+        User user = usersRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
+        Entreprise entreprise = user.getEntreprise();
+        if (entreprise == null) throw new RuntimeException("Aucune entreprise associée");
+
+        boolean isAdminOrManager = CentralAccess.isAdminOrManagerOfEntreprise(user, entreprise.getId());
+        boolean hasPermissionGestionProduits = user.getRole().hasPermission(PermissionType.GERER_PRODUITS);
+        boolean isVendeur = user.getRole().hasPermission(PermissionType.VENDRE_PRODUITS);
+
+        if (!isAdminOrManager && !hasPermissionGestionProduits && !isVendeur) {
+            throw new RuntimeException("Accès refusé");
+        }
+
+        // --- Vérifier que la catégorie existe et appartient à l'entreprise ---
+        Categorie categorie = categorieRepository.findByIdAndEntrepriseId(categorieId, entreprise.getId())
+                .orElseThrow(() -> new RuntimeException("Catégorie introuvable ou non autorisée"));
+
+        // --- Validation des paramètres de pagination ---
+        if (page < 0) page = 0;
+        if (size <= 0) size = 20; // Taille par défaut
+        if (size > 100) size = 100; // Limite maximale pour éviter la surcharge
+
+        // --- Pagination des produits de la catégorie ---
+        Pageable pageable = PageRequest.of(page, size, Sort.by("nom").ascending());
+        Page<Produit> produitsPage = produitRepository.findByCategorieIdAndEntrepriseIdPaginated(
+                categorieId, entreprise.getId(), pageable);
+
+        // --- Filtrer et mapper les produits selon les permissions ---
+        List<ProduitDetailsResponseDTO> produitDTOs = produitsPage.getContent().stream()
+                .filter(produit -> {
+                    if (Boolean.TRUE.equals(produit.getDeleted())) return false;
+                    if (isVendeur && produit.getBoutique() != null) {
+                        List<UserBoutique> userBoutiques = user.getUserBoutiques();
+                        if (userBoutiques != null && !userBoutiques.isEmpty()) {
+                            return produit.getBoutique().getId().equals(userBoutiques.get(0).getBoutique().getId());
+                        }
+                    }
+                    return !TypeProduit.SERVICE.equals(produit.getTypeProduit());
+                })
+                .map(this::toProduitDTO)
+                .collect(Collectors.toList());
+
+        // --- Créer la page de DTOs ---
+        Page<ProduitDetailsResponseDTO> dtoPage = new PageImpl<>(
+                produitDTOs, 
+                pageable, 
+                produitsPage.getTotalElements()
+        );
+
+        return ProduitPaginatedResponseDTO.fromPage(dtoPage);
+    }
+
+    // Méthode de compatibilité (maintenue pour l'ancienne API)
+    public List<CategorieResponseDTO> getCategoriesWithProduitCount(HttpServletRequest request) {
+        return getAllCategoriesWithProduitCount(request);
+    }
+
+    // Récupérer toutes les catégories et ses produits avec pagination (méthode scalable pour SaaS)
+    public CategoriePaginatedResponseDTO getCategoriesWithProduitCountPaginated(HttpServletRequest request, int page, int size) {
+        // --- JWT & utilisateur inchangé ---
+        String token = request.getHeader("Authorization");
+        if (token == null || !token.startsWith("Bearer ")) {
+            throw new RuntimeException("Token JWT manquant ou mal formaté");
+        }
+
+        Long userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
+        User user = usersRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
+        Entreprise entreprise = user.getEntreprise();
+        if (entreprise == null) throw new RuntimeException("Aucune entreprise associée");
+
+        boolean isAdminOrManager = CentralAccess.isAdminOrManagerOfEntreprise(user, entreprise.getId());
+        boolean hasPermissionGestionProduits = user.getRole().hasPermission(PermissionType.GERER_PRODUITS);
+        boolean isVendeur = user.getRole().hasPermission(PermissionType.VENDRE_PRODUITS);
+
+        if (!isAdminOrManager && !hasPermissionGestionProduits && !isVendeur) {
+            throw new RuntimeException("Accès refusé");
+        }
+
+        // --- Validation des paramètres de pagination ---
+        if (page < 0) page = 0;
+        if (size <= 0) size = 20; // Taille par défaut
+        if (size > 100) size = 100; // Limite maximale pour éviter la surcharge
+
+        // --- Récupérer les catégories avec pagination ---
+        Pageable pageable = PageRequest.of(page, size, Sort.by("nom").ascending());
+        Page<Categorie> categoriesPage = categorieRepository.findByEntrepriseId(entreprise.getId(), pageable);
+
+        // --- Récupérer le count groupé par catégorie pour les catégories de la page ---
+        List<Long> categorieIds = categoriesPage.getContent().stream()
+                .map(Categorie::getId)
+                .collect(Collectors.toList());
+
+        Map<Long, Long> produitCountMap = new HashMap<>();
+        if (!categorieIds.isEmpty()) {
+            produitCountMap = produitRepository.countProduitsParCategorieIds(entreprise.getId(), categorieIds)
+                    .stream()
+                    .collect(Collectors.toMap(
+                            obj -> (Long) obj[0],
+                            obj -> (Long) obj[1]
+                    ));
+        }
+
+        // --- Récupérer les produits pour les catégories de la page seulement ---
+        Map<Long, List<Produit>> produitsParCategorie = new HashMap<>();
+        if (!categorieIds.isEmpty()) {
+            List<Produit> produits = produitRepository.findByCategorieIdsAndEntrepriseId(categorieIds, entreprise.getId());
+            produitsParCategorie = produits.stream()
+                    .collect(Collectors.groupingBy(p -> p.getCategorie().getId()));
+        }
+
+        // --- Construire la réponse paginée ---
+        List<CategorieResponseDTO> categorieResponseDTOs = new ArrayList<>();
+        for (Categorie categorie : categoriesPage.getContent()) {
             // set le count directement depuis la DB
             categorie.setProduitCount(produitCountMap.getOrDefault(categorie.getId(), 0L));
 
@@ -130,7 +274,14 @@ public class CategorieService {
             categorieResponseDTOs.add(categorieDTO);
         }
 
-        return categorieResponseDTOs;
+        // --- Créer la page de DTOs ---
+        Page<CategorieResponseDTO> dtoPage = new PageImpl<>(
+                categorieResponseDTOs, 
+                pageable, 
+                categoriesPage.getTotalElements()
+        );
+
+        return CategoriePaginatedResponseDTO.fromPage(dtoPage);
     }
 
     // Méthode privée pour mapping DTO
