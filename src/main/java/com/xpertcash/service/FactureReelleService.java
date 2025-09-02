@@ -4,10 +4,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -15,6 +12,10 @@ import java.util.Comparator;
 
 import org.hibernate.Hibernate;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
@@ -22,6 +23,7 @@ import com.xpertcash.DTOs.EntrepriseClientDTO;
 import com.xpertcash.DTOs.FactureReelleDTO;
 import com.xpertcash.DTOs.LigneFactureDTO;
 import com.xpertcash.DTOs.PaiementDTO;
+import com.xpertcash.DTOs.PaginatedResponseDTO;
 import com.xpertcash.DTOs.CLIENT.ClientDTO;
 import com.xpertcash.configuration.CentralAccess;
 import com.xpertcash.configuration.JwtUtil;
@@ -34,7 +36,6 @@ import com.xpertcash.entity.PermissionType;
 import com.xpertcash.entity.User;
 import com.xpertcash.entity.Enum.RoleType;
 import com.xpertcash.entity.Enum.StatutFactureProForma;
-import com.xpertcash.entity.Enum.StatutFactureReelle;
 import com.xpertcash.entity.Enum.StatutPaiementFacture;
 import com.xpertcash.repository.FactureProformaRepository;
 import com.xpertcash.repository.FactureReelleRepository;
@@ -178,8 +179,20 @@ public void supprimerFactureReelleLiee(FactureProForma proforma) {
 }
 
 
-   // Méthode pour lister les factures réelles
+   // Méthode pour lister les factures réelles (ancienne version pour compatibilité)
   public List<FactureReelleDTO> listerMesFacturesReelles(HttpServletRequest request) {
+    // Utiliser la version paginée avec des paramètres par défaut
+    PaginatedResponseDTO<FactureReelleDTO> result = listerMesFacturesReellesPaginated(0, 50, request);
+    return result.getContent();
+  }
+
+  // Méthode scalable avec pagination pour lister les factures réelles
+  public PaginatedResponseDTO<FactureReelleDTO> listerMesFacturesReellesPaginated(int page, int size, HttpServletRequest request) {
+    // --- 1. Validation des paramètres de pagination ---
+    if (page < 0) page = 0;
+    if (size <= 0) size = 20; // Taille par défaut
+    if (size > 100) size = 100; // Limite maximale pour éviter la surcharge
+
     // 🔐 Récupération et validation du token
     String token = request.getHeader("Authorization");
     if (token == null || !token.startsWith("Bearer ")) {
@@ -215,26 +228,29 @@ public void supprimerFactureReelleLiee(FactureProForma proforma) {
         throw new SecurityException("Le module de gestion des factures n'est pas activé pour cette entreprise", e);
     }
 
-    // 🔍 Récupération des factures : Seules les personnes autorisées (Admin, Manager, ou ayant Permission Gestion Facturation)
-    List<FactureReelle> factures;
-    if (isAdminOrManager || hasPermission) {
-        // L'utilisateur peut voir toutes les factures de l’entreprise
-        factures = factureReelleRepository.findByEntrepriseOrderByDateCreationDesc(entreprise);
-    } else {
-        // Si l'utilisateur n'a pas les permissions, on lève une exception
+    // 🔍 Vérification des autorisations
+    if (!(isAdminOrManager || hasPermission)) {
         throw new SecurityException("Accès interdit : Vous n'avez pas les permissions nécessaires pour voir ces factures.");
     }
 
-    // 🔄 Transformation des factures en DTO
-    return factures.stream()
-            .map(facture -> {
-                BigDecimal totalFacture = BigDecimal.valueOf(facture.getTotalFacture());
-                BigDecimal totalPaye = paiementRepository.sumMontantsByFactureReelle(facture.getId());
-                if (totalPaye == null) totalPaye = BigDecimal.ZERO;
-                BigDecimal montantRestant = totalFacture.subtract(totalPaye);
-                return new FactureReelleDTO(facture, montantRestant);
-            })
-            .collect(Collectors.toList());
+    // --- 2. Création du Pageable avec tri optimisé ---
+    Pageable pageable = PageRequest.of(page, size, 
+        Sort.by("dateCreation").descending().and(Sort.by("id").descending()));
+
+    // --- 3. Récupération paginée des factures ---
+    Page<FactureReelle> facturesPage = factureReelleRepository.findByEntrepriseOrderByDateCreationDescPaginated(entreprise, pageable);
+
+    // --- 4. Transformation des factures en DTO ---
+    Page<FactureReelleDTO> facturesDTO = facturesPage.map(facture -> {
+        BigDecimal totalFacture = BigDecimal.valueOf(facture.getTotalFacture());
+        BigDecimal totalPaye = paiementRepository.sumMontantsByFactureReelle(facture.getId());
+        if (totalPaye == null) totalPaye = BigDecimal.ZERO;
+        BigDecimal montantRestant = totalFacture.subtract(totalPaye);
+        return new FactureReelleDTO(facture, montantRestant);
+    });
+
+    // --- 5. Retour de la réponse paginée ---
+    return PaginatedResponseDTO.fromPage(facturesDTO);
 }
  
     // Trier les facture par mois/année

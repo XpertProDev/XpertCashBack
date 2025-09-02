@@ -766,77 +766,77 @@ public class FactureProformaService {
 
     //Methode pour recuperer les factures pro forma dune entreprise
    @Transactional
-public List<Map<String, Object>> getFacturesParEntrepriseParUtilisateur(Long userIdRequete, HttpServletRequest request) {
-    // 🔐 JWT & utilisateur courant
-    String token = request.getHeader("Authorization");
-    if (token == null || !token.startsWith("Bearer ")) {
-        throw new RuntimeException("Token JWT manquant ou mal formaté");
-    }
-
-    Long userIdCourant = jwtUtil.extractUserId(token.replace("Bearer ", ""));
-    User currentUser = usersRepository.findById(userIdCourant)
-            .orElseThrow(() -> new RuntimeException("Utilisateur courant introuvable"));
-    User targetUser = usersRepository.findById(userIdRequete)
-            .orElseThrow(() -> new RuntimeException("Utilisateur cible non trouvé"));
-
-    Entreprise entrepriseCourante = currentUser.getEntreprise();
-    Entreprise entrepriseCible = targetUser.getEntreprise();
-
-    if (entrepriseCourante == null || entrepriseCible == null
-        || !entrepriseCourante.getId().equals(entrepriseCible.getId())) {
-        throw new RuntimeException("Opération interdite : utilisateurs de différentes entreprises.");
-    }
-
-    boolean isAdmin = currentUser.getRole().getName() == RoleType.ADMIN;
-    boolean isManager = currentUser.getRole().getName() == RoleType.MANAGER;
-    boolean hasPermission = currentUser.getRole().hasPermission(PermissionType.GESTION_FACTURATION);
-    boolean isApprover = factureProformaRepository.existsByApprobateursAndEntrepriseId(currentUser, entrepriseCourante.getId());
-
-    // 🔹 Récupérer toutes les factures avec JOIN FETCH pour éviter LazyInitializationException
-    List<FactureProForma> factures = factureProformaRepository.findFacturesAvecRelationsParEntreprise(entrepriseCourante.getId());
-
-    // 🔹 Filtrage d'accès métier (logique inchangée)
-    if (!(isAdmin || isManager)) {
-        if (hasPermission || isApprover) {
-            factures = factures.stream()
-                    .filter(f -> f.getUtilisateurCreateur().getId().equals(userIdCourant)
-                            || (f.getApprobateurs() != null && f.getApprobateurs().contains(currentUser)))
-                    .collect(Collectors.toList());
-        } else {
-            if (!Objects.equals(userIdCourant, userIdRequete)) {
-                throw new RuntimeException("Vous ne pouvez voir que vos propres factures.");
-            }
-            factures = factures.stream()
-                    .filter(f -> f.getUtilisateurCreateur().getId().equals(userIdCourant))
-                    .collect(Collectors.toList());
+    public List<Map<String, Object>> getFacturesParEntrepriseParUtilisateur(Long userIdRequete, HttpServletRequest request) {
+        // 🔐 JWT & utilisateur courant
+        String token = request.getHeader("Authorization");
+        if (token == null || !token.startsWith("Bearer ")) {
+            throw new RuntimeException("Token JWT manquant ou mal formaté");
         }
-    }
 
-    // 🔹 Transformer en Map et trier
-    return factures.stream()
-            .sorted(Comparator.comparing(FactureProForma::getDateCreation).reversed()
-                    .thenComparing(FactureProForma::getId).reversed())
-            .map(facture -> {
-                Map<String, Object> map = new HashMap<>();
-                map.put("id", facture.getId());
-                map.put("numeroFacture", facture.getNumeroFacture());
-                map.put("dateCreation", facture.getDateCreation());
-                map.put("description", facture.getDescription());
-                map.put("totalHT", facture.getTotalHT());
-                map.put("remise", facture.getRemise());
-                map.put("tva", facture.isTva());
-                map.put("totalFacture", facture.getTotalFacture());
-                map.put("statut", facture.getStatut());
-                map.put("ligneFactureProforma", facture.getLignesFacture() != null ? facture.getLignesFacture() : Collections.emptyList());
-                map.put("client", facture.getClient() != null ? facture.getClient().getNomComplet() : null);
-                map.put("entrepriseClient", facture.getEntrepriseClient() != null ? facture.getEntrepriseClient().getNom() : null);
-                map.put("entreprise", facture.getEntreprise() != null ? facture.getEntreprise().getNomEntreprise() : null);
-                map.put("dateRelance", facture.getDateRelance());
-                map.put("notifie", facture.isNotifie());
-                return map;
-            })
-            .collect(Collectors.toList());
-}
+        Long userIdCourant = jwtUtil.extractUserId(token.replace("Bearer ", ""));
+        User currentUser = usersRepository.findById(userIdCourant)
+                .orElseThrow(() -> new RuntimeException("Utilisateur courant introuvable"));
+        User targetUser = usersRepository.findById(userIdRequete)
+                .orElseThrow(() -> new RuntimeException("Utilisateur cible non trouvé"));
+
+        Entreprise entrepriseCourante = currentUser.getEntreprise();
+        Entreprise entrepriseCible = targetUser.getEntreprise();
+
+        if (entrepriseCourante == null || entrepriseCible == null
+            || !entrepriseCourante.getId().equals(entrepriseCible.getId())) {
+            throw new RuntimeException("Opération interdite : utilisateurs de différentes entreprises.");
+        }
+
+        boolean isAdmin = currentUser.getRole().getName() == RoleType.ADMIN;
+        boolean isManager = currentUser.getRole().getName() == RoleType.MANAGER;
+        boolean hasPermission = currentUser.getRole().hasPermission(PermissionType.GESTION_FACTURATION);
+        boolean isApprover = factureProformaRepository.existsByApprobateursAndEntrepriseId(currentUser, entrepriseCourante.getId());
+
+        // 🔹 Récupérer toutes les factures avec JOIN FETCH pour éviter LazyInitializationException
+        List<FactureProForma> factures = factureProformaRepository.findFacturesAvecRelationsParEntreprise(entrepriseCourante.getId());
+
+        // 🔹 Filtrage d'accès métier (logique inchangée)
+        if (!(isAdmin || isManager)) {
+            if (hasPermission || isApprover) {
+                factures = factures.stream()
+                        .filter(f -> f.getUtilisateurCreateur().getId().equals(userIdCourant)
+                                || (f.getApprobateurs() != null && f.getApprobateurs().contains(currentUser)))
+                        .collect(Collectors.toList());
+            } else {
+                if (!Objects.equals(userIdCourant, userIdRequete)) {
+                    throw new RuntimeException("Vous ne pouvez voir que vos propres factures.");
+                }
+                factures = factures.stream()
+                        .filter(f -> f.getUtilisateurCreateur().getId().equals(userIdCourant))
+                        .collect(Collectors.toList());
+            }
+        }
+
+        // 🔹 Transformer en Map et trier
+        return factures.stream()
+                .sorted(Comparator.comparing(FactureProForma::getDateCreation).reversed()
+                        .thenComparing(FactureProForma::getId).reversed())
+                .map(facture -> {
+                    Map<String, Object> map = new HashMap<>();
+                    map.put("id", facture.getId());
+                    map.put("numeroFacture", facture.getNumeroFacture());
+                    map.put("dateCreation", facture.getDateCreation());
+                    map.put("description", facture.getDescription());
+                    map.put("totalHT", facture.getTotalHT());
+                    map.put("remise", facture.getRemise());
+                    map.put("tva", facture.isTva());
+                    map.put("totalFacture", facture.getTotalFacture());
+                    map.put("statut", facture.getStatut());
+                    map.put("ligneFactureProforma", facture.getLignesFacture() != null ? facture.getLignesFacture() : Collections.emptyList());
+                    map.put("client", facture.getClient() != null ? facture.getClient().getNomComplet() : null);
+                    map.put("entrepriseClient", facture.getEntrepriseClient() != null ? facture.getEntrepriseClient().getNom() : null);
+                    map.put("entreprise", facture.getEntreprise() != null ? facture.getEntreprise().getNomEntreprise() : null);
+                    map.put("dateRelance", facture.getDateRelance());
+                    map.put("notifie", facture.isNotifie());
+                    return map;
+                })
+                .collect(Collectors.toList());
+    }
 
 
 

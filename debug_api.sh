@@ -103,3 +103,5 @@ rm -f /tmp/response_*.json
 
 echo ""
 echo "✅ Débogage terminé !"
+
+

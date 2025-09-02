@@ -73,3 +73,5 @@ echo "   - Le contenu est limité à la taille de page demandée"
 echo "   - Les statistiques de stock sont correctes (en stock, hors stock)"
 echo "   - La gestion des erreurs fonctionne"
 echo "   - Les droits d'accès sont respectés"
+
+

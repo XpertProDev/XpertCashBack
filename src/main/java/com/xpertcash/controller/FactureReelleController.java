@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import com.xpertcash.DTOs.FactureReelleDTO;
+import com.xpertcash.DTOs.PaginatedResponseDTO;
 import com.xpertcash.DTOs.PaiementDTO;
 import com.xpertcash.configuration.JwtUtil;
 import com.xpertcash.entity.FactureProForma;
@@ -33,20 +34,34 @@ public class FactureReelleController {
 
     @Autowired
     private FactureReelleService factureReelleService;
-
-    @Autowired
-    private UsersRepository usersRepository;
-
       @Autowired
     private JwtUtil jwtUtil;
 
 
  
-    // Endpoint pour lister tout les factures reelles
+    // Endpoint pour lister toutes les factures réelles (ancienne version pour compatibilité)
     @GetMapping("/mes-factures-reelles")
     public ResponseEntity<List<FactureReelleDTO>> getMesFacturesReelles(HttpServletRequest request) {
         List<FactureReelleDTO> factures = factureReelleService.listerMesFacturesReelles(request);
         return ResponseEntity.ok(factures);
+    }
+
+    // Endpoint scalable avec pagination pour lister les factures réelles
+    @GetMapping("/mes-factures-reelles/paginated")
+    public ResponseEntity<PaginatedResponseDTO<FactureReelleDTO>> getMesFacturesReellesPaginated(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            HttpServletRequest request) {
+        try {
+            PaginatedResponseDTO<FactureReelleDTO> factures = factureReelleService.listerMesFacturesReellesPaginated(page, size, request);
+            return ResponseEntity.ok(factures);
+        } catch (SecurityException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(new PaginatedResponseDTO<>());
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(new PaginatedResponseDTO<>());
+        }
     }
 
     // Endpoint pour trier les factures par mois/année
