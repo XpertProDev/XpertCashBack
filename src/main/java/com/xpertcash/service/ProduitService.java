@@ -16,12 +16,19 @@ import org.apache.poi.openxml4j.exceptions.NotOfficeXmlFileException;
 import org.apache.poi.poifs.filesystem.OfficeXmlFileException;
 import org.apache.poi.ss.usermodel.*;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.xpertcash.DTOs.FactureDTO;
 import com.xpertcash.DTOs.ProduitDTO;
+import com.xpertcash.DTOs.ProduitEntreprisePaginatedResponseDTO;
+import com.xpertcash.DTOs.ProduitStockPaginatedResponseDTO;
 import com.xpertcash.DTOs.StockHistoryDTO;
 import com.xpertcash.DTOs.PRODUIT.ProduitRequest;
 import com.xpertcash.configuration.CentralAccess;
@@ -1170,59 +1177,98 @@ public class ProduitService {
 
     // Lister Produit par boutique (excluant les produits dans la corbeille)
     @Transactional
-public List<ProduitDTO> getProduitsParStock(Long boutiqueId, HttpServletRequest request) {
-    // --- 1. Extraction utilisateur via JWT ---
-    String token = request.getHeader("Authorization");
-    if (token == null || !token.startsWith("Bearer ")) {
-        throw new RuntimeException("Token JWT manquant ou mal formaté");
+    public List<ProduitDTO> getProduitsParStock(Long boutiqueId, HttpServletRequest request) {
+        return getProduitsParStockPaginated(boutiqueId, 0, Integer.MAX_VALUE, request).getContent();
     }
 
-    Long userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
-    User user = usersRepository.findById(userId)
-            .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
-
-    // --- 2. Vérification de la boutique ---
-    Boutique boutique = boutiqueRepository.findById(boutiqueId)
-            .orElseThrow(() -> new RuntimeException("Boutique non trouvée"));
-    if (!boutique.isActif()) {
-        throw new RuntimeException("Cette boutique est désactivée, ses produits ne sont pas accessibles !");
-    }
-
-    // --- 3. Vérification d'accès à l'entreprise ---
-    Long entrepriseId = boutique.getEntreprise().getId();
-    if (!entrepriseId.equals(user.getEntreprise().getId())) {
-        throw new RuntimeException("Accès interdit : cette boutique ne vous appartient pas");
-    }
-
-    // --- 4. Vérification des droits ---
-    RoleType role = user.getRole().getName();
-    boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
-    boolean hasPermission = user.getRole().hasPermission(PermissionType.GERER_PRODUITS)
-                        || user.getRole().hasPermission(PermissionType.VENDRE_PRODUITS)
-                        || user.getRole().hasPermission(PermissionType.APPROVISIONNER_STOCK)
-                        || user.getRole().hasPermission(PermissionType.GERER_BOUTIQUE);
-
-    if (!isAdminOrManager && !hasPermission) {
-        throw new RuntimeException("Accès interdit : vous n'avez pas les droits pour consulter les produits.");
-    }
-
-    // --- 5. Vérification rôle vendeur ---
-    boolean isVendeur = role == RoleType.VENDEUR;
-    if (isVendeur) {
-        Optional<UserBoutique> userBoutique = userBoutiqueRepository.findByUserIdAndBoutiqueId(userId, boutiqueId);
-        if (!userBoutique.isPresent()) {
-            throw new RuntimeException("Vous n'êtes pas affecté à cette boutique, vous ne pouvez pas voir ses produits.");
+    // Méthode scalable avec pagination pour récupérer les produits d'une boutique
+    @Transactional
+    public ProduitStockPaginatedResponseDTO getProduitsParStockPaginated(
+            Long boutiqueId, 
+            int page, 
+            int size, 
+            HttpServletRequest request) {
+        
+        // --- 1. Validation des paramètres de pagination ---
+        if (page < 0) page = 0;
+        if (size <= 0) size = 20; // Taille par défaut
+        if (size > 100) size = 100; // Limite maximale pour éviter la surcharge
+        
+        // --- 2. Extraction utilisateur via JWT ---
+        String token = request.getHeader("Authorization");
+        if (token == null || !token.startsWith("Bearer ")) {
+            throw new RuntimeException("Token JWT manquant ou mal formaté");
         }
+
+        Long userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
+        User user = usersRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+
+        // --- 3. Vérification de la boutique ---
+        Boutique boutique = boutiqueRepository.findById(boutiqueId)
+                .orElseThrow(() -> new RuntimeException("Boutique non trouvée"));
+        if (!boutique.isActif()) {
+            throw new RuntimeException("Cette boutique est désactivée, ses produits ne sont pas accessibles !");
+        }
+
+        // --- 4. Vérification d'accès à l'entreprise ---
+        Long entrepriseId = boutique.getEntreprise().getId();
+        if (!entrepriseId.equals(user.getEntreprise().getId())) {
+            throw new RuntimeException("Accès interdit : cette boutique ne vous appartient pas");
+        }
+
+        // --- 5. Vérification des droits ---
+        RoleType role = user.getRole().getName();
+        boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
+        boolean hasPermission = user.getRole().hasPermission(PermissionType.GERER_PRODUITS)
+                            || user.getRole().hasPermission(PermissionType.VENDRE_PRODUITS)
+                            || user.getRole().hasPermission(PermissionType.APPROVISIONNER_STOCK)
+                            || user.getRole().hasPermission(PermissionType.GERER_BOUTIQUE);
+
+        if (!isAdminOrManager && !hasPermission) {
+            throw new RuntimeException("Accès interdit : vous n'avez pas les droits pour consulter les produits.");
+        }
+
+        // --- 6. Vérification rôle vendeur ---
+        boolean isVendeur = role == RoleType.VENDEUR;
+        if (isVendeur) {
+            Optional<UserBoutique> userBoutique = userBoutiqueRepository.findByUserIdAndBoutiqueId(userId, boutiqueId);
+            if (!userBoutique.isPresent()) {
+                throw new RuntimeException("Vous n'êtes pas affecté à cette boutique, vous ne pouvez pas voir ses produits.");
+            }
+        }
+
+        // --- 7. Créer le Pageable avec tri optimisé ---
+        Pageable pageable = PageRequest.of(page, size, Sort.by("nom").ascending());
+
+        // --- 8. Récupérer les produits avec pagination ---
+        Page<Produit> produitsPage = produitRepository.findProduitsByBoutiqueIdPaginated(boutiqueId, pageable);
+
+        // --- 9. Récupérer les statistiques globales (une seule fois) ---
+        long totalProduitsActifs = produitRepository.countProduitsActifsByBoutiqueId(boutiqueId);
+        long totalProduitsEnStock = produitRepository.countProduitsEnStockByBoutiqueId(boutiqueId);
+        long totalProduitsHorsStock = produitRepository.countProduitsHorsStockByBoutiqueId(boutiqueId);
+
+        // --- 10. Convertir les produits de la page courante vers DTOs ---
+        List<ProduitDTO> produitsDTOs = produitsPage.getContent().stream()
+                .map(produit -> {
+                    ProduitDTO dto = convertToProduitDTO(produit);
+                    // Pour l'API stock, on n'a pas besoin du champ boutiques
+                    dto.setBoutiques(null);
+                    return dto;
+                })
+                .collect(Collectors.toList());
+
+        // --- 11. Créer la page de DTOs ---
+        Page<ProduitDTO> dtoPage = new PageImpl<>(
+                produitsDTOs,
+                pageable,
+                totalProduitsActifs
+        );
+
+        // --- 12. Retourner la réponse paginée ---
+        return ProduitStockPaginatedResponseDTO.fromPage(dtoPage, totalProduitsActifs, totalProduitsEnStock, totalProduitsHorsStock);
     }
-
-    // --- 6. Récupération des produits actifs (1 seule requête optimisée) ---
-    List<Produit> produitsActifs = produitRepository.findActiveByBoutiqueIdWithRelations(boutiqueId);
-
-    // --- 7. Conversion vers DTO ---
-    return produitsActifs.stream()
-            .map(this::convertToProduitDTO)
-            .collect(Collectors.toList());
-}
 
 
    
@@ -1434,65 +1480,96 @@ public List<ProduitDTO> getProduitsParStock(Long boutiqueId, HttpServletRequest 
 
     // Méthode pour récupérer tous les produits de toutes les boutiques d'une entreprise
     public List<ProduitDTO> getProduitsParEntreprise(Long entrepriseId, HttpServletRequest request) {
-    // --- 1. Extraire l'utilisateur via JWT ---
-    String token = request.getHeader("Authorization");
-    if (token == null || !token.startsWith("Bearer ")) {
-        throw new RuntimeException("Token JWT manquant ou mal formaté");
+        return getProduitsParEntreprisePaginated(entrepriseId, 0, Integer.MAX_VALUE, request).getContent();
     }
 
-    Long userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
-    User user = usersRepository.findById(userId)
-            .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
-    Entreprise entreprise = user.getEntreprise();
-    if (entreprise == null) throw new RuntimeException("Aucune entreprise associée à cet utilisateur");
-
-    // --- 2. Vérification des droits ---
-    boolean isAdminOrManager = CentralAccess.isAdminOrManagerOfEntreprise(user, entreprise.getId());
-    boolean hasPermissionGestionProduits = user.getRole().hasPermission(PermissionType.GERER_PRODUITS);
-    boolean hasPermissionGestionFacturation = user.getRole().hasPermission(PermissionType.GESTION_FACTURATION);
-
-    if (!isAdminOrManager && !hasPermissionGestionProduits && !hasPermissionGestionFacturation) {
-        throw new RuntimeException("Accès refusé : vous n'avez pas les droits nécessaires pour consulter les produits.");
-    }
-
-    // --- 3. Vérification de l'entreprise ---
-    if (!entreprise.getId().equals(entrepriseId)) {
-        throw new RuntimeException("Accès refusé : vous ne pouvez pas accéder aux produits d'une autre entreprise.");
-    }
-
-    // --- 4. Récupérer tous les produits de l'entreprise avec JOIN FETCH pour les boutiques ---
-    List<Produit> produits = produitRepository.findAllWithBoutiqueByEntrepriseId(entrepriseId);
-
-    // --- 5. Regrouper par codeGenerique ---
-    Map<String, ProduitDTO> produitsUniques = new HashMap<>();
-
-    for (Produit produit : produits) {
-        if (Boolean.TRUE.equals(produit.getDeleted())) continue;
-
-        Boutique boutique = produit.getBoutique();
-        if (boutique != null && boutique.isActif()) {
-            String codeGenerique = produit.getCodeGenerique();
-
-            ProduitDTO produitDTO = produitsUniques.computeIfAbsent(codeGenerique, k -> {
-                ProduitDTO dto = convertToProduitDTO(produit);
-                dto.setBoutiques(new ArrayList<>());
-                dto.setQuantite(0);
-                return dto;
-            });
-
-            Map<String, Object> boutiqueInfo = new HashMap<>();
-            boutiqueInfo.put("nom", boutique.getNomBoutique());
-            boutiqueInfo.put("id", boutique.getId());
-            boutiqueInfo.put("typeBoutique", boutique.getTypeBoutique());
-            boutiqueInfo.put("quantite", produit.getQuantite());
-
-            produitDTO.getBoutiques().add(boutiqueInfo);
-            produitDTO.setQuantite(produitDTO.getQuantite() + produit.getQuantite());
+    // Méthode scalable avec pagination pour récupérer les produits d'une entreprise
+    public ProduitEntreprisePaginatedResponseDTO getProduitsParEntreprisePaginated(
+            Long entrepriseId, 
+            int page, 
+            int size, 
+            HttpServletRequest request) {
+        
+        // --- 1. Validation des paramètres de pagination ---
+        if (page < 0) page = 0;
+        if (size <= 0) size = 20; // Taille par défaut
+        if (size > 100) size = 100; // Limite maximale pour éviter la surcharge
+        
+        // --- 2. Extraire l'utilisateur via JWT ---
+        String token = request.getHeader("Authorization");
+        if (token == null || !token.startsWith("Bearer ")) {
+            throw new RuntimeException("Token JWT manquant ou mal formaté");
         }
-    }
 
-    return new ArrayList<>(produitsUniques.values());
-}
+        Long userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
+        User user = usersRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
+        Entreprise entreprise = user.getEntreprise();
+        if (entreprise == null) throw new RuntimeException("Aucune entreprise associée à cet utilisateur");
+
+        // --- 3. Vérification des droits ---
+        boolean isAdminOrManager = CentralAccess.isAdminOrManagerOfEntreprise(user, entreprise.getId());
+        boolean hasPermissionGestionProduits = user.getRole().hasPermission(PermissionType.GERER_PRODUITS);
+        boolean hasPermissionGestionFacturation = user.getRole().hasPermission(PermissionType.GESTION_FACTURATION);
+
+        if (!isAdminOrManager && !hasPermissionGestionProduits && !hasPermissionGestionFacturation) {
+            throw new RuntimeException("Accès refusé : vous n'avez pas les droits nécessaires pour consulter les produits.");
+        }
+
+        // --- 4. Vérification de l'entreprise ---
+        if (!entreprise.getId().equals(entrepriseId)) {
+            throw new RuntimeException("Accès refusé : vous ne pouvez pas accéder aux produits d'une autre entreprise.");
+        }
+
+        // --- 5. Créer le Pageable avec tri optimisé ---
+        Pageable pageable = PageRequest.of(page, size, Sort.by("codeGenerique").ascending().and(Sort.by("nom").ascending()));
+
+        // --- 6. Récupérer les produits avec pagination ---
+        Page<Produit> produitsPage = produitRepository.findProduitsByEntrepriseIdPaginated(entrepriseId, pageable);
+
+        // --- 7. Récupérer les statistiques globales (une seule fois) ---
+        long totalProduitsUniques = produitRepository.countProduitsUniquesByEntrepriseId(entrepriseId);
+        long totalBoutiques = produitRepository.countBoutiquesActivesByEntrepriseId(entrepriseId);
+
+        // --- 8. Traiter les produits de la page courante ---
+        Map<String, ProduitDTO> produitsUniques = new HashMap<>();
+
+        for (Produit produit : produitsPage.getContent()) {
+            if (Boolean.TRUE.equals(produit.getDeleted())) continue;
+
+            Boutique boutique = produit.getBoutique();
+            if (boutique != null && boutique.isActif()) {
+                String codeGenerique = produit.getCodeGenerique();
+
+                ProduitDTO produitDTO = produitsUniques.computeIfAbsent(codeGenerique, k -> {
+                    ProduitDTO dto = convertToProduitDTO(produit);
+                    dto.setBoutiques(new ArrayList<>());
+                    dto.setQuantite(0);
+                    return dto;
+                });
+
+                Map<String, Object> boutiqueInfo = new HashMap<>();
+                boutiqueInfo.put("nom", boutique.getNomBoutique());
+                boutiqueInfo.put("id", boutique.getId());
+                boutiqueInfo.put("typeBoutique", boutique.getTypeBoutique());
+                boutiqueInfo.put("quantite", produit.getQuantite());
+
+                produitDTO.getBoutiques().add(boutiqueInfo);
+                produitDTO.setQuantite(produitDTO.getQuantite() + produit.getQuantite());
+            }
+        }
+
+        // --- 9. Créer la page de DTOs ---
+        List<ProduitDTO> produitsDTOs = new ArrayList<>(produitsUniques.values());
+        Page<ProduitDTO> dtoPage = new PageImpl<>(
+                produitsDTOs,
+                pageable,
+                totalProduitsUniques
+        );
+
+        // --- 10. Retourner la réponse paginée ---
+        return ProduitEntreprisePaginatedResponseDTO.fromPage(dtoPage, totalProduitsUniques, totalBoutiques);
+    }
 
   
 

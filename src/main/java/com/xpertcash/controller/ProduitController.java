@@ -23,6 +23,8 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.xpertcash.DTOs.AjouterStockRequest;
 import com.xpertcash.DTOs.FactureDTO;
 import com.xpertcash.DTOs.ProduitDTO;
+import com.xpertcash.DTOs.ProduitEntreprisePaginatedResponseDTO;
+import com.xpertcash.DTOs.ProduitStockPaginatedResponseDTO;
 import com.xpertcash.DTOs.RetirerStockRequest;
 import com.xpertcash.DTOs.StockHistoryDTO;
 import com.xpertcash.DTOs.PRODUIT.ProduitRequest;
@@ -411,7 +413,7 @@ public ResponseEntity<?> updateProduit(
 
       
 
-        //Endpoint GetAll produits de toutes les boutiques d'une entreprise
+            
         @GetMapping("/produits/entreprise/{entrepriseId}")
         public ResponseEntity<?> getProduitsParEntreprise(@PathVariable Long entrepriseId, HttpServletRequest request) {
             try {
@@ -552,6 +554,56 @@ public ResponseEntity<?> updateProduit(
             dataRow.createCell(10).setCellValue(10);
 
             workbook.write(response.getOutputStream());
+        }
+    }
+
+    // Endpoint scalable avec pagination pour récupérer les produits d'une entreprise
+    @GetMapping("/entreprise/{entrepriseId}/produits/paginated")
+    public ResponseEntity<ProduitEntreprisePaginatedResponseDTO> getProduitsParEntreprisePaginated(
+            @PathVariable Long entrepriseId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            HttpServletRequest request) {
+        
+        try {
+            // Validation des paramètres
+            if (page < 0) page = 0;
+            if (size <= 0) size = 20;
+            if (size > 100) size = 100; // Limite maximale
+            
+            ProduitEntreprisePaginatedResponseDTO response = produitService.getProduitsParEntreprisePaginated(
+                    entrepriseId, page, size, request);
+            
+            return ResponseEntity.ok(response);
+            
+        } catch (Exception e) {
+            e.printStackTrace();
+            throw new RuntimeException("Erreur lors de la récupération des produits paginés: " + e.getMessage());
+        }
+    }
+
+    // Endpoint scalable avec pagination pour récupérer les produits d'une boutique
+    @GetMapping("/boutique/{boutiqueId}/produits/paginated")
+    public ResponseEntity<ProduitStockPaginatedResponseDTO> getProduitsParStockPaginated(
+            @PathVariable Long boutiqueId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            HttpServletRequest request) {
+        
+        try {
+            // Validation des paramètres
+            if (page < 0) page = 0;
+            if (size <= 0) size = 20;
+            if (size > 100) size = 100; // Limite maximale
+            
+            ProduitStockPaginatedResponseDTO response = produitService.getProduitsParStockPaginated(
+                    boutiqueId, page, size, request);
+            
+            return ResponseEntity.ok(response);
+            
+        } catch (Exception e) {
+            e.printStackTrace();
+            throw new RuntimeException("Erreur lors de la récupération des produits paginés: " + e.getMessage());
         }
     }
        

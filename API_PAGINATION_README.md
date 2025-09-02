@@ -1,95 +1,104 @@
-# API Pagination pour les Produits par Catégorie - XpertCashBack
+# API Pagination - Produits par Entreprise et par Stock
 
 ## Vue d'ensemble
 
-Cette implémentation corrige l'architecture en paginant les **produits** par catégorie plutôt que les catégories elles-mêmes. C'est la bonne approche car :
-- **Catégories** : Généralement peu nombreuses (quelques dizaines)
-- **Produits** : Peuvent être très nombreux (milliers par catégorie)
-
-Cette approche améliore considérablement la scalabilité de l'application SaaS.
+Ces APIs ont été conçues pour être **scalables** et supporter des **données volumineuses** dans un environnement SaaS. Elles remplacent les anciennes méthodes qui récupéraient tous les produits en une seule fois, ce qui pouvait causer des problèmes de performance avec de grandes quantités de données.
 
 ## Endpoints disponibles
 
-### 1. Endpoint pour récupérer toutes les catégories (sans pagination)
+### 1. Produits par Entreprise
 ```
-GET /api/auth/allCategories
+GET /api/auth/entreprise/{entrepriseId}/produits/paginated
 ```
-- Retourne toutes les catégories avec le **comptage** des produits
-- **Pas de produits** : Seulement le nombre de produits par catégorie
-- **Rapide** : Les catégories sont peu nombreuses
 
-### 2. Endpoint pour récupérer les produits d'une catégorie (avec pagination)
+### 2. Produits par Stock (Boutique)
 ```
-GET /api/auth/categories/{categorieId}/produits?page={page}&size={size}
+GET /api/auth/boutique/{boutiqueId}/produits/paginated
 ```
-- Retourne les produits d'une catégorie spécifique avec pagination
-- **Scalable** : Peut gérer des milliers de produits par catégorie
 
-### 3. Endpoint de compatibilité (maintenu pour l'ancienne API)
-```
-GET /api/auth/allCategory
-```
-- Retourne toutes les catégories avec leurs produits (sans pagination)
-- **Attention** : Peut être lent avec de gros volumes de données
+## Paramètres
 
-#### Paramètres de requête pour la pagination des produits
-- `page` (optionnel) : Numéro de page (commence à 0, défaut : 0)
-- `size` (optionnel) : Taille de la page (défaut : 20, max : 100)
+### Path Parameters
+- `entrepriseId` (Long, requis) : ID de l'entreprise (pour l'API entreprise)
+- `boutiqueId` (Long, requis) : ID de la boutique (pour l'API stock)
 
-#### Exemples d'utilisation
+### Query Parameters
+- `page` (int, optionnel) : Numéro de la page (défaut: 0)
+- `size` (int, optionnel) : Taille de la page (défaut: 20, max: 100)
+
+### Headers
+- `Authorization: Bearer {token}` (requis) : Token JWT de l'utilisateur
+
+## Exemples d'utilisation
+
+### API Produits par Entreprise
+
+#### Récupérer la première page avec 20 éléments (défaut)
 ```bash
-# Récupérer toutes les catégories (sans pagination)
-GET /api/auth/allCategories
-
-# Récupérer les produits de la catégorie "Electronique" (ID: 2)
-GET /api/auth/categories/2/produits
-
-# Première page avec 20 produits (défaut)
-GET /api/auth/categories/2/produits?page=0&size=20
-
-# Deuxième page avec 10 produits
-GET /api/auth/categories/2/produits?page=1&size=10
-
-# Troisième page avec 50 produits
-GET /api/auth/categories/2/produits?page=2&size=50
+curl -X GET "http://localhost:8080/api/auth/entreprise/123/produits/paginated" \
+  -H "Authorization: Bearer your-jwt-token"
 ```
 
-## Structure de réponse
-
-### 1. Réponse des catégories (sans pagination)
-```json
-{
-  "categories": [
-    {
-      "id": 1,
-      "nom": "Électronique",
-      "produitCount": 150,
-      "createdAt": "2024-01-01T10:00:00",
-      "produits": []  // Liste vide - produits chargés séparément
-    },
-    {
-      "id": 2,
-      "nom": "Alimentation",
-      "produitCount": 75,
-      "createdAt": "2024-01-01T10:00:00",
-      "produits": []
-    }
-  ]
-}
+#### Récupérer la page 2 avec 50 éléments
+```bash
+curl -X GET "http://localhost:8080/api/auth/entreprise/123/produits/paginated?page=1&size=50" \
+  -H "Authorization: Bearer your-jwt-token"
 ```
 
-### 2. Réponse paginée des produits d'une catégorie
+#### Récupérer la page 5 avec 100 éléments (maximum)
+```bash
+curl -X GET "http://localhost:8080/api/auth/entreprise/123/produits/paginated?page=4&size=100" \
+  -H "Authorization: Bearer your-jwt-token"
+```
+
+### API Produits par Stock (Boutique)
+
+#### Récupérer la première page avec 20 éléments (défaut)
+```bash
+curl -X GET "http://localhost:8080/api/auth/boutique/456/produits/paginated" \
+  -H "Authorization: Bearer your-jwt-token"
+```
+
+#### Récupérer la page 2 avec 30 éléments
+```bash
+curl -X GET "http://localhost:8080/api/auth/boutique/456/produits/paginated?page=1&size=30" \
+  -H "Authorization: Bearer your-jwt-token"
+```
+
+#### Récupérer la page 3 avec 100 éléments (maximum)
+```bash
+curl -X GET "http://localhost:8080/api/auth/boutique/456/produits/paginated?page=2&size=100" \
+  -H "Authorization: Bearer your-jwt-token"
+```
+
+## Réponse
+
+### API Produits par Entreprise
+
 ```json
 {
-  "produits": [
+  "content": [
     {
       "id": 1,
-      "nom": "iPhone 16",
-      "prixVente": 450000.0,
-      "prixAchat": 320000.0,
-      "quantite": 398,
-      "categorieId": 2,
-      "nomCategorie": "Electronique"
+      "nom": "Produit A",
+      "prixVente": 1000.0,
+      "prixAchat": 500.0,
+      "quantite": 150,
+      "codeGenerique": "PROD001",
+      "boutiques": [
+        {
+          "id": 1,
+          "nom": "Boutique Centre",
+          "typeBoutique": "PHYSIQUE",
+          "quantite": 75
+        },
+        {
+          "id": 2,
+          "nom": "Boutique Nord",
+          "typeBoutique": "PHYSIQUE",
+          "quantite": 75
+        }
+      ]
     }
   ],
   "pageNumber": 0,
@@ -99,130 +108,250 @@ GET /api/auth/categories/2/produits?page=2&size=50
   "hasNext": true,
   "hasPrevious": false,
   "isFirst": true,
-  "isLast": false
+  "isLast": false,
+  "totalProduitsUniques": 150,
+  "totalBoutiques": 5
 }
 ```
 
-### Métadonnées de pagination
-- `pageNumber` : Page actuelle (commence à 0)
-- `pageSize` : Nombre d'éléments par page
-- `totalElements` : Nombre total d'éléments
-- `totalPages` : Nombre total de pages
-- `hasNext` : Y a-t-il une page suivante ?
-- `hasPrevious` : Y a-t-il une page précédente ?
-- `isFirst` : Est-ce la première page ?
-- `isLast` : Est-ce la dernière page ?
+### API Produits par Stock (Boutique)
+
+```json
+{
+  "content": [
+    {
+      "id": 1,
+      "nom": "Produit A",
+      "prixVente": 1000.0,
+      "prixAchat": 500.0,
+      "quantite": 75,
+      "categorieId": 2,
+      "nomCategorie": "Électronique",
+      "uniteId": 1,
+      "nomUnite": "Pièce",
+      "enStock": true,
+      "boutiqueId": 456
+    }
+  ],
+  "pageNumber": 0,
+  "pageSize": 20,
+  "totalElements": 85,
+  "totalPages": 5,
+  "hasNext": true,
+  "hasPrevious": false,
+  "isFirst": true,
+  "isLast": false,
+  "totalProduitsActifs": 85,
+  "totalProduitsEnStock": 65,
+  "totalProduitsHorsStock": 20
+}
+```
+
+## Structure de la réponse
+
+### API Produits par Entreprise
+
+| Champ | Type | Description |
+|-------|------|-------------|
+| `content` | Array | Liste des produits de la page courante |
+| `pageNumber` | int | Numéro de la page actuelle (0-based) |
+| `pageSize` | int | Taille de la page |
+| `totalElements` | long | Nombre total de produits uniques |
+| `totalPages` | int | Nombre total de pages |
+| `hasNext` | boolean | Y a-t-il une page suivante ? |
+| `hasPrevious` | boolean | Y a-t-il une page précédente ? |
+| `isFirst` | boolean | Est-ce la première page ? |
+| `isLast` | boolean | Est-ce la dernière page ? |
+| `totalProduitsUniques` | long | Nombre total de produits uniques par code générique |
+| `totalBoutiques` | long | Nombre total de boutiques actives |
+
+### API Produits par Stock (Boutique)
+
+| Champ | Type | Description |
+|-------|------|-------------|
+| `content` | Array | Liste des produits de la page courante |
+| `pageNumber` | int | Numéro de la page actuelle (0-based) |
+| `pageSize` | int | Taille de la page |
+| `totalElements` | long | Nombre total de produits actifs |
+| `totalPages` | int | Nombre total de pages |
+| `hasNext` | boolean | Y a-t-il une page suivante ? |
+| `hasPrevious` | boolean | Y a-t-il une page précédente ? |
+| `isFirst` | boolean | Est-ce la première page ? |
+| `isLast` | boolean | Est-ce la dernière page ? |
+| `totalProduitsActifs` | long | Nombre total de produits actifs |
+| `totalProduitsEnStock` | long | Nombre total de produits en stock |
+| `totalProduitsHorsStock` | long | Nombre total de produits hors stock |
 
 ## Avantages de la pagination
 
-### 1. Performance
-- **Chargement rapide** : Seules les données nécessaires sont récupérées
-- **Mémoire optimisée** : Évite le chargement de milliers d'objets en mémoire
-- **Temps de réponse constant** : Performance prévisible même avec de gros volumes
+### 1. **Performance**
+- Chargement plus rapide des pages
+- Moins de mémoire utilisée côté serveur
+- Réponse plus rapide pour l'utilisateur
 
-### 2. Scalabilité
-- **Gestion de gros volumes** : Peut gérer des millions de produits par catégorie
-- **Évolutivité** : Performance maintenue lors de la croissance des données
-- **Ressources optimisées** : Utilisation efficace de la base de données
+### 2. **Scalabilité**
+- Support de milliers/millions de produits
+- Performance constante quelle que soit la taille des données
+- Évite les timeouts sur de gros volumes
 
-### 3. Expérience utilisateur
-- **Navigation intuitive** : Pagination classique avec boutons précédent/suivant
-- **Chargement progressif** : Possibilité de charger plus de données à la demande
-- **Interface responsive** : Adapté aux différents appareils
+### 3. **UX améliorée**
+- Interface plus réactive
+- Possibilité de navigation par pages
+- Affichage progressif des données
+
+### 4. **Sécurité**
+- Limitation de la taille des requêtes
+- Protection contre les attaques DoS
+- Contrôle des ressources serveur
 
 ## Implémentation technique
 
-### 1. Service Layer
-- `getCategoriesWithProduitCountPaginated()` : Méthode principale avec pagination
-- Validation des paramètres (page ≥ 0, 1 ≤ size ≤ 100)
-- Tri par nom de catégorie (ascendant)
+### API Produits par Entreprise
 
-### 2. Repository Layer
-- `findByEntrepriseId()` : Pagination des catégories par entreprise
-- `countProduitsParCategorieIds()` : Comptage optimisé par catégorie
-- `findByCategorieIdsAndEntrepriseId()` : Récupération des produits par catégorie
+#### Repository
+```java
+@Query("SELECT p FROM Produit p " +
+       "LEFT JOIN FETCH p.boutique b " +
+       "WHERE (b.entreprise.id = :entrepriseId OR b IS NULL) " +
+       "AND (p.deleted IS NULL OR p.deleted = false) " +
+       "ORDER BY p.codeGenerique, p.nom")
+Page<Produit> findProduitsByEntrepriseIdPaginated(
+    @Param("entrepriseId") Long entrepriseId, 
+    Pageable pageable);
+```
 
-### 3. DTOs
-- `PaginatedResponseDTO<T>` : DTO générique pour la pagination
-- `CategoriePaginatedResponseDTO` : DTO spécifique aux catégories
+#### Service
+- Validation des paramètres de pagination
+- Gestion des droits d'accès
+- Optimisation des requêtes avec JOIN FETCH
+- Groupement par code générique
+- Calcul des statistiques globales
 
-## Bonnes pratiques d'utilisation
+### API Produits par Stock (Boutique)
 
-### 1. Taille de page recommandée
+#### Repository
+```java
+@Query("SELECT p FROM Produit p " +
+       "LEFT JOIN FETCH p.categorie c " +
+       "LEFT JOIN FETCH p.uniteDeMesure u " +
+       "LEFT JOIN FETCH p.boutique b " +
+       "WHERE p.boutique.id = :boutiqueId " +
+       "AND (p.deleted IS NULL OR p.deleted = false) " +
+       "ORDER BY p.nom ASC")
+Page<Produit> findProduitsByBoutiqueIdPaginated(
+    @Param("boutiqueId") Long boutiqueId, 
+    Pageable pageable);
+```
+
+#### Service
+- Validation des paramètres de pagination
+- Gestion des droits d'accès et vérification d'affectation boutique
+- Optimisation des requêtes avec JOIN FETCH
+- Calcul des statistiques de stock (en stock, hors stock)
+
+### Contrôleur
+- Validation des paramètres
+- Gestion des erreurs
+- Limitation de la taille maximale (100)
+
+## Bonnes pratiques
+
+### 1. **Taille de page recommandée**
 - **Mobile** : 10-20 éléments
 - **Desktop** : 20-50 éléments
-- **Maximum** : 100 éléments (limite imposée)
+- **Tableau de bord** : 50-100 éléments
 
-### 2. Navigation
-```javascript
-// Exemple de navigation côté client
-function loadNextPage() {
-    const nextPage = currentPage + 1;
-    if (nextPage < totalPages) {
-        loadCategories(nextPage, pageSize);
-    }
-}
+### 2. **Navigation**
+- Toujours afficher le numéro de page actuel
+- Indiquer le nombre total de pages
+- Fournir des boutons précédent/suivant
+- Permettre de sauter à une page spécifique
 
-function loadPreviousPage() {
-    const prevPage = currentPage - 1;
-    if (prevPage >= 0) {
-        loadCategories(prevPage, pageSize);
-    }
-}
-```
+### 3. **Gestion des erreurs**
+- Valider les paramètres côté client et serveur
+- Gérer les cas de page invalide
+- Retourner des messages d'erreur clairs
 
-### 3. Gestion des erreurs
-```javascript
-// Exemple de gestion d'erreur
-try {
-    const response = await fetch('/api/auth/allCategoryPaginated?page=0&size=20');
-    if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-    }
-    const data = await response.json();
-    // Traitement des données
-} catch (error) {
-    console.error('Erreur lors du chargement des catégories:', error);
-    // Gestion de l'erreur côté client
-}
-```
+### 4. **Cache**
+- Mettre en cache les statistiques globales
+- Utiliser le cache pour les données fréquemment consultées
+- Invalider le cache lors des modifications
 
 ## Migration depuis l'ancienne API
 
-### 1. Compatibilité
-- L'ancienne API reste fonctionnelle
-- Aucune modification nécessaire pour les clients existants
+### API Produits par Entreprise
 
-### 2. Migration progressive
-```javascript
-// Ancien code
-const categories = await fetch('/api/auth/allCategory');
-
-// Nouveau code avec pagination
-const categoriesPage = await fetch('/api/auth/allCategoryPaginated?page=0&size=20');
-const { categories, totalPages, hasNext } = await categoriesPage.json();
+#### Avant (non-scalable)
+```java
+// Récupérait TOUS les produits
+List<ProduitDTO> produits = produitService.getProduitsParEntreprise(entrepriseId, request);
 ```
 
-### 3. Tests de performance
-```bash
-# Test avec de gros volumes
-curl "http://localhost:8080/api/auth/allCategoryPaginated?page=0&size=100"
-curl "http://localhost:8080/api/auth/allCategoryPaginated?page=10&size=100"
+#### Après (scalable)
+```java
+// Récupère seulement une page
+ProduitEntreprisePaginatedResponseDTO response = produitService.getProduitsParEntreprisePaginated(
+    entrepriseId, page, size, request);
+
+List<ProduitDTO> produits = response.getContent();
+int totalPages = response.getTotalPages();
+boolean hasNext = response.hasNext();
+```
+
+### API Produits par Stock (Boutique)
+
+#### Avant (non-scalable)
+```java
+// Récupérait TOUS les produits
+List<ProduitDTO> produits = produitService.getProduitsParStock(boutiqueId, request);
+```
+
+#### Après (scalable)
+```java
+// Récupère seulement une page
+ProduitStockPaginatedResponseDTO response = produitService.getProduitsParStockPaginated(
+    boutiqueId, page, size, request);
+
+List<ProduitDTO> produits = response.getContent();
+int totalPages = response.getTotalPages();
+boolean hasNext = response.hasNext();
+long totalEnStock = response.getTotalProduitsEnStock();
+long totalHorsStock = response.getTotalProduitsHorsStock();
 ```
 
 ## Monitoring et métriques
 
-### 1. Métriques à surveiller
+### Métriques à surveiller
 - Temps de réponse par page
+- Taille des réponses
 - Utilisation mémoire
-- Charge base de données
 - Nombre de requêtes par seconde
 
-### 2. Alertes recommandées
+### Alertes
 - Temps de réponse > 2 secondes
 - Utilisation mémoire > 80%
-- Erreurs de pagination > 5%
+- Erreur 500 > 5%
 
 ## Conclusion
 
-Cette implémentation de pagination transforme votre API de catégories en une solution scalable et performante, adaptée aux besoins d'une application SaaS moderne. Elle maintient la compatibilité tout en offrant des performances optimales pour la gestion de gros volumes de données.
+Cette implémentation de pagination transforme vos APIs en des solutions **entreprise-grade** capables de gérer des volumes de données importants tout en maintenant des performances optimales. 
+
+### 🚀 **APIs disponibles**
+
+1. **Produits par Entreprise** : Gestion centralisée de tous les produits d'une entreprise avec groupement par code générique
+2. **Produits par Stock (Boutique)** : Gestion locale des produits d'une boutique spécifique avec statistiques de stock
+
+### 💡 **Avantages clés**
+
+- **Scalabilité** : Support de milliers/millions de produits
+- **Performance** : Temps de réponse constant quelle que soit la taille des données
+- **UX** : Interface réactive avec navigation par pages
+- **Sécurité** : Contrôle des droits d'accès et limitation des ressources
+- **Monitoring** : Statistiques détaillées pour le suivi des performances
+
+### 🎯 **Cas d'usage recommandés**
+
+- **API Entreprise** : Tableaux de bord, rapports globaux, gestion centralisée
+- **API Stock** : Gestion de boutique, inventaire local, vente au détail
+
+Ces APIs respectent les meilleures pratiques de développement SaaS et offrent une expérience utilisateur fluide même avec des volumes de données importants.

@@ -127,5 +127,59 @@ List<Produit> findAllWithBoutiqueByEntrepriseId(@Param("entrepriseId") Long entr
        "WHERE p.boutique.id = :boutiqueId AND (p.deleted IS NULL OR p.deleted = false)")
 List<Produit> findActiveByBoutiqueIdWithRelations(@Param("boutiqueId") Long boutiqueId);
 
+// Récupérer les produits d'une entreprise avec pagination et groupement par code générique
+@Query("SELECT p FROM Produit p " +
+       "LEFT JOIN FETCH p.boutique b " +
+       "WHERE (b.entreprise.id = :entrepriseId OR b IS NULL) " +
+       "AND (p.deleted IS NULL OR p.deleted = false) " +
+       "ORDER BY p.codeGenerique, p.nom")
+Page<Produit> findProduitsByEntrepriseIdPaginated(
+    @Param("entrepriseId") Long entrepriseId, 
+    Pageable pageable);
+
+// Compter le nombre total de produits uniques par entreprise
+@Query("SELECT COUNT(DISTINCT p.codeGenerique) FROM Produit p " +
+       "LEFT JOIN p.boutique b " +
+       "WHERE (b.entreprise.id = :entrepriseId OR b IS NULL) " +
+       "AND (p.deleted IS NULL OR p.deleted = false)")
+long countProduitsUniquesByEntrepriseId(@Param("entrepriseId") Long entrepriseId);
+
+// Compter le nombre total de boutiques actives d'une entreprise
+@Query("SELECT COUNT(DISTINCT b.id) FROM Boutique b " +
+       "WHERE b.entreprise.id = :entrepriseId AND b.actif = true")
+long countBoutiquesActivesByEntrepriseId(@Param("entrepriseId") Long entrepriseId);
+
+// Récupérer les produits d'une boutique avec pagination
+@Query("SELECT p FROM Produit p " +
+       "LEFT JOIN FETCH p.categorie c " +
+       "LEFT JOIN FETCH p.uniteDeMesure u " +
+       "LEFT JOIN FETCH p.boutique b " +
+       "WHERE p.boutique.id = :boutiqueId " +
+       "AND (p.deleted IS NULL OR p.deleted = false) " +
+       "ORDER BY p.nom ASC")
+Page<Produit> findProduitsByBoutiqueIdPaginated(
+    @Param("boutiqueId") Long boutiqueId, 
+    Pageable pageable);
+
+// Compter le nombre total de produits actifs d'une boutique
+@Query("SELECT COUNT(p) FROM Produit p " +
+       "WHERE p.boutique.id = :boutiqueId " +
+       "AND (p.deleted IS NULL OR p.deleted = false)")
+long countProduitsActifsByBoutiqueId(@Param("boutiqueId") Long boutiqueId);
+
+// Compter le nombre de produits en stock d'une boutique
+@Query("SELECT COUNT(p) FROM Produit p " +
+       "WHERE p.boutique.id = :boutiqueId " +
+       "AND (p.deleted IS NULL OR p.deleted = false) " +
+       "AND p.enStock = true")
+long countProduitsEnStockByBoutiqueId(@Param("boutiqueId") Long boutiqueId);
+
+// Compter le nombre de produits hors stock d'une boutique
+@Query("SELECT COUNT(p) FROM Produit p " +
+       "WHERE p.boutique.id = :boutiqueId " +
+       "AND (p.deleted IS NULL OR p.deleted = false) " +
+       "AND (p.enStock = false OR p.enStock IS NULL)")
+long countProduitsHorsStockByBoutiqueId(@Param("boutiqueId") Long boutiqueId);
+
 }
 
