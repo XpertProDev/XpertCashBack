@@ -29,10 +29,14 @@ import com.xpertcash.repository.Module.PaiementModuleRepository;
 import com.xpertcash.service.Module.ModuleActivationService;
 
 import jakarta.servlet.http.HttpServletRequest;
+import com.xpertcash.service.AuthenticationHelper;
 
 @RestController
 @RequestMapping("/api/auth")
 public class ModuleActivationController {
+
+    @Autowired
+    private AuthenticationHelper authHelper;
     @Autowired
     private ModuleActivationService moduleActivationService;
     
@@ -53,9 +57,7 @@ public ResponseEntity<?> consulterTempsEssaiModules(HttpServletRequest request) 
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Token JWT manquant ou mal formaté");
     }
 
-    Long userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
-    User utilisateur = usersRepository.findById(userId)
-        .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
+    User utilisateur = authHelper.getAuthenticatedUserWithFallback(request);
 
     Entreprise entreprise = utilisateur.getEntreprise();
     if (entreprise == null) {
@@ -94,47 +96,7 @@ public ResponseEntity<?> consulterTempsEssaiModules(HttpServletRequest request) 
             throw new RuntimeException("Token JWT manquant ou mal formaté");
         }
 
-        Long userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
-
-        moduleActivationService.activerModuleAvecPaiement(
-                userId,
-                demande.getNomModule(),
-                demande.getDureeMois(),
-                demande.getNumeroCarte(),
-                demande.getCvc(),
-                demande.getDateExpiration(),
-                demande.getNomCompletProprietaire(),
-                demande.getEmailProprietaireCarte(),
-                demande.getPays(),
-                demande.getAdresse(),
-                demande.getVille()
-        );
-
-        return ResponseEntity.ok("Le module '" + demande.getNomModule() + "' a été activé avec succès.");
-    }
-
-
-
-    //Endpoint pour lister tout les  modules actifs ou non actifs
-    @GetMapping("/entreprise/modules")
-    public ResponseEntity<List<ModuleDTO>> getModulesEntreprise(HttpServletRequest request) {
-        List<ModuleDTO> modules = moduleActivationService.listerModulesEntreprise(request);
-        return ResponseEntity.ok(modules);
-    }
-
-
-    //Les Facture de payement pour lentreprise
-    @GetMapping("/mes-paiements")
-    public ResponseEntity<?> getPaiementsModules(HttpServletRequest request) {
-
-        String token = request.getHeader("Authorization");
-        if (token == null || !token.startsWith("Bearer ")) {
-            return ResponseEntity.badRequest().body("Token manquant");
-        }
-
-        Long userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
-        User user = usersRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
+        User user = authHelper.getAuthenticatedUserWithFallback(request);
 
         RoleType role = user.getRole().getName();
         if (role != RoleType.ADMIN && role != RoleType.MANAGER) {
@@ -166,9 +128,7 @@ public ResponseEntity<?> consulterTempsEssaiModules(HttpServletRequest request) 
             return ResponseEntity.badRequest().body("Token manquant");
         }
 
-        Long userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
-        User user = usersRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
+        User user = authHelper.getAuthenticatedUserWithFallback(request);
 
         if (user.getRole().getName() != RoleType.SUPER_ADMIN) {
             return ResponseEntity.status(403).body("Accès réservé au propriétaire de la plateforme");

@@ -63,10 +63,8 @@ public List<FactureVenteResponseDTO> getAllFacturesForConnectedUser(HttpServletR
     if (token == null || !token.startsWith("Bearer ")) {
         throw new RuntimeException("Token JWT manquant ou invalide");
     }
-    String jwtToken = token.substring(7);
-    Long userId = jwtUtil.extractUserId(jwtToken);
-
-    User user = usersRepository.findById(userId)
+    String userUuid = jwtUtil.extractUserUuid(token.substring(7));
+    User user = usersRepository.findByUuid(userUuid)
             .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
 
     Long entrepriseId = user.getEntreprise().getId();

@@ -51,9 +51,13 @@ import jakarta.transaction.Transactional;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import com.xpertcash.service.AuthenticationHelper;
 
 @Service
 public class FactureProformaService {
+
+    @Autowired
+    private AuthenticationHelper authHelper;
 
     private static final Logger log = LoggerFactory.getLogger(FactureProformaService.class);
 
@@ -723,11 +727,15 @@ public class FactureProformaService {
             throw new RuntimeException("Token JWT manquant ou mal formaté");
         }
 
-        token = token.replace("Bearer ", "");
-        Long userId = jwtUtil.extractUserId(token);
+        Long userId;
+        try {
+            userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
+        } catch (Exception e) {
+            throw new RuntimeException("Erreur lors de l'extraction de l'ID de l'utilisateur depuis le token", e);
+        }
 
         User user = usersRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+                .orElseThrow(() -> new RuntimeException("Utilisateur introuvable !"));
 
         FactureProForma facture = factureProformaRepository.findById(factureId)
                 .orElseThrow(() -> new EntityNotFoundException("Facture introuvable avec l'ID : " + factureId));

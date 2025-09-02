@@ -46,9 +46,13 @@ import com.xpertcash.service.Module.ModuleActivationService;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.transaction.Transactional;
+import com.xpertcash.service.AuthenticationHelper;
 
 @Service
 public class FactureReelleService {
+
+    @Autowired
+    private AuthenticationHelper authHelper;
 
     @Autowired
     private FactureReelleRepository factureReelleRepository;
@@ -396,9 +400,7 @@ public void supprimerFactureReelleLiee(FactureProForma proforma) {
         throw new RuntimeException("Token JWT manquant ou mal formaté");
     }
 
-    Long userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
-    User utilisateur = usersRepository.findById(userId)
-            .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
+    User utilisateur = authHelper.getAuthenticatedUserWithFallback(request);
 
     // 🧾 Récupération de la facture
     FactureReelle facture = factureReelleRepository.findById(factureId)
@@ -482,10 +484,7 @@ public void supprimerFactureReelleLiee(FactureProForma proforma) {
         throw new RuntimeException("Token JWT manquant ou mal formaté");
     }
 
-    Long userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
-
-    User user = usersRepository.findById(userId)
-        .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+    User user = authHelper.getAuthenticatedUserWithFallback(request);
 
     Entreprise entreprise = user.getEntreprise();
     if (entreprise == null) {
@@ -506,7 +505,7 @@ public void supprimerFactureReelleLiee(FactureProForma proforma) {
     }
 
     // 4. Vérification des droits d'accès
-    boolean isCreateur = facture.getUtilisateurCreateur().getId().equals(userId);
+    boolean isCreateur = facture.getUtilisateurCreateur().getId().equals(user.getId());
     if (!(isAdminOrManager || hasGestionFacturePermission || isCreateur)) {
         throw new RuntimeException("Accès refusé : vous n'avez pas les droits pour consulter les paiements de cette facture");
     }

@@ -58,6 +58,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.io.IOException;
 import com.xpertcash.service.IMAGES.ImageStorageService;
+import com.xpertcash.service.AuthenticationHelper;
 
 
 
@@ -65,6 +66,9 @@ import com.xpertcash.service.IMAGES.ImageStorageService;
 
 @Service
 public class ProduitService {
+
+    @Autowired
+    private AuthenticationHelper authHelper;
 
     @Autowired
     private BoutiqueRepository boutiqueRepository;
@@ -116,335 +120,115 @@ public class ProduitService {
 
 
 
-    // Ajouter un produit à la liste sans le stock
+    // Créer un nouveau produit dans plusieurs boutiques
     public List<ProduitDTO> createProduit(HttpServletRequest request, List<Long> boutiqueIds,
                                       List<Integer> quantites, List<Integer> seuilAlert, ProduitRequest produitRequest, boolean addToStock, String image) {
-        try {
             // ✅ Extraction et validation du token
-            String token = request.getHeader("Authorization");
-            if (token == null || !token.startsWith("Bearer ")) {
-                throw new RuntimeException("Token JWT manquant ou mal formaté");
-            }
+        User user = authHelper.getAuthenticatedUserWithFallback(request);
 
-            String jwtToken = token.substring(7);
-            Long utilisateurId;
-            try {
-                utilisateurId = jwtUtil.extractUserId(jwtToken);
-            } catch (Exception e) {
-                throw new RuntimeException("Erreur lors de l'extraction de l'ID utilisateur depuis le token", e);
-            }
-            
-
-            // ✅ Chargement de l'utilisateur connecté
-            User utilisateur = usersRepository.findById(utilisateurId)
-                    .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
-
-            // ✅ Récupération de la boutique et de l’entreprise associée
-            Boutique premiereBoutique = boutiqueRepository.findById(boutiqueIds.get(0))
-                    .orElseThrow(() -> new RuntimeException("Boutique non trouvée"));
-
-            Entreprise entreprise = premiereBoutique.getEntreprise();
-            if (entreprise == null) {
-                throw new RuntimeException("La boutique n'est liée à aucune entreprise.");
-            }
-
-            Long entrepriseId = entreprise.getId();
-
-            // 🔐 Vérification : seul un ADMIN ou un utilisateur avec la permission peut continuer
-            RoleType role = utilisateur.getRole().getName();
-            // boolean isAdmin = utilisateur.getRole().getName() == RoleType.ADMIN;
-             boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
-             boolean hasPermission = utilisateur.getRole().hasPermission(PermissionType.GERER_PRODUITS);
-                boolean hasPermissionGestionFacturation = utilisateur.getRole().hasPermission(PermissionType.GESTION_FACTURATION);
-
-
-            if (!isAdminOrManager && !hasPermission && !hasPermissionGestionFacturation) {
-                throw new RuntimeException("Accès refusé : seuls les ADMIN ou les utilisateurs ayant la permission GERER_PRODUITS peuvent ajouter un produit.");
-            }
-
-            List<ProduitDTO> produitsAjoutes = new ArrayList<>();
-
-            // Vérification que le nombre de boutiques et quantités est le même
-            if (boutiqueIds.size() != quantites.size()) {
-                throw new RuntimeException("Le nombre de boutiques ne correspond pas au nombre de quantités !");
-            }
-
-            // Vérifier si le produit existe déjà dans une boutique de la même entreprise
-            Produit produitExistant = produitRepository.findByNomAndEntrepriseId(produitRequest.getNom(), entrepriseId);
-
-            String codeGenerique;
-            if (produitExistant != null) {
-                // Réutiliser le codeGenerique existant
-                codeGenerique = produitExistant.getCodeGenerique();
-            } else {
-                // Générer un nouveau codeGenerique unique
-                codeGenerique = generateProductCode();
-            }
-
-            // Pour chaque boutique et sa quantité spécifique
-            for (int i = 0; i < boutiqueIds.size(); i++) {
-                Long boutiqueId = boutiqueIds.get(i);
-                Integer quantite = quantites.get(i);
-                Integer seuil = seuilAlert.get(i);
-
-                Boutique boutique = boutiqueRepository.findById(boutiqueId)
-                        .orElseThrow(() -> new RuntimeException("Boutique non trouvée"));
-
-                // Vérification si le produit est déjà enregistré dans cette boutique
-                if (produitRepository.findByNomAndBoutiqueId(produitRequest.getNom(), boutiqueId) != null) {
-                    throw new RuntimeException("Un produit avec le même nom existe déjà dans la boutique ID: " + boutiqueId);
-                }
-                if (produitRequest.getCodeBare() != null && !produitRequest.getCodeBare().trim().isEmpty() &&
-                        produitRepository.findByCodeBareAndBoutiqueId(produitRequest.getCodeBare().trim(), boutiqueId) != null) {
-                    throw new RuntimeException("Un produit avec le même code-barre existe déjà dans la boutique ID: " + boutiqueId);
-                }
-
-                // Récupérer la catégorie et unité
-                Categorie categorie;
-                if (produitRequest.getCategorieId() != null) {
-                    categorie = categorieRepository.findById(produitRequest.getCategorieId())
-                            .orElseThrow(() -> new RuntimeException("Catégorie non trouvée"));
-                } else {
-                    // Vérifier si "Sans Catégorie" existe déjà pour l'entreprise
-                    categorie = categorieRepository.findByNomAndEntrepriseId("Sans Catégorie", entrepriseId);
-                    if (categorie == null) {
-                        categorie = new Categorie();
-                        categorie.setNom("Sans Catégorie");
-                        categorie.setEntreprise(entreprise);
-                        categorie.setCreatedAt(LocalDateTime.now());
-                        categorie = categorieRepository.save(categorie);
-                    }
-                }
-
-                
-                Unite unite = (produitRequest.getUniteId() != null) ?
-                        uniteRepository.findById(produitRequest.getUniteId())
-                                .orElseThrow(() -> new RuntimeException("Unité de mesure non trouvée")) : null;
-
-                Produit produit = new Produit();
-                produit.setNom(produitRequest.getNom());
-                produit.setDescription(produitRequest.getDescription());
-                produit.setPrixVente(produitRequest.getPrixVente());
-                produit.setPrixAchat(produitRequest.getPrixAchat());
-                produit.setQuantite(quantite != null ? quantite : 0);
-                produit.setSeuilAlert(seuil != null ? seuil : 0);
-                produit.setTypeProduit(produitRequest.getTypeProduit());
-                produit.setCategorie(categorie);
-                produit.setUniteDeMesure(unite);
-                produit.setCodeGenerique(codeGenerique);
-                produit.setCodeBare(produitRequest.getCodeBare());
-                produit.setPhoto(image);
-                produit.setCreatedAt(LocalDateTime.now());
-                produit.setLastUpdated(LocalDateTime.now());
-                produit.setBoutique(boutique);
-
-                if (produitRequest.getDatePreemption() != null) {
-                    produit.setDatePreemption(produitRequest.getDatePreemption());
-                }
-
-                Produit savedProduit = produitRepository.save(produit);
-
-                // Ajouter au stock si demandé
-                if (produitRequest.getTypeProduit() == TypeProduit.PHYSIQUE && addToStock) {
-                    Stock stock = new Stock();
-                    stock.setStockActuel(quantite != null ? quantite : 0);
-                    stock.setStockApres(stock.getStockActuel());
-                    stock.setQuantiteAjoute(0);
-                    stock.setBoutique(boutique);
-                    stock.setProduit(savedProduit);
-                    stock.setCreatedAt(LocalDateTime.now());
-                    stock.setLastUpdated(LocalDateTime.now());
-                    stock.setSeuilAlert(seuil != null ? seuil : 0);
-                    stock.setDatePreemption(savedProduit.getDatePreemption());
-                    stockRepository.save(stock);
-                    savedProduit.setEnStock(true);
-                    produitRepository.save(savedProduit);
-
-                }
-
-                produitsAjoutes.add(mapToDTO(savedProduit));
-            }
-
-            return produitsAjoutes;
-
-        } catch (RuntimeException e) {
-            System.err.println("Erreur lors de la création du produit : " + e.getMessage());
-            throw new RuntimeException(e.getMessage(), e);
-        }
-}
-
-
-    private ProduitDTO mapToDTO(Produit produit) {
-        ProduitDTO produitDTO = new ProduitDTO();
-        produitDTO.setId(produit.getId());
-        produitDTO.setNom(produit.getNom());
-        produitDTO.setPrixVente(produit.getPrixVente());
-        produitDTO.setPrixAchat(produit.getPrixAchat());
-        produitDTO.setQuantite(produit.getQuantite());
-        produitDTO.setSeuilAlert(produit.getSeuilAlert());
-        produitDTO.setCodeBare(produit.getCodeBare());
-        produitDTO.setCodeGenerique(produit.getCodeGenerique());
-        produitDTO.setPhoto(produit.getPhoto());
-        produitDTO.setEnStock(produit.getEnStock());
-        produitDTO.setCreatedAt(produit.getCreatedAt());
-        produitDTO.setLastUpdated(produit.getLastUpdated());
-        produitDTO.setDatePreemption(produit.getDatePreemption());
-
-
-        // Assigner les IDs des entités liées (pas directement les objets)
-        if (produit.getCategorie() != null) {
-            produitDTO.setCategorieId(produit.getCategorie().getId());
-        }
-        if (produit.getUniteDeMesure() != null) {
-            produitDTO.setUniteId(produit.getUniteDeMesure().getId());
-        }
-
-       TypeProduit type = produit.getTypeProduit();
-        produitDTO.setTypeProduit(type != null ? type.name() : null);
-
-
-
-        return produitDTO;
-    }
-
-    private String generateProductCode() {
-        String code;
-        do {
-            String randomCode = String.format("%05d", (int)(Math.random() * 100000));
-            code = "P-" + randomCode;
-        } while (produitRepository.existsByCodeGenerique(code));
-
-        return code;
-    }
-
-    //Methode pour ajuster la quantiter du produit en stock
-    public Facture ajouterStock(Long boutiqueId, Map<Long, Integer> produitsQuantites, String description, String codeFournisseur, Long fournisseurId, HttpServletRequest request) {
-
-        // Extraction du token JWT
-        String token = request.getHeader("Authorization");
-        if (token == null || !token.startsWith("Bearer ")) {
-            throw new RuntimeException("Token JWT manquant ou mal formaté");
-        }
-
-        Long userId;
-        try {
-            userId = jwtUtil.extractUserId(token.substring(7));
-        } catch (Exception e) {
-            throw new RuntimeException("Erreur lors de l'extraction de l'ID de l'utilisateur depuis le token", e);
-        }
-
-        // ✅ Récupération de l'utilisateur
-        User user = usersRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
-
-        // ✅ Récupération de la boutique
-        Boutique boutique = boutiqueRepository.findById(boutiqueId)
-                .orElseThrow(() -> new RuntimeException("Boutique introuvable"));
-
-        Long entrepriseId = boutique.getEntreprise().getId();
-
-        // 🔒 Vérifier que l'utilisateur appartient bien à la même entreprise
-        if (!user.getEntreprise().getId().equals(entrepriseId)) {
-            throw new RuntimeException("Accès interdit : cette boutique ne vous appartient pas");
-        }
-
-        // 🔐 Contrôle d'accès strict : seulement ADMIN ou permission explicite
+        // Vérification des droits
         RoleType role = user.getRole().getName();
         boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
         boolean hasPermission = user.getRole().hasPermission(PermissionType.GERER_PRODUITS);
-        boolean hasPermissionGestion = user.getRole().hasPermission(PermissionType.APPROVISIONNER_STOCK);
 
-
-        if (!isAdminOrManager && !hasPermission && !hasPermissionGestion) {
-            throw new RuntimeException("Accès refusé : seuls les ADMIN ou les utilisateurs ayant la permission GERER_PRODUITS peuvent gérer le stock de cette boutique.");
+        if (!isAdminOrManager && !hasPermission) {
+            throw new RuntimeException("Accès refusé : vous n'avez pas les droits pour créer des produits.");
         }
 
-
-
-        List<Produit> produits = new ArrayList<>();
-        Fournisseur fournisseurEntity = null;
-
-       for (Map.Entry<Long, Integer> entry : produitsQuantites.entrySet()) {
-        Long produitId = entry.getKey();
-        Integer quantiteAjoute = entry.getValue();
-
-        Produit produit = produitRepository.findById(produitId)
-                .orElseThrow(() -> new RuntimeException("Produit non trouvé"));
-
-          // 🔒 Vérifier que le produit appartient à la même entreprise (via sa boutique)
-        Boutique produitBoutique = produit.getBoutique();
-        if (produitBoutique == null || !produitBoutique.getEntreprise().getId().equals(entrepriseId)) {
-            throw new RuntimeException("Le produit ID " + produitId + " n'appartient pas à l'entreprise de la boutique.");
+        List<ProduitDTO> produitsCreated = new ArrayList<>();
+        
+        // Créer le produit dans chaque boutique spécifiée
+        for (int i = 0; i < boutiqueIds.size(); i++) {
+            Long boutiqueId = boutiqueIds.get(i);
+            Integer quantite = quantites.get(i);
+            Integer seuil = seuilAlert.get(i);
+            
+            // Vérifier la boutique
+            Boutique boutique = boutiqueRepository.findById(boutiqueId)
+                    .orElseThrow(() -> new RuntimeException("Boutique introuvable: " + boutiqueId));
+            
+            // Vérifier l'appartenance à l'entreprise
+            if (!boutique.getEntreprise().getId().equals(user.getEntreprise().getId())) {
+                throw new RuntimeException("Accès interdit : cette boutique ne vous appartient pas");
+            }
+            
+            // Créer le produit
+            Produit produit = createSingleProduit(produitRequest, boutique, quantite, seuil, addToStock, image);
+            
+            // Convertir en DTO
+            ProduitDTO dto = convertToProduitDTO(produit);
+            produitsCreated.add(dto);
         }
-
-        Stock stock = stockRepository.findByProduit(produit);
-        if (stock == null) {
-            throw new RuntimeException("Stock introuvable pour ce produit");
+        
+        return produitsCreated;
+    }
+    
+    // Méthode helper pour créer un seul produit
+    private Produit createSingleProduit(ProduitRequest produitRequest, Boutique boutique, Integer quantite, Integer seuilAlert, boolean addToStock, String image) {
+        // Générer code générique unique basé sur le nom du produit
+        String codeGenerique = "PROD_" + System.currentTimeMillis();
+        
+        // Créer le produit
+        Produit produit = new Produit();
+        produit.setNom(produitRequest.getNom());
+        produit.setDescription(produitRequest.getDescription());
+        produit.setPrixVente(produitRequest.getPrixVente());
+        produit.setPrixAchat(produitRequest.getPrixAchat());
+        produit.setQuantite(quantite != null ? quantite : 0);
+        produit.setSeuilAlert(seuilAlert != null ? seuilAlert : 0);
+        produit.setCodeBare(produitRequest.getCodeBare());
+        produit.setCodeGenerique(codeGenerique);
+        produit.setBoutique(boutique);
+        produit.setEnStock(addToStock);
+        produit.setCreatedAt(LocalDateTime.now());
+        produit.setLastUpdated(LocalDateTime.now());
+        produit.setDeleted(false);
+        
+        // Gérer la catégorie
+        if (produitRequest.getCategorieId() != null) {
+            Categorie categorie = categorieRepository.findById(produitRequest.getCategorieId())
+                    .orElseThrow(() -> new RuntimeException("Catégorie non trouvée"));
+            produit.setCategorie(categorie);
         }
-
-    int stockAvant = stock.getStockActuel();
-    int nouvelleQuantiteProduit = produit.getQuantite() + quantiteAjoute;
-
-    // Mettre à jour produit et stock
-    produit.setQuantite(nouvelleQuantiteProduit);
-    produitRepository.save(produit);
-
-    stock.setStockActuel(nouvelleQuantiteProduit);
-    stock.setQuantiteAjoute(quantiteAjoute);
-    stock.setStockApres(nouvelleQuantiteProduit);
-    stock.setLastUpdated(LocalDateTime.now());
-
-
-    // Initialiser la liste si null
-
-    stockRepository.save(stock);
-
-    // Charger le fournisseur seulement s'il est fourni
-    if (fournisseurId != null) {
-        fournisseurEntity = fournisseurRepository.findById(fournisseurId)
-            .orElseThrow(() -> new RuntimeException("Fournisseur non trouvé avec l'ID : " + fournisseurId));
-    }
-
-    // 🔁 Enregistrer dans StockProduitFournisseur
-    StockProduitFournisseur spf = new StockProduitFournisseur();
-    spf.setStock(stock);
-    spf.setProduit(produit);
-    spf.setQuantiteAjoutee(quantiteAjoute);
-
-    // Affecter le fournisseur uniquement s'il existe
-    if (fournisseurEntity != null) {
-        spf.setFournisseur(fournisseurEntity);
-    }
-
-    stockProduitFournisseurRepository.save(spf);
-
-
-
-    // 🕒 Historique
-    StockHistory stockHistory = new StockHistory();
-    stockHistory.setAction("Ajout sur quantité");
-    stockHistory.setQuantite(quantiteAjoute);
-    stockHistory.setStockAvant(stockAvant);
-    stockHistory.setStockApres(nouvelleQuantiteProduit);
-    stockHistory.setDescription(description);
-    stockHistory.setCreatedAt(LocalDateTime.now());
-    stockHistory.setStock(stock);
-    stockHistory.setUser(user);
-    if (codeFournisseur != null && !codeFournisseur.isEmpty()) {
-        stockHistory.setCodeFournisseur(codeFournisseur);
-    }
-
-    if (fournisseurId != null) {
-        stockHistory.setFournisseur(fournisseurEntity);
-    }
-
-    stockHistoryRepository.save(stockHistory);
-
-    produits.add(produit);
-}
-
-        // Enregistrer une facture avec plusieurs produits
-        return enregistrerFacture("AJOUTER", produits, produitsQuantites, description, codeFournisseur, fournisseurEntity, user);
+        
+        // Gérer l'unité
+        if (produitRequest.getUniteId() != null) {
+            Unite unite = uniteRepository.findById(produitRequest.getUniteId())
+                    .orElseThrow(() -> new RuntimeException("Unité non trouvée"));
+            produit.setUniteDeMesure(unite);
+        }
+        
+        // Gérer l'image si fournie
+        if (image != null && !image.isEmpty()) {
+            produit.setPhoto(image);
+        }
+        
+        // Type de produit
+        if (produitRequest.getTypeProduit() != null) {
+            produit.setTypeProduit(produitRequest.getTypeProduit());
+        }
+        
+        // Date de préemption
+        if (produitRequest.getDatePreemption() != null) {
+            produit.setDatePreemption(produitRequest.getDatePreemption());
+        }
+        
+        // Sauvegarder le produit
+        produit = produitRepository.save(produit);
+        
+        // Créer le stock si nécessaire
+        if (addToStock) {
+            Stock stock = new Stock();
+            stock.setProduit(produit);
+            stock.setBoutique(boutique);
+            stock.setStockActuel(quantite != null ? quantite : 0);
+            stock.setSeuilAlert(seuilAlert != null ? seuilAlert : 0);
+            stock.setCreatedAt(LocalDateTime.now());
+            stock.setLastUpdated(LocalDateTime.now());
+            stockRepository.save(stock);
+        }
+        
+        return produit;
     }
 
     // Méthode pour ajuster la quantité du produit en stock (retirer des produits)
@@ -455,18 +239,7 @@ public class ProduitService {
         if (token == null || !token.startsWith("Bearer ")) {
             throw new RuntimeException("Token JWT manquant ou mal formaté");
         }
-        String jwtToken = token.substring(7);
-
-        Long userId;
-        try {
-            userId = jwtUtil.extractUserId(jwtToken);
-        } catch (Exception e) {
-            throw new RuntimeException("Erreur lors de l'extraction de l'ID utilisateur depuis le token", e);
-        }
-
-        // 2️⃣ Chargement de l'utilisateur
-        User user = usersRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+        User user = authHelper.getAuthenticatedUserWithFallback(request);
 
         // 3️⃣ Vérification de la boutique
         Boutique boutique = boutiqueRepository.findById(boutiqueId)
@@ -1022,11 +795,7 @@ public class ProduitService {
         }
 
         String token = authHeader.substring(7);
-        Long userId = jwtUtil.extractUserId(token);
-
-        // 3. Vérification de l'utilisateur
-        User user = usersRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+        User user = authHelper.getAuthenticatedUserWithFallback(request);
 
         // ✅ 4. Vérification d'appartenance à la même entreprise
         Long produitEntrepriseId = produit.getBoutique().getEntreprise().getId();
@@ -1062,7 +831,7 @@ public class ProduitService {
         // 🗑️ 8. Marquage comme supprimé
         produit.setDeleted(true);
         produit.setDeletedAt(LocalDateTime.now());
-        produit.setDeletedBy(userId);
+        produit.setDeletedBy(user.getId());
         produitRepository.save(produit);
     }
 
@@ -1096,10 +865,7 @@ public class ProduitService {
             throw new RuntimeException("Token JWT manquant ou mal formaté");
         }
         String token = authHeader.substring(7);
-        Long userId = jwtUtil.extractUserId(token);
-
-        User user = usersRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+        User user = authHelper.getAuthenticatedUserWithFallback(request);
 
          // Vérification des rôles et permissions
          RoleType role = user.getRole().getName();
@@ -1147,11 +913,7 @@ public class ProduitService {
         }
 
         String token = authHeader.substring(7);
-        Long userId = jwtUtil.extractUserId(token);
-
-        // 2. Récupération de l'utilisateur
-        User user = usersRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+        User user = authHelper.getAuthenticatedUserWithFallback(request);
 
         // 3. Vérification des rôles et permissions
         boolean isAdmin = user.getRole().getName() == RoleType.ADMIN;
@@ -1205,13 +967,7 @@ public class ProduitService {
             throw new RuntimeException("Token JWT manquant ou mal formaté");
         }
 
-        Long userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
-        if (userId == null) {
-            throw new RuntimeException("Impossible d'extraire l'ID utilisateur du token JWT");
-        }
-        
-        User user = usersRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé avec l'ID: " + userId));
+        User user = authHelper.getAuthenticatedUserWithFallback(request);
 
         // --- 3. Vérification de la boutique ---
         Boutique boutique = boutiqueRepository.findById(boutiqueId)
@@ -1241,7 +997,7 @@ public class ProduitService {
         // --- 6. Vérification rôle vendeur ---
         boolean isVendeur = role == RoleType.VENDEUR;
         if (isVendeur) {
-            Optional<UserBoutique> userBoutique = userBoutiqueRepository.findByUserIdAndBoutiqueId(userId, boutiqueId);
+            Optional<UserBoutique> userBoutique = userBoutiqueRepository.findByUserIdAndBoutiqueId(user.getId(), boutiqueId);
             if (!userBoutique.isPresent()) {
                 throw new RuntimeException("Vous n'êtes pas affecté à cette boutique, vous ne pouvez pas voir ses produits.");
             }
@@ -1322,11 +1078,7 @@ public class ProduitService {
     }
 
     String token = authHeader.substring(7);
-    Long userId = jwtUtil.extractUserId(token);
-
-    // 2. Vérification de l'utilisateur
-    User user = usersRepository.findById(userId)
-            .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+    User user = authHelper.getAuthenticatedUserWithFallback(request);
 
     // 3. Vérification de la boutique
     Boutique boutique = boutiqueRepository.findById(boutiqueId)
@@ -1510,16 +1262,10 @@ public class ProduitService {
             throw new RuntimeException("Token JWT manquant ou mal formaté");
         }
 
-        Long userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
-        if (userId == null) {
-            throw new RuntimeException("Impossible d'extraire l'ID utilisateur du token JWT");
-        }
-        
-        User user = usersRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("Utilisateur introuvable avec l'ID: " + userId));
+        User user = authHelper.getAuthenticatedUserWithFallback(request);
         
         if (user.getEntreprise() == null) {
-            throw new RuntimeException("Aucune entreprise associée à l'utilisateur ID: " + userId);
+            throw new RuntimeException("Aucune entreprise associée à l'utilisateur ID: " + user.getId());
         }
         
         Entreprise entreprise = user.getEntreprise();

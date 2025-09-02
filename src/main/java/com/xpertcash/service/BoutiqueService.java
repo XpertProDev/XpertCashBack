@@ -38,9 +38,13 @@ import com.xpertcash.repository.TransfertRepository;
 import com.xpertcash.repository.UsersRepository;
 
 import jakarta.servlet.http.HttpServletRequest;
+import com.xpertcash.service.AuthenticationHelper;
 
 @Service
 public class BoutiqueService {
+
+    @Autowired
+    private AuthenticationHelper authHelper;
 
     @Autowired
     private BoutiqueRepository boutiqueRepository;
@@ -118,18 +122,7 @@ public class BoutiqueService {
         throw new RuntimeException("Token JWT manquant ou mal formaté");
     }
 
-    String jwtToken = token.substring(7); // Retirer "Bearer "
-
-    Long userId;
-    try {
-        userId = jwtUtil.extractUserId(jwtToken);
-    } catch (Exception e) {
-        throw new RuntimeException("Erreur lors de l'extraction de l'ID utilisateur depuis le token", e);
-    }
-
-    // 👤 Récupération de l'utilisateur
-    User user = usersRepository.findById(userId)
-            .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+    User user = authHelper.getAuthenticatedUserWithFallback(request);
 
     if (user.getEntreprise() == null) {
         throw new RuntimeException("Vous n'êtes associé à aucune entreprise.");
@@ -158,18 +151,7 @@ public class BoutiqueService {
         throw new RuntimeException("Token JWT manquant ou mal formaté");
     }
 
-    String jwtToken = token.substring(7); // Supprimer "Bearer "
-    Long userId;
-
-    try {
-        userId = jwtUtil.extractUserId(jwtToken);
-    } catch (Exception e) {
-        throw new RuntimeException("Erreur lors de l'extraction de l'ID utilisateur depuis le token", e);
-    }
-
-    // 👤 Récupération de l'utilisateur
-    User user = usersRepository.findById(userId)
-            .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+    User user = authHelper.getAuthenticatedUserWithFallback(request);
 
     // 🏬 Récupération de la boutique
     Boutique boutique = boutiqueRepository.findById(boutiqueId)
@@ -201,9 +183,7 @@ public class BoutiqueService {
         throw new RuntimeException("Token JWT manquant ou mal formaté");
     }
 
-    Long userId = jwtUtil.extractUserId(token.substring(7));
-    User user = usersRepository.findById(userId)
-            .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+    User user = authHelper.getAuthenticatedUserWithFallback(request);
 
     // 🏬 Récupérer la boutique
     Boutique boutique = boutiqueRepository.findById(boutiqueId)
@@ -369,9 +349,7 @@ public class BoutiqueService {
             throw new RuntimeException("Token JWT manquant ou mal formaté");
         }
 
-        Long userId = jwtUtil.extractUserId(token.substring(7));
-        User user = usersRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+        User user = authHelper.getAuthenticatedUserWithFallback(request);
 
         // 🏬 Récupération des boutiques
         Boutique boutiqueSource = boutiqueRepository.findById(boutiqueSourceId)
@@ -465,17 +443,7 @@ public class BoutiqueService {
             throw new RuntimeException("Token JWT manquant ou mal formaté");
         }
 
-        String jwtToken = token.substring(7);
-        Long userId;
-        try {
-            userId = jwtUtil.extractUserId(jwtToken);
-        } catch (Exception e) {
-            throw new RuntimeException("Erreur lors de l'extraction de l'ID utilisateur depuis le token", e);
-        }
-
-        // 👤 Récupérer l'utilisateur
-        User user = usersRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+        User user = authHelper.getAuthenticatedUserWithFallback(request);
 
         // 🏬 Récupérer la boutique
         Boutique boutique = boutiqueRepository.findById(boutiqueId)
@@ -554,9 +522,7 @@ public class BoutiqueService {
         throw new RuntimeException("Token JWT manquant ou mal formaté");
     }
 
-    Long userId = jwtUtil.extractUserId(token.substring(7));
-    User user = usersRepository.findById(userId)
-            .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+    User user = authHelper.getAuthenticatedUserWithFallback(request);
 
     // 🏬 Récupération de la boutique
     Boutique boutique = boutiqueRepository.findById(boutiqueId)
@@ -587,9 +553,7 @@ public class BoutiqueService {
         throw new RuntimeException("Token JWT manquant ou mal formaté");
     }
 
-    Long userId = jwtUtil.extractUserId(token.substring(7));
-    User user = usersRepository.findById(userId)
-            .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+    User user = authHelper.getAuthenticatedUserWithFallback(request);
 
     // 🏬 Récupération de la boutique
     Boutique boutique = boutiqueRepository.findById(boutiqueId)
@@ -660,9 +624,7 @@ public class BoutiqueService {
             throw new RuntimeException("Token JWT manquant ou mal formaté");
         }
 
-        Long userId = jwtUtil.extractUserId(token.substring(7));
-        User user = usersRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+        User user = authHelper.getAuthenticatedUserWithFallback(request);
 
         // 🏬 Récupération de la boutique
         Boutique boutique = boutiqueRepository.findById(boutiqueId)

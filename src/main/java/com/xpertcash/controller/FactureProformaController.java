@@ -70,14 +70,10 @@ public class FactureProformaController {
             @RequestBody FactureProForma facture,
             @RequestParam(defaultValue = "0") Double remisePourcentage,
             @RequestParam(defaultValue = "false") Boolean appliquerTVA,
-            @RequestHeader("Authorization") String token,  // Récupération du token depuis l'en-tête
-            HttpServletRequest request) {  // Passage du HttpServletRequest complet
+            HttpServletRequest request) {
 
         try {
-            // Ajouter le token dans l'en-tête de la requête
-            request.setAttribute("Authorization", token);
-
-            // Appel du service pour ajouter la facture, en passant la requête avec le token
+            // Appel du service pour ajouter la facture
             FactureProForma nouvelleFacture = factureProformaService.ajouterFacture(facture, remisePourcentage, appliquerTVA, request);
 
             // Retourner la facture créée en réponse HTTP 201 (CREATED)

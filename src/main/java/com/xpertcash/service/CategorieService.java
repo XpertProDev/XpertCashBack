@@ -38,9 +38,13 @@ import com.xpertcash.repository.ProduitRepository;
 import com.xpertcash.repository.UsersRepository;
 
 import jakarta.servlet.http.HttpServletRequest;
+import com.xpertcash.service.AuthenticationHelper;
 
 @Service
 public class CategorieService {
+
+    @Autowired
+    private AuthenticationHelper authHelper;
     @Autowired
     private CategorieRepository categorieRepository;
 
@@ -83,9 +87,7 @@ public class CategorieService {
             throw new RuntimeException("Token JWT manquant ou mal formaté");
         }
 
-        Long userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
-        User user = usersRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
+        User user = authHelper.getAuthenticatedUserWithFallback(request);
         Entreprise entreprise = user.getEntreprise();
         if (entreprise == null) throw new RuntimeException("Aucune entreprise associée");
 
@@ -136,9 +138,7 @@ public class CategorieService {
             throw new RuntimeException("Token JWT manquant ou mal formaté");
         }
 
-        Long userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
-        User user = usersRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
+        User user = authHelper.getAuthenticatedUserWithFallback(request);
         Entreprise entreprise = user.getEntreprise();
         if (entreprise == null) throw new RuntimeException("Aucune entreprise associée");
 
@@ -202,9 +202,7 @@ public class CategorieService {
             throw new RuntimeException("Token JWT manquant ou mal formaté");
         }
 
-        Long userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
-        User user = usersRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
+        User user = authHelper.getAuthenticatedUserWithFallback(request);
         Entreprise entreprise = user.getEntreprise();
         if (entreprise == null) throw new RuntimeException("Aucune entreprise associée");
 
@@ -351,9 +349,7 @@ private ProduitDetailsResponseDTO toProduitDTO(Produit produit) {
         throw new RuntimeException("Token JWT manquant ou mal formaté");
     }
 
-    Long userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
-    User user = usersRepository.findById(userId)
-            .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
+    User user = authHelper.getAuthenticatedUserWithFallback(request);
 
     // 2. Vérifier l'appartenance à une entreprise
     Entreprise entreprise = user.getEntreprise();

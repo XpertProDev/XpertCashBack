@@ -30,15 +30,19 @@ public class Utilitaire {
             throw new RuntimeException("Token JWT manquant ou mal formaté");
         }
 
-        Long userId;
+        String userUuid;
         try {
-            userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
+            userUuid = jwtUtil.extractUserUuid(token.replace("Bearer ", ""));
         } catch (Exception e) {
-            throw new RuntimeException("Erreur lors de l'extraction de l'ID utilisateur", e);
+            throw new RuntimeException("Erreur lors de l'extraction de l'UUID utilisateur", e);
         }
 
-        return usersRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
+        if (userUuid == null) {
+            throw new RuntimeException("UUID utilisateur non trouvé dans le token");
+        }
+
+        return usersRepository.findByUuid(userUuid)
+                .orElseThrow(() -> new RuntimeException("Utilisateur introuvable avec UUID: " + userUuid));
     }
 
 

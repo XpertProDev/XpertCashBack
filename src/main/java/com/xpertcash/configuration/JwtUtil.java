@@ -17,7 +17,21 @@ public class JwtUtil {
         this.jwtConfig = jwtConfig;
     }
 
-    // Méthode pour extraire l'ID de l'utilisateur depuis le JWT
+    // Méthode pour extraire l'UUID de l'utilisateur depuis le JWT
+    public String extractUserUuid(String token) {
+        try {
+            return extractClaim(token, Claims::getSubject);
+        } catch (ExpiredJwtException e) {
+            System.out.println("⚠️ Token expiré : impossible d'extraire l'UUID utilisateur.");
+            return null;
+        } catch (JwtException | IllegalArgumentException e) {
+            System.out.println("⚠️ Token invalide ou mal formé : " + e.getMessage());
+            return null;
+        }
+    }
+
+    // Méthode LEGACY pour extraire l'ID de l'utilisateur depuis le JWT (pour compatibilité)
+    @Deprecated
     public Long extractUserId(String token) {
         try {
             return Long.parseLong(extractClaim(token, Claims::getSubject));

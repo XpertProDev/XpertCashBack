@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.stream.Collectors;
+import jakarta.servlet.http.HttpServletRequest;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -70,8 +71,9 @@ public class GlobalNotificationController {
     @PutMapping("/notifications/{id}/read")
     public ResponseEntity<Void> markAsRead(
             @PathVariable Long id,
-            @RequestHeader("Authorization") String authHeader
+            HttpServletRequest request
     ) {
+        String authHeader = request.getHeader("Authorization");
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }

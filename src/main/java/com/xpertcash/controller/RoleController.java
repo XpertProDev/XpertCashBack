@@ -9,6 +9,7 @@ import com.xpertcash.service.RoleService;
 import lombok.RequiredArgsConstructor;
 import java.util.List;
 import org.springframework.http.ResponseEntity;
+import jakarta.servlet.http.HttpServletRequest;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -21,9 +22,10 @@ public class RoleController {
 
         @PutMapping("/updateRole/{userId}")
     public ResponseEntity<User> updateUserRole(
-            @RequestHeader("Authorization") String token, 
+            HttpServletRequest request, 
             @PathVariable Long userId, 
             @RequestBody RoleRequest roleRequest) {
+        String token = request.getHeader("Authorization");
         User updatedUser = roleService.updateUserRole(token, userId, roleRequest.getName());
         return ResponseEntity.ok(updatedUser);
     }

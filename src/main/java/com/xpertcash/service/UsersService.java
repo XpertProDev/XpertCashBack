@@ -57,11 +57,15 @@ import java.util.stream.Collectors;
 
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
+import com.xpertcash.service.AuthenticationHelper;
 
 
 
 @Service
 public class UsersService {
+
+    @Autowired
+    private AuthenticationHelper authHelper;
 
     @Autowired
     private UsersRepository usersRepository;
@@ -108,8 +112,6 @@ public class UsersService {
 
 
 
-
-  
    @Transactional(noRollbackFor = MessagingException.class)
     public RegisterResponse registerUsers(String nomComplet, String email, String password, String phone, String pays, String nomEntreprise, String nomBoutique) {
         RegisterResponse response = new RegisterResponse();
@@ -215,6 +217,7 @@ public class UsersService {
     
         // Créer l'utilisateur
         User user = new User();
+        user.setUuid(UUID.randomUUID().toString());
         user.setEmail(email);
         user.setPassword(hashedPassword);
         user.setPhone(phone);
@@ -332,7 +335,7 @@ public class UsersService {
             boolean userActivationPossible = isAdmin ? (user.isActivatedLien() || within24Hours) : true;
 
             return Jwts.builder()
-                    .setSubject(String.valueOf(user.getId()))
+                    .setSubject(user.getUuid())
                     .claim("role", user.getRole().getName())
                     .claim("userActivated", userActivated)
                     .claim("adminActivated", adminActivated)
@@ -348,7 +351,7 @@ public class UsersService {
             Date expirationDate = new Date(now.getTime() + refreshExpiration);
 
             return Jwts.builder()
-                    .setSubject(String.valueOf(user.getId()))
+                    .setSubject(user.getUuid())
                     .setIssuedAt(now)
                     .setExpiration(expirationDate)
                     .signWith(SignatureAlgorithm.HS256, jwtConfig.getSecretKey())
@@ -522,6 +525,7 @@ public class UsersService {
                     
                 // Créer un nouvel utilisateur avec l'activation dépendante de l'admin
                 User newUser = new User();
+                newUser.setUuid(UUID.randomUUID().toString());
                 newUser.setEmail(userRequest.getEmail());
                 newUser.setPassword(encodedPassword);
                 newUser.setNomComplet(userRequest.getNomComplet());
@@ -902,9 +906,7 @@ public class UsersService {
     }
 
     // Extraction de l'ID de l'utilisateur à partir du token
-    Long userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
-    User user = usersRepository.findById(userId)
-            .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
+    User user = authHelper.getAuthenticatedUserWithFallback(request);
 
     // Récupération de l'entreprise associée à l'utilisateur
     Entreprise entreprise = user.getEntreprise();
@@ -1105,10 +1107,7 @@ public class UsersService {
         }
 
         token = token.replace("Bearer ", "");
-        Long userId = jwtUtil.extractUserId(token);
-
-        User user = usersRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+        User user = authHelper.getAuthenticatedUserWithFallback(request);
 
         Entreprise entreprise = user.getEntreprise();
         if (entreprise == null) {
