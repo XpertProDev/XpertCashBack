@@ -1194,6 +1194,11 @@ public class ProduitService {
         if (size <= 0) size = 20; // Taille par défaut
         if (size > 100) size = 100; // Limite maximale pour éviter la surcharge
         
+        // Validation de l'ID de la boutique
+        if (boutiqueId == null) {
+            throw new RuntimeException("L'ID de la boutique ne peut pas être null");
+        }
+        
         // --- 2. Extraction utilisateur via JWT ---
         String token = request.getHeader("Authorization");
         if (token == null || !token.startsWith("Bearer ")) {
@@ -1201,8 +1206,12 @@ public class ProduitService {
         }
 
         Long userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
+        if (userId == null) {
+            throw new RuntimeException("Impossible d'extraire l'ID utilisateur du token JWT");
+        }
+        
         User user = usersRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+                .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé avec l'ID: " + userId));
 
         // --- 3. Vérification de la boutique ---
         Boutique boutique = boutiqueRepository.findById(boutiqueId)
@@ -1251,12 +1260,7 @@ public class ProduitService {
 
         // --- 10. Convertir les produits de la page courante vers DTOs ---
         List<ProduitDTO> produitsDTOs = produitsPage.getContent().stream()
-                .map(produit -> {
-                    ProduitDTO dto = convertToProduitDTO(produit);
-                    // Pour l'API stock, on n'a pas besoin du champ boutiques
-                    dto.setBoutiques(null);
-                    return dto;
-                })
+                .map(this::convertToProduitDTO)
                 .collect(Collectors.toList());
 
         // --- 11. Créer la page de DTOs ---
@@ -1495,6 +1499,11 @@ public class ProduitService {
         if (size <= 0) size = 20; // Taille par défaut
         if (size > 100) size = 100; // Limite maximale pour éviter la surcharge
         
+        // Validation de l'ID de l'entreprise
+        if (entrepriseId == null) {
+            throw new RuntimeException("L'ID de l'entreprise ne peut pas être null");
+        }
+        
         // --- 2. Extraire l'utilisateur via JWT ---
         String token = request.getHeader("Authorization");
         if (token == null || !token.startsWith("Bearer ")) {
@@ -1502,10 +1511,21 @@ public class ProduitService {
         }
 
         Long userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
+        if (userId == null) {
+            throw new RuntimeException("Impossible d'extraire l'ID utilisateur du token JWT");
+        }
+        
         User user = usersRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
+                .orElseThrow(() -> new RuntimeException("Utilisateur introuvable avec l'ID: " + userId));
+        
+        if (user.getEntreprise() == null) {
+            throw new RuntimeException("Aucune entreprise associée à l'utilisateur ID: " + userId);
+        }
+        
         Entreprise entreprise = user.getEntreprise();
-        if (entreprise == null) throw new RuntimeException("Aucune entreprise associée à cet utilisateur");
+        if (entreprise.getId() == null) {
+            throw new RuntimeException("L'ID de l'entreprise de l'utilisateur est null");
+        }
 
         // --- 3. Vérification des droits ---
         boolean isAdminOrManager = CentralAccess.isAdminOrManagerOfEntreprise(user, entreprise.getId());
@@ -1518,7 +1538,7 @@ public class ProduitService {
 
         // --- 4. Vérification de l'entreprise ---
         if (!entreprise.getId().equals(entrepriseId)) {
-            throw new RuntimeException("Accès refusé : vous ne pouvez pas accéder aux produits d'une autre entreprise.");
+            throw new RuntimeException("Accès refusé : vous ne pouvez pas accéder aux produits d'une autre entreprise. Votre entreprise: " + entreprise.getId() + ", Demandée: " + entrepriseId);
         }
 
         // --- 5. Créer le Pageable avec tri optimisé ---

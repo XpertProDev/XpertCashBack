@@ -91,9 +91,9 @@ curl -X GET "http://localhost:8080/api/auth/boutique/456/produits/paginated?page
           "nom": "Boutique Centre",
           "typeBoutique": "PHYSIQUE",
           "quantite": 75
-        },
-        {
-          "id": 2,
+    },
+    {
+      "id": 2,
           "nom": "Boutique Nord",
           "typeBoutique": "PHYSIQUE",
           "quantite": 75
