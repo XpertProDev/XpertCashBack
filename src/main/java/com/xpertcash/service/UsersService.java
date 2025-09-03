@@ -634,6 +634,7 @@ public class UsersService {
         // Conversion de l'utilisateur en DTO et retour
         return new UserDTO(
             targetUser.getId(),
+            targetUser.getUuid(),
             targetUser.getPersonalCode(),
             targetUser.getNomComplet(),
             targetUser.getEmail(),
@@ -903,6 +904,7 @@ public class UsersService {
         // Création du UserDTO
         return new UserDTO(
             userEntity.getId(),
+            userEntity.getUuid(),
             userEntity.getPersonalCode(),
             userEntity.getNomComplet(),
             userEntity.getEmail(),
@@ -965,6 +967,7 @@ public class UsersService {
     // Conversion de l'utilisateur en UserDTO
     UserDTO userDTO = new UserDTO(
         targetUser.getId(),
+        targetUser.getUuid(),
         targetUser.getPersonalCode(),
         targetUser.getNomComplet(),
         targetUser.getEmail(),

@@ -11,6 +11,7 @@ import lombok.Setter;
 @Getter
 public class UserDTO {
     private Long id;
+    private String uuid;
     private String personalCode;
     private String nomComplet;
     private String email;
@@ -28,11 +29,12 @@ public class UserDTO {
 
     // Constructeurs, getters, setters...
 
-    public UserDTO(Long id, String personalCode, String nomComplet, String email, String phone, 
+    public UserDTO(Long id, String uuid, String personalCode, String nomComplet, String email, String phone, 
                    String pays, String photo, String createdAt, String activationCode, 
                    Boolean activatedLien, Boolean enabledLien, String lastActivity, 
                    Boolean locked, RoleDTO role, List<Long> userBoutiques) {
         this.id = id;
+        this.uuid = uuid;
         this.personalCode = personalCode;
         this.nomComplet = nomComplet;
         this.email = email;
