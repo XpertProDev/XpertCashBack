@@ -11,6 +11,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -108,15 +109,73 @@ public ResponseEntity<?> consulterTempsEssaiModules(HttpServletRequest request) 
             return ResponseEntity.badRequest().body("Aucune entreprise associée à cet utilisateur");
         }
 
-        List<PaiementModule> paiements = paiementModuleRepository.findByEntrepriseId(entreprise.getId());
+        try {
+            // Appeler le service pour activer le module avec paiement
+            moduleActivationService.activerModuleAvecPaiement(
+                user.getId(),
+                demande.getNomModule(),
+                demande.getDureeMois(),
+                demande.getNumeroCarte(),
+                demande.getCvc(),
+                demande.getDateExpiration(),
+                demande.getNomCompletProprietaire(),
+                demande.getEmailProprietaireCarte(),
+                demande.getPays(),
+                demande.getAdresse(),
+                demande.getVille()
+            );
 
-        List<PaiementModuleDTO> paiementDTOS = paiements.stream()
-                .map(PaiementModuleDTO::new)
-                .collect(Collectors.toList());
-
-        return ResponseEntity.ok(paiementDTOS);
+            return ResponseEntity.ok("Module activé avec succès !");
+            
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body("Erreur lors de l'activation : " + e.getMessage());
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body("Erreur interne lors de l'activation : " + e.getMessage());
+        }
     }
 
+      //Endpoint pour lister tout les  modules actifs ou non actifs
+      @GetMapping("/entreprise/modules")
+      public ResponseEntity<List<ModuleDTO>> getModulesEntreprise(HttpServletRequest request) {
+          List<ModuleDTO> modules = moduleActivationService.listerModulesEntreprise(request);
+          return ResponseEntity.ok(modules);
+      }
+  
+    //Endpoint pour vérifier le statut d'activation d'un module spécifique
+    @GetMapping("/entreprise/modules/{codeModule}/statut")
+    public ResponseEntity<?> verifierStatutModule(
+            @PathVariable String codeModule,
+            HttpServletRequest request) {
+        
+        String token = request.getHeader("Authorization");
+        if (token == null || !token.startsWith("Bearer ")) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Token JWT manquant ou mal formaté");
+        }
+
+        User user = authHelper.getAuthenticatedUserWithFallback(request);
+        Entreprise entreprise = user.getEntreprise();
+        
+        if (entreprise == null) {
+            return ResponseEntity.badRequest().body("Aucune entreprise associée à cet utilisateur");
+        }
+
+        try {
+            boolean moduleActif = moduleActivationService.isModuleActifPourEntreprise(entreprise, codeModule);
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("codeModule", codeModule);
+            response.put("actif", moduleActif);
+            response.put("entreprise", entreprise.getNomEntreprise());
+            
+            return ResponseEntity.ok(response);
+            
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body("Erreur lors de la vérification : " + e.getMessage());
+        }
+    }
+  
 
     //Total des paiements par module.
 

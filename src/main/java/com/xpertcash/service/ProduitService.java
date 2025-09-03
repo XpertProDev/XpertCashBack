@@ -32,7 +32,7 @@ import com.xpertcash.DTOs.ProduitStockPaginatedResponseDTO;
 import com.xpertcash.DTOs.StockHistoryDTO;
 import com.xpertcash.DTOs.PRODUIT.ProduitRequest;
 import com.xpertcash.configuration.CentralAccess;
-import com.xpertcash.configuration.JwtUtil;
+
 import com.xpertcash.entity.Boutique;
 import com.xpertcash.entity.Categorie;
 import com.xpertcash.entity.Entreprise;
@@ -73,8 +73,7 @@ public class ProduitService {
     @Autowired
     private BoutiqueRepository boutiqueRepository;
 
-    @Autowired
-    private JwtUtil jwtUtil;
+
 
     @Autowired
     private UsersRepository usersRepository;
@@ -231,6 +230,121 @@ public class ProduitService {
         return produit;
     }
 
+    //Methode pour ajuster la quantiter du produit en stock
+    public Facture ajouterStock(Long boutiqueId, Map<Long, Integer> produitsQuantites, String description, String codeFournisseur, Long fournisseurId, HttpServletRequest request) {
+
+        User user = authHelper.getAuthenticatedUserWithFallback(request);
+
+        // ✅ Récupération de la boutique
+        Boutique boutique = boutiqueRepository.findById(boutiqueId)
+                .orElseThrow(() -> new RuntimeException("Boutique introuvable"));
+
+        Long entrepriseId = boutique.getEntreprise().getId();
+
+        // 🔒 Vérifier que l'utilisateur appartient bien à la même entreprise
+        if (!user.getEntreprise().getId().equals(entrepriseId)) {
+            throw new RuntimeException("Accès interdit : cette boutique ne vous appartient pas");
+        }
+
+        // 🔐 Contrôle d'accès strict : seulement ADMIN ou permission explicite
+        RoleType role = user.getRole().getName();
+        boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
+        boolean hasPermission = user.getRole().hasPermission(PermissionType.GERER_PRODUITS);
+        boolean hasPermissionGestion = user.getRole().hasPermission(PermissionType.APPROVISIONNER_STOCK);
+
+
+        if (!isAdminOrManager && !hasPermission && !hasPermissionGestion) {
+            throw new RuntimeException("Accès refusé : seuls les ADMIN ou les utilisateurs ayant la permission GERER_PRODUITS peuvent gérer le stock de cette boutique.");
+        }
+
+
+
+        List<Produit> produits = new ArrayList<>();
+        Fournisseur fournisseurEntity = null;
+
+       for (Map.Entry<Long, Integer> entry : produitsQuantites.entrySet()) {
+        Long produitId = entry.getKey();
+        Integer quantiteAjoute = entry.getValue();
+
+        Produit produit = produitRepository.findById(produitId)
+                .orElseThrow(() -> new RuntimeException("Produit non trouvé"));
+
+          // 🔒 Vérifier que le produit appartient à la même entreprise (via sa boutique)
+        Boutique produitBoutique = produit.getBoutique();
+        if (produitBoutique == null || !produitBoutique.getEntreprise().getId().equals(entrepriseId)) {
+            throw new RuntimeException("Le produit ID " + produitId + " n'appartient pas à l'entreprise de la boutique.");
+        }
+
+        Stock stock = stockRepository.findByProduit(produit);
+        if (stock == null) {
+            throw new RuntimeException("Stock introuvable pour ce produit");
+        }
+
+    int stockAvant = stock.getStockActuel();
+    int nouvelleQuantiteProduit = produit.getQuantite() + quantiteAjoute;
+
+    // Mettre à jour produit et stock
+    produit.setQuantite(nouvelleQuantiteProduit);
+    produitRepository.save(produit);
+
+    stock.setStockActuel(nouvelleQuantiteProduit);
+    stock.setQuantiteAjoute(quantiteAjoute);
+    stock.setStockApres(nouvelleQuantiteProduit);
+    stock.setLastUpdated(LocalDateTime.now());
+
+
+    // Initialiser la liste si null
+
+    stockRepository.save(stock);
+
+    // Charger le fournisseur seulement s'il est fourni
+    if (fournisseurId != null) {
+        fournisseurEntity = fournisseurRepository.findById(fournisseurId)
+            .orElseThrow(() -> new RuntimeException("Fournisseur non trouvé avec l'ID : " + fournisseurId));
+    }
+
+    // 🔁 Enregistrer dans StockProduitFournisseur
+    StockProduitFournisseur spf = new StockProduitFournisseur();
+    spf.setStock(stock);
+    spf.setProduit(produit);
+    spf.setQuantiteAjoutee(quantiteAjoute);
+
+    // Affecter le fournisseur uniquement s'il existe
+    if (fournisseurEntity != null) {
+        spf.setFournisseur(fournisseurEntity);
+    }
+
+    stockProduitFournisseurRepository.save(spf);
+
+
+
+    // 🕒 Historique
+    StockHistory stockHistory = new StockHistory();
+    stockHistory.setAction("Ajout sur quantité");
+    stockHistory.setQuantite(quantiteAjoute);
+    stockHistory.setStockAvant(stockAvant);
+    stockHistory.setStockApres(nouvelleQuantiteProduit);
+    stockHistory.setDescription(description);
+    stockHistory.setCreatedAt(LocalDateTime.now());
+    stockHistory.setStock(stock);
+    stockHistory.setUser(user);
+    if (codeFournisseur != null && !codeFournisseur.isEmpty()) {
+        stockHistory.setCodeFournisseur(codeFournisseur);
+    }
+
+    if (fournisseurId != null) {
+        stockHistory.setFournisseur(fournisseurEntity);
+    }
+
+    stockHistoryRepository.save(stockHistory);
+
+    produits.add(produit);
+}
+
+        // Enregistrer une facture avec plusieurs produits
+        return enregistrerFacture("AJOUTER", produits, produitsQuantites, description, codeFournisseur, fournisseurEntity, user);
+    }
+
     // Méthode pour ajuster la quantité du produit en stock (retirer des produits)
     public FactureDTO retirerStock(Long boutiqueId, Map<Long, Integer> produitsQuantites, String description, HttpServletRequest request) {
 
@@ -326,6 +440,8 @@ public class ProduitService {
 }
 
 
+
+
       // Génère un numéro unique de facture
    private String generateNumeroFacture() {
         int currentYear = LocalDate.now().getYear();
@@ -411,22 +527,7 @@ public class ProduitService {
      //Methode liste Historique sur Stock
   public List<StockHistoryDTO> getStockHistory(Long produitId, HttpServletRequest request) {
 
-    // 🔐 Vérification du token JWT
-    String token = request.getHeader("Authorization");
-    if (token == null || !token.startsWith("Bearer ")) {
-        throw new RuntimeException("Token JWT manquant ou mal formaté");
-    }
-
-    Long userId;
-    try {
-        userId = jwtUtil.extractUserId(token.substring(7));
-    } catch (Exception e) {
-        throw new RuntimeException("Erreur lors de l'extraction de l'ID utilisateur depuis le token", e);
-    }
-
-    // 🔐 Récupération de l'utilisateur
-    User user = usersRepository.findById(userId)
-            .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+    User user = authHelper.getAuthenticatedUserWithFallback(request);
 
     if (user.getEntreprise() == null) {
         throw new RuntimeException("Utilisateur non rattaché à une entreprise.");
@@ -501,22 +602,7 @@ public class ProduitService {
     // Récupérer tous les mouvements de stock
     public List<StockHistoryDTO> getAllStockHistory(HttpServletRequest request) {
 
-    // 🔐 Vérification du token JWT
-    String token = request.getHeader("Authorization");
-    if (token == null || !token.startsWith("Bearer ")) {
-        throw new RuntimeException("Token JWT manquant ou mal formaté");
-    }
-
-    Long userId;
-    try {
-        userId = jwtUtil.extractUserId(token.substring(7));
-    } catch (Exception e) {
-        throw new RuntimeException("Erreur lors de l'extraction de l'ID utilisateur depuis le token", e);
-    }
-
-    // 🔐 Récupération de l'utilisateur
-    User user = usersRepository.findById(userId)
-            .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+    User user = authHelper.getAuthenticatedUserWithFallback(request);
 
     if (user.getEntreprise() == null) {
         throw new RuntimeException("Utilisateur non rattaché à une entreprise.");
@@ -565,22 +651,7 @@ public class ProduitService {
 
    //Lister Stock
     public List<Stock> getAllStocks(HttpServletRequest request) {
-        // 🔐 Vérification du token
-        String token = request.getHeader("Authorization");
-        if (token == null || !token.startsWith("Bearer ")) {
-            throw new RuntimeException("Token JWT manquant ou mal formaté");
-        }
-
-        Long userId;
-        try {
-            userId = jwtUtil.extractUserId(token.substring(7));
-        } catch (Exception e) {
-            throw new RuntimeException("Erreur lors de l'extraction de l'ID utilisateur depuis le token", e);
-        }
-
-        // 🔐 Récupération de l'utilisateur
-        User user = usersRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+        User user = authHelper.getAuthenticatedUserWithFallback(request);
 
         if (user.getEntreprise() == null) {
             throw new RuntimeException("Utilisateur non rattaché à une entreprise.");
@@ -604,22 +675,7 @@ public class ProduitService {
    // Update Produit
     public ProduitDTO updateProduct(Long produitId, ProduitRequest produitRequest, MultipartFile imageFile, boolean addToStock, HttpServletRequest request)
  {
-    // Vérification de l'autorisation de l'admin
-    String token = request.getHeader("Authorization");
-    if (token == null || !token.startsWith("Bearer ")) {
-        throw new RuntimeException("Token JWT manquant ou mal formaté");
-    }
-
-    token = token.replace("Bearer ", "");
-    Long adminId = null;
-    try {
-        adminId = jwtUtil.extractUserId(token);
-    } catch (Exception e) {
-        throw new RuntimeException("Erreur lors de l'extraction de l'ID de l'admin depuis le token", e);
-    }
-
-    User admin = usersRepository.findById(adminId)
-        .orElseThrow(() -> new RuntimeException("Admin non trouvé"));
+    User admin = authHelper.getAuthenticatedUserWithFallback(request);
 
     // 🛡️ Autorisation et permission
     RoleType role = admin.getRole().getName();
@@ -1132,21 +1188,7 @@ public class ProduitService {
     //Methode pour reuperer un produit par son id
    public ProduitDTO getProduitById(Long id, HttpServletRequest request) {
     // Vérification de l'autorisation de l'admin
-    String token = request.getHeader("Authorization");
-    if (token == null || !token.startsWith("Bearer ")) {
-        throw new RuntimeException("Token JWT manquant ou mal formaté");
-    }
-
-    token = token.replace("Bearer ", "");
-    Long adminId;
-    try {
-        adminId = jwtUtil.extractUserId(token);
-    } catch (Exception e) {
-        throw new RuntimeException("Erreur lors de l'extraction de l'ID de l'admin depuis le token", e);
-    }
-
-    User admin = usersRepository.findById(adminId)
-            .orElseThrow(() -> new RuntimeException("Admin non trouvé"));
+    User admin = authHelper.getAuthenticatedUserWithFallback(request);
 
     // Autorisation et permission
     RoleType role = admin.getRole().getName();
@@ -1359,17 +1401,7 @@ public class ProduitService {
             // Extraire le token sans "Bearer "
             String token = tokenHeader.substring(7);
 
-            // 2. Extraction de l'ID utilisateur
-            Long userId;
-            try {
-                userId = jwtUtil.extractUserId(token);
-            } catch (Exception e) {
-                throw new RuntimeException("Token JWT invalide ou expiré", e);
-            }
-
-            // 3. Chargement de l'utilisateur
-            User user = usersRepository.findById(userId)
-                    .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+            User user = authHelper.getAuthenticatedUserWithFallback(request);
 
             // 4. Vérification de l'entreprise
             Entreprise entreprise = entrepriseRepository.findById(entrepriseId)

@@ -27,7 +27,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.xpertcash.DTOs.FactureProFormaDTO;
-import com.xpertcash.configuration.JwtUtil;
+import com.xpertcash.service.AuthenticationHelper;
 import com.xpertcash.entity.Entreprise;
 import com.xpertcash.entity.FactureProForma;
 import com.xpertcash.entity.MethodeEnvoi;
@@ -58,7 +58,7 @@ public class FactureProformaController {
     private UsersRepository usersRepository;
 
     @Autowired
-    private JwtUtil jwtUtil;
+    private AuthenticationHelper authHelper;
 
     @Autowired
     private MailService mailService;
@@ -106,8 +106,7 @@ public class FactureProformaController {
             @PathVariable("factureId") Long factureId,
             HttpServletRequest request) {
         try {
-            String token = request.getHeader("Authorization");
-            factureProformaService.supprimerFactureProforma(factureId, token);
+            factureProformaService.supprimerFactureProforma(factureId, request);
 
             // ✅ Retourner un objet JSON
             Map<String, String> response = new HashMap<>();
@@ -177,23 +176,11 @@ public class FactureProformaController {
     // Endpoint pour recuperer la liste des factures pro forma dune entreprise
     @GetMapping("/mes-factures")
     public ResponseEntity<Object> getFacturesParEntreprise(HttpServletRequest request) {
-        String token = request.getHeader("Authorization");
-        if (token == null || !token.startsWith("Bearer ")) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(Map.of("error", "Token JWT manquant ou mal formaté"));
-        }
-
-        Long userId;
-        try {
-            userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(Map.of("error", "Token JWT invalide"));
-        }
+        User user = authHelper.getAuthenticatedUserWithFallback(request);
 
         try {
             List<Map<String, Object>> factures = factureProformaService
-                    .getFacturesParEntrepriseParUtilisateur(userId, request);
+                    .getFacturesParEntrepriseParUtilisateur(user.getId(), request);
             return ResponseEntity.ok(factures);
         } catch (Exception e) {
             e.printStackTrace(); // Pour loguer l’erreur réelle côté serveur
@@ -220,21 +207,7 @@ public class FactureProformaController {
             @PathVariable Long id,
             HttpServletRequest request) {
 
-        // 🔐 Extraction de l'utilisateur depuis le token JWT
-        String token = request.getHeader("Authorization");
-        if (token == null || !token.startsWith("Bearer ")) {
-            throw new RuntimeException("Token JWT manquant ou mal formaté");
-        }
-
-        Long userId;
-        try {
-            userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
-        } catch (Exception e) {
-            throw new RuntimeException("Erreur lors de l'extraction de l'ID de l'utilisateur depuis le token", e);
-        }
-
-        User user = usersRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("Utilisateur introuvable !"));
+        User user = authHelper.getAuthenticatedUserWithFallback(request);
 
         // Récupération de la facture
         FactureProForma facture = factureProformaRepository.findById(id)
@@ -362,23 +335,11 @@ public ResponseEntity<List<FactureProFormaDTO>> getFacturesParPeriode(
         @RequestParam(name = "dateFin", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateFin,
         HttpServletRequest request
 ) {
-    String token = request.getHeader("Authorization");
-    if (token == null || !token.startsWith("Bearer ")) {
-        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(null);
-    }
-
-    Long userId;
     try {
-        // Extraire l'ID de l'utilisateur à partir du token JWT
-        userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
-    } catch (Exception e) {
-        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(null);
-    }
-
-    try {
+        User user = authHelper.getAuthenticatedUserWithFallback(request);
         // Appeler le service pour obtenir les factures en fonction de la période
         List<FactureProFormaDTO> facturesDTO = factureProformaService.getFacturesParPeriode(
-                userId, request, typePeriode, dateDebut, dateFin);
+                user.getId(), request, typePeriode, dateDebut, dateFin);
         
         return ResponseEntity.ok(facturesDTO);  // Retourner la liste des DTOs
     } catch (Exception e) {

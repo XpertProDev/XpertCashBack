@@ -29,6 +29,7 @@ import com.xpertcash.entity.User;
 import com.xpertcash.repository.CategorieRepository;
 import com.xpertcash.repository.UsersRepository;
 import com.xpertcash.service.CategorieService;
+import com.xpertcash.service.AuthenticationHelper;
 
 import jakarta.servlet.http.HttpServletRequest;
 
@@ -43,61 +44,49 @@ public class CategorieController {
     private UsersRepository usersRepository;
     @Autowired
     private JwtUtil jwtUtil;
+    @Autowired
+    private AuthenticationHelper authHelper;
 
     // Ajouter une catégorie (seul ADMIN)
     @PostMapping("/createCategory")
-public ResponseEntity<Object> createCategorie(@RequestBody Map<String, String> payload, HttpServletRequest request) {
-    try {
-        String nom = payload.get("nom");
-        
-        // Récupérer l'ID de l'entreprise de l'utilisateur authentifié à partir du token JWT
-        String token = request.getHeader("Authorization");
-        if (token == null || !token.startsWith("Bearer ")) {
-            throw new RuntimeException("Token JWT manquant ou mal formaté");
-        }
-
-        Long userId;
+    public ResponseEntity<Object> createCategorie(@RequestBody Map<String, String> payload, HttpServletRequest request) {
         try {
-            userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
-        } catch (Exception e) {
-            throw new RuntimeException("Erreur lors de l'extraction de l'ID utilisateur", e);
-        }
+            String nom = payload.get("nom");
+            
+            User user = authHelper.getAuthenticatedUserWithFallback(request);
 
-        User user = usersRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
+            Entreprise entreprise = user.getEntreprise();
+            if (entreprise == null) {
+                throw new RuntimeException("Aucune entreprise associée à cet utilisateur");
+            }
 
-        Entreprise entreprise = user.getEntreprise();
-        if (entreprise == null) {
-            throw new RuntimeException("Aucune entreprise associée à cet utilisateur");
-        }
+            // Si le nom de la catégorie est vide
+            if (nom == null || nom.isEmpty()) {
+                throw new RuntimeException("Catégorie ne peut pas être vide !");
+            }
 
-        // Si le nom de la catégorie est vide
-        if (nom == null || nom.isEmpty()) {
-            throw new RuntimeException("Catégorie ne peut pas être vide !");
-        }
+            // Vérifier si la catégorie existe déjà
+            if (categorieRepository.existsByNom(nom)) {
+                Map<String, String> errorResponse = new HashMap<>();
+                errorResponse.put("error", "Cette catégorie existe déjà !");
+                return ResponseEntity.status(HttpStatus.CONFLICT).body(errorResponse);
+            }
 
-        // Vérifier si la catégorie existe déjà
-        if (categorieRepository.existsByNom(nom)) {
+            // Créer la catégorie et l'associer à l'entreprise de l'utilisateur
+            Categorie savedCategorie = categorieService.createCategorie(nom, entreprise.getId());
+
+            // Retourner un message de succès ou un objet simple
+            Map<String, Object> response = new HashMap<>();
+            response.put("id", savedCategorie.getId());
+            response.put("nom", savedCategorie.getNom());
+            response.put("message", "Catégorie créée avec succès !");
+            return ResponseEntity.status(HttpStatus.CREATED).body(response);
+        } catch (RuntimeException e) {
             Map<String, String> errorResponse = new HashMap<>();
-            errorResponse.put("error", "Cette catégorie existe déjà !");
-            return ResponseEntity.status(HttpStatus.CONFLICT).body(errorResponse);
+            errorResponse.put("error", e.getMessage());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
         }
-
-        // Créer la catégorie et l'associer à l'entreprise de l'utilisateur
-        Categorie savedCategorie = categorieService.createCategorie(nom, entreprise.getId());
-
-        // Retourner un message de succès ou un objet simple
-        Map<String, Object> response = new HashMap<>();
-        response.put("id", savedCategorie.getId());
-        response.put("nom", savedCategorie.getNom());
-        response.put("message", "Catégorie créée avec succès !");
-        return ResponseEntity.status(HttpStatus.CREATED).body(response);
-    } catch (RuntimeException e) {
-        Map<String, String> errorResponse = new HashMap<>();
-        errorResponse.put("error", e.getMessage());
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
     }
-}
 
 
         // Récupérer toutes les catégories avec comptage des produits (sans pagination)

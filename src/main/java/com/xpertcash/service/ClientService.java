@@ -14,8 +14,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import com.xpertcash.configuration.CentralAccess;
-import com.xpertcash.configuration.JwtUtil;
+
 import com.xpertcash.entity.Client;
+import com.xpertcash.service.AuthenticationHelper;
 import com.xpertcash.entity.Entreprise;
 import com.xpertcash.entity.EntrepriseClient;
 import com.xpertcash.entity.PermissionType;
@@ -45,7 +46,7 @@ public class ClientService {
     private UsersRepository usersRepository;
 
     @Autowired
-    private JwtUtil jwtUtil;
+    private AuthenticationHelper authHelper;
 
     @Autowired
     private ImageStorageService imageStorageService;
@@ -62,22 +63,7 @@ public class ClientService {
             throw new RuntimeException("Le nom du client est obligatoire !");
         }
 
-    // 🔐 Vérifier la présence du token JWT et récupérer l'ID de l'utilisateur connecté
-    String token = request.getHeader("Authorization");
-    if (token == null || !token.startsWith("Bearer ")) {
-        throw new RuntimeException("Token JWT manquant ou mal formaté");
-    }
-
-    Long userId;
-    try {
-        userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
-    } catch (Exception e) {
-        throw new RuntimeException("Erreur lors de l'extraction de l'ID de l'utilisateur depuis le token", e);
-    }
-
-    // 🔐 Récupérer l'utilisateur
-    User user = usersRepository.findById(userId)
-            .orElseThrow(() -> new RuntimeException("Utilisateur introuvable !"));
+    User user = authHelper.getAuthenticatedUserWithFallback(request);
 
     // 🔐 Vérifier que l'utilisateur est lié à une entreprise
     Entreprise entrepriseUtilisateur = user.getEntreprise();
@@ -197,21 +183,7 @@ public class ClientService {
 
 
     public List<Client> getAllClients(HttpServletRequest request) {
-    // 1. Extraire l'utilisateur à partir du token
-    String token = request.getHeader("Authorization");
-    if (token == null || !token.startsWith("Bearer ")) {
-        throw new RuntimeException("Token JWT manquant ou mal formaté");
-    }
-
-    Long userId;
-    try {
-        userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
-    } catch (Exception e) {
-        throw new RuntimeException("Erreur lors de l'extraction de l'ID utilisateur", e);
-    }
-
-    User user = usersRepository.findById(userId)
-            .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
+    User user = authHelper.getAuthenticatedUserWithFallback(request);
 
     Entreprise entreprise = user.getEntreprise();
     if (entreprise == null) {
@@ -251,21 +223,7 @@ public class ClientService {
 
     //Methode pour recuperer seulement les entreprise client
     public List<EntrepriseClient> getAllEntrepriseClients(HttpServletRequest request) {
-    // 1. Extraire le token et l'utilisateur
-    String token = request.getHeader("Authorization");
-    if (token == null || !token.startsWith("Bearer ")) {
-        throw new RuntimeException("Token JWT manquant ou mal formaté");
-    }
-
-    Long userId;
-    try {
-        userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
-    } catch (Exception e) {
-        throw new RuntimeException("Erreur lors de l'extraction de l'ID utilisateur", e);
-    }
-
-    User user = usersRepository.findById(userId)
-            .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
+    User user = authHelper.getAuthenticatedUserWithFallback(request);
 
     Entreprise entreprise = user.getEntreprise();
     if (entreprise == null) {
@@ -314,22 +272,7 @@ public class ClientService {
 
         Client existingClient = existingClientOpt.get();
 
-
-        // 🔐 Authentification de l'utilisateur
-        String token = request.getHeader("Authorization");
-        if (token == null || !token.startsWith("Bearer ")) {
-            throw new RuntimeException("Token JWT manquant ou mal formaté");
-        }
-
-        Long userId;
-        try {
-            userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
-        } catch (Exception e) {
-            throw new RuntimeException("Erreur lors de l'extraction de l'ID utilisateur", e);
-        }
-
-        User user = usersRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
+        User user = authHelper.getAuthenticatedUserWithFallback(request);
 
         Entreprise entreprise = user.getEntreprise();
         if (entreprise == null) {
@@ -426,21 +369,7 @@ public class ClientService {
         Client client = clientRepository.findById(clientId)
                 .orElseThrow(() -> new EntityNotFoundException("Client introuvable avec l'ID : " + clientId));
 
-        // 🔐 Authentification de l'utilisateur
-        String token = request.getHeader("Authorization");
-        if (token == null || !token.startsWith("Bearer ")) {
-            throw new RuntimeException("Token JWT manquant ou mal formaté");
-        }
-
-        Long userId;
-        try {
-            userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
-        } catch (Exception e) {
-            throw new RuntimeException("Erreur lors de l'extraction de l'ID utilisateur", e);
-        }
-
-        User user = usersRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
+        User user = authHelper.getAuthenticatedUserWithFallback(request);
 
         Entreprise entreprise = user.getEntreprise();
         if (entreprise == null) {

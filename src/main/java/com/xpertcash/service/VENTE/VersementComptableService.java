@@ -10,7 +10,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.xpertcash.DTOs.VENTE.VersementComptableDTO;
 import com.xpertcash.composant.Utilitaire;
-import com.xpertcash.configuration.JwtUtil;
 import com.xpertcash.entity.Boutique;
 import com.xpertcash.entity.User;
 import com.xpertcash.entity.Enum.RoleType;
@@ -43,28 +42,12 @@ public class VersementComptableService {
     private UsersRepository usersRepository;
     
   
-    @Autowired
-    private JwtUtil jwtUtil;
+
  
 
     @Transactional
     public List<VersementComptableDTO> getVersementsDeBoutique(Long boutiqueId, HttpServletRequest request) {
-        // 🔐 Vérification du token JWT
-        String token = request.getHeader("Authorization");
-        if (token == null || !token.startsWith("Bearer ")) {
-            throw new RuntimeException("Token JWT manquant ou mal formaté");
-        }
-
-        Long userId;
-        try {
-            userId = jwtUtil.extractUserId(token.substring(7));
-        } catch (Exception e) {
-            throw new RuntimeException("Erreur lors de l'extraction de l'ID utilisateur depuis le token", e);
-        }
-
-        // Récupération de l'utilisateur connecté
-        User user = usersRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+        User user = authHelper.getAuthenticatedUserWithFallback(request);
         if (user.getEntreprise() == null) {
             throw new RuntimeException("L'utilisateur connecté n'appartient à aucune entreprise.");
         }

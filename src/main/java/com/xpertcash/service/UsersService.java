@@ -10,7 +10,7 @@ import com.xpertcash.DTOs.USER.UserDTO;
 import com.xpertcash.DTOs.USER.UserRequest;
 import com.xpertcash.configuration.CentralAccess;
 import com.xpertcash.configuration.JwtConfig;
-import com.xpertcash.configuration.JwtUtil;
+
 import com.xpertcash.configuration.PasswordGenerator;
 import com.xpertcash.configuration.QRCodeGenerator;
 import com.xpertcash.entity.*;
@@ -82,8 +82,6 @@ public class UsersService {
     @Autowired
     private BCryptPasswordEncoder passwordEncoder;
 
-    @Autowired
-    private JwtUtil jwtUtil; 
     private final JwtConfig jwtConfig;
     @Autowired
     private BoutiqueRepository boutiqueRepository;
@@ -452,20 +450,7 @@ public class UsersService {
                     throw new RuntimeException("Token JWT manquant ou mal formaté");
                 }
 
-                // Extraire le token sans le "Bearer "
-                token = token.replace("Bearer ", "");
-
-                Long adminId = null;
-                try {
-                    // Décrypter le token pour obtenir l'ID de l'admin
-                    adminId = jwtUtil.extractUserId(token);
-                } catch (Exception e) {
-                    throw new RuntimeException("Erreur lors de l'extraction de l'ID de l'admin depuis le token", e);
-                }
-
-                // Récupérer l'admin par l'ID extrait du token
-                User admin = usersRepository.findById(adminId)
-                        .orElseThrow(() -> new RuntimeException("Admin non trouvé"));
+                User admin = authHelper.getAuthenticatedUserWithFallback(request);
 
                  // Vérifier que l'utilisateur a une entreprise
                 Entreprise entreprise = admin.getEntreprise();
@@ -583,18 +568,7 @@ public class UsersService {
     //Attribution des permissions à un utilisateur
     @Transactional
     public UserDTO assignPermissionsToUser(Long userId, Map<PermissionType, Boolean> permissions, HttpServletRequest request) {
-        // 🔐 Extraction du token JWT
-        String token = request.getHeader("Authorization");
-        if (token == null || !token.startsWith("Bearer ")) {
-            throw new RuntimeException("Token JWT manquant ou mal formaté");
-        }
-
-        token = token.replace("Bearer ", "");
-        Long currentUserId = jwtUtil.extractUserId(token);
-
-        // 👤 Utilisateur courant
-        User currentUser = usersRepository.findById(currentUserId)
-                .orElseThrow(() -> new RuntimeException("Utilisateur courant non trouvé"));
+        User currentUser = authHelper.getAuthenticatedUserWithFallback(request);
 
         // 👤 Utilisateur cible
         User targetUser = usersRepository.findById(userId)
@@ -680,22 +654,7 @@ public class UsersService {
     //Suprim UserToEntreprise 
     @Transactional
     public void deleteUserFromEntreprise(HttpServletRequest request, Long userId) {
-    String token = request.getHeader("Authorization");
-    if (token == null || !token.startsWith("Bearer ")) {
-        throw new RuntimeException("Token JWT manquant ou mal formaté");
-    }
-
-    token = token.replace("Bearer ", "");
-
-    Long adminId;
-    try {
-        adminId = jwtUtil.extractUserId(token);
-    } catch (Exception e) {
-        throw new RuntimeException("Erreur lors de l'extraction de l'ID de l'admin depuis le token", e);
-    }
-
-    User admin = usersRepository.findById(adminId)
-            .orElseThrow(() -> new RuntimeException("Admin non trouvé"));
+    User admin = authHelper.getAuthenticatedUserWithFallback(request);
 
     if (admin.getRole() == null) {
         throw new RuntimeException("Rôle de l'utilisateur non défini");
@@ -714,7 +673,7 @@ public class UsersService {
             .orElseThrow(() -> new RuntimeException("Utilisateur à supprimer non trouvé"));
 
     // Empêcher de se supprimer soi-même
-    if (adminId.equals(userId)) {
+    if (admin.getId().equals(userId)) {
         throw new RuntimeException("Vous ne pouvez pas supprimer votre propre compte.");
     }
 
@@ -966,23 +925,7 @@ public class UsersService {
     //Get user by id
   public UserDTO getUserById(Long userId, HttpServletRequest request) {
 
-    // Extraction du token JWT
-    String token = request.getHeader("Authorization");
-    if (token == null || !token.startsWith("Bearer ")) {
-        throw new RuntimeException("Token JWT manquant ou mal formaté");
-    }
-
-    token = token.replace("Bearer ", "");
-    Long connectedUserId;
-    try {
-        connectedUserId = jwtUtil.extractUserId(token);
-    } catch (Exception e) {
-        throw new RuntimeException("Erreur lors de l'extraction de l'ID utilisateur depuis le token", e);
-    }
-
-    // Récupération du user connecté
-    User connectedUser = usersRepository.findById(connectedUserId)
-            .orElseThrow(() -> new RuntimeException("Utilisateur connecté introuvable"));
+    User connectedUser = authHelper.getAuthenticatedUserWithFallback(request);
 
     // Récupération du user ciblé
     User targetUser = usersRepository.findById(userId)
@@ -999,7 +942,7 @@ public class UsersService {
             && targetUser.getEntreprise() != null
             && connectedUser.getEntreprise().getId().equals(targetUser.getEntreprise().getId());
 
-    boolean isSelf = connectedUserId.equals(userId);
+    boolean isSelf = connectedUser.getId().equals(userId);
 
     // Vérification des droits d'accès
     if (!isAdminOrManager && !isSelf && !hasGestionUtilisateurPermission) {
@@ -1044,24 +987,7 @@ public class UsersService {
     // Méthode pour suspendre ou réactiver un utilisateur
     @Transactional
     public void suspendUser(HttpServletRequest request, Long userId, boolean suspend) {
-        // 🔐 Extraction du token
-        String token = request.getHeader("Authorization");
-        if (token == null || !token.startsWith("Bearer ")) {
-            throw new RuntimeException("Token JWT manquant ou mal formaté");
-        }
-
-        token = token.replace("Bearer ", "");
-
-        Long currentUserId;
-        try {
-            currentUserId = jwtUtil.extractUserId(token);
-        } catch (Exception e) {
-            throw new RuntimeException("Erreur lors de l'extraction de l'ID utilisateur depuis le token", e);
-        }
-
-        // 👤 Utilisateur courant
-        User currentUser = usersRepository.findById(currentUserId)
-                .orElseThrow(() -> new RuntimeException("Utilisateur courant non trouvé"));
+        User currentUser = authHelper.getAuthenticatedUserWithFallback(request);
 
         // 👤 Utilisateur cible
         User targetUser = usersRepository.findById(userId)
@@ -1132,23 +1058,7 @@ public class UsersService {
 
     //Methode qui recupere linformation de lentrprise de user connecter
     public EntrepriseDTO getEntrepriseOfConnectedUser(HttpServletRequest request) {
-    String authorizationHeader = request.getHeader("Authorization");
-
-    if (authorizationHeader == null || !authorizationHeader.startsWith("Bearer ")) {
-        throw new RuntimeException("Token JWT manquant ou mal formaté");
-    }
-
-    String token = authorizationHeader.substring(7); // Retirer "Bearer "
-
-    Long userId;
-    try {
-        userId = jwtUtil.extractUserId(token);
-    } catch (JwtException e) {
-        throw new RuntimeException("Token JWT invalide ou expiré", e);
-    }
-
-    User user = usersRepository.findById(userId)
-            .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+    User user = authHelper.getAuthenticatedUserWithFallback(request);
 
     Entreprise entreprise = user.getEntreprise();
     if (entreprise == null) {

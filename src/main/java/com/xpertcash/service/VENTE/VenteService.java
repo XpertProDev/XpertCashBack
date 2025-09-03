@@ -438,14 +438,14 @@ public VenteResponse enregistrerVente(VenteRequest request, HttpServletRequest h
             throw new RuntimeException("Token JWT manquant ou mal formaté");
         }
         
-        Long userId;
+        String userUuid;
         try {
-            userId = jwtUtil.extractUserId(jwtToken.replace("Bearer ", ""));
+            userUuid = jwtUtil.extractUserUuid(jwtToken.replace("Bearer ", ""));
         } catch (Exception e) {
-            throw new RuntimeException("Erreur lors de l'extraction de l'ID de l'utilisateur depuis le token", e);
+            throw new RuntimeException("Erreur lors de l'extraction de l'UUID de l'utilisateur depuis le token", e);
         }
 
-        User user = usersRepository.findById(userId)
+        User user = usersRepository.findByUuid(userUuid)
                 .orElseThrow(() -> new RuntimeException("Utilisateur introuvable !"));
 
         // 🔐 Vérification des droits

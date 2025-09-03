@@ -22,7 +22,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.xpertcash.DTOs.FOURNISSEUR.FournisseurDTO;
 import com.xpertcash.DTOs.FOURNISSEUR.FournisseurResponseDTO;
-import com.xpertcash.configuration.JwtUtil;
+import com.xpertcash.service.AuthenticationHelper;
 import com.xpertcash.entity.Facture;
 import com.xpertcash.entity.Fournisseur;
 import com.xpertcash.entity.User;
@@ -53,8 +53,8 @@ public class FournisseurController {
     @Autowired
     private FactureRepository factureRepository;
 
-     @Autowired
-    private JwtUtil jwtUtil;
+    @Autowired
+    private AuthenticationHelper authHelper;
     @Autowired
     private UsersRepository usersRepository;
 
@@ -240,21 +240,7 @@ public ResponseEntity<?> getFournisseurById(@PathVariable Long id, HttpServletRe
     public ResponseEntity<List<Map<String, Object>>> getFacturesParFournisseur(@PathVariable Long fournisseurId,
          HttpServletRequest request) {
 
-        // 1. Extraire l'utilisateur depuis le token
-    String token = request.getHeader("Authorization");
-    if (token == null || !token.startsWith("Bearer ")) {
-        throw new RuntimeException("Token JWT manquant ou mal formaté");
-    }
-
-    Long userId;
-    try {
-        userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
-    } catch (Exception e) {
-        throw new RuntimeException("Erreur lors de l'extraction de l'ID de l'utilisateur depuis le token", e);
-    }
-
-    User user = usersRepository.findById(userId)
-            .orElseThrow(() -> new RuntimeException("Utilisateur introuvable !"));
+        User user = authHelper.getAuthenticatedUserWithFallback(request);
 
     // 2. Vérifier que le fournisseur appartient à la même entreprise que l'utilisateur
     Fournisseur fournisseur = fournisseurRepository.findById(fournisseurId)

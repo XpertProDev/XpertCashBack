@@ -13,8 +13,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import com.xpertcash.configuration.CentralAccess;
-import com.xpertcash.configuration.JwtUtil;
+
 import com.xpertcash.entity.Client;
+import com.xpertcash.service.AuthenticationHelper;
 import com.xpertcash.entity.Entreprise;
 import com.xpertcash.entity.EntrepriseClient;
 import com.xpertcash.entity.PermissionType;
@@ -37,7 +38,8 @@ public class EntrepriseClientService {
     @Autowired
     private UsersRepository usersRepository;
     @Autowired
-    private JwtUtil jwtUtil;
+    private AuthenticationHelper authHelper;
+
     @Autowired
     private FactureProformaRepository factureProformaRepository;
     @Autowired
@@ -46,73 +48,59 @@ public class EntrepriseClientService {
   
 
    @Transactional
- public EntrepriseClient saveEntreprise(EntrepriseClient entrepriseClient, HttpServletRequest request) {
-    // 🔐 Authentification via JWT
-    String token = request.getHeader("Authorization");
-    if (token == null || !token.startsWith("Bearer ")) {
-        throw new RuntimeException("Token JWT manquant ou mal formaté");
+    public EntrepriseClient saveEntreprise(EntrepriseClient entrepriseClient, HttpServletRequest request) {
+        User user = authHelper.getAuthenticatedUserWithFallback(request);
+
+        Entreprise entreprise = user.getEntreprise();
+        if (entreprise == null) {
+            throw new RuntimeException("Aucune entreprise associée à cet utilisateur");
+        }
+
+        // 🔒 Vérifier les droits
+        boolean isAdminOrManager = CentralAccess.isAdminOrManagerOfEntreprise(user, entreprise.getId());
+        boolean hasPermissionGestionClient = user.getRole().hasPermission(PermissionType.GERER_CLIENTS);
+        boolean hasPermissionGestionFacturation = user.getRole().hasPermission(PermissionType.GESTION_FACTURATION);
+
+
+        if (!isAdminOrManager && !hasPermissionGestionClient && !hasPermissionGestionFacturation) {
+            throw new RuntimeException("Accès refusé : vous n'avez pas les permissions pour créer une entreprise cliente.");
+        }
+
+        // ✅ Vérification du nom
+        if (entrepriseClient.getNom() == null || entrepriseClient.getNom().trim().isEmpty()) {
+            throw new RuntimeException("Le nom de l'entreprise est obligatoire !");
+        }
+
+        // ✅ Unicité email / téléphone
+        String email = entrepriseClient.getEmail();
+        String telephone = entrepriseClient.getTelephone();
+
+        Optional<EntrepriseClient> existingByEmail = Optional.empty();
+        Optional<EntrepriseClient> existingByTelephone = Optional.empty();
+
+        if (email != null && !email.isEmpty()) {
+            existingByEmail = entrepriseClientRepository.findByEmail(email);
+        }
+
+        if (telephone != null && !telephone.isEmpty()) {
+            existingByTelephone = entrepriseClientRepository.findByTelephone(telephone);
+        }
+
+        if (existingByEmail.isPresent() && existingByTelephone.isPresent()) {
+            throw new RuntimeException("Une entreprise avec cet email et ce téléphone existe déjà !");
+        } else if (existingByEmail.isPresent()) {
+            throw new RuntimeException("Une entreprise avec cet email existe déjà !");
+        } else if (existingByTelephone.isPresent()) {
+            throw new RuntimeException("Une entreprise avec ce téléphone existe déjà !");
+        }
+
+        // 🔗 Lier l’entreprise cliente à l’entreprise de l’utilisateur
+        entrepriseClient.setEntreprise(entreprise);
+        entrepriseClient.setCreatedAt(LocalDateTime.now());
+
+        // 💾 Enregistrement
+        return entrepriseClientRepository.save(entrepriseClient);
     }
-
-    Long userId;
-    try {
-        userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
-    } catch (Exception e) {
-        throw new RuntimeException("Erreur lors de l'extraction de l'ID utilisateur", e);
-    }
-
-    User user = usersRepository.findById(userId)
-            .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
-
-    Entreprise entreprise = user.getEntreprise();
-    if (entreprise == null) {
-        throw new RuntimeException("Aucune entreprise associée à cet utilisateur");
-    }
-
-    // 🔒 Vérifier les droits
-    boolean isAdminOrManager = CentralAccess.isAdminOrManagerOfEntreprise(user, entreprise.getId());
-    boolean hasPermissionGestionClient = user.getRole().hasPermission(PermissionType.GERER_CLIENTS);
-    boolean hasPermissionGestionFacturation = user.getRole().hasPermission(PermissionType.GESTION_FACTURATION);
-
-
-    if (!isAdminOrManager && !hasPermissionGestionClient && !hasPermissionGestionFacturation) {
-        throw new RuntimeException("Accès refusé : vous n'avez pas les permissions pour créer une entreprise cliente.");
-    }
-
-    // ✅ Vérification du nom
-    if (entrepriseClient.getNom() == null || entrepriseClient.getNom().trim().isEmpty()) {
-        throw new RuntimeException("Le nom de l'entreprise est obligatoire !");
-    }
-
-    // ✅ Unicité email / téléphone
-    String email = entrepriseClient.getEmail();
-    String telephone = entrepriseClient.getTelephone();
-
-    Optional<EntrepriseClient> existingByEmail = Optional.empty();
-    Optional<EntrepriseClient> existingByTelephone = Optional.empty();
-
-    if (email != null && !email.isEmpty()) {
-        existingByEmail = entrepriseClientRepository.findByEmail(email);
-    }
-
-    if (telephone != null && !telephone.isEmpty()) {
-        existingByTelephone = entrepriseClientRepository.findByTelephone(telephone);
-    }
-
-    if (existingByEmail.isPresent() && existingByTelephone.isPresent()) {
-        throw new RuntimeException("Une entreprise avec cet email et ce téléphone existe déjà !");
-    } else if (existingByEmail.isPresent()) {
-        throw new RuntimeException("Une entreprise avec cet email existe déjà !");
-    } else if (existingByTelephone.isPresent()) {
-        throw new RuntimeException("Une entreprise avec ce téléphone existe déjà !");
-    }
-
-    // 🔗 Lier l’entreprise cliente à l’entreprise de l’utilisateur
-    entrepriseClient.setEntreprise(entreprise);
-    entrepriseClient.setCreatedAt(LocalDateTime.now());
-
-    // 💾 Enregistrement
-    return entrepriseClientRepository.save(entrepriseClient);
-}
 
 
     public Optional<EntrepriseClient> getEntrepriseById(Long id, HttpServletRequest request) {
@@ -120,21 +108,7 @@ public class EntrepriseClientService {
         throw new IllegalArgumentException("L'ID de l'entreprise cliente est obligatoire !");
     }
 
-    // 🔐 Authentification JWT
-    String token = request.getHeader("Authorization");
-    if (token == null || !token.startsWith("Bearer ")) {
-        throw new RuntimeException("Token JWT manquant ou mal formaté");
-    }
-
-    Long userId;
-    try {
-        userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
-    } catch (Exception e) {
-        throw new RuntimeException("Erreur lors de l'extraction de l'ID utilisateur", e);
-    }
-
-    User user = usersRepository.findById(userId)
-            .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
+    User user = authHelper.getAuthenticatedUserWithFallback(request);
 
     Entreprise entreprise = user.getEntreprise();
     if (entreprise == null) {
@@ -160,21 +134,7 @@ public class EntrepriseClientService {
 
 
    public List<EntrepriseClient> getAllEntreprises(HttpServletRequest request) {
-    // 🔐 Authentification JWT
-    String token = request.getHeader("Authorization");
-    if (token == null || !token.startsWith("Bearer ")) {
-        throw new RuntimeException("Token JWT manquant ou mal formaté");
-    }
-
-    Long userId;
-    try {
-        userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
-    } catch (Exception e) {
-        throw new RuntimeException("Erreur lors de l'extraction de l'ID utilisateur", e);
-    }
-
-    User user = usersRepository.findById(userId)
-            .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
+    User user = authHelper.getAuthenticatedUserWithFallback(request);
 
     Entreprise entreprise = user.getEntreprise();
     if (entreprise == null) {
@@ -239,21 +199,7 @@ public void deleteEntrepriseClientIfNoOrdersOrInvoices(Long entrepriseClientId, 
     EntrepriseClient entrepriseClient = entrepriseClientRepository.findById(entrepriseClientId)
             .orElseThrow(() -> new EntityNotFoundException("Client entreprise introuvable avec l'ID : " + entrepriseClientId));
 
-    // 🔐 Authentification de l'utilisateur
-    String token = request.getHeader("Authorization");
-    if (token == null || !token.startsWith("Bearer ")) {
-        throw new RuntimeException("Token JWT manquant ou mal formaté");
-    }
-
-    Long userId;
-    try {
-        userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
-    } catch (Exception e) {
-        throw new RuntimeException("Erreur lors de l'extraction de l'ID utilisateur", e);
-    }
-
-    User user = usersRepository.findById(userId)
-            .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
+    User user = authHelper.getAuthenticatedUserWithFallback(request);
 
     Entreprise entreprise = user.getEntreprise();
     if (entreprise == null) {

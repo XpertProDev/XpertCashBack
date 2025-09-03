@@ -26,7 +26,7 @@ import com.xpertcash.DTOs.PaiementDTO;
 import com.xpertcash.DTOs.PaginatedResponseDTO;
 import com.xpertcash.DTOs.CLIENT.ClientDTO;
 import com.xpertcash.configuration.CentralAccess;
-import com.xpertcash.configuration.JwtUtil;
+
 import com.xpertcash.entity.Entreprise;
 import com.xpertcash.entity.FactureProForma;
 import com.xpertcash.entity.FactureReelle;
@@ -71,8 +71,7 @@ public class FactureReelleService {
     @Autowired
     private FactureProformaRepository factureProformaRepository;
 
-    @Autowired
-    private JwtUtil jwtUtil;
+
 
     @Autowired
     private ModuleActivationService moduleActivationService;
@@ -197,23 +196,7 @@ public void supprimerFactureReelleLiee(FactureProForma proforma) {
     if (size <= 0) size = 20; // Taille par défaut
     if (size > 100) size = 100; // Limite maximale pour éviter la surcharge
 
-    // 🔐 Récupération et validation du token
-    String token = request.getHeader("Authorization");
-    if (token == null || !token.startsWith("Bearer ")) {
-        throw new SecurityException("Token JWT manquant ou mal formaté");
-    }
-
-    Long userId;
-    try {
-        // Extraction de l'ID utilisateur depuis le token JWT
-        userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
-    } catch (Exception e) {
-        throw new SecurityException("Erreur lors de l'extraction de l'utilisateur depuis le token", e);
-    }
-
-    // 👤 Utilisateur courant
-    User utilisateur = usersRepository.findById(userId)
-            .orElseThrow(() -> new SecurityException("Utilisateur introuvable ou non authentifié"));
+    User utilisateur = authHelper.getAuthenticatedUserWithFallback(request);
 
     // 🏢 Vérification de l'entreprise à laquelle appartient l'utilisateur
     Entreprise entreprise = utilisateur.getEntreprise();
@@ -259,23 +242,7 @@ public void supprimerFactureReelleLiee(FactureProForma proforma) {
  
     // Trier les facture par mois/année
    public ResponseEntity<?> filtrerFacturesParMoisEtAnnee(Integer mois, Integer annee, HttpServletRequest request) {
-    // 🔐 Extraction et validation du token JWT
-    String token = request.getHeader("Authorization");
-    if (token == null || !token.startsWith("Bearer ")) {
-        throw new SecurityException("Token JWT manquant ou mal formaté");
-    }
-
-    Long userId;
-    try {
-        // Extraction de l'ID utilisateur depuis le token JWT
-        userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
-    } catch (Exception e) {
-        throw new SecurityException("Erreur lors de l'extraction de l'ID utilisateur depuis le token", e);
-    }
-
-    // 👤 Récupération de l'utilisateur
-    User user = usersRepository.findById(userId)
-            .orElseThrow(() -> new SecurityException("Utilisateur introuvable"));
+    User user = authHelper.getAuthenticatedUserWithFallback(request);
 
     // 🏢 Vérification de l'entreprise
     Long entrepriseId = user.getEntreprise().getId();
@@ -338,22 +305,7 @@ public void supprimerFactureReelleLiee(FactureProForma proforma) {
 
     // Methode Get facture reel by id
     public FactureReelleDTO getFactureReelleById(Long factureId, HttpServletRequest request) {
-    // 🔐 Extraire le token JWT
-    String token = request.getHeader("Authorization");
-    if (token == null || !token.startsWith("Bearer ")) {
-        throw new RuntimeException("Token JWT manquant ou mal formaté");
-    }
-
-    Long userId;
-    try {
-        userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
-    } catch (Exception e) {
-        throw new RuntimeException("Erreur lors de l'extraction de l'ID utilisateur", e);
-    }
-
-    // 👤 Récupérer l'utilisateur connecté
-    User user = usersRepository.findById(userId)
-            .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
+    User user = authHelper.getAuthenticatedUserWithFallback(request);
 
     // 📄 Récupérer la facture
     FactureReelle facture = factureReelleRepository.findById(factureId)
@@ -374,7 +326,7 @@ public void supprimerFactureReelleLiee(FactureProForma proforma) {
         // 🔒 Vérification des rôles et permissions
     boolean isAdminOrManagerOfEntreprise = CentralAccess.isAdminOrManagerOfEntreprise(user, entrepriseFactureId);
     boolean hasPermission = user.getRole().hasPermission(PermissionType.GESTION_FACTURATION);
-    boolean isCreateur = facture.getUtilisateurCreateur().getId().equals(userId);
+    boolean isCreateur = facture.getUtilisateurCreateur().getId().equals(user.getId());
 
     if (!(isAdminOrManagerOfEntreprise || hasPermission || isCreateur)) {
         throw new RuntimeException("Accès interdit : vous n'avez pas les droits pour consulter cette facture !");
@@ -518,22 +470,7 @@ public void supprimerFactureReelleLiee(FactureProForma proforma) {
 
     //Facture impayer all facture
    public List<FactureReelleDTO> listerFacturesImpayees(HttpServletRequest request) {
-    // 🔐 1. Extraire le token JWT
-    String token = request.getHeader("Authorization");
-    if (token == null || !token.startsWith("Bearer ")) {
-        throw new RuntimeException("Token JWT manquant ou mal formaté");
-    }
-
-    Long userId;
-    try {
-        userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
-    } catch (Exception e) {
-        throw new RuntimeException("Erreur lors de l'extraction de l'utilisateur depuis le token", e);
-    }
-
-    // 👤 2. Récupérer l'utilisateur connecté
-    User user = usersRepository.findById(userId)
-            .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+    User user = authHelper.getAuthenticatedUserWithFallback(request);
 
     if (user.getEntreprise() == null) {
         throw new RuntimeException("Utilisateur n'est associé à aucune entreprise");
@@ -559,7 +496,7 @@ public void supprimerFactureReelleLiee(FactureProForma proforma) {
     } else {
         // Peut seulement voir les factures qu'il a créées dans son entreprise
         factures = factureReelleRepository.findByEntrepriseIdAndUtilisateurCreateurIdAndStatutPaiementIn(
-            entrepriseId, userId, statutsImpayes
+            entrepriseId, user.getId(), statutsImpayes
         );
     }
 
@@ -586,21 +523,7 @@ public void supprimerFactureReelleLiee(FactureProForma proforma) {
 //Modifier le statut d'une facture
 @Transactional
 public FactureProForma annulerFactureReelle(FactureReelle modifications, HttpServletRequest request) {
-    // 🔐 1. Extraction utilisateur depuis JWT
-    String token = request.getHeader("Authorization");
-    if (token == null || !token.startsWith("Bearer ")) {
-        throw new RuntimeException("Token JWT manquant ou mal formaté");
-    }
-
-    Long userId;
-    try {
-        userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
-    } catch (Exception e) {
-        throw new RuntimeException("Erreur lors de l'extraction de l'ID de l'utilisateur depuis le token", e);
-    }
-
-    User user = usersRepository.findById(userId)
-            .orElseThrow(() -> new RuntimeException("Utilisateur introuvable !"));
+    User user = authHelper.getAuthenticatedUserWithFallback(request);
 
     // 📄 2. Récupération de la facture réelle
     FactureReelle factureReelle = factureReelleRepository.findById(modifications.getId())
@@ -655,14 +578,7 @@ public FactureProForma annulerFactureReelle(FactureReelle modifications, HttpSer
 
 public List<FactureReelleDTO> getFacturesParPeriode(Long userIdRequete, HttpServletRequest request,
                                                      String typePeriode, LocalDate dateDebut, LocalDate dateFin) {
-    String token = request.getHeader("Authorization"); 
-    if (token == null || !token.startsWith("Bearer ")) {
-        throw new RuntimeException("Token JWT manquant ou mal formaté");
-    }
-
-    Long userIdCourant = jwtUtil.extractUserId(token.replace("Bearer ", ""));
-    User currentUser = usersRepository.findById(userIdCourant)
-            .orElseThrow(() -> new RuntimeException("Utilisateur courant introuvable"));
+    User currentUser = authHelper.getAuthenticatedUserWithFallback(request);
     User targetUser = usersRepository.findById(userIdRequete)
             .orElseThrow(() -> new RuntimeException("Utilisateur cible non trouvé"));
 
