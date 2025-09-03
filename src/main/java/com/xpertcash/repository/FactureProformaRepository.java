@@ -5,6 +5,8 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -101,6 +103,52 @@ List<FactureProForma> findFacturesAvecRelationsParEntrepriseEtPeriode(
         @Param("dateEnd") LocalDateTime dateEnd
 );
 
+// Méthodes de pagination pour les factures proforma
+@Query("SELECT f FROM FactureProForma f " +
+       "LEFT JOIN FETCH f.approbateurs a " +
+       "LEFT JOIN FETCH f.utilisateurCreateur u " +
+       "LEFT JOIN FETCH f.client c " +
+       "LEFT JOIN FETCH f.entrepriseClient ec " +
+       "LEFT JOIN FETCH f.entreprise e " +
+       "WHERE f.entreprise.id = :entrepriseId " +
+       "ORDER BY f.dateCreation DESC, f.id DESC")
+Page<FactureProForma> findFacturesAvecRelationsParEntreprisePaginated(
+    @Param("entrepriseId") Long entrepriseId, 
+    Pageable pageable);
+
+// Méthode de pagination avec filtrage par utilisateur
+@Query("SELECT f FROM FactureProForma f " +
+       "LEFT JOIN FETCH f.approbateurs a " +
+       "LEFT JOIN FETCH f.utilisateurCreateur u " +
+       "LEFT JOIN FETCH f.client c " +
+       "LEFT JOIN FETCH f.entrepriseClient ec " +
+       "LEFT JOIN FETCH f.entreprise e " +
+       "WHERE f.entreprise.id = :entrepriseId " +
+       "AND (f.utilisateurCreateur.id = :userId " +
+       "     OR f.utilisateurApprobateur.id = :userId " +
+       "     OR :userId IN (SELECT u2.id FROM f.approbateurs u2)) " +
+       "ORDER BY f.dateCreation DESC, f.id DESC")
+Page<FactureProForma> findFacturesAvecRelationsParEntrepriseEtUtilisateurPaginated(
+    @Param("entrepriseId") Long entrepriseId,
+    @Param("userId") Long userId,
+    Pageable pageable);
+
+// Compter le nombre total de factures par entreprise
+@Query("SELECT COUNT(f) FROM FactureProForma f WHERE f.entreprise.id = :entrepriseId")
+long countFacturesByEntrepriseId(@Param("entrepriseId") Long entrepriseId);
+
+// Compter le nombre de factures par statut pour une entreprise
+@Query("SELECT COUNT(f) FROM FactureProForma f " +
+       "WHERE f.entreprise.id = :entrepriseId AND f.statut = :statut")
+long countFacturesByEntrepriseIdAndStatut(@Param("entrepriseId") Long entrepriseId, @Param("statut") StatutFactureProForma statut);
+
+// Compter le nombre de factures par utilisateur pour une entreprise
+@Query("SELECT COUNT(f) FROM FactureProForma f " +
+       "WHERE f.entreprise.id = :entrepriseId " +
+       "AND (f.utilisateurCreateur.id = :userId " +
+       "     OR f.utilisateurApprobateur.id = :userId " +
+       "     OR :userId IN (SELECT u.id FROM f.approbateurs u))")
+long countFacturesByEntrepriseIdAndUtilisateur(@Param("entrepriseId") Long entrepriseId, @Param("userId") Long userId);
     
 }
 

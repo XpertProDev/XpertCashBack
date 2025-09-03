@@ -66,4 +66,3 @@ echo "   - Les statistiques globales sont correctes"
 echo "   - La gestion des erreurs fonctionne"
 
 
-

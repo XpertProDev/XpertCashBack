@@ -10,12 +10,18 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 
 import com.xpertcash.DTOs.EntrepriseClientDTO;
 import com.xpertcash.DTOs.FactureProFormaDTO;
+import com.xpertcash.DTOs.FactureProformaPaginatedResponseDTO;
 import com.xpertcash.DTOs.LigneFactureDTO;
 import com.xpertcash.DTOs.CLIENT.ClientDTO;
 import com.xpertcash.configuration.CentralAccess;
@@ -731,8 +737,25 @@ public class FactureProformaService {
    
 
     //Methode pour recuperer les factures pro forma dune entreprise
-   @Transactional
+    @Transactional
     public List<Map<String, Object>> getFacturesParEntrepriseParUtilisateur(Long userIdRequete, HttpServletRequest request) {
+        return getFacturesParEntrepriseParUtilisateurPaginated(userIdRequete, 0, Integer.MAX_VALUE, request).getContent();
+    }
+
+    // Méthode scalable avec pagination pour récupérer les factures proforma d'une entreprise
+    @Transactional
+    public FactureProformaPaginatedResponseDTO getFacturesParEntrepriseParUtilisateurPaginated(
+            Long userIdRequete, 
+            int page, 
+            int size, 
+            HttpServletRequest request) {
+        
+        // --- 1. Validation des paramètres de pagination ---
+        if (page < 0) page = 0;
+        if (size <= 0) size = 20; // Taille par défaut
+        if (size > 100) size = 100; // Limite maximale pour éviter la surcharge
+        
+        // --- 2. Récupération et validation de l'utilisateur ---
         User currentUser = authHelper.getAuthenticatedUserWithFallback(request);
         User targetUser = usersRepository.findById(userIdRequete)
                 .orElseThrow(() -> new RuntimeException("Utilisateur cible non trouvé"));
@@ -745,35 +768,48 @@ public class FactureProformaService {
             throw new RuntimeException("Opération interdite : utilisateurs de différentes entreprises.");
         }
 
+        // --- 3. Vérification des droits d'accès ---
         boolean isAdmin = currentUser.getRole().getName() == RoleType.ADMIN;
         boolean isManager = currentUser.getRole().getName() == RoleType.MANAGER;
         boolean hasPermission = currentUser.getRole().hasPermission(PermissionType.GESTION_FACTURATION);
         boolean isApprover = factureProformaRepository.existsByApprobateursAndEntrepriseId(currentUser, entrepriseCourante.getId());
 
-        // 🔹 Récupérer toutes les factures avec JOIN FETCH pour éviter LazyInitializationException
-        List<FactureProForma> factures = factureProformaRepository.findFacturesAvecRelationsParEntreprise(entrepriseCourante.getId());
+        // --- 4. Créer le Pageable avec tri optimisé ---
+        Pageable pageable = PageRequest.of(page, size, Sort.by("dateCreation").descending().and(Sort.by("id").descending()));
 
-        // 🔹 Filtrage d'accès métier (logique inchangée)
-        if (!(isAdmin || isManager)) {
-            if (hasPermission || isApprover) {
-                factures = factures.stream()
-                        .filter(f -> f.getUtilisateurCreateur().getId().equals(currentUser.getId())
-                                || (f.getApprobateurs() != null && f.getApprobateurs().contains(currentUser)))
-                        .collect(Collectors.toList());
-            } else {
-                if (!Objects.equals(currentUser.getId(), userIdRequete)) {
-                    throw new RuntimeException("Vous ne pouvez voir que vos propres factures.");
-                }
-                factures = factures.stream()
-                        .filter(f -> f.getUtilisateurCreateur().getId().equals(currentUser.getId()))
-                        .collect(Collectors.toList());
+        // --- 5. Récupérer les factures avec pagination selon les droits ---
+        Page<FactureProForma> facturesPage;
+        
+        if (isAdmin || isManager) {
+            // Admins et managers voient toutes les factures de l'entreprise
+            facturesPage = factureProformaRepository.findFacturesAvecRelationsParEntreprisePaginated(
+                    entrepriseCourante.getId(), pageable);
+        } else if (hasPermission || isApprover) {
+            // Utilisateurs avec permissions voient leurs factures + celles où ils sont approbateurs
+            facturesPage = factureProformaRepository.findFacturesAvecRelationsParEntrepriseEtUtilisateurPaginated(
+                    entrepriseCourante.getId(), currentUser.getId(), pageable);
+        } else {
+            // Utilisateurs normaux ne voient que leurs propres factures
+            if (!Objects.equals(currentUser.getId(), userIdRequete)) {
+                throw new RuntimeException("Vous ne pouvez voir que vos propres factures.");
             }
+            facturesPage = factureProformaRepository.findFacturesAvecRelationsParEntrepriseEtUtilisateurPaginated(
+                    entrepriseCourante.getId(), currentUser.getId(), pageable);
         }
 
-        // 🔹 Transformer en Map et trier
-        return factures.stream()
-                .sorted(Comparator.comparing(FactureProForma::getDateCreation).reversed()
-                        .thenComparing(FactureProForma::getId).reversed())
+        // --- 6. Récupérer les statistiques globales (une seule fois) ---
+        long totalFactures = factureProformaRepository.countFacturesByEntrepriseId(entrepriseCourante.getId());
+        long totalFacturesBrouillon = factureProformaRepository.countFacturesByEntrepriseIdAndStatut(
+                entrepriseCourante.getId(), StatutFactureProForma.BROUILLON);
+        long totalFacturesEnAttente = factureProformaRepository.countFacturesByEntrepriseIdAndStatut(
+                entrepriseCourante.getId(), StatutFactureProForma.APPROBATION);
+        long totalFacturesValidees = factureProformaRepository.countFacturesByEntrepriseIdAndStatut(
+                entrepriseCourante.getId(), StatutFactureProForma.VALIDE);
+        long totalFacturesAnnulees = factureProformaRepository.countFacturesByEntrepriseIdAndStatut(
+                entrepriseCourante.getId(), StatutFactureProForma.ANNULE);
+
+        // --- 7. Transformer les factures de la page courante en Map ---
+        List<Map<String, Object>> facturesMap = facturesPage.getContent().stream()
                 .map(facture -> {
                     Map<String, Object> map = new HashMap<>();
                     map.put("id", facture.getId());
@@ -794,6 +830,17 @@ public class FactureProformaService {
                     return map;
                 })
                 .collect(Collectors.toList());
+
+        // --- 8. Créer la page de DTOs ---
+        Page<Map<String, Object>> dtoPage = new PageImpl<>(
+                facturesMap,
+                pageable,
+                facturesPage.getTotalElements()
+        );
+
+        // --- 9. Retourner la réponse paginée ---
+        return FactureProformaPaginatedResponseDTO.fromPage(dtoPage, totalFactures, totalFacturesBrouillon, 
+                totalFacturesEnAttente, totalFacturesValidees, totalFacturesAnnulees);
     }
 
 

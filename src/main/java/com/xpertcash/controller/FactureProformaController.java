@@ -27,6 +27,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.xpertcash.DTOs.FactureProFormaDTO;
+import com.xpertcash.DTOs.FactureProformaPaginatedResponseDTO;
 import com.xpertcash.service.AuthenticationHelper;
 import com.xpertcash.entity.Entreprise;
 import com.xpertcash.entity.FactureProForma;
@@ -347,6 +348,34 @@ public ResponseEntity<List<FactureProFormaDTO>> getFacturesParPeriode(
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
     }
 }
+
+    // Endpoint scalable avec pagination pour récupérer les factures proforma de l'utilisateur connecté
+    @GetMapping("/mes-factures/paginated")
+    public ResponseEntity<FactureProformaPaginatedResponseDTO> getFacturesParEntrepriseParUtilisateurPaginated(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            HttpServletRequest request) {
+        
+        try {
+            // Validation des paramètres
+            if (page < 0) page = 0;
+            if (size <= 0) size = 20;
+            if (size > 100) size = 100; // Limite maximale
+            
+            // Récupérer l'ID de l'utilisateur depuis le token
+            User currentUser = authHelper.getAuthenticatedUserWithFallback(request);
+            Long userId = currentUser.getId();
+            
+            FactureProformaPaginatedResponseDTO response = factureProformaService.getFacturesParEntrepriseParUtilisateurPaginated(
+                    userId, page, size, request);
+            
+            return ResponseEntity.ok(response);
+            
+        } catch (Exception e) {
+            e.printStackTrace();
+            throw new RuntimeException("Erreur lors de la récupération des factures paginées: " + e.getMessage());
+        }
+    }
 
 
 }
