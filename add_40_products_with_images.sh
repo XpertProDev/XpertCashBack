@@ -37,7 +37,8 @@ create_product() {
     # Télécharger l'image temporairement
     local temp_image=""
     if [ ! -z "$image_url" ]; then
-        temp_image=$(mktemp --suffix=.jpg)
+        # Utiliser une approche compatible macOS pour mktemp
+        temp_image=$(mktemp /tmp/image_XXXXXX.jpg)
         echo -e "${BLUE}📥 Téléchargement de l'image: $image_url${NC}"
         if curl -s -o "$temp_image" "$image_url"; then
             echo -e "${GREEN}✅ Image téléchargée: $temp_image${NC}"
