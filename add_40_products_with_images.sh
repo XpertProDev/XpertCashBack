@@ -5,7 +5,6 @@
 
 # Configuration
 BASE_URL="http://localhost:8080/api/auth"
-TOKEN="eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiI3NzVjN2JmYS0xNmVkLTQ0OTgtODE1MS1jNTFmMGFmYTEwZWUiLCJyb2xlIjoiQURNSU4iLCJ1c2VyQWN0aXZhdGVkIjp0cnVlLCJhZG1pbkFjdGl2YXRlZCI6dHJ1ZSwidXNlckFjdGl2YXRpb25Qb3NzaWJsZSI6dHJ1ZSwiaWF0IjoxNzU2OTkzMzA1LCJleHAiOjE3NTcwNzk3MDV9.n-KWivVUaj4xc7kfXWCy_CLf1Ohndh_Bll6UunwZc6M"
 BOUTIQUE_ID="1"
 
 # Couleurs pour les logs
@@ -16,6 +15,23 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 echo -e "${BLUE}🚀 Début de l'ajout de 40 produits avec images...${NC}"
+
+# Demander le token JWT
+echo ""
+echo "📋 Instructions:"
+echo "1. Connectez-vous à votre application pour obtenir votre token JWT"
+echo "2. Entrez votre token JWT ci-dessous"
+echo ""
+
+read -p "🔑 Entrez votre token JWT: " TOKEN
+
+if [ -z "$TOKEN" ]; then
+    echo -e "${RED}❌ Token JWT requis. Arrêt du script.${NC}"
+    exit 1
+fi
+
+echo ""
+echo -e "${GREEN}✅ Token JWT configuré${NC}"
 
 # Fonction pour créer un produit
 create_product() {
@@ -144,14 +160,7 @@ create_unite() {
     fi
 }
 
-# Vérifier la configuration
-if [ "$TOKEN" = "YOUR_JWT_TOKEN_HERE" ]; then
-    echo -e "${RED}❌ ERREUR: Vous devez configurer votre token JWT dans le script${NC}"
-    echo -e "${YELLOW}💡 Utilisez: ./get_api_info.sh pour obtenir les informations nécessaires${NC}"
-    exit 1
-fi
-
-echo -e "${GREEN}✅ Configuration OK, token trouvé${NC}"
+echo -e "${GREEN}✅ Configuration OK, token configuré${NC}"
 
 # Créer les unités nécessaires
 echo -e "${BLUE}📏 Création des unités...${NC}"
@@ -230,7 +239,7 @@ create_product "Plante Monstera" "Plante verte Monstera Deliciosa" 45.00 30.00 1
 create_product "Bougie parfumée" "Bougie parfumée vanille 200g" 18.00 12.00 30 10 $CAT_MAISON $UNITE_PIECE "BOUG001" "https://images.unsplash.com/photo-1602143407151-7111542de6e8?w=400" "PHYSIQUE" ""
 
 # Produits avec catégories - Sports & Loisirs
-create_product "Vélo de route" "Vélo de route carbone" 1200.00 800.00 3 1 $CAT_SPORTS $UNITE_PIECE "VROUTE001" "https://images.unsplash.com/photo-1558618047-3c8c76ca7d13?w=400" "PHYSIQUE" ""
+create_product "Vélo de route" "Vélo de route carbone" 1200.00 800.00 3 1 $CAT_SPORTS $UNITE_PIECE "VROUTE001" "https://images.unsplash.com/photo-1678719873553-548425a1046b?q=80&w=400" "PHYSIQUE" ""
 create_product "Raquette tennis" "Raquette tennis Wilson" 180.00 120.00 10 3 $CAT_SPORTS $UNITE_PIECE "RTENN001" "https://images.unsplash.com/photo-1551698618-1dfe5d97d256?w=400" "PHYSIQUE" ""
 create_product "Ballon de foot" "Ballon de football Adidas" 25.00 15.00 20 6 $CAT_SPORTS $UNITE_PIECE "BFOOT001" "https://images.unsplash.com/photo-1431324155629-1a6deb1dec8d?w=400" "PHYSIQUE" ""
 create_product "Tapis de yoga" "Tapis de yoga antidérapant" 35.00 25.00 15 5 $CAT_SPORTS $UNITE_PIECE "TYOGA001" "https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?w=400" "PHYSIQUE" ""
@@ -251,11 +260,11 @@ create_product "Shampoing bio" "Shampoing bio cheveux" 15.00 10.00 30 10 $CAT_BE
 create_product "Masque facial" "Masque purifiant" 22.00 15.00 18 6 $CAT_BEAUTE $UNITE_PIECE "MFAC001" "https://images.unsplash.com/photo-1556228720-195a672e8a03?w=400" "PHYSIQUE" "2025-07-15"
 
 # Produits avec catégories - Automobile
-create_product "Pneu Michelin" "Pneu été 205/55 R16" 85.00 60.00 20 6 $CAT_AUTO $UNITE_PIECE "PMICH001" "https://images.unsplash.com/photo-1558618047-3c8c76ca7d13?w=400" "PHYSIQUE" ""
-create_product "Huile moteur 5W30" "Huile moteur synthétique 5L" 45.00 30.00 15 5 $CAT_AUTO $UNITE_LITRE "HMOT001" "https://images.unsplash.com/photo-1558618047-3c8c76ca7d13?w=400" "PHYSIQUE" "2025-12-31"
-create_product "Batterie voiture" "Batterie 12V 70Ah" 120.00 80.00 8 3 $CAT_AUTO $UNITE_PIECE "BBAT001" "https://images.unsplash.com/photo-1558618047-3c8c76ca7d13?w=400" "PHYSIQUE" ""
-create_product "Pare-brise" "Pare-brise avant" 200.00 150.00 5 2 $CAT_AUTO $UNITE_PIECE "PPAR001" "https://images.unsplash.com/photo-1558618047-3c8c76ca7d13?w=400" "PHYSIQUE" ""
-create_product "Feux LED" "Feux LED avant" 80.00 55.00 12 4 $CAT_AUTO $UNITE_PIECE "FLED001" "https://images.unsplash.com/photo-1558618047-3c8c76ca7d13?w=400" "PHYSIQUE" ""
+create_product "Pneu Michelin" "Pneu été 205/55 R16" 85.00 60.00 20 6 $CAT_AUTO $UNITE_PIECE "PMICH001" "https://images.unsplash.com/photo-1566238318960-8a8f5473f050?q=80&w=400" "PHYSIQUE" ""
+create_product "Huile moteur 5W30" "Huile moteur synthétique 5L" 45.00 30.00 15 5 $CAT_AUTO $UNITE_LITRE "HMOT001" "https://images.unsplash.com/photo-1613214293055-5678e2f6d7de?q=80&w=400" "PHYSIQUE" "2025-12-31"
+create_product "Batterie voiture" "Batterie 12V 70Ah" 120.00 80.00 8 3 $CAT_AUTO $UNITE_PIECE "BBAT001" "https://images.unsplash.com/photo-1756806381989-d10b7f569e89?q=80&w=400" "PHYSIQUE" ""
+create_product "Pare-brise" "Pare-brise avant" 200.00 150.00 5 2 $CAT_AUTO $UNITE_PIECE "PPAR001" "https://images.unsplash.com/photo-1756806381989-d10b7f569e89?q=80&w=400" "PHYSIQUE" ""
+create_product "Feux LED" "Feux LED avant" 80.00 55.00 12 4 $CAT_AUTO $UNITE_PIECE "FLED001" "https://images.unsplash.com/photo-1756806381989-d10b7f569e89?q=80&w=400" "PHYSIQUE" ""
 
 # Produits avec catégories - Bricolage
 create_product "Perceuse Bosch" "Perceuse visseuse 18V" 150.00 100.00 8 3 $CAT_BRICOLAGE $UNITE_PIECE "PBOSCH001" "https://images.unsplash.com/photo-1581094794329-c8112a89af12?w=400" "PHYSIQUE" ""
@@ -265,18 +274,18 @@ create_product "Peinture blanche" "Peinture acrylique 2.5L" 35.00 25.00 15 5 $CA
 create_product "Pinceau set" "Set de pinceaux peinture" 18.00 12.00 25 8 $CAT_BRICOLAGE $UNITE_PIECE "PSET001" "https://images.unsplash.com/photo-1581094794329-c8112a89af12?w=400" "PHYSIQUE" ""
 
 # Produits avec catégories - Jouets & Jeux
-create_product "Lego Creator" "Set Lego Creator 3-en-1" 45.00 30.00 12 4 $CAT_JOUETS $UNITE_PIECE "LCR001" "https://images.unsplash.com/photo-1558618047-3c8c76ca7d13?w=400" "PHYSIQUE" ""
-create_product "Poupée Barbie" "Poupée Barbie Fashionista" 25.00 18.00 20 6 $CAT_JOUETS $UNITE_PIECE "PBARB001" "https://images.unsplash.com/photo-1558618047-3c8c76ca7d13?w=400" "PHYSIQUE" ""
-create_product "Jeu de société" "Monopoly édition classique" 35.00 25.00 15 5 $CAT_JOUETS $UNITE_PIECE "JMSOC001" "https://images.unsplash.com/photo-1558618047-3c8c76ca7d13?w=400" "PHYSIQUE" ""
-create_product "Puzzle 1000 pièces" "Puzzle paysage montagne" 18.00 12.00 25 8 $CAT_JOUETS $UNITE_PIECE "PUZ1000_001" "https://images.unsplash.com/photo-1558618047-3c8c76ca7d13?w=400" "PHYSIQUE" ""
-create_product "Voiture télécommandée" "Voiture RC 1:18" 80.00 55.00 8 3 $CAT_JOUETS $UNITE_PIECE "VRC001" "https://images.unsplash.com/photo-1558618047-3c8c76ca7d13?w=400" "PHYSIQUE" ""
+create_product "Lego Creator" "Set Lego Creator 3-en-1" 45.00 30.00 12 4 $CAT_JOUETS $UNITE_PIECE "LCR001" "https://images.unsplash.com/photo-1756806381989-d10b7f569e89?q=80&w=400" "PHYSIQUE" ""
+create_product "Poupée Barbie" "Poupée Barbie Fashionista" 25.00 18.00 20 6 $CAT_JOUETS $UNITE_PIECE "PBARB001" "https://images.unsplash.com/photo-1730647297091-094977ccbbc7?q=80&w=400" "PHYSIQUE" ""
+create_product "Jeu de société" "Monopoly édition classique" 35.00 25.00 15 5 $CAT_JOUETS $UNITE_PIECE "JMSOC001" "https://images.unsplash.com/photo-1756806381989-d10b7f569e89?q=80&w=400" "PHYSIQUE" ""
+create_product "Puzzle 1000 pièces" "Puzzle paysage montagne" 18.00 12.00 25 8 $CAT_JOUETS $UNITE_PIECE "PUZ1000_001" "https://plus.unsplash.com/premium_photo-1723507389644-a69471da76d5?q=80&w=400" "PHYSIQUE" ""
+create_product "Voiture télécommandée" "Voiture RC 1:18" 80.00 55.00 8 3 $CAT_JOUETS $UNITE_PIECE "VRC001" "https://images.unsplash.com/photo-1756806381989-d10b7f569e89?q=80&w=400" "PHYSIQUE" ""
 
 # Produits SANS catégorie (pour tester la fonctionnalité "Sans Category")
-create_product "Produit mystère 1" "Produit sans catégorie définie" 50.00 35.00 10 3 $CAT_SANS_CATEGORIE $UNITE_PIECE "PMYST001" "https://images.unsplash.com/photo-1558618047-3c8c76ca7d13?w=400" "PHYSIQUE" ""
-create_product "Produit mystère 2" "Autre produit sans catégorie" 75.00 50.00 8 2 $CAT_SANS_CATEGORIE $UNITE_PIECE "PMYST002" "https://images.unsplash.com/photo-1558618047-3c8c76ca7d13?w=400" "PHYSIQUE" ""
-create_product "Produit mystère 3" "Troisième produit sans catégorie" 30.00 20.00 15 5 $CAT_SANS_CATEGORIE $UNITE_PIECE "PMYST003" "https://images.unsplash.com/photo-1558618047-3c8c76ca7d13?w=400" "PHYSIQUE" ""
-create_product "Produit mystère 4" "Quatrième produit sans catégorie" 95.00 65.00 6 2 $CAT_SANS_CATEGORIE $UNITE_PIECE "PMYST004" "https://images.unsplash.com/photo-1558618047-3c8c76ca7d13?w=400" "PHYSIQUE" ""
-create_product "Produit mystère 5" "Cinquième produit sans catégorie" 40.00 28.00 12 4 $CAT_SANS_CATEGORIE $UNITE_PIECE "PMYST005" "https://images.unsplash.com/photo-1558618047-3c8c76ca7d13?w=400" "PHYSIQUE" ""
+create_product "Produit mystère 1" "Produit sans catégorie définie" 50.00 35.00 10 3 $CAT_SANS_CATEGORIE $UNITE_PIECE "PMYST001" "https://images.unsplash.com/photo-1756806381989-d10b7f569e89?q=80&w=400" "PHYSIQUE" ""
+create_product "Produit mystère 2" "Autre produit sans catégorie" 75.00 50.00 8 2 $CAT_SANS_CATEGORIE $UNITE_PIECE "PMYST002" "https://images.unsplash.com/photo-1756806381989-d10b7f569e89?q=80&w=400" "PHYSIQUE" ""
+create_product "Produit mystère 3" "Troisième produit sans catégorie" 30.00 20.00 15 5 $CAT_SANS_CATEGORIE $UNITE_PIECE "PMYST003" "https://images.unsplash.com/photo-1756806381989-d10b7f569e89?q=80&w=400" "PHYSIQUE" ""
+create_product "Produit mystère 4" "Quatrième produit sans catégorie" 95.00 65.00 6 2 $CAT_SANS_CATEGORIE $UNITE_PIECE "PMYST004" "https://images.unsplash.com/photo-1756806381989-d10b7f569e89?q=80&w=400" "PHYSIQUE" ""
+create_product "Produit mystère 5" "Cinquième produit sans catégorie" 40.00 28.00 12 4 $CAT_SANS_CATEGORIE $UNITE_PIECE "PMYST005" "https://images.unsplash.com/photo-1756806381989-d10b7f569e89?q=80&w=400" "PHYSIQUE" ""
 
 echo -e "${GREEN}🎉 Script terminé ! 40 produits ont été ajoutés avec succès.${NC}"
 echo -e "${BLUE}📊 Résumé:${NC}"
