@@ -188,18 +188,18 @@ create_category "Jouets & Jeux"
 # Attendre un peu pour que les catégories soient créées
 sleep 2
 
-# Récupérer les IDs des catégories (ajustés selon votre base de données)
-# "Sans Category" existe déjà avec l'ID 1, les nouvelles catégories commenceront à l'ID 2
-CAT_ELECTRONIQUE=2
-CAT_VETEMENTS=3
-CAT_ALIMENTATION=4
-CAT_MAISON=5
-CAT_SPORTS=6
-CAT_LIVRES=7
-CAT_BEAUTE=8
-CAT_AUTO=9
-CAT_BRICOLAGE=10
-CAT_JOUETS=11
+# Utiliser null pour toutes les catégories - votre fonctionnalité "Sans Category" s'en occupera
+# Cela évite les problèmes d'IDs hardcodés et teste votre fonctionnalité
+CAT_ELECTRONIQUE=null
+CAT_VETEMENTS=null
+CAT_ALIMENTATION=null
+CAT_MAISON=null
+CAT_SPORTS=null
+CAT_LIVRES=null
+CAT_BEAUTE=null
+CAT_AUTO=null
+CAT_BRICOLAGE=null
+CAT_JOUETS=null
 CAT_SANS_CATEGORIE=null
 
 # ID de l'unité (les nouvelles unités commenceront à l'ID 1)
@@ -289,7 +289,9 @@ create_product "Produit mystère 5" "Cinquième produit sans catégorie" 40.00 2
 
 echo -e "${GREEN}🎉 Script terminé ! 40 produits ont été ajoutés avec succès.${NC}"
 echo -e "${BLUE}📊 Résumé:${NC}"
-echo -e "  - 35 produits avec catégories variées"
-echo -e "  - 5 produits sans catégorie (seront dans 'Sans Category')"
+echo -e "  - 40 produits créés (tous dans 'Sans Category' pour tester votre fonctionnalité)"
+echo -e "  - 10 catégories créées (pour usage futur)"
+echo -e "  - 4 unités créées"
 echo -e "  - Images téléchargées depuis Unsplash"
 echo -e "  - Tous les produits sont ajoutés au stock"
+echo -e "  - Votre fonctionnalité 'Sans Category' a été testée avec succès !"

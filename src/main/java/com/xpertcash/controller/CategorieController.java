@@ -1,6 +1,5 @@
 package com.xpertcash.controller;
 
-import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -21,13 +20,10 @@ import org.springframework.web.bind.annotation.RestController;
 import com.xpertcash.DTOs.CategorieResponseDTO;
 import com.xpertcash.DTOs.CategoriePaginatedResponseDTO;
 import com.xpertcash.DTOs.ProduitPaginatedResponseDTO;
-import com.xpertcash.configuration.JwtUtil;
 import com.xpertcash.entity.Categorie;
 import com.xpertcash.entity.Entreprise;
-import com.xpertcash.entity.Unite;
 import com.xpertcash.entity.User;
 import com.xpertcash.repository.CategorieRepository;
-import com.xpertcash.repository.UsersRepository;
 import com.xpertcash.service.CategorieService;
 import com.xpertcash.service.AuthenticationHelper;
 
@@ -40,10 +36,6 @@ public class CategorieController {
     private CategorieService categorieService;
     @Autowired
     private CategorieRepository categorieRepository;
-    @Autowired
-    private UsersRepository usersRepository;
-    @Autowired
-    private JwtUtil jwtUtil;
     @Autowired
     private AuthenticationHelper authHelper;
 
@@ -166,6 +158,23 @@ public class CategorieController {
                 
             } catch (Exception e) {
                 System.err.println("Erreur interne lors de la récupération des catégories paginées : " + e.getMessage());
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
+            }
+        }
+
+        // Récupérer les catégories avec le nombre de produits (méthode simple)
+        @GetMapping("/categories/count")
+        public ResponseEntity<List<Map<String, Object>>> getCategoriesWithProductCount(HttpServletRequest request) {
+            try {
+                List<Map<String, Object>> categoriesWithCount = categorieService.getCategoriesWithProductCount(request);
+                return ResponseEntity.ok(categoriesWithCount);
+                
+            } catch (RuntimeException e) {
+                System.err.println("Erreur lors de la récupération du nombre de produits par catégorie : " + e.getMessage());
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(null);
+                
+            } catch (Exception e) {
+                System.err.println("Erreur interne lors de la récupération du nombre de produits par catégorie : " + e.getMessage());
                 return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
             }
         }
