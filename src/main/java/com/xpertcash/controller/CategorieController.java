@@ -179,6 +179,7 @@ public class CategorieController {
             }
         }
 
+     
     
 
     // Supprimer une catégorie

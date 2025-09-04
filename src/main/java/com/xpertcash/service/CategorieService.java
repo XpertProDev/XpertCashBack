@@ -389,7 +389,7 @@ private ProduitDetailsResponseDTO toProduitDTO(Produit produit) {
         }
     }
 
-    // Méthode simple pour obtenir le nombre de produits par catégorie
+    // Méthode simple pour obtenir le nombre de produits par catégorie (OPTIMISÉE)
     public List<Map<String, Object>> getCategoriesWithProductCount(HttpServletRequest request) {
         // --- JWT & utilisateur inchangé ---
         String token = request.getHeader("Authorization");
@@ -412,7 +412,7 @@ private ProduitDetailsResponseDTO toProduitDTO(Produit produit) {
         // --- Récupérer toutes les catégories de l'entreprise ---
         List<Categorie> allCategories = categorieRepository.findByEntrepriseId(entreprise.getId());
 
-        // --- Récupérer le count groupé par catégorie ---
+        // --- Récupérer le count groupé par catégorie (OPTIMISÉ avec filtre deleted) ---
         Map<Long, Long> produitCountMap = produitRepository.countProduitsParCategorie(entreprise.getId())
                 .stream()
                 .collect(Collectors.toMap(
@@ -434,4 +434,5 @@ private ProduitDetailsResponseDTO toProduitDTO(Produit produit) {
         return result;
     }
 
+  
 }
