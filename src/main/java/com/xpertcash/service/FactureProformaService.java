@@ -10,16 +10,22 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 
 import com.xpertcash.DTOs.EntrepriseClientDTO;
 import com.xpertcash.DTOs.FactureProFormaDTO;
+import com.xpertcash.DTOs.FactureProformaPaginatedResponseDTO;
 import com.xpertcash.DTOs.LigneFactureDTO;
 import com.xpertcash.DTOs.CLIENT.ClientDTO;
 import com.xpertcash.configuration.CentralAccess;
-import com.xpertcash.configuration.JwtUtil;
+
 import com.xpertcash.entity.Client;
 import com.xpertcash.entity.Entreprise;
 import com.xpertcash.entity.EntrepriseClient;
@@ -51,9 +57,13 @@ import jakarta.transaction.Transactional;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import com.xpertcash.service.AuthenticationHelper;
 
 @Service
 public class FactureProformaService {
+
+    @Autowired
+    private AuthenticationHelper authHelper;
 
     private static final Logger log = LoggerFactory.getLogger(FactureProformaService.class);
 
@@ -90,8 +100,7 @@ public class FactureProformaService {
 
 
 
-    @Autowired
-    private JwtUtil jwtUtil;
+
 
     @Autowired
     private ModuleActivationService moduleActivationService;
@@ -106,22 +115,7 @@ public class FactureProformaService {
         throw new RuntimeException("La facture ne peut pas être vide !");
     }
 
-    // Vérifier la présence du token JWT et récupérer l'ID de l'utilisateur connecté
-    String token = request.getHeader("Authorization");
-    if (token == null || !token.startsWith("Bearer ")) {
-        throw new RuntimeException("Token JWT manquant ou mal formaté");
-    }
-
-        Long userId;
-    try {
-        userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
-    } catch (Exception e) {
-        throw new RuntimeException("Erreur lors de l'extraction de l'ID de l'utilisateur depuis le token", e);
-    }
-
-    // 👤 Récupérer l'utilisateur connecté
-    User user = usersRepository.findById(userId)
-            .orElseThrow(() -> new RuntimeException("Utilisateur introuvable !"));
+    User user = authHelper.getAuthenticatedUserWithFallback(request);
 
     // 🏢 Vérifier que l'utilisateur est bien associé à une entreprise
     Entreprise entrepriseUtilisateur = user.getEntreprise();
@@ -325,21 +319,7 @@ public class FactureProformaService {
         // Stocker l'ancien montant total HT avant toute modification
         double ancienTotalHT = facture.getTotalHT();
 
-        // 🔐 Extraction de l'utilisateur depuis le token JWT
-        String token = request.getHeader("Authorization");
-        if (token == null || !token.startsWith("Bearer ")) {
-            throw new RuntimeException("Token JWT manquant ou mal formaté");
-        }
-
-        Long userId;
-        try {
-            userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
-        } catch (Exception e) {
-            throw new RuntimeException("Erreur lors de l'extraction de l'ID de l'utilisateur depuis le token", e);
-        }
-
-        User user = usersRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("Utilisateur introuvable !"));
+        User user = authHelper.getAuthenticatedUserWithFallback(request);
 
          // --- Vérification que la facture appartient à la même entreprise que l'utilisateur ---
         Entreprise entrepriseFacture = facture.getEntreprise();
@@ -420,7 +400,7 @@ public class FactureProformaService {
 
         // 🔁 Application des modifications normales
         facture.setUtilisateurModificateur(user);
-        System.out.println("Modification effectuée par l'utilisateur ID: " + userId);
+        System.out.println("Modification effectuée par l'utilisateur ID: " + user.getId());
         System.out.println("Modifications reçues: " + modifications);
 
         // 💡 Génération de facture réelle si passage à VALIDE
@@ -718,16 +698,8 @@ public class FactureProformaService {
 
     //Supression dune facture proforma en brouillon
      @Transactional
-    public void supprimerFactureProforma(Long factureId, String token) {
-        if (token == null || !token.startsWith("Bearer ")) {
-            throw new RuntimeException("Token JWT manquant ou mal formaté");
-        }
-
-        token = token.replace("Bearer ", "");
-        Long userId = jwtUtil.extractUserId(token);
-
-        User user = usersRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+    public void supprimerFactureProforma(Long factureId, HttpServletRequest request) {
+        User user = authHelper.getAuthenticatedUserWithFallback(request);
 
         FactureProForma facture = factureProformaRepository.findById(factureId)
                 .orElseThrow(() -> new EntityNotFoundException("Facture introuvable avec l'ID : " + factureId));
@@ -765,78 +737,111 @@ public class FactureProformaService {
    
 
     //Methode pour recuperer les factures pro forma dune entreprise
-   @Transactional
-public List<Map<String, Object>> getFacturesParEntrepriseParUtilisateur(Long userIdRequete, HttpServletRequest request) {
-    // 🔐 JWT & utilisateur courant
-    String token = request.getHeader("Authorization");
-    if (token == null || !token.startsWith("Bearer ")) {
-        throw new RuntimeException("Token JWT manquant ou mal formaté");
+    @Transactional
+    public List<Map<String, Object>> getFacturesParEntrepriseParUtilisateur(Long userIdRequete, HttpServletRequest request) {
+        return getFacturesParEntrepriseParUtilisateurPaginated(userIdRequete, 0, Integer.MAX_VALUE, request).getContent();
     }
 
-    Long userIdCourant = jwtUtil.extractUserId(token.replace("Bearer ", ""));
-    User currentUser = usersRepository.findById(userIdCourant)
-            .orElseThrow(() -> new RuntimeException("Utilisateur courant introuvable"));
-    User targetUser = usersRepository.findById(userIdRequete)
-            .orElseThrow(() -> new RuntimeException("Utilisateur cible non trouvé"));
+    // Méthode scalable avec pagination pour récupérer les factures proforma d'une entreprise
+    @Transactional
+    public FactureProformaPaginatedResponseDTO getFacturesParEntrepriseParUtilisateurPaginated(
+            Long userIdRequete, 
+            int page, 
+            int size, 
+            HttpServletRequest request) {
+        
+        // --- 1. Validation des paramètres de pagination ---
+        if (page < 0) page = 0;
+        if (size <= 0) size = 20; // Taille par défaut
+        if (size > 100) size = 100; // Limite maximale pour éviter la surcharge
+        
+        // --- 2. Récupération et validation de l'utilisateur ---
+        User currentUser = authHelper.getAuthenticatedUserWithFallback(request);
+        User targetUser = usersRepository.findById(userIdRequete)
+                .orElseThrow(() -> new RuntimeException("Utilisateur cible non trouvé"));
 
-    Entreprise entrepriseCourante = currentUser.getEntreprise();
-    Entreprise entrepriseCible = targetUser.getEntreprise();
+        Entreprise entrepriseCourante = currentUser.getEntreprise();
+        Entreprise entrepriseCible = targetUser.getEntreprise();
 
-    if (entrepriseCourante == null || entrepriseCible == null
-        || !entrepriseCourante.getId().equals(entrepriseCible.getId())) {
-        throw new RuntimeException("Opération interdite : utilisateurs de différentes entreprises.");
-    }
+        if (entrepriseCourante == null || entrepriseCible == null
+            || !entrepriseCourante.getId().equals(entrepriseCible.getId())) {
+            throw new RuntimeException("Opération interdite : utilisateurs de différentes entreprises.");
+        }
 
-    boolean isAdmin = currentUser.getRole().getName() == RoleType.ADMIN;
-    boolean isManager = currentUser.getRole().getName() == RoleType.MANAGER;
-    boolean hasPermission = currentUser.getRole().hasPermission(PermissionType.GESTION_FACTURATION);
-    boolean isApprover = factureProformaRepository.existsByApprobateursAndEntrepriseId(currentUser, entrepriseCourante.getId());
+        // --- 3. Vérification des droits d'accès ---
+        boolean isAdmin = currentUser.getRole().getName() == RoleType.ADMIN;
+        boolean isManager = currentUser.getRole().getName() == RoleType.MANAGER;
+        boolean hasPermission = currentUser.getRole().hasPermission(PermissionType.GESTION_FACTURATION);
+        boolean isApprover = factureProformaRepository.existsByApprobateursAndEntrepriseId(currentUser, entrepriseCourante.getId());
 
-    // 🔹 Récupérer toutes les factures avec JOIN FETCH pour éviter LazyInitializationException
-    List<FactureProForma> factures = factureProformaRepository.findFacturesAvecRelationsParEntreprise(entrepriseCourante.getId());
+        // --- 4. Créer le Pageable avec tri optimisé ---
+        Pageable pageable = PageRequest.of(page, size, Sort.by("dateCreation").descending().and(Sort.by("id").descending()));
 
-    // 🔹 Filtrage d'accès métier (logique inchangée)
-    if (!(isAdmin || isManager)) {
-        if (hasPermission || isApprover) {
-            factures = factures.stream()
-                    .filter(f -> f.getUtilisateurCreateur().getId().equals(userIdCourant)
-                            || (f.getApprobateurs() != null && f.getApprobateurs().contains(currentUser)))
-                    .collect(Collectors.toList());
+        // --- 5. Récupérer les factures avec pagination selon les droits ---
+        Page<FactureProForma> facturesPage;
+        
+        if (isAdmin || isManager) {
+            // Admins et managers voient toutes les factures de l'entreprise
+            facturesPage = factureProformaRepository.findFacturesAvecRelationsParEntreprisePaginated(
+                    entrepriseCourante.getId(), pageable);
+        } else if (hasPermission || isApprover) {
+            // Utilisateurs avec permissions voient leurs factures + celles où ils sont approbateurs
+            facturesPage = factureProformaRepository.findFacturesAvecRelationsParEntrepriseEtUtilisateurPaginated(
+                    entrepriseCourante.getId(), currentUser.getId(), pageable);
         } else {
-            if (!Objects.equals(userIdCourant, userIdRequete)) {
+            // Utilisateurs normaux ne voient que leurs propres factures
+            if (!Objects.equals(currentUser.getId(), userIdRequete)) {
                 throw new RuntimeException("Vous ne pouvez voir que vos propres factures.");
             }
-            factures = factures.stream()
-                    .filter(f -> f.getUtilisateurCreateur().getId().equals(userIdCourant))
-                    .collect(Collectors.toList());
+            facturesPage = factureProformaRepository.findFacturesAvecRelationsParEntrepriseEtUtilisateurPaginated(
+                    entrepriseCourante.getId(), currentUser.getId(), pageable);
         }
-    }
 
-    // 🔹 Transformer en Map et trier
-    return factures.stream()
-            .sorted(Comparator.comparing(FactureProForma::getDateCreation).reversed()
-                    .thenComparing(FactureProForma::getId).reversed())
-            .map(facture -> {
-                Map<String, Object> map = new HashMap<>();
-                map.put("id", facture.getId());
-                map.put("numeroFacture", facture.getNumeroFacture());
-                map.put("dateCreation", facture.getDateCreation());
-                map.put("description", facture.getDescription());
-                map.put("totalHT", facture.getTotalHT());
-                map.put("remise", facture.getRemise());
-                map.put("tva", facture.isTva());
-                map.put("totalFacture", facture.getTotalFacture());
-                map.put("statut", facture.getStatut());
-                map.put("ligneFactureProforma", facture.getLignesFacture() != null ? facture.getLignesFacture() : Collections.emptyList());
-                map.put("client", facture.getClient() != null ? facture.getClient().getNomComplet() : null);
-                map.put("entrepriseClient", facture.getEntrepriseClient() != null ? facture.getEntrepriseClient().getNom() : null);
-                map.put("entreprise", facture.getEntreprise() != null ? facture.getEntreprise().getNomEntreprise() : null);
-                map.put("dateRelance", facture.getDateRelance());
-                map.put("notifie", facture.isNotifie());
-                return map;
-            })
-            .collect(Collectors.toList());
-}
+        // --- 6. Récupérer les statistiques globales (une seule fois) ---
+        long totalFactures = factureProformaRepository.countFacturesByEntrepriseId(entrepriseCourante.getId());
+        long totalFacturesBrouillon = factureProformaRepository.countFacturesByEntrepriseIdAndStatut(
+                entrepriseCourante.getId(), StatutFactureProForma.BROUILLON);
+        long totalFacturesEnAttente = factureProformaRepository.countFacturesByEntrepriseIdAndStatut(
+                entrepriseCourante.getId(), StatutFactureProForma.APPROBATION);
+        long totalFacturesValidees = factureProformaRepository.countFacturesByEntrepriseIdAndStatut(
+                entrepriseCourante.getId(), StatutFactureProForma.VALIDE);
+        long totalFacturesAnnulees = factureProformaRepository.countFacturesByEntrepriseIdAndStatut(
+                entrepriseCourante.getId(), StatutFactureProForma.ANNULE);
+
+        // --- 7. Transformer les factures de la page courante en Map ---
+        List<Map<String, Object>> facturesMap = facturesPage.getContent().stream()
+                .map(facture -> {
+                    Map<String, Object> map = new HashMap<>();
+                    map.put("id", facture.getId());
+                    map.put("numeroFacture", facture.getNumeroFacture());
+                    map.put("dateCreation", facture.getDateCreation());
+                    map.put("description", facture.getDescription());
+                    map.put("totalHT", facture.getTotalHT());
+                    map.put("remise", facture.getRemise());
+                    map.put("tva", facture.isTva());
+                    map.put("totalFacture", facture.getTotalFacture());
+                    map.put("statut", facture.getStatut());
+                    map.put("ligneFactureProforma", facture.getLignesFacture() != null ? facture.getLignesFacture() : Collections.emptyList());
+                    map.put("client", facture.getClient() != null ? facture.getClient().getNomComplet() : null);
+                    map.put("entrepriseClient", facture.getEntrepriseClient() != null ? facture.getEntrepriseClient().getNom() : null);
+                    map.put("entreprise", facture.getEntreprise() != null ? facture.getEntreprise().getNomEntreprise() : null);
+                    map.put("dateRelance", facture.getDateRelance());
+                    map.put("notifie", facture.isNotifie());
+                    return map;
+                })
+                .collect(Collectors.toList());
+
+        // --- 8. Créer la page de DTOs ---
+        Page<Map<String, Object>> dtoPage = new PageImpl<>(
+                facturesMap,
+                pageable,
+                facturesPage.getTotalElements()
+        );
+
+        // --- 9. Retourner la réponse paginée ---
+        return FactureProformaPaginatedResponseDTO.fromPage(dtoPage, totalFactures, totalFacturesBrouillon, 
+                totalFacturesEnAttente, totalFacturesValidees, totalFacturesAnnulees);
+    }
 
 
 
@@ -845,20 +850,7 @@ public List<Map<String, Object>> getFacturesParEntrepriseParUtilisateur(Long use
     // Methode pour recuperer une facture pro forma par son id
     // Méthode privée pour récupérer l'entité FactureProForma avec contrôle d'accès
     public FactureProForma getFactureProformaEntityById(Long id, HttpServletRequest request) {
-        String token = request.getHeader("Authorization");
-        if (token == null || !token.startsWith("Bearer ")) {
-            throw new RuntimeException("Token JWT manquant ou mal formaté");
-        }
-
-        Long userId;
-        try {
-            userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
-        } catch (Exception e) {
-            throw new RuntimeException("Erreur lors de l'extraction de l'ID utilisateur depuis le token", e);
-        }
-
-        User utilisateur = usersRepository.findById(userId)
-            .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
+        User utilisateur = authHelper.getAuthenticatedUserWithFallback(request);
 
         FactureProForma facture = factureProformaRepository.findById(id)
             .orElseThrow(() -> new RuntimeException("Facture Proforma introuvable avec l'ID : " + id));
@@ -896,21 +888,7 @@ public FactureProFormaDTO getFactureProformaById(Long id, HttpServletRequest req
             FactureProForma facture = factureProformaRepository.findById(factureId)
                     .orElseThrow(() -> new RuntimeException("Facture non trouvée !"));
 
-            // Vérification du token JWT 
-            String token = request.getHeader("Authorization");
-            if (token == null || !token.startsWith("Bearer ")) {
-                throw new RuntimeException("Token JWT manquant ou mal formaté");
-            }
-
-            Long userId;
-            try {
-                userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
-            } catch (Exception e) {
-                throw new RuntimeException("Erreur lors de l'extraction de l'ID de l'utilisateur depuis le token", e);
-            }
-
-            User user = usersRepository.findById(userId)
-                    .orElseThrow(() -> new RuntimeException("Utilisateur introuvable !"));
+            User user = authHelper.getAuthenticatedUserWithFallback(request);
 
             // Récupération de la note à modifier
             NoteFactureProForma note = noteFactureProFormaRepository.findById(noteId)
@@ -962,21 +940,7 @@ public FactureProFormaDTO getFactureProformaById(Long id, HttpServletRequest req
         FactureProForma facture = factureProformaRepository.findById(factureId)
                 .orElseThrow(() -> new RuntimeException("Facture non trouvée !"));
 
-        // Vérification du token JWT
-        String token = request.getHeader("Authorization");
-        if (token == null || !token.startsWith("Bearer ")) {
-            throw new RuntimeException("Token JWT manquant ou mal formaté");
-        }
-
-        Long userId;
-        try {
-            userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
-        } catch (Exception e) {
-            throw new RuntimeException("Erreur lors de l'extraction de l'ID de l'utilisateur depuis le token", e);
-        }
-
-        User user = usersRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("Utilisateur introuvable !"));
+        User user = authHelper.getAuthenticatedUserWithFallback(request);
 
         // Détermination du rôle
         RoleType role = user.getRole().getName();
@@ -1017,18 +981,7 @@ public FactureProFormaDTO getFactureProformaById(Long id, HttpServletRequest req
 
     //Methode get note dune facture by id
     public NoteFactureProForma getNotesByFactureId(Long factureId, Long noteId, HttpServletRequest request) {
-        String token = request.getHeader("Authorization");
-        if (token == null || !token.startsWith("Bearer ")) {
-            throw new RuntimeException("Token JWT manquant ou mal formaté");
-        }
-        Long userId;
-        try {
-            userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
-        } catch (Exception e) {
-            throw new RuntimeException("Erreur lors de l'extraction de l'ID de l'utilisateur depuis le token", e);
-        }
-        User user = usersRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("Utilisateur introuvable !"));
+        User user = authHelper.getAuthenticatedUserWithFallback(request);
         // Récupération de la facture
         FactureProForma facture = factureProformaRepository.findById(factureId)
                 .orElseThrow(() -> new RuntimeException("Facture non trouvée avec l'ID : " + factureId));
@@ -1060,15 +1013,7 @@ public FactureProFormaDTO getFactureProformaById(Long id, HttpServletRequest req
     //Trier
 public List<FactureProFormaDTO> getFacturesParPeriode(Long userIdRequete, HttpServletRequest request,
                                                       String typePeriode, LocalDate dateDebut, LocalDate dateFin) {
-    // 🔐 JWT & utilisateur courant
-    String token = request.getHeader("Authorization"); 
-    if (token == null || !token.startsWith("Bearer ")) {
-        throw new RuntimeException("Token JWT manquant ou mal formaté");
-    }
-
-    Long userIdCourant = jwtUtil.extractUserId(token.replace("Bearer ", ""));
-    User currentUser = usersRepository.findById(userIdCourant)
-            .orElseThrow(() -> new RuntimeException("Utilisateur courant introuvable"));
+    User currentUser = authHelper.getAuthenticatedUserWithFallback(request);
     User targetUser = usersRepository.findById(userIdRequete)
             .orElseThrow(() -> new RuntimeException("Utilisateur cible non trouvé"));
 
@@ -1115,18 +1060,18 @@ public List<FactureProFormaDTO> getFacturesParPeriode(Long userIdRequete, HttpSe
             .findFacturesAvecRelationsParEntrepriseEtPeriode(entrepriseCourante.getId(), dateStart, dateEnd);
 
     // 🔹 Filtrage selon les rôles et permissions
-    if (!(isAdmin || isManager)) {
-        if (hasPermission) {
-            factures = factures.stream()
-                    .filter(f -> f.getUtilisateurCreateur().getId().equals(userIdCourant)
+            if (!(isAdmin || isManager)) {
+            if (hasPermission) {
+                factures = factures.stream()
+                        .filter(f -> f.getUtilisateurCreateur().getId().equals(currentUser.getId())
                                || f.getApprobateurs().contains(currentUser))
-                    .collect(Collectors.toList());
-        } else {
-            factures = factures.stream()
-                    .filter(f -> f.getUtilisateurCreateur().getId().equals(userIdCourant))
-                    .collect(Collectors.toList());
+                        .collect(Collectors.toList());
+            } else {
+                factures = factures.stream()
+                        .filter(f -> f.getUtilisateurCreateur().getId().equals(currentUser.getId()))
+                        .collect(Collectors.toList());
+            }
         }
-    }
 
     // 🔹 Transformation en DTO et tri
     return factures.stream()

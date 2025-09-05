@@ -13,6 +13,8 @@ import com.xpertcash.DTOs.EntrepriseDTO;
 import com.xpertcash.DTOs.LoginRequest;
 import com.xpertcash.DTOs.RegistrationRequest;
 import com.xpertcash.service.UsersService;
+import com.xpertcash.service.AuthenticationHelper;
+import com.xpertcash.composant.Utilitaire;
 
 import io.jsonwebtoken.Claims;
 import jakarta.servlet.http.HttpServletRequest;
@@ -38,9 +40,12 @@ public class UsersController {
     private UsersService usersService;
     @Autowired
     private JwtUtil jwtUtil;
-    @Autowired JwtConfig jwtConfig;
-
-    
+    @Autowired 
+    JwtConfig jwtConfig;
+    @Autowired
+    private Utilitaire utilitaire;
+    @Autowired
+    private AuthenticationHelper authHelper;
 
     @Autowired
     private UsersRepository usersRepository;
@@ -227,12 +232,11 @@ public ResponseEntity<RegisterResponse> register(@RequestBody RegistrationReques
 
 
     @GetMapping("/user/info")
-    public ResponseEntity<Object> getUserInfo(@RequestHeader("Authorization") String token) {
-        String jwtToken = token.substring(7); // Enlever "Bearer "
-        Long userId = jwtUtil.extractUserId(jwtToken);
-
+    public ResponseEntity<Object> getUserInfo(HttpServletRequest request) {
         try {
-            UserRequest userInfo = usersService.getInfo(userId);
+            // Utiliser AuthenticationHelper avec fallback pour transition douce
+            User user = authHelper.getAuthenticatedUserWithFallback(request);
+            UserRequest userInfo = usersService.getInfo(user.getId());
             return ResponseEntity.ok(userInfo);
 
         } catch (RuntimeException e) {

@@ -82,10 +82,14 @@ List<Produit> findAllByEntrepriseId(@Param("entrepriseId") Long entrepriseId);
        "WHERE b.entreprise.id = :entrepriseId OR p.boutique IS NULL")
 List<Produit> findAllWithCategorieAndBoutiqueByEntrepriseId(@Param("entrepriseId") Long entrepriseId);
 
-// Compter les produits par catégorie pour une entreprise
+// Compter les produits par catégorie pour une entreprise (ULTRA-OPTIMISÉ)
 @Query("SELECT p.categorie.id, COUNT(p) FROM Produit p " +
-       "WHERE p.boutique.entreprise.id = :entrepriseId " +
-       "GROUP BY p.categorie.id")
+       "JOIN p.boutique b " +
+       "WHERE b.entreprise.id = :entrepriseId " +
+       "AND (p.deleted IS NULL OR p.deleted = false) " +
+       "AND p.categorie.id IS NOT NULL " +
+       "GROUP BY p.categorie.id " +
+       "ORDER BY COUNT(p) DESC")
 List<Object[]> countProduitsParCategorie(@Param("entrepriseId") Long entrepriseId);
 
 // Compter les produits par catégorie pour une liste spécifique de catégories

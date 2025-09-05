@@ -58,7 +58,6 @@ public class ProduitController {
     @RequestPart("seuilAlert") String seuilAlertJson,
     @RequestPart(value = "image", required = false) MultipartFile imageFile,
     @RequestParam boolean addToStock,
-    @RequestHeader("Authorization") String token,
     HttpServletRequest request) {
     try {
         // Vérification de l'image reçue
@@ -320,37 +319,39 @@ public ResponseEntity<?> updateProduit(
         
 
         //Endpoint pour ajuster la quantiter du produit en stock
-        @PatchMapping(value = "/ajouterStock", consumes = MediaType.APPLICATION_JSON_VALUE)
-        public ResponseEntity<?> ajouterStock(
-                @RequestBody AjouterStockRequest request,
-                @RequestHeader("Authorization") String token,
-                HttpServletRequest httpRequest
-        ) {
-            System.out.println("➡️ Boutique ID: " + request.getBoutiqueId());
-            System.out.println("➡️ Produits et quantités: " + request.getProduitsQuantites());
-            System.out.println("➡️ Fournisseur ID: " + request.getFournisseurId());
-
-            if (request.getBoutiqueId() == null) {
-                return ResponseEntity.badRequest().body("Le champ 'boutiqueId' est obligatoire.");
-            }
-
-            try {
-                Facture facture = produitService.ajouterStock(
-                        request.getBoutiqueId(),
-                        request.getProduitsQuantites(),
-                        request.getDescription(),
-                        request.getCodeFournisseur(),
-                        request.getFournisseurId(),
-                        httpRequest
-                );
-
-                return ResponseEntity.ok(new FactureDTO(facture));
-            } catch (Exception e) {
-                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                        .body("Erreur lors de l'ajout du stock : " + e.getMessage());
-            }
-        }
-
+               //Endpoint pour ajuster la quantiter du produit en stock
+               @PatchMapping(value = "/ajouterStock", consumes = MediaType.APPLICATION_JSON_VALUE)
+               public ResponseEntity<?> ajouterStock(
+                       @RequestBody AjouterStockRequest request,
+                       @RequestHeader("Authorization") String token,
+                       HttpServletRequest httpRequest
+               ) {
+                   System.out.println("➡️ Boutique ID: " + request.getBoutiqueId());
+                   System.out.println("➡️ Produits et quantités: " + request.getProduitsQuantites());
+                   System.out.println("➡️ Fournisseur ID: " + request.getFournisseurId());
+       
+                   if (request.getBoutiqueId() == null) {
+                       return ResponseEntity.badRequest().body("Le champ 'boutiqueId' est obligatoire.");
+                   }
+       
+                   try {
+                       Facture facture = produitService.ajouterStock(
+                               request.getBoutiqueId(),
+                               request.getProduitsQuantites(),
+                               request.getDescription(),
+                               request.getCodeFournisseur(),
+                               request.getFournisseurId(),
+                               httpRequest
+                       );
+       
+                       return ResponseEntity.ok(new FactureDTO(facture));
+                   } catch (Exception e) {
+                       return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                               .body("Erreur lors de l'ajout du stock : " + e.getMessage());
+                   }
+               }
+       
+      
             
             // Endpoint Stock Historique
             @GetMapping("/stockhistorique/{produitId}")
@@ -377,7 +378,6 @@ public ResponseEntity<?> updateProduit(
         @PatchMapping(value = "/retirerStock", consumes = { MediaType.APPLICATION_JSON_VALUE })
         public ResponseEntity<?> retirerStock(
                 @RequestBody RetirerStockRequest retirerStockRequest,
-                @RequestHeader("Authorization") String token,
                 HttpServletRequest request) {
             try {
                 if (retirerStockRequest.getProduitsQuantites() == null || retirerStockRequest.getProduitsQuantites().isEmpty()) {
@@ -438,11 +438,11 @@ public ResponseEntity<?> updateProduit(
                 @RequestParam("file") MultipartFile file,
                 @RequestParam Long entrepriseId,
                 @RequestParam(value = "boutiqueIds", required = false) String boutiqueIdsJson,
-                @RequestHeader("Authorization") String token, // Token complet avec "Bearer"
                 HttpServletRequest request) {
 
             try {
                 // Validation du token JWT
+                String token = request.getHeader("Authorization");
                 if (token == null || !token.startsWith("Bearer ")) {
                     throw new RuntimeException("Token JWT manquant ou mal formaté");
                 }

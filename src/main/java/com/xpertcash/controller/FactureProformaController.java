@@ -27,7 +27,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.xpertcash.DTOs.FactureProFormaDTO;
-import com.xpertcash.configuration.JwtUtil;
+import com.xpertcash.DTOs.FactureProformaPaginatedResponseDTO;
+import com.xpertcash.service.AuthenticationHelper;
 import com.xpertcash.entity.Entreprise;
 import com.xpertcash.entity.FactureProForma;
 import com.xpertcash.entity.MethodeEnvoi;
@@ -58,7 +59,7 @@ public class FactureProformaController {
     private UsersRepository usersRepository;
 
     @Autowired
-    private JwtUtil jwtUtil;
+    private AuthenticationHelper authHelper;
 
     @Autowired
     private MailService mailService;
@@ -70,14 +71,10 @@ public class FactureProformaController {
             @RequestBody FactureProForma facture,
             @RequestParam(defaultValue = "0") Double remisePourcentage,
             @RequestParam(defaultValue = "false") Boolean appliquerTVA,
-            @RequestHeader("Authorization") String token,  // Récupération du token depuis l'en-tête
-            HttpServletRequest request) {  // Passage du HttpServletRequest complet
+            HttpServletRequest request) {
 
         try {
-            // Ajouter le token dans l'en-tête de la requête
-            request.setAttribute("Authorization", token);
-
-            // Appel du service pour ajouter la facture, en passant la requête avec le token
+            // Appel du service pour ajouter la facture
             FactureProForma nouvelleFacture = factureProformaService.ajouterFacture(facture, remisePourcentage, appliquerTVA, request);
 
             // Retourner la facture créée en réponse HTTP 201 (CREATED)
@@ -110,8 +107,7 @@ public class FactureProformaController {
             @PathVariable("factureId") Long factureId,
             HttpServletRequest request) {
         try {
-            String token = request.getHeader("Authorization");
-            factureProformaService.supprimerFactureProforma(factureId, token);
+            factureProformaService.supprimerFactureProforma(factureId, request);
 
             // ✅ Retourner un objet JSON
             Map<String, String> response = new HashMap<>();
@@ -179,33 +175,21 @@ public class FactureProformaController {
 
 
     // Endpoint pour recuperer la liste des factures pro forma dune entreprise
-@GetMapping("/mes-factures")
-public ResponseEntity<Object> getFacturesParEntreprise(HttpServletRequest request) {
-    String token = request.getHeader("Authorization");
-    if (token == null || !token.startsWith("Bearer ")) {
-        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                .body(Map.of("error", "Token JWT manquant ou mal formaté"));
-    }
+    @GetMapping("/mes-factures")
+    public ResponseEntity<Object> getFacturesParEntreprise(HttpServletRequest request) {
+        User user = authHelper.getAuthenticatedUserWithFallback(request);
 
-    Long userId;
-    try {
-        userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
-    } catch (Exception e) {
-        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                .body(Map.of("error", "Token JWT invalide"));
+        try {
+            List<Map<String, Object>> factures = factureProformaService
+                    .getFacturesParEntrepriseParUtilisateur(user.getId(), request);
+            return ResponseEntity.ok(factures);
+        } catch (Exception e) {
+            e.printStackTrace(); // Pour loguer l’erreur réelle côté serveur
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Erreur interne lors de la récupération des factures",
+                                "details", e.getMessage()));
+        }
     }
-
-    try {
-        List<Map<String, Object>> factures = factureProformaService
-                .getFacturesParEntrepriseParUtilisateur(userId, request);
-        return ResponseEntity.ok(factures);
-    } catch (Exception e) {
-        e.printStackTrace(); // Pour loguer l’erreur réelle côté serveur
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(Map.of("error", "Erreur interne lors de la récupération des factures",
-                             "details", e.getMessage()));
-    }
-}
 
 
 
@@ -224,21 +208,7 @@ public ResponseEntity<Object> getFacturesParEntreprise(HttpServletRequest reques
             @PathVariable Long id,
             HttpServletRequest request) {
 
-        // 🔐 Extraction de l'utilisateur depuis le token JWT
-        String token = request.getHeader("Authorization");
-        if (token == null || !token.startsWith("Bearer ")) {
-            throw new RuntimeException("Token JWT manquant ou mal formaté");
-        }
-
-        Long userId;
-        try {
-            userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
-        } catch (Exception e) {
-            throw new RuntimeException("Erreur lors de l'extraction de l'ID de l'utilisateur depuis le token", e);
-        }
-
-        User user = usersRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("Utilisateur introuvable !"));
+        User user = authHelper.getAuthenticatedUserWithFallback(request);
 
         // Récupération de la facture
         FactureProForma facture = factureProformaRepository.findById(id)
@@ -366,23 +336,11 @@ public ResponseEntity<List<FactureProFormaDTO>> getFacturesParPeriode(
         @RequestParam(name = "dateFin", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateFin,
         HttpServletRequest request
 ) {
-    String token = request.getHeader("Authorization");
-    if (token == null || !token.startsWith("Bearer ")) {
-        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(null);
-    }
-
-    Long userId;
     try {
-        // Extraire l'ID de l'utilisateur à partir du token JWT
-        userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
-    } catch (Exception e) {
-        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(null);
-    }
-
-    try {
+        User user = authHelper.getAuthenticatedUserWithFallback(request);
         // Appeler le service pour obtenir les factures en fonction de la période
         List<FactureProFormaDTO> facturesDTO = factureProformaService.getFacturesParPeriode(
-                userId, request, typePeriode, dateDebut, dateFin);
+                user.getId(), request, typePeriode, dateDebut, dateFin);
         
         return ResponseEntity.ok(facturesDTO);  // Retourner la liste des DTOs
     } catch (Exception e) {
@@ -390,6 +348,34 @@ public ResponseEntity<List<FactureProFormaDTO>> getFacturesParPeriode(
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
     }
 }
+
+    // Endpoint scalable avec pagination pour récupérer les factures proforma de l'utilisateur connecté
+    @GetMapping("/mes-factures/paginated")
+    public ResponseEntity<FactureProformaPaginatedResponseDTO> getFacturesParEntrepriseParUtilisateurPaginated(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            HttpServletRequest request) {
+        
+        try {
+            // Validation des paramètres
+            if (page < 0) page = 0;
+            if (size <= 0) size = 20;
+            if (size > 100) size = 100; // Limite maximale
+            
+            // Récupérer l'ID de l'utilisateur depuis le token
+            User currentUser = authHelper.getAuthenticatedUserWithFallback(request);
+            Long userId = currentUser.getId();
+            
+            FactureProformaPaginatedResponseDTO response = factureProformaService.getFacturesParEntrepriseParUtilisateurPaginated(
+                    userId, page, size, request);
+            
+            return ResponseEntity.ok(response);
+            
+        } catch (Exception e) {
+            e.printStackTrace();
+            throw new RuntimeException("Erreur lors de la récupération des factures paginées: " + e.getMessage());
+        }
+    }
 
 
 }

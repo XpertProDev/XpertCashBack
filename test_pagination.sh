@@ -64,3 +64,5 @@ echo "   - Les métadonnées de pagination sont présentes"
 echo "   - Le contenu est limité à la taille de page demandée"
 echo "   - Les statistiques globales sont correctes"
 echo "   - La gestion des erreurs fonctionne"
+
+

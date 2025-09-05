@@ -12,7 +12,7 @@ import java.util.stream.Collectors;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import com.xpertcash.configuration.JwtUtil;
+import com.xpertcash.service.AuthenticationHelper;
 import com.xpertcash.entity.FactProHistoriqueAction;
 import com.xpertcash.entity.FactureProForma;
 import com.xpertcash.entity.User;
@@ -39,7 +39,7 @@ public class FactProHistoriqueService {
     private UsersRepository usersRepository;
 
     @Autowired
-    private JwtUtil jwtUtil;
+    private AuthenticationHelper authHelper;
 
 
 
@@ -57,20 +57,7 @@ public void enregistrerActionHistorique(FactureProForma facture, User user, Stri
 
 
   public Map<String, Object> getHistoriqueFacture(Long factureId, HttpServletRequest request) {
-    String token = request.getHeader("Authorization");
-    if (token == null || !token.startsWith("Bearer ")) {
-        throw new RuntimeException("Token JWT manquant ou mal formaté");
-    }
-
-    Long userId;
-    try {
-        userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
-    } catch (Exception e) {
-        throw new RuntimeException("Erreur lors de l'extraction de l'ID de l'utilisateur depuis le token", e);
-    }
-
-    User user = usersRepository.findById(userId)
-            .orElseThrow(() -> new RuntimeException("Utilisateur introuvable !"));
+    User user = authHelper.getAuthenticatedUserWithFallback(request);
 
     FactureProForma facture = factureProformaRepository.findById(factureId)
             .orElseThrow(() -> new RuntimeException("Facture Proforma introuvable avec l'ID : " + factureId));

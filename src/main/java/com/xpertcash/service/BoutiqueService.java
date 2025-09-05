@@ -18,7 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.xpertcash.DTOs.ProduitDTO;
 import com.xpertcash.configuration.CentralAccess;
-import com.xpertcash.configuration.JwtUtil;
+
 import com.xpertcash.entity.Boutique;
 import com.xpertcash.entity.PermissionType;
 import com.xpertcash.entity.Produit;
@@ -38,15 +38,18 @@ import com.xpertcash.repository.TransfertRepository;
 import com.xpertcash.repository.UsersRepository;
 
 import jakarta.servlet.http.HttpServletRequest;
+import com.xpertcash.service.AuthenticationHelper;
 
 @Service
 public class BoutiqueService {
 
     @Autowired
-    private BoutiqueRepository boutiqueRepository;
+    private AuthenticationHelper authHelper;
 
     @Autowired
-    private JwtUtil jwtUtil; 
+    private BoutiqueRepository boutiqueRepository;
+
+ 
 
     @Autowired
     private UsersRepository usersRepository;
@@ -75,16 +78,7 @@ public class BoutiqueService {
             throw new RuntimeException("Token JWT manquant ou mal formaté");
         }
 
-        // Extraire l'ID de l'admin depuis le token
-        Long adminId = null;
-        try {
-            adminId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
-        } catch (Exception e) {
-            throw new RuntimeException("Erreur lors de l'extraction de l'ID de l'admin depuis le token", e);
-        }
-           // Récupérer l'admin par son ID
-        User admin = usersRepository.findById(adminId)
-                .orElseThrow(() -> new RuntimeException("Admin non trouvé"));
+        User admin = authHelper.getAuthenticatedUserWithFallback(request);
 
         // Vérifier que l'admin est bien un Admin
         if (admin.getRole() == null || !admin.getRole().getName().equals(RoleType.ADMIN)) {
@@ -118,18 +112,7 @@ public class BoutiqueService {
         throw new RuntimeException("Token JWT manquant ou mal formaté");
     }
 
-    String jwtToken = token.substring(7); // Retirer "Bearer "
-
-    Long userId;
-    try {
-        userId = jwtUtil.extractUserId(jwtToken);
-    } catch (Exception e) {
-        throw new RuntimeException("Erreur lors de l'extraction de l'ID utilisateur depuis le token", e);
-    }
-
-    // 👤 Récupération de l'utilisateur
-    User user = usersRepository.findById(userId)
-            .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+    User user = authHelper.getAuthenticatedUserWithFallback(request);
 
     if (user.getEntreprise() == null) {
         throw new RuntimeException("Vous n'êtes associé à aucune entreprise.");
@@ -158,18 +141,7 @@ public class BoutiqueService {
         throw new RuntimeException("Token JWT manquant ou mal formaté");
     }
 
-    String jwtToken = token.substring(7); // Supprimer "Bearer "
-    Long userId;
-
-    try {
-        userId = jwtUtil.extractUserId(jwtToken);
-    } catch (Exception e) {
-        throw new RuntimeException("Erreur lors de l'extraction de l'ID utilisateur depuis le token", e);
-    }
-
-    // 👤 Récupération de l'utilisateur
-    User user = usersRepository.findById(userId)
-            .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+    User user = authHelper.getAuthenticatedUserWithFallback(request);
 
     // 🏬 Récupération de la boutique
     Boutique boutique = boutiqueRepository.findById(boutiqueId)
@@ -201,9 +173,7 @@ public class BoutiqueService {
         throw new RuntimeException("Token JWT manquant ou mal formaté");
     }
 
-    Long userId = jwtUtil.extractUserId(token.substring(7));
-    User user = usersRepository.findById(userId)
-            .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+    User user = authHelper.getAuthenticatedUserWithFallback(request);
 
     // 🏬 Récupérer la boutique
     Boutique boutique = boutiqueRepository.findById(boutiqueId)
@@ -239,14 +209,7 @@ public class BoutiqueService {
             throw new RuntimeException("Token JWT manquant ou mal formaté");
         }
 
-          Long userId;
-        try {
-            userId = jwtUtil.extractUserId(token.substring(7));
-        } catch (Exception e) {
-            throw new RuntimeException("Erreur lors de l'extraction de l'ID utilisateur depuis le token", e);
-        }
-         User user = usersRepository.findById(userId)
-            .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+        User user = authHelper.getAuthenticatedUserWithFallback(request);
 
 
          if (user.getEntreprise() == null) {
@@ -369,9 +332,7 @@ public class BoutiqueService {
             throw new RuntimeException("Token JWT manquant ou mal formaté");
         }
 
-        Long userId = jwtUtil.extractUserId(token.substring(7));
-        User user = usersRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+        User user = authHelper.getAuthenticatedUserWithFallback(request);
 
         // 🏬 Récupération des boutiques
         Boutique boutiqueSource = boutiqueRepository.findById(boutiqueSourceId)
@@ -465,17 +426,7 @@ public class BoutiqueService {
             throw new RuntimeException("Token JWT manquant ou mal formaté");
         }
 
-        String jwtToken = token.substring(7);
-        Long userId;
-        try {
-            userId = jwtUtil.extractUserId(jwtToken);
-        } catch (Exception e) {
-            throw new RuntimeException("Erreur lors de l'extraction de l'ID utilisateur depuis le token", e);
-        }
-
-        // 👤 Récupérer l'utilisateur
-        User user = usersRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+        User user = authHelper.getAuthenticatedUserWithFallback(request);
 
         // 🏬 Récupérer la boutique
         Boutique boutique = boutiqueRepository.findById(boutiqueId)
@@ -554,9 +505,7 @@ public class BoutiqueService {
         throw new RuntimeException("Token JWT manquant ou mal formaté");
     }
 
-    Long userId = jwtUtil.extractUserId(token.substring(7));
-    User user = usersRepository.findById(userId)
-            .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+    User user = authHelper.getAuthenticatedUserWithFallback(request);
 
     // 🏬 Récupération de la boutique
     Boutique boutique = boutiqueRepository.findById(boutiqueId)
@@ -587,9 +536,7 @@ public class BoutiqueService {
         throw new RuntimeException("Token JWT manquant ou mal formaté");
     }
 
-    Long userId = jwtUtil.extractUserId(token.substring(7));
-    User user = usersRepository.findById(userId)
-            .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+    User user = authHelper.getAuthenticatedUserWithFallback(request);
 
     // 🏬 Récupération de la boutique
     Boutique boutique = boutiqueRepository.findById(boutiqueId)
@@ -622,12 +569,9 @@ public class BoutiqueService {
     }
     token = token.replace("Bearer ", "");
 
-    // Extraire l'ID de l'admin depuis le token
-    Long adminId = jwtUtil.extractUserId(token);
+    User admin = authHelper.getAuthenticatedUserWithFallback(request);
 
     // Vérifier que l'utilisateur est un admin
-    User admin = usersRepository.findById(adminId)
-            .orElseThrow(() -> new RuntimeException("Admin non trouvé"));
 
     if (admin.getRole() == null || !admin.getRole().getName().equals(RoleType.ADMIN)) {
         throw new RuntimeException("Seul un ADMIN peut consulter cette liste !");
@@ -660,9 +604,7 @@ public class BoutiqueService {
             throw new RuntimeException("Token JWT manquant ou mal formaté");
         }
 
-        Long userId = jwtUtil.extractUserId(token.substring(7));
-        User user = usersRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+        User user = authHelper.getAuthenticatedUserWithFallback(request);
 
         // 🏬 Récupération de la boutique
         Boutique boutique = boutiqueRepository.findById(boutiqueId)

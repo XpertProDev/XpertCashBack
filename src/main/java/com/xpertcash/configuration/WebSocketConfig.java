@@ -63,10 +63,12 @@ class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
                     if (bearer != null && bearer.startsWith("Bearer ")) {
                         String token = bearer.substring(7);
                         // Maintenant jwtUtil est disponible
-                        Long userId = jwtUtil.extractUserId(token);
-                        Principal user = new UsernamePasswordAuthenticationToken(
-                                userId.toString(), null, List.of());
-                        accessor.setUser(user);
+                        String userUuid = jwtUtil.extractUserUuid(token);
+                        if (userUuid != null) {
+                            Principal user = new UsernamePasswordAuthenticationToken(
+                                    userUuid, null, List.of());
+                            accessor.setUser(user);
+                        }
                     }
                 }
                 return message;

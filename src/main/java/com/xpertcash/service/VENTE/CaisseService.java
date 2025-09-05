@@ -48,9 +48,8 @@ public class CaisseService {
         if (token == null || !token.startsWith("Bearer ")) {
             throw new RuntimeException("Token JWT manquant ou mal formaté");
         }
-        String jwtToken = token.substring(7);
-        Long userId = jwtUtil.extractUserId(jwtToken);
-        return usersRepository.findById(userId)
+        String userUuid = jwtUtil.extractUserUuid(token.substring(7));
+        return usersRepository.findByUuid(userUuid)
                 .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
     }
 

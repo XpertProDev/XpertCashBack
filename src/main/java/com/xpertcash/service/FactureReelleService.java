@@ -4,10 +4,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.Optional;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -15,6 +12,10 @@ import java.util.Comparator;
 
 import org.hibernate.Hibernate;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
@@ -22,9 +23,10 @@ import com.xpertcash.DTOs.EntrepriseClientDTO;
 import com.xpertcash.DTOs.FactureReelleDTO;
 import com.xpertcash.DTOs.LigneFactureDTO;
 import com.xpertcash.DTOs.PaiementDTO;
+import com.xpertcash.DTOs.PaginatedResponseDTO;
 import com.xpertcash.DTOs.CLIENT.ClientDTO;
 import com.xpertcash.configuration.CentralAccess;
-import com.xpertcash.configuration.JwtUtil;
+
 import com.xpertcash.entity.Entreprise;
 import com.xpertcash.entity.FactureProForma;
 import com.xpertcash.entity.FactureReelle;
@@ -34,7 +36,6 @@ import com.xpertcash.entity.PermissionType;
 import com.xpertcash.entity.User;
 import com.xpertcash.entity.Enum.RoleType;
 import com.xpertcash.entity.Enum.StatutFactureProForma;
-import com.xpertcash.entity.Enum.StatutFactureReelle;
 import com.xpertcash.entity.Enum.StatutPaiementFacture;
 import com.xpertcash.repository.FactureProformaRepository;
 import com.xpertcash.repository.FactureReelleRepository;
@@ -45,9 +46,13 @@ import com.xpertcash.service.Module.ModuleActivationService;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.transaction.Transactional;
+import com.xpertcash.service.AuthenticationHelper;
 
 @Service
 public class FactureReelleService {
+
+    @Autowired
+    private AuthenticationHelper authHelper;
 
     @Autowired
     private FactureReelleRepository factureReelleRepository;
@@ -66,8 +71,7 @@ public class FactureReelleService {
     @Autowired
     private FactureProformaRepository factureProformaRepository;
 
-    @Autowired
-    private JwtUtil jwtUtil;
+
 
     @Autowired
     private ModuleActivationService moduleActivationService;
@@ -178,25 +182,21 @@ public void supprimerFactureReelleLiee(FactureProForma proforma) {
 }
 
 
-   // Méthode pour lister les factures réelles
+   // Méthode pour lister les factures réelles (ancienne version pour compatibilité)
   public List<FactureReelleDTO> listerMesFacturesReelles(HttpServletRequest request) {
-    // 🔐 Récupération et validation du token
-    String token = request.getHeader("Authorization");
-    if (token == null || !token.startsWith("Bearer ")) {
-        throw new SecurityException("Token JWT manquant ou mal formaté");
-    }
+    // Utiliser la version paginée avec des paramètres par défaut
+    PaginatedResponseDTO<FactureReelleDTO> result = listerMesFacturesReellesPaginated(0, 50, request);
+    return result.getContent();
+  }
 
-    Long userId;
-    try {
-        // Extraction de l'ID utilisateur depuis le token JWT
-        userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
-    } catch (Exception e) {
-        throw new SecurityException("Erreur lors de l'extraction de l'utilisateur depuis le token", e);
-    }
+  // Méthode scalable avec pagination pour lister les factures réelles
+  public PaginatedResponseDTO<FactureReelleDTO> listerMesFacturesReellesPaginated(int page, int size, HttpServletRequest request) {
+    // --- 1. Validation des paramètres de pagination ---
+    if (page < 0) page = 0;
+    if (size <= 0) size = 20; // Taille par défaut
+    if (size > 100) size = 100; // Limite maximale pour éviter la surcharge
 
-    // 👤 Utilisateur courant
-    User utilisateur = usersRepository.findById(userId)
-            .orElseThrow(() -> new SecurityException("Utilisateur introuvable ou non authentifié"));
+    User utilisateur = authHelper.getAuthenticatedUserWithFallback(request);
 
     // 🏢 Vérification de l'entreprise à laquelle appartient l'utilisateur
     Entreprise entreprise = utilisateur.getEntreprise();
@@ -215,47 +215,34 @@ public void supprimerFactureReelleLiee(FactureProForma proforma) {
         throw new SecurityException("Le module de gestion des factures n'est pas activé pour cette entreprise", e);
     }
 
-    // 🔍 Récupération des factures : Seules les personnes autorisées (Admin, Manager, ou ayant Permission Gestion Facturation)
-    List<FactureReelle> factures;
-    if (isAdminOrManager || hasPermission) {
-        // L'utilisateur peut voir toutes les factures de l’entreprise
-        factures = factureReelleRepository.findByEntrepriseOrderByDateCreationDesc(entreprise);
-    } else {
-        // Si l'utilisateur n'a pas les permissions, on lève une exception
+    // 🔍 Vérification des autorisations
+    if (!(isAdminOrManager || hasPermission)) {
         throw new SecurityException("Accès interdit : Vous n'avez pas les permissions nécessaires pour voir ces factures.");
     }
 
-    // 🔄 Transformation des factures en DTO
-    return factures.stream()
-            .map(facture -> {
-                BigDecimal totalFacture = BigDecimal.valueOf(facture.getTotalFacture());
-                BigDecimal totalPaye = paiementRepository.sumMontantsByFactureReelle(facture.getId());
-                if (totalPaye == null) totalPaye = BigDecimal.ZERO;
-                BigDecimal montantRestant = totalFacture.subtract(totalPaye);
-                return new FactureReelleDTO(facture, montantRestant);
-            })
-            .collect(Collectors.toList());
+    // --- 2. Création du Pageable avec tri optimisé ---
+    Pageable pageable = PageRequest.of(page, size, 
+        Sort.by("dateCreation").descending().and(Sort.by("id").descending()));
+
+    // --- 3. Récupération paginée des factures ---
+    Page<FactureReelle> facturesPage = factureReelleRepository.findByEntrepriseOrderByDateCreationDescPaginated(entreprise, pageable);
+
+    // --- 4. Transformation des factures en DTO ---
+    Page<FactureReelleDTO> facturesDTO = facturesPage.map(facture -> {
+        BigDecimal totalFacture = BigDecimal.valueOf(facture.getTotalFacture());
+        BigDecimal totalPaye = paiementRepository.sumMontantsByFactureReelle(facture.getId());
+        if (totalPaye == null) totalPaye = BigDecimal.ZERO;
+        BigDecimal montantRestant = totalFacture.subtract(totalPaye);
+        return new FactureReelleDTO(facture, montantRestant);
+    });
+
+    // --- 5. Retour de la réponse paginée ---
+    return PaginatedResponseDTO.fromPage(facturesDTO);
 }
  
     // Trier les facture par mois/année
    public ResponseEntity<?> filtrerFacturesParMoisEtAnnee(Integer mois, Integer annee, HttpServletRequest request) {
-    // 🔐 Extraction et validation du token JWT
-    String token = request.getHeader("Authorization");
-    if (token == null || !token.startsWith("Bearer ")) {
-        throw new SecurityException("Token JWT manquant ou mal formaté");
-    }
-
-    Long userId;
-    try {
-        // Extraction de l'ID utilisateur depuis le token JWT
-        userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
-    } catch (Exception e) {
-        throw new SecurityException("Erreur lors de l'extraction de l'ID utilisateur depuis le token", e);
-    }
-
-    // 👤 Récupération de l'utilisateur
-    User user = usersRepository.findById(userId)
-            .orElseThrow(() -> new SecurityException("Utilisateur introuvable"));
+    User user = authHelper.getAuthenticatedUserWithFallback(request);
 
     // 🏢 Vérification de l'entreprise
     Long entrepriseId = user.getEntreprise().getId();
@@ -318,22 +305,7 @@ public void supprimerFactureReelleLiee(FactureProForma proforma) {
 
     // Methode Get facture reel by id
     public FactureReelleDTO getFactureReelleById(Long factureId, HttpServletRequest request) {
-    // 🔐 Extraire le token JWT
-    String token = request.getHeader("Authorization");
-    if (token == null || !token.startsWith("Bearer ")) {
-        throw new RuntimeException("Token JWT manquant ou mal formaté");
-    }
-
-    Long userId;
-    try {
-        userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
-    } catch (Exception e) {
-        throw new RuntimeException("Erreur lors de l'extraction de l'ID utilisateur", e);
-    }
-
-    // 👤 Récupérer l'utilisateur connecté
-    User user = usersRepository.findById(userId)
-            .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
+    User user = authHelper.getAuthenticatedUserWithFallback(request);
 
     // 📄 Récupérer la facture
     FactureReelle facture = factureReelleRepository.findById(factureId)
@@ -354,7 +326,7 @@ public void supprimerFactureReelleLiee(FactureProForma proforma) {
         // 🔒 Vérification des rôles et permissions
     boolean isAdminOrManagerOfEntreprise = CentralAccess.isAdminOrManagerOfEntreprise(user, entrepriseFactureId);
     boolean hasPermission = user.getRole().hasPermission(PermissionType.GESTION_FACTURATION);
-    boolean isCreateur = facture.getUtilisateurCreateur().getId().equals(userId);
+    boolean isCreateur = facture.getUtilisateurCreateur().getId().equals(user.getId());
 
     if (!(isAdminOrManagerOfEntreprise || hasPermission || isCreateur)) {
         throw new RuntimeException("Accès interdit : vous n'avez pas les droits pour consulter cette facture !");
@@ -380,9 +352,7 @@ public void supprimerFactureReelleLiee(FactureProForma proforma) {
         throw new RuntimeException("Token JWT manquant ou mal formaté");
     }
 
-    Long userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
-    User utilisateur = usersRepository.findById(userId)
-            .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
+    User utilisateur = authHelper.getAuthenticatedUserWithFallback(request);
 
     // 🧾 Récupération de la facture
     FactureReelle facture = factureReelleRepository.findById(factureId)
@@ -466,10 +436,7 @@ public void supprimerFactureReelleLiee(FactureProForma proforma) {
         throw new RuntimeException("Token JWT manquant ou mal formaté");
     }
 
-    Long userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
-
-    User user = usersRepository.findById(userId)
-        .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+    User user = authHelper.getAuthenticatedUserWithFallback(request);
 
     Entreprise entreprise = user.getEntreprise();
     if (entreprise == null) {
@@ -490,7 +457,7 @@ public void supprimerFactureReelleLiee(FactureProForma proforma) {
     }
 
     // 4. Vérification des droits d'accès
-    boolean isCreateur = facture.getUtilisateurCreateur().getId().equals(userId);
+    boolean isCreateur = facture.getUtilisateurCreateur().getId().equals(user.getId());
     if (!(isAdminOrManager || hasGestionFacturePermission || isCreateur)) {
         throw new RuntimeException("Accès refusé : vous n'avez pas les droits pour consulter les paiements de cette facture");
     }
@@ -503,22 +470,7 @@ public void supprimerFactureReelleLiee(FactureProForma proforma) {
 
     //Facture impayer all facture
    public List<FactureReelleDTO> listerFacturesImpayees(HttpServletRequest request) {
-    // 🔐 1. Extraire le token JWT
-    String token = request.getHeader("Authorization");
-    if (token == null || !token.startsWith("Bearer ")) {
-        throw new RuntimeException("Token JWT manquant ou mal formaté");
-    }
-
-    Long userId;
-    try {
-        userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
-    } catch (Exception e) {
-        throw new RuntimeException("Erreur lors de l'extraction de l'utilisateur depuis le token", e);
-    }
-
-    // 👤 2. Récupérer l'utilisateur connecté
-    User user = usersRepository.findById(userId)
-            .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+    User user = authHelper.getAuthenticatedUserWithFallback(request);
 
     if (user.getEntreprise() == null) {
         throw new RuntimeException("Utilisateur n'est associé à aucune entreprise");
@@ -544,7 +496,7 @@ public void supprimerFactureReelleLiee(FactureProForma proforma) {
     } else {
         // Peut seulement voir les factures qu'il a créées dans son entreprise
         factures = factureReelleRepository.findByEntrepriseIdAndUtilisateurCreateurIdAndStatutPaiementIn(
-            entrepriseId, userId, statutsImpayes
+            entrepriseId, user.getId(), statutsImpayes
         );
     }
 
@@ -571,21 +523,7 @@ public void supprimerFactureReelleLiee(FactureProForma proforma) {
 //Modifier le statut d'une facture
 @Transactional
 public FactureProForma annulerFactureReelle(FactureReelle modifications, HttpServletRequest request) {
-    // 🔐 1. Extraction utilisateur depuis JWT
-    String token = request.getHeader("Authorization");
-    if (token == null || !token.startsWith("Bearer ")) {
-        throw new RuntimeException("Token JWT manquant ou mal formaté");
-    }
-
-    Long userId;
-    try {
-        userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
-    } catch (Exception e) {
-        throw new RuntimeException("Erreur lors de l'extraction de l'ID de l'utilisateur depuis le token", e);
-    }
-
-    User user = usersRepository.findById(userId)
-            .orElseThrow(() -> new RuntimeException("Utilisateur introuvable !"));
+    User user = authHelper.getAuthenticatedUserWithFallback(request);
 
     // 📄 2. Récupération de la facture réelle
     FactureReelle factureReelle = factureReelleRepository.findById(modifications.getId())
@@ -640,14 +578,7 @@ public FactureProForma annulerFactureReelle(FactureReelle modifications, HttpSer
 
 public List<FactureReelleDTO> getFacturesParPeriode(Long userIdRequete, HttpServletRequest request,
                                                      String typePeriode, LocalDate dateDebut, LocalDate dateFin) {
-    String token = request.getHeader("Authorization"); 
-    if (token == null || !token.startsWith("Bearer ")) {
-        throw new RuntimeException("Token JWT manquant ou mal formaté");
-    }
-
-    Long userIdCourant = jwtUtil.extractUserId(token.replace("Bearer ", ""));
-    User currentUser = usersRepository.findById(userIdCourant)
-            .orElseThrow(() -> new RuntimeException("Utilisateur courant introuvable"));
+    User currentUser = authHelper.getAuthenticatedUserWithFallback(request);
     User targetUser = usersRepository.findById(userIdRequete)
             .orElseThrow(() -> new RuntimeException("Utilisateur cible non trouvé"));
 

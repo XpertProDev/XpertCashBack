@@ -16,6 +16,7 @@ import java.util.Optional;
 @Repository
 public interface UsersRepository extends JpaRepository<User, Long> {
     Optional<User> findById(Long id);
+    Optional<User> findByUuid(String uuid);
     Optional<User> findByEmail(String email);
     Optional<User> findByPhone(String phone);
     
@@ -53,6 +54,14 @@ public interface UsersRepository extends JpaRepository<User, Long> {
        "LEFT JOIN FETCH r.permissions p " +
        "WHERE u.id = :userId")
 Optional<User> findByIdWithEntrepriseAndRole(@Param("userId") Long userId);
+
+// Récupérer l'utilisateur par UUID avec entreprise et role en une seule requête
+@Query("SELECT u FROM User u " +
+       "JOIN FETCH u.entreprise e " +
+       "JOIN FETCH u.role r " +
+       "LEFT JOIN FETCH r.permissions p " +
+       "WHERE u.uuid = :uuid")
+Optional<User> findByUuidWithEntrepriseAndRole(@Param("uuid") String uuid);
 
 
 

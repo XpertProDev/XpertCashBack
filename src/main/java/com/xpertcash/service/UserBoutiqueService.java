@@ -16,8 +16,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.xpertcash.DTOs.Boutique.BoutiqueResponseVendeur;
 import com.xpertcash.DTOs.Boutique.VendeurDTO;
-import com.xpertcash.configuration.JwtUtil;
+
 import com.xpertcash.entity.Boutique;
+import com.xpertcash.service.AuthenticationHelper;
 import com.xpertcash.entity.Permission;
 import com.xpertcash.entity.PermissionType;
 import com.xpertcash.entity.Role;
@@ -45,7 +46,7 @@ public class UserBoutiqueService {
     private UserBoutiqueRepository userBoutiqueRepository;
 
     @Autowired
-    private JwtUtil jwtUtil;  
+    private AuthenticationHelper authHelper;
 
     @Autowired
     private RoleRepository roleRepository;
@@ -60,22 +61,7 @@ public class UserBoutiqueService {
 public List<String> assignerVendeurAuxBoutiques(HttpServletRequest request, Long userId, List<Long> boutiqueIds) {
     List<String> resultMessages = new ArrayList<>();
 
-    // 🔐 Vérification du token JWT
-    String token = request.getHeader("Authorization");
-    if (token == null || !token.startsWith("Bearer ")) {
-        throw new RuntimeException("Token JWT manquant ou mal formaté");
-    }
-
-    Long adminId;
-    try {
-        adminId = jwtUtil.extractUserId(token.substring(7));
-    } catch (Exception e) {
-        throw new RuntimeException("Erreur lors de l'extraction de l'ID utilisateur depuis le token", e);
-    }
-
-    // Récupérer l'utilisateur connecté (admin ou manager)
-    User admin = usersRepository.findById(adminId)
-            .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+    User admin = authHelper.getAuthenticatedUserWithFallback(request);
 
     if (admin.getEntreprise() == null) {
         throw new RuntimeException("L'utilisateur connecté n'appartient à aucune entreprise.");
@@ -187,22 +173,7 @@ public List<String> assignerVendeurAuxBoutiques(HttpServletRequest request, Long
 public List<String> retirerVendeurDesBoutiques(HttpServletRequest request, Long userId, List<Long> boutiqueIds) {
     List<String> resultMessages = new ArrayList<>();
 
-    // 🔐 Vérification du token JWT
-    String token = request.getHeader("Authorization");
-    if (token == null || !token.startsWith("Bearer ")) {
-        throw new RuntimeException("Token JWT manquant ou mal formaté");
-    }
-
-    Long adminId;
-    try {
-        adminId = jwtUtil.extractUserId(token.substring(7));
-    } catch (Exception e) {
-        throw new RuntimeException("Erreur lors de l'extraction de l'ID utilisateur depuis le token", e);
-    }
-
-    // Récupérer l'utilisateur connecté (admin ou manager)
-    User admin = usersRepository.findById(adminId)
-            .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+    User admin = authHelper.getAuthenticatedUserWithFallback(request);
 
     if (admin.getEntreprise() == null) {
         throw new RuntimeException("L'utilisateur connecté n'appartient à aucune entreprise.");
@@ -290,22 +261,7 @@ public List<String> retirerVendeurDesBoutiques(HttpServletRequest request, Long 
         Map<String, Object> response = new HashMap<>();
 
         try {
-            // 🔐 Vérification du token JWT
-            String token = request.getHeader("Authorization");
-            if (token == null || !token.startsWith("Bearer ")) {
-                throw new RuntimeException("Token JWT manquant ou mal formaté");
-            }
-
-            Long adminId;
-            try {
-                adminId = jwtUtil.extractUserId(token.substring(7));
-            } catch (Exception e) {
-                throw new RuntimeException("Erreur lors de l'extraction de l'ID utilisateur depuis le token", e);
-            }
-
-            // Récupérer l'utilisateur connecté (admin ou manager)
-            User admin = usersRepository.findById(adminId)
-                    .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+            User admin = authHelper.getAuthenticatedUserWithFallback(request);
 
             if (admin.getEntreprise() == null) {
                 throw new RuntimeException("L'utilisateur connecté n'appartient à aucune entreprise.");
@@ -371,22 +327,7 @@ public List<String> retirerVendeurDesBoutiques(HttpServletRequest request, Long 
    // Methode pour recuperer tous les utilisateur dune boutique
     @Transactional
     public List<VendeurDTO> getVendeursDeBoutique(Long boutiqueId, HttpServletRequest request) {
-        // 🔐 Vérification du token JWT et des droits d'accès
-        String token = request.getHeader("Authorization");
-        if (token == null || !token.startsWith("Bearer ")) {
-            throw new RuntimeException("Token JWT manquant ou mal formaté");
-        }
-
-        Long adminId;
-        try {
-            adminId = jwtUtil.extractUserId(token.substring(7));  // Extraction de l'ID de l'utilisateur connecté
-        } catch (Exception e) {
-            throw new RuntimeException("Erreur lors de l'extraction de l'ID utilisateur depuis le token", e);
-        }
-
-        // Récupération de l'utilisateur connecté (admin ou manager)
-        User admin = usersRepository.findById(adminId)
-                .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+        User admin = authHelper.getAuthenticatedUserWithFallback(request);
         if (admin.getEntreprise() == null) {
             throw new RuntimeException("L'utilisateur connecté n'appartient à aucune entreprise.");
         }

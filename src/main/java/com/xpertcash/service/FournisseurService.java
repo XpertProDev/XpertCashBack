@@ -14,7 +14,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
-import com.xpertcash.configuration.JwtUtil;
+
 import com.xpertcash.entity.Entreprise;
 import com.xpertcash.entity.Fournisseur;
 import com.xpertcash.entity.PermissionType;
@@ -25,6 +25,7 @@ import com.xpertcash.repository.FournisseurRepository;
 import com.xpertcash.repository.StockProduitFournisseurRepository;
 import com.xpertcash.repository.UsersRepository;
 import com.xpertcash.service.IMAGES.ImageStorageService;
+import com.xpertcash.service.AuthenticationHelper;
 
 import jakarta.servlet.http.HttpServletRequest;
 
@@ -54,7 +55,7 @@ public class FournisseurService {
     
 
     @Autowired
-    private JwtUtil jwtUtil;
+    private AuthenticationHelper authHelper;
 
     // Save a new fournisseur
    public Fournisseur saveFournisseur(Fournisseur fournisseur, MultipartFile imageFournisseurFile, HttpServletRequest request) {
@@ -62,22 +63,7 @@ public class FournisseurService {
             throw new RuntimeException("Le nom du fournisseur est obligatoire !");
         }
 
-          // Vérifier la présence du token JWT et récupérer l'ID de l'utilisateur connecté
-    String token = request.getHeader("Authorization");
-    if (token == null || !token.startsWith("Bearer ")) {
-        throw new RuntimeException("Token JWT manquant ou mal formaté");
-    }
-
-    Long userId = null;
-    try {
-        userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
-    } catch (Exception e) {
-        throw new RuntimeException("Erreur lors de l'extraction de l'ID de l'utilisateur depuis le token", e);
-    }
-
-    // Récupérer l'utilisateur par son ID
-    User user = usersRepository.findById(userId)
-            .orElseThrow(() -> new RuntimeException("Utilisateur introuvable !"));
+    User user = authHelper.getAuthenticatedUserWithFallback(request);
 
     // Vérifier que l'utilisateur a une entreprise associée (entreprise créatrice de la facture)
     Entreprise entrepriseUtilisateur = user.getEntreprise();
@@ -121,22 +107,7 @@ public class FournisseurService {
     // Get fournisseur dune entreprise de l utilisateur 
     public List<Fournisseur> getFournisseursByEntreprise(HttpServletRequest request) {
         
-    String token = request.getHeader("Authorization");
-    if (token == null || !token.startsWith("Bearer ")) {
-        throw new RuntimeException("Token JWT manquant ou mal formaté");
-    }
-
-    Long userId;
-    try {
-        token = token.replace("Bearer ", "");
-        userId = jwtUtil.extractUserId(token);
-    } catch (Exception e) {
-        throw new RuntimeException("Erreur lors de l'extraction de l'ID utilisateur depuis le token", e);
-    }
-
-    // Récupérer l'utilisateur
-    User user = usersRepository.findById(userId)
-            .orElseThrow(() -> new RuntimeException("Utilisateur introuvable !"));
+    User user = authHelper.getAuthenticatedUserWithFallback(request);
 
     // Vérifier la présence d'une entreprise liée à l'utilisateur
     Entreprise entreprise = user.getEntreprise();
@@ -172,42 +143,13 @@ public class FournisseurService {
 }
 
 private User getUserFromRequest(HttpServletRequest request) {
-    String authHeader = request.getHeader("Authorization");
-    if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-        throw new RuntimeException("Token JWT manquant ou mal formaté");
-    }
-
-    String token = authHeader.substring(7);
-    Long userId;
-    try {
-        userId = jwtUtil.extractUserId(token);
-    } catch (Exception e) {
-        throw new RuntimeException("Erreur lors de l'extraction de l'ID utilisateur depuis le token", e);
-    }
-
-    return usersRepository.findById(userId)
-            .orElseThrow(() -> new RuntimeException("Utilisateur introuvable !"));
+    return authHelper.getAuthenticatedUserWithFallback(request);
 }
 
 
     // Update fournisseur
    public Fournisseur updateFournisseur(Long id, Fournisseur updatedData,MultipartFile imageFournisseurFile, HttpServletRequest request) {
-    // 1. Extraire le token JWT
-    String token = request.getHeader("Authorization");
-    if (token == null || !token.startsWith("Bearer ")) {
-        throw new RuntimeException("Token JWT manquant ou mal formaté");
-    }
-
-    Long userId;
-    try {
-        userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
-    } catch (Exception e) {
-        throw new RuntimeException("Erreur lors de l'extraction de l'ID de l'utilisateur depuis le token", e);
-    }
-
-    // 2. Vérifier l'utilisateur et son entreprise
-    User user = usersRepository.findById(userId)
-            .orElseThrow(() -> new RuntimeException("Utilisateur introuvable !"));
+    User user = authHelper.getAuthenticatedUserWithFallback(request);
 
     Entreprise entrepriseUtilisateur = user.getEntreprise();
     if (entrepriseUtilisateur == null) {
@@ -285,18 +227,7 @@ private User getUserFromRequest(HttpServletRequest request) {
   // Lister tout les stocks lieu a un fournisseur
     public List<Map<String, Object>> getNomProduitEtQuantiteAjoutee(Long fournisseurId,
     HttpServletRequest request) {
-          String token = request.getHeader("Authorization");
-    if (token == null || !token.startsWith("Bearer ")) {
-        throw new RuntimeException("Token JWT manquant ou mal formaté");
-    }
-      Long userId;
-    try {
-        userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
-    } catch (Exception e) {
-        throw new RuntimeException("Erreur lors de l'extraction de l'ID de l'utilisateur depuis le token", e);
-    }
-     User user = usersRepository.findById(userId)
-            .orElseThrow(() -> new RuntimeException("Utilisateur introuvable !"));
+    User user = authHelper.getAuthenticatedUserWithFallback(request);
 
     // 2. Vérifier que le fournisseur appartient à la même entreprise
     Fournisseur fournisseur = fournisseurRepository.findById(fournisseurId)

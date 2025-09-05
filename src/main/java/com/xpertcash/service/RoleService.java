@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 
 import com.xpertcash.configuration.JwtUtil;
 import com.xpertcash.entity.Permission;
+import com.xpertcash.service.AuthenticationHelper;
 import com.xpertcash.entity.PermissionType;
 import com.xpertcash.entity.Role;
 import com.xpertcash.entity.User;
@@ -33,6 +34,7 @@ public class RoleService {
     private final PermissionRepository permissionRepository;
     private final JwtUtil jwtUtil;
     private final UsersRepository usersRepository;
+    private final AuthenticationHelper authHelper;
 
     @PostConstruct
     public void initRoles() {
@@ -143,16 +145,16 @@ public class RoleService {
         // Extraire le token sans le "Bearer "
         token = token.replace("Bearer ", "");
     
-        Long adminId;
+        String adminUuid;
         try {
-            // Décrypter le token pour obtenir l'ID de l'admin
-            adminId = jwtUtil.extractUserId(token);
+            // Décrypter le token pour obtenir l'UUID de l'admin
+            adminUuid = jwtUtil.extractUserUuid(token);
         } catch (Exception e) {
-            throw new RuntimeException("Erreur lors de l'extraction de l'ID de l'admin depuis le token", e);
+            throw new RuntimeException("Erreur lors de l'extraction de l'UUID de l'admin depuis le token", e);
         }
     
-        // Récupérer l'admin par l'ID extrait du token
-        User admin = usersRepository.findById(adminId)
+        // Récupérer l'admin par l'UUID extrait du token
+        User admin = usersRepository.findByUuid(adminUuid)
                 .orElseThrow(() -> new RuntimeException("Admin non trouvé"));
     
         // Vérifier que l'Admin est bien un ADMIN

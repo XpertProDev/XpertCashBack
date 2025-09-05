@@ -259,7 +259,7 @@ public class MailService {
     helper.setSubject(subject);
     helper.setText(htmlContent, true);
 
-    InputStream logoStream = getClass().getClassLoader().getResourceAsStream("assets/logoxpertpro.png");
+    InputStream logoStream = getClass().getClassLoader().getResourceAsStream("assets/tchakeda.png");
     if (logoStream != null) {
         ByteArrayDataSource logoDataSource = new ByteArrayDataSource(logoStream, "image/png");
         helper.addInline("logo", logoDataSource);

@@ -32,9 +32,13 @@ import com.xpertcash.service.MailService;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.transaction.Transactional;
+import com.xpertcash.service.AuthenticationHelper;
 
 @Service
 public class ModuleActivationService {
+
+    @Autowired
+    private AuthenticationHelper authHelper;
 
     @Autowired
     private EntrepriseRepository entrepriseRepository;
@@ -388,9 +392,7 @@ public void activerModuleAvecPaiement(Long userId,
         throw new RuntimeException("Token manquant ou mal formé");
     }
 
-    Long userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
-    User user = usersRepository.findById(userId)
-            .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
+    User user = authHelper.getAuthenticatedUserWithFallback(request);
 
     if (user.getEntreprise() == null) {
         throw new RuntimeException("L'utilisateur n'est associé à aucune entreprise");

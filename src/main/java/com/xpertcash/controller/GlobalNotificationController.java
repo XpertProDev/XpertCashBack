@@ -1,7 +1,7 @@
 package com.xpertcash.controller;
 
 import com.xpertcash.DTOs.GlobalNotificationDto;
-import com.xpertcash.configuration.JwtUtil;
+import com.xpertcash.service.AuthenticationHelper;
 import com.xpertcash.entity.GlobalNotification;
 import com.xpertcash.entity.User;
 import com.xpertcash.service.GlobalNotificationService;
@@ -12,18 +12,19 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.stream.Collectors;
+import jakarta.servlet.http.HttpServletRequest;
 
 @RestController
 @RequestMapping("/api/auth")
 public class GlobalNotificationController {
 
     private final GlobalNotificationService globalNotificationService;
-    private final JwtUtil jwtUtil;
+    private final AuthenticationHelper authHelper;
 
     public GlobalNotificationController(GlobalNotificationService globalNotificationService,
-                                        JwtUtil jwtUtil) {
+                                        AuthenticationHelper authHelper) {
         this.globalNotificationService = globalNotificationService;
-        this.jwtUtil = jwtUtil;
+        this.authHelper = authHelper;
     }
 
     /**
@@ -32,36 +33,29 @@ public class GlobalNotificationController {
      */
     @GetMapping("/list/global/notifications")
     public ResponseEntity<List<GlobalNotificationDto>> getUserNotifications(
-            @RequestHeader(value = "Authorization", required = false) String authHeader
+            HttpServletRequest request
     ) {
-        // 1️⃣ Vérifier le header
-        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+        try {
+            User user = authHelper.getAuthenticatedUserWithFallback(request);
+            
+            // 3️⃣ Récupérer les notifications
+            List<GlobalNotification> notifs = globalNotificationService.getUserNotifications(user.getId());
+
+            // 4️⃣ Mapper vers le DTO
+            List<GlobalNotificationDto> dtoList = notifs.stream()
+                    .map(notif -> new GlobalNotificationDto(
+                            notif.getId(),
+                            notif.getMessage(),
+                            notif.getCreatedAt(),
+                            notif.getRecipient().getNomComplet(),
+                            notif.isRead()
+                    ))
+                    .collect(Collectors.toList());
+
+            return ResponseEntity.ok(dtoList);
+        } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
-
-        // 2️⃣ Extraire et valider le token
-        String token = authHeader.substring(7);
-        Long userId = jwtUtil.extractUserId(token);
-        if (userId == null) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
-        }
-
-        // 3️⃣ Récupérer les notifications
-        List<GlobalNotification> notifs = globalNotificationService.getUserNotifications(userId);
-
-        // 4️⃣ Mapper vers le DTO
-        // 4️⃣ Mapper vers le DTO
-        List<GlobalNotificationDto> dtoList = notifs.stream()
-                .map(notif -> new GlobalNotificationDto(
-                        notif.getId(),
-                        notif.getMessage(),
-                        notif.getCreatedAt(),
-                        notif.getRecipient().getNomComplet(),
-                        notif.isRead() // AJOUTEZ CE CHAMP
-                ))
-                .collect(Collectors.toList());
-
-        return ResponseEntity.ok(dtoList);
     }
 
     /**
@@ -70,17 +64,14 @@ public class GlobalNotificationController {
     @PutMapping("/notifications/{id}/read")
     public ResponseEntity<Void> markAsRead(
             @PathVariable Long id,
-            @RequestHeader("Authorization") String authHeader
+            HttpServletRequest request
     ) {
-        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+        try {
+            User user = authHelper.getAuthenticatedUserWithFallback(request);
+            globalNotificationService.markAsRead(id, user.getId());
+            return ResponseEntity.noContent().build();
+        } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
-        String token = authHeader.substring(7);
-        Long userId = jwtUtil.extractUserId(token);
-        if (userId == null) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
-        }
-        globalNotificationService.markAsRead(id, userId);
-        return ResponseEntity.noContent().build();
     }
 }

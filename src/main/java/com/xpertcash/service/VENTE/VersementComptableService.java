@@ -10,7 +10,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.xpertcash.DTOs.VENTE.VersementComptableDTO;
 import com.xpertcash.composant.Utilitaire;
-import com.xpertcash.configuration.JwtUtil;
 import com.xpertcash.entity.Boutique;
 import com.xpertcash.entity.User;
 import com.xpertcash.entity.Enum.RoleType;
@@ -27,9 +26,13 @@ import com.xpertcash.repository.VENTE.VenteRepository;
 import com.xpertcash.repository.VENTE.VersementComptableRepository;
 
 import jakarta.servlet.http.HttpServletRequest;
+import com.xpertcash.service.AuthenticationHelper;
 
 @Service
 public class VersementComptableService {
+
+    @Autowired
+    private AuthenticationHelper authHelper;
 
     @Autowired
     private VersementComptableRepository versementComptableRepository;
@@ -39,28 +42,12 @@ public class VersementComptableService {
     private UsersRepository usersRepository;
     
   
-    @Autowired
-    private JwtUtil jwtUtil;
+
  
 
     @Transactional
     public List<VersementComptableDTO> getVersementsDeBoutique(Long boutiqueId, HttpServletRequest request) {
-        // 🔐 Vérification du token JWT
-        String token = request.getHeader("Authorization");
-        if (token == null || !token.startsWith("Bearer ")) {
-            throw new RuntimeException("Token JWT manquant ou mal formaté");
-        }
-
-        Long userId;
-        try {
-            userId = jwtUtil.extractUserId(token.substring(7));
-        } catch (Exception e) {
-            throw new RuntimeException("Erreur lors de l'extraction de l'ID utilisateur depuis le token", e);
-        }
-
-        // Récupération de l'utilisateur connecté
-        User user = usersRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+        User user = authHelper.getAuthenticatedUserWithFallback(request);
         if (user.getEntreprise() == null) {
             throw new RuntimeException("L'utilisateur connecté n'appartient à aucune entreprise.");
         }
@@ -122,10 +109,7 @@ public class VersementComptableService {
             throw new RuntimeException("Token JWT manquant ou mal formaté");
         }
 
-        Long userId = jwtUtil.extractUserId(token.substring(7));
-
-        User user = usersRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+        User user = authHelper.getAuthenticatedUserWithFallback(request);
 
         if (user.getEntreprise() == null) {
             throw new RuntimeException("L'utilisateur connecté n'appartient à aucune entreprise.");
@@ -182,11 +166,7 @@ public List<VersementComptableDTO> getVersementsParStatut(Long boutiqueId, Statu
     if (token == null || !token.startsWith("Bearer ")) {
         throw new RuntimeException("Token JWT manquant ou mal formaté");
     }
-    Long userId = jwtUtil.extractUserId(token.substring(7));
-
-    // 🔍 Récupération de l'utilisateur
-    User user = usersRepository.findById(userId)
-            .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+    User user = authHelper.getAuthenticatedUserWithFallback(request);
 
     if (user.getEntreprise() == null) {
         throw new RuntimeException("L'utilisateur connecté n'appartient à aucune entreprise.");

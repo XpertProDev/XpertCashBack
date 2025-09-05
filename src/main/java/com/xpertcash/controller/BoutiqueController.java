@@ -41,59 +41,59 @@ public class BoutiqueController {
 
     // Ajouter une boutique (requête JSON)
     @PostMapping("/ajouterBoutique")
-public ResponseEntity<Map<String, String>> ajouterBoutique(
-        HttpServletRequest request,
-        @RequestBody Map<String, String> boutiqueDetails) {
-    
-    Map<String, String> response = new HashMap<>();
+    public ResponseEntity<Map<String, String>> ajouterBoutique(
+            HttpServletRequest request,
+            @RequestBody Map<String, String> boutiqueDetails) {
+        
+        Map<String, String> response = new HashMap<>();
 
-    try {
-        // Extraire les données depuis la requête 
-        String nomBoutique = boutiqueDetails.get("nomBoutique");
-        String adresse = boutiqueDetails.get("adresse");
-        String telephone = boutiqueDetails.get("telephone");
-        String email = boutiqueDetails.get("email");
-        String typeString = boutiqueDetails.get("type"); // Nouveau champ attendu
-
-        if (typeString == null || typeString.isEmpty()) {
-            throw new RuntimeException("Le type de boutique est requis (BOUTIQUE ou ENTREPOT).");
-        }
-
-        // Convertir le type en enum
-        TypeBoutique typeBoutique;
         try {
-            typeBoutique = TypeBoutique.valueOf(typeString.toUpperCase());
-        } catch (IllegalArgumentException e) {
-            throw new RuntimeException("Type de boutique invalide. Utilisez BOUTIQUE ou ENTREPOT.");
+            // Extraire les données depuis la requête 
+            String nomBoutique = boutiqueDetails.get("nomBoutique");
+            String adresse = boutiqueDetails.get("adresse");
+            String telephone = boutiqueDetails.get("telephone");
+            String email = boutiqueDetails.get("email");
+            String typeString = boutiqueDetails.get("type"); // Nouveau champ attendu
+
+            if (typeString == null || typeString.isEmpty()) {
+                throw new RuntimeException("Le type de boutique est requis (BOUTIQUE ou ENTREPOT).");
+            }
+
+            // Convertir le type en enum
+            TypeBoutique typeBoutique;
+            try {
+                typeBoutique = TypeBoutique.valueOf(typeString.toUpperCase());
+            } catch (IllegalArgumentException e) {
+                throw new RuntimeException("Type de boutique invalide. Utilisez BOUTIQUE ou ENTREPOT.");
+            }
+
+            Boutique nouvelleBoutique = boutiqueService.ajouterBoutique(request, nomBoutique, adresse, telephone, email, typeBoutique);
+
+            response.put("message", "Boutique ajoutée avec succès !");
+            return ResponseEntity.ok(response);
+
+        } catch (RuntimeException e) {
+            System.err.println("🔴 ERREUR : " + e.getMessage());
+
+            if (e.getMessage().contains("Token JWT")) {
+                response.put("error", "Votre session a expiré. Veuillez vous reconnecter.");
+            } 
+            else if (e.getMessage().contains("Seul un admin peut ajouter une boutique")) {
+                response.put("error", "Accès refusé : Vous n'avez pas les droits nécessaires.");
+            } 
+            else if (e.getMessage().contains("L'Admin n'a pas d'entreprise associée")) {
+                response.put("error", "Vous devez d'abord créer une entreprise avant d'ajouter une boutique.");
+            }
+            else if (e.getMessage().contains("Type de boutique invalide") || e.getMessage().contains("Le type de boutique est requis")) {
+                response.put("error", e.getMessage());
+            } 
+            else {
+                response.put("error", "Impossible d'ajouter la boutique. Veuillez réessayer plus tard.");
+            }
+
+            return ResponseEntity.badRequest().body(response);
         }
-
-        Boutique nouvelleBoutique = boutiqueService.ajouterBoutique(request, nomBoutique, adresse, telephone, email, typeBoutique);
-
-        response.put("message", "Boutique ajoutée avec succès !");
-        return ResponseEntity.ok(response);
-
-    } catch (RuntimeException e) {
-        System.err.println("🔴 ERREUR : " + e.getMessage());
-
-        if (e.getMessage().contains("Token JWT")) {
-            response.put("error", "Votre session a expiré. Veuillez vous reconnecter.");
-        } 
-        else if (e.getMessage().contains("Seul un admin peut ajouter une boutique")) {
-            response.put("error", "Accès refusé : Vous n'avez pas les droits nécessaires.");
-        } 
-        else if (e.getMessage().contains("L'Admin n'a pas d'entreprise associée")) {
-            response.put("error", "Vous devez d'abord créer une entreprise avant d'ajouter une boutique.");
-        }
-        else if (e.getMessage().contains("Type de boutique invalide") || e.getMessage().contains("Le type de boutique est requis")) {
-            response.put("error", e.getMessage());
-        } 
-        else {
-            response.put("error", "Impossible d'ajouter la boutique. Veuillez réessayer plus tard.");
-        }
-
-        return ResponseEntity.badRequest().body(response);
     }
-}
 
     // Récupérer toutes les boutiques d'une entreprise
     @GetMapping("/boutiqueEntreprise")

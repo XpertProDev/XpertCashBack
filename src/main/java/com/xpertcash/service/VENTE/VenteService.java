@@ -40,6 +40,7 @@ import jakarta.servlet.http.HttpServletRequest;
 
 import com.xpertcash.configuration.CentralAccess;
 import com.xpertcash.configuration.JwtUtil;
+import com.xpertcash.service.AuthenticationHelper;
 
 @Service
 public class VenteService {
@@ -74,6 +75,8 @@ public class VenteService {
     private ClientRepository clientRepository;
     @Autowired
     private EntrepriseClientRepository entrepriseClientRepository;
+    @Autowired
+    private AuthenticationHelper authHelper;
 
 
  @Transactional
@@ -83,17 +86,7 @@ public VenteResponse enregistrerVente(VenteRequest request, HttpServletRequest h
     if (token == null || !token.startsWith("Bearer ")) {
         throw new RuntimeException("Token JWT manquant ou mal formaté");
     }
-    String jwtToken = token.substring(7);
-
-    Long userId;
-    try {
-        userId = jwtUtil.extractUserId(jwtToken);
-    } catch (Exception e) {
-        throw new RuntimeException("Erreur lors de l'extraction de l'ID utilisateur depuis le token", e);
-    }
-
-    User user = usersRepository.findById(userId)
-            .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+    User user = authHelper.getAuthenticatedUserWithFallback(httpRequest);
 
     // 🔐 Vérification des droits
     RoleType role = user.getRole().getName();
@@ -298,9 +291,7 @@ public VenteResponse enregistrerVente(VenteRequest request, HttpServletRequest h
         if (token == null || !token.startsWith("Bearer ")) {
             throw new RuntimeException("Token JWT manquant ou mal formaté");
         }
-        Long userId = jwtUtil.extractUserId(token.substring(7));
-        User user = usersRepository.findById(userId)
-            .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+        User user = authHelper.getAuthenticatedUserWithFallback(httpRequest);
 
         Vente vente = venteRepository.findById(request.getVenteId())
             .orElseThrow(() -> new RuntimeException("Vente non trouvée"));
@@ -446,9 +437,16 @@ public VenteResponse enregistrerVente(VenteRequest request, HttpServletRequest h
         if (jwtToken == null || !jwtToken.startsWith("Bearer ")) {
             throw new RuntimeException("Token JWT manquant ou mal formaté");
         }
-        Long userId = jwtUtil.extractUserId(jwtToken.substring(7));
-        User user = usersRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+        
+        String userUuid;
+        try {
+            userUuid = jwtUtil.extractUserUuid(jwtToken.replace("Bearer ", ""));
+        } catch (Exception e) {
+            throw new RuntimeException("Erreur lors de l'extraction de l'UUID de l'utilisateur depuis le token", e);
+        }
+
+        User user = usersRepository.findByUuid(userUuid)
+                .orElseThrow(() -> new RuntimeException("Utilisateur introuvable !"));
 
         // 🔐 Vérification des droits
         RoleType role = user.getRole().getName();
@@ -492,17 +490,7 @@ public VenteResponse getVenteById(Long id, HttpServletRequest httpRequest) {
     if (token == null || !token.startsWith("Bearer ")) {
         throw new RuntimeException("Token JWT manquant ou mal formaté");
     }
-    String jwtToken = token.substring(7);
-
-    Long userId;
-    try {
-        userId = jwtUtil.extractUserId(jwtToken);
-    } catch (Exception e) {
-        throw new RuntimeException("Erreur lors de l'extraction de l'ID utilisateur depuis le token", e);
-    }
-
-    User user = usersRepository.findById(userId)
-            .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+    User user = authHelper.getAuthenticatedUserWithFallback(httpRequest);
 
     // 🔎 Charger la vente demandée
     Vente vente = venteRepository.findById(id)
@@ -635,9 +623,7 @@ public List<VenteResponse> getVentesByVendeur(Long vendeurId, HttpServletRequest
             throw new RuntimeException("Token JWT manquant ou mal formaté");
         }
 
-        Long userId = jwtUtil.extractUserId(token.substring(7));
-        User user = usersRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+        User user = authHelper.getAuthenticatedUserWithFallback(request);
 
         if (user.getEntreprise() == null) {
             throw new RuntimeException("Vous n'êtes associé à aucune entreprise.");
@@ -693,9 +679,7 @@ public double getMontantTotalVentesDuMoisConnecte(HttpServletRequest request) {
         throw new RuntimeException("Token JWT manquant ou mal formaté");
     }
 
-    Long userId = jwtUtil.extractUserId(token.substring(7));
-    User user = usersRepository.findById(userId)
-            .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+    User user = authHelper.getAuthenticatedUserWithFallback(request);
 
     if (user.getEntreprise() == null) {
         throw new RuntimeException("Vous n'êtes associé à aucune entreprise.");
@@ -752,9 +736,7 @@ public double getMontantTotalVentesDuMois(Long entrepriseId) {
             throw new RuntimeException("Token JWT manquant ou mal formaté");
         }
 
-        Long userId = jwtUtil.extractUserId(token.substring(7));
-        User user = usersRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+        User user = authHelper.getAuthenticatedUserWithFallback(request);
         
         Long entrepriseId = user.getEntreprise().getId();
         
@@ -806,9 +788,7 @@ public double getMontantTotalVentesDuMois(Long entrepriseId) {
             throw new RuntimeException("Token JWT manquant ou mal formaté");
         }
 
-        Long userId = jwtUtil.extractUserId(token.substring(7));
-        User user = usersRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+        User user = authHelper.getAuthenticatedUserWithFallback(request);
         
 
         Long entrepriseId = user.getEntreprise().getId();
@@ -839,9 +819,7 @@ public double getMontantTotalVentesDuMois(Long entrepriseId) {
             throw new RuntimeException("Token JWT manquant ou mal formaté");
         }
 
-        Long userId = jwtUtil.extractUserId(token.substring(7));
-        User user = usersRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+        User user = authHelper.getAuthenticatedUserWithFallback(request);
 
         Long entrepriseId = user.getEntreprise().getId();
 
@@ -901,9 +879,7 @@ public double calculerBeneficeNetAnnuelConnecte(HttpServletRequest request) {
         throw new RuntimeException("Token JWT manquant ou mal formaté");
     }
 
-    Long userId = jwtUtil.extractUserId(token.substring(7));
-    User user = usersRepository.findById(userId)
-            .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+    User user = authHelper.getAuthenticatedUserWithFallback(request);
 
     Long entrepriseId = user.getEntreprise().getId();
     // Vérification des droits

@@ -16,11 +16,24 @@ GET /api/auth/entreprise/{entrepriseId}/produits/paginated
 GET /api/auth/boutique/{boutiqueId}/produits/paginated
 ```
 
+### 3. Factures Proforma par Entreprise
+
+#### 3.1 Factures de l'utilisateur connecté
+```
+GET /api/auth/factures/entreprise/paginated
+```
+
+#### 3.2 Factures d'un utilisateur spécifique (admins/managers uniquement)
+```
+GET /api/auth/factures/entreprise/{userId}/paginated
+```
+
 ## Paramètres
 
 ### Path Parameters
 - `entrepriseId` (Long, requis) : ID de l'entreprise (pour l'API entreprise)
 - `boutiqueId` (Long, requis) : ID de la boutique (pour l'API stock)
+- `userId` (Long, requis) : ID de l'utilisateur (pour l'API factures proforma)
 
 ### Query Parameters
 - `page` (int, optionnel) : Numéro de la page (défaut: 0)
@@ -68,6 +81,36 @@ curl -X GET "http://localhost:8080/api/auth/boutique/456/produits/paginated?page
 #### Récupérer la page 3 avec 100 éléments (maximum)
 ```bash
 curl -X GET "http://localhost:8080/api/auth/boutique/456/produits/paginated?page=2&size=100" \
+  -H "Authorization: Bearer your-jwt-token"
+```
+
+### API Factures Proforma par Entreprise
+
+#### 3.1 Factures de l'utilisateur connecté
+
+##### Récupérer la première page avec 20 éléments (défaut)
+```bash
+curl -X GET "http://localhost:8080/api/auth/factures/entreprise/paginated" \
+  -H "Authorization: Bearer your-jwt-token"
+```
+
+##### Récupérer la page 2 avec 30 éléments
+```bash
+curl -X GET "http://localhost:8080/api/auth/factures/entreprise/paginated?page=1&size=30" \
+  -H "Authorization: Bearer your-jwt-token"
+```
+
+#### 3.2 Factures d'un utilisateur spécifique (admins/managers)
+
+##### Récupérer la première page avec 20 éléments (défaut)
+```bash
+curl -X GET "http://localhost:8080/api/auth/factures/entreprise/123/paginated" \
+  -H "Authorization: Bearer your-jwt-token"
+```
+
+##### Récupérer la page 2 avec 30 éléments
+```bash
+curl -X GET "http://localhost:8080/api/auth/factures/entreprise/123/paginated?page=1&size=30" \
   -H "Authorization: Bearer your-jwt-token"
 ```
 

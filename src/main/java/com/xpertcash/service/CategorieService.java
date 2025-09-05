@@ -6,7 +6,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -20,11 +19,8 @@ import org.springframework.stereotype.Service;
 import com.xpertcash.DTOs.CategorieResponseDTO;
 import com.xpertcash.DTOs.CategoriePaginatedResponseDTO;
 import com.xpertcash.DTOs.ProduitPaginatedResponseDTO;
-import com.xpertcash.DTOs.Boutique.BoutiqueResponse;
 import com.xpertcash.DTOs.PRODUIT.ProduitDetailsResponseDTO;
 import com.xpertcash.configuration.CentralAccess;
-import com.xpertcash.configuration.JwtUtil;
-import com.xpertcash.entity.Boutique;
 import com.xpertcash.entity.Categorie;
 import com.xpertcash.entity.Entreprise;
 import com.xpertcash.entity.PermissionType;
@@ -35,25 +31,22 @@ import com.xpertcash.entity.Enum.TypeProduit;
 import com.xpertcash.repository.CategorieRepository;
 import com.xpertcash.repository.EntrepriseRepository;
 import com.xpertcash.repository.ProduitRepository;
-import com.xpertcash.repository.UsersRepository;
 
 import jakarta.servlet.http.HttpServletRequest;
+import com.xpertcash.service.AuthenticationHelper;
 
 @Service
 public class CategorieService {
-    @Autowired
-    private CategorieRepository categorieRepository;
 
     @Autowired
-    private UsersRepository usersRepository;
+    private AuthenticationHelper authHelper;
+    @Autowired
+    private CategorieRepository categorieRepository;
 
     @Autowired
     private ProduitRepository produitRepository;
 
     @Autowired EntrepriseRepository entrepriseRepository;
-
-    @Autowired
-    private JwtUtil jwtUtil;
 
      // Ajouter une nouvelle catégorie (seul ADMIN peut le faire)
   public Categorie createCategorie(String nom, Long entrepriseId) {
@@ -83,9 +76,7 @@ public class CategorieService {
             throw new RuntimeException("Token JWT manquant ou mal formaté");
         }
 
-        Long userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
-        User user = usersRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
+        User user = authHelper.getAuthenticatedUserWithFallback(request);
         Entreprise entreprise = user.getEntreprise();
         if (entreprise == null) throw new RuntimeException("Aucune entreprise associée");
 
@@ -136,9 +127,7 @@ public class CategorieService {
             throw new RuntimeException("Token JWT manquant ou mal formaté");
         }
 
-        Long userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
-        User user = usersRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
+        User user = authHelper.getAuthenticatedUserWithFallback(request);
         Entreprise entreprise = user.getEntreprise();
         if (entreprise == null) throw new RuntimeException("Aucune entreprise associée");
 
@@ -151,7 +140,7 @@ public class CategorieService {
         }
 
         // --- Vérifier que la catégorie existe et appartient à l'entreprise ---
-        Categorie categorie = categorieRepository.findByIdAndEntrepriseId(categorieId, entreprise.getId())
+        categorieRepository.findByIdAndEntrepriseId(categorieId, entreprise.getId())
                 .orElseThrow(() -> new RuntimeException("Catégorie introuvable ou non autorisée"));
 
         // --- Validation des paramètres de pagination ---
@@ -202,9 +191,7 @@ public class CategorieService {
             throw new RuntimeException("Token JWT manquant ou mal formaté");
         }
 
-        Long userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
-        User user = usersRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
+        User user = authHelper.getAuthenticatedUserWithFallback(request);
         Entreprise entreprise = user.getEntreprise();
         if (entreprise == null) throw new RuntimeException("Aucune entreprise associée");
 
@@ -351,9 +338,7 @@ private ProduitDetailsResponseDTO toProduitDTO(Produit produit) {
         throw new RuntimeException("Token JWT manquant ou mal formaté");
     }
 
-    Long userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
-    User user = usersRepository.findById(userId)
-            .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
+    User user = authHelper.getAuthenticatedUserWithFallback(request);
 
     // 2. Vérifier l'appartenance à une entreprise
     Entreprise entreprise = user.getEntreprise();
@@ -404,4 +389,50 @@ private ProduitDetailsResponseDTO toProduitDTO(Produit produit) {
         }
     }
 
+    // Méthode simple pour obtenir le nombre de produits par catégorie (OPTIMISÉE)
+    public List<Map<String, Object>> getCategoriesWithProductCount(HttpServletRequest request) {
+        // --- JWT & utilisateur inchangé ---
+        String token = request.getHeader("Authorization");
+        if (token == null || !token.startsWith("Bearer ")) {
+            throw new RuntimeException("Token JWT manquant ou mal formaté");
+        }
+
+        User user = authHelper.getAuthenticatedUserWithFallback(request);
+        Entreprise entreprise = user.getEntreprise();
+        if (entreprise == null) throw new RuntimeException("Aucune entreprise associée");
+
+        boolean isAdminOrManager = CentralAccess.isAdminOrManagerOfEntreprise(user, entreprise.getId());
+        boolean hasPermissionGestionProduits = user.getRole().hasPermission(PermissionType.GERER_PRODUITS);
+        boolean isVendeur = user.getRole().hasPermission(PermissionType.VENDRE_PRODUITS);
+
+        if (!isAdminOrManager && !hasPermissionGestionProduits && !isVendeur) {
+            throw new RuntimeException("Accès refusé");
+        }
+
+        // --- Récupérer toutes les catégories de l'entreprise ---
+        List<Categorie> allCategories = categorieRepository.findByEntrepriseId(entreprise.getId());
+
+        // --- Récupérer le count groupé par catégorie (OPTIMISÉ avec filtre deleted) ---
+        Map<Long, Long> produitCountMap = produitRepository.countProduitsParCategorie(entreprise.getId())
+                .stream()
+                .collect(Collectors.toMap(
+                        obj -> (Long) obj[0],
+                        obj -> (Long) obj[1]
+                ));
+
+        // --- Construire la réponse simple ---
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (Categorie categorie : allCategories) {
+            Map<String, Object> categorieInfo = new HashMap<>();
+            categorieInfo.put("id", categorie.getId());
+            categorieInfo.put("nom", categorie.getNom());
+            categorieInfo.put("produitCount", produitCountMap.getOrDefault(categorie.getId(), 0L));
+            categorieInfo.put("createdAt", categorie.getCreatedAt());
+            result.add(categorieInfo);
+        }
+
+        return result;
+    }
+
+  
 }

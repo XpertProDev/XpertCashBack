@@ -144,3 +144,5 @@ Si le problème persiste après avoir suivi ce guide :
 - [ ] Utilisateur a une entreprise associée
 - [ ] Entreprise a un ID valide
 - [ ] Base de données accessible et fonctionnelle
+
+
