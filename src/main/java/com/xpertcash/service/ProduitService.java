@@ -60,6 +60,10 @@ import java.io.IOException;
 import com.xpertcash.service.IMAGES.ImageStorageService;
 import com.xpertcash.service.AuthenticationHelper;
 
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.CacheEvict;
+
+
 
 
 
@@ -1002,11 +1006,13 @@ public class ProduitService {
 
     // Méthode scalable avec pagination pour récupérer les produits d'une boutique
     @Transactional
+    @Cacheable(value = "produits-boutique", key = "#boutiqueId + '_' + #page + '_' + #size")
     public ProduitStockPaginatedResponseDTO getProduitsParStockPaginated(
             Long boutiqueId, 
             int page, 
             int size, 
             HttpServletRequest request) {
+        
         
         // --- 1. Validation des paramètres de pagination ---
         if (page < 0) page = 0;
