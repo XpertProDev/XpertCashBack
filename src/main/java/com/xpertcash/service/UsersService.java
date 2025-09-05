@@ -204,7 +204,8 @@ public class UsersService {
         boutique.setCreatedAt(LocalDateTime.now());
         boutique.setTypeBoutique(TypeBoutique.BOUTIQUE);
         boutiqueRepository.save(boutique);
-    
+
+            
         // Créer un stock vide initial
        
     
@@ -837,34 +838,22 @@ public class UsersService {
 
     //Get user info
     public UserRequest getInfo(Long userId) {
-        User user = usersRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+    // --- 1. Récupérer l'utilisateur avec entreprise et role join fetch ---
+    User user = usersRepository.findByIdWithEntrepriseAndRole(userId)
+            .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
 
-        Entreprise entreprise = user.getEntreprise();
+    Entreprise entreprise = user.getEntreprise();
 
-        List<BoutiqueResponse> boutiqueResponses;
-        String roleType = user.getRole().getName().name();
+    List<BoutiqueResponse> boutiqueResponses;
+    String roleType = user.getRole().getName().name();
 
-        if (roleType.equals("VENDEUR")) {
-            // Boutiques assignées au vendeur
-            boutiqueResponses = user.getUserBoutiques()
-                    .stream()
-                    .map(b -> new BoutiqueResponse(
-                            b.getId(),
-                            b.getBoutique().getNomBoutique(),
-                            b.getBoutique().getAdresse(),
-                            b.getBoutique().getTelephone(),
-                            b.getBoutique().getEmail(),
-                            b.getBoutique().getCreatedAt(),
-                            b.getBoutique().isActif(),
-                            b.getBoutique().getTypeBoutique()
-                    ))
-                    .collect(Collectors.toList());
-        } else {
-            // ADMIN ou MANAGER : toutes les boutiques de l'entreprise
-            boutiqueResponses = entreprise.getBoutiques()
-                    .stream()
-                    .map(b -> new BoutiqueResponse(
+    if ("VENDEUR".equals(roleType)) {
+        // Boutiques assignées au vendeur
+        boutiqueResponses = user.getUserBoutiques()
+                .stream()
+                .map(ub -> {
+                    Boutique b = ub.getBoutique();
+                    return new BoutiqueResponse(
                             b.getId(),
                             b.getNomBoutique(),
                             b.getAdresse(),
@@ -873,19 +862,36 @@ public class UsersService {
                             b.getCreatedAt(),
                             b.isActif(),
                             b.getTypeBoutique()
-                    ))
-                    .collect(Collectors.toList());
-        }
-
-        // Permissions
-        List<String> permissions = user.getRole().getPermissions()
-                .stream()
-                .map(permission -> permission.getType().name())
+                    );
+                })
                 .collect(Collectors.toList());
-
-        return new UserRequest(user, entreprise, boutiqueResponses, permissions);
+    } else {
+        // ADMIN ou MANAGER : toutes les boutiques de l'entreprise
+        boutiqueResponses = entreprise.getBoutiques()
+                .stream()
+                .map(b -> new BoutiqueResponse(
+                        b.getId(),
+                        b.getNomBoutique(),
+                        b.getAdresse(),
+                        b.getTelephone(),
+                        b.getEmail(),
+                        b.getCreatedAt(),
+                        b.isActif(),
+                        b.getTypeBoutique()
+                ))
+                .collect(Collectors.toList());
     }
 
+    // Permissions
+    List<String> permissions = user.getRole().getPermissions()
+            .stream()
+            .map(p -> p.getType().name())
+            .collect(Collectors.toList());
+
+    return new UserRequest(user, entreprise, boutiqueResponses, permissions);
+}
+
+   
 
 // Pour la récupération de tous les utilisateurs d'une entreprise
  public List<UserDTO> getAllUsersOfEntreprise(HttpServletRequest request) {

@@ -1,5 +1,7 @@
 package com.xpertcash.controller.VENTE;
 
+import com.xpertcash.DTOs.CLIENT.ClientVenteRequest;
+import com.xpertcash.DTOs.CLIENT.VenteParClientResponse;
 import com.xpertcash.DTOs.VENTE.RemboursementRequest;
 import com.xpertcash.DTOs.VENTE.RemboursementResponse;
 import com.xpertcash.DTOs.VENTE.VenteRequest;
@@ -30,10 +32,27 @@ public class VenteController {
 
     //Remboursement
     @PostMapping("/vente/rembourser")
-    public ResponseEntity<VenteResponse> rembourserVente(@RequestBody RemboursementRequest request, HttpServletRequest httpRequest) {
-        VenteResponse response = venteService.rembourserVente(request, httpRequest);
-        return ResponseEntity.ok(response);
+    public ResponseEntity<?> rembourserVente(@RequestBody RemboursementRequest request, HttpServletRequest httpRequest) {
+        try {
+            VenteResponse response = venteService.rembourserVente(request, httpRequest);
+            return ResponseEntity.ok(Map.of(
+                "status", "success",
+                "message", "Remboursement effectué avec succès",
+                "data", response
+            ));
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(Map.of(
+                "status", "error",
+                "message", e.getMessage()
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(Map.of(
+                "status", "error",
+                "message", "Erreur interne du serveur : " + e.getMessage()
+            ));
+        }
     }
+
 
         // Lister les remboursements d'une vente
         @GetMapping("/mes/remboursements")
@@ -127,5 +146,25 @@ public class VenteController {
     }
 
     
+    // Get achat par client
+ @PostMapping("/par-client")
+public ResponseEntity<List<VenteParClientResponse>> getVentesParClient(
+        @RequestBody ClientVenteRequest request,
+        HttpServletRequest httpRequest) {
+
+    List<VenteParClientResponse> ventes = venteService.getVentesParClient(
+            request.getClientId(),
+            request.getEntrepriseClientId(),
+            httpRequest
+    );
+    return ResponseEntity.ok(ventes);
+}
+
+// Get all achat client
+@GetMapping("/ventes/all-clients")
+public ResponseEntity<List<VenteParClientResponse>> getVentesClientsAffilies(HttpServletRequest httpRequest) {
+    List<VenteParClientResponse> ventes = venteService.getVentesClientsAffilies(httpRequest);
+    return ResponseEntity.ok(ventes);
+}
 
 }

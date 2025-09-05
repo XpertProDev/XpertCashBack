@@ -75,6 +75,31 @@ public interface FactureProformaRepository extends JpaRepository<FactureProForma
      boolean existsByApprobateursAndEntrepriseId(User approbateur, Long entrepriseId);
 
 
+     // Récupérer toutes les factures d'une entreprise avec les relations nécessaires en une seule requête
+@Query("SELECT DISTINCT f FROM FactureProForma f " +
+       "LEFT JOIN FETCH f.approbateurs a " +
+       "LEFT JOIN FETCH f.utilisateurCreateur u " +
+       "LEFT JOIN FETCH f.client c " +
+       "LEFT JOIN FETCH f.entrepriseClient ec " +
+       "LEFT JOIN FETCH f.entreprise e " +
+       "WHERE f.entreprise.id = :entrepriseId")
+List<FactureProForma> findFacturesAvecRelationsParEntreprise(@Param("entrepriseId") Long entrepriseId);
+
+
+// Récupérer toutes les factures d'une entreprise dans une période avec les relations nécessaires
+@Query("SELECT f FROM FactureProForma f " +
+       "LEFT JOIN FETCH f.utilisateurCreateur u " +
+       "LEFT JOIN FETCH f.approbateurs a " +
+       "LEFT JOIN FETCH f.lignesFacture lf " +
+       "LEFT JOIN FETCH f.client c " +
+       "LEFT JOIN FETCH f.entrepriseClient ec " +
+       "WHERE f.entreprise.id = :entrepriseId " +
+       "AND f.dateCreation >= :dateStart AND f.dateCreation < :dateEnd")
+List<FactureProForma> findFacturesAvecRelationsParEntrepriseEtPeriode(
+        @Param("entrepriseId") Long entrepriseId,
+        @Param("dateStart") LocalDateTime dateStart,
+        @Param("dateEnd") LocalDateTime dateEnd
+);
 
     
 }

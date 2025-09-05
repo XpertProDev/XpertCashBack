@@ -179,27 +179,34 @@ public class FactureProformaController {
 
 
     // Endpoint pour recuperer la liste des factures pro forma dune entreprise
-    @GetMapping("/mes-factures")
-    public ResponseEntity<List<Map<String, Object>>> getFacturesParEntreprise(HttpServletRequest request) {
-        String token = request.getHeader("Authorization");
-        if (token == null || !token.startsWith("Bearer ")) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(null);
-        }
-
-        Long userId;
-        try {
-            userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(null);
-        }
-
-        try {
-            List<Map<String, Object>> factures = factureProformaService.getFacturesParEntrepriseParUtilisateur(userId, request);
-            return ResponseEntity.ok(factures);
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
-        }
+@GetMapping("/mes-factures")
+public ResponseEntity<Object> getFacturesParEntreprise(HttpServletRequest request) {
+    String token = request.getHeader("Authorization");
+    if (token == null || !token.startsWith("Bearer ")) {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body(Map.of("error", "Token JWT manquant ou mal formaté"));
     }
+
+    Long userId;
+    try {
+        userId = jwtUtil.extractUserId(token.replace("Bearer ", ""));
+    } catch (Exception e) {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body(Map.of("error", "Token JWT invalide"));
+    }
+
+    try {
+        List<Map<String, Object>> factures = factureProformaService
+                .getFacturesParEntrepriseParUtilisateur(userId, request);
+        return ResponseEntity.ok(factures);
+    } catch (Exception e) {
+        e.printStackTrace(); // Pour loguer l’erreur réelle côté serveur
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(Map.of("error", "Erreur interne lors de la récupération des factures",
+                             "details", e.getMessage()));
+    }
+}
+
 
 
 
@@ -344,7 +351,7 @@ public class FactureProformaController {
                 map.put("entrepriseClientNom", f.getEntrepriseClient().getNom());
             }
 
-            return map;
+            return map; 
         }).collect(Collectors.toList());
 
         return ResponseEntity.ok(result);

@@ -18,6 +18,8 @@ import java.util.List;
 
 import com.xpertcash.entity.Boutique;
 import com.xpertcash.entity.Caisse;
+import com.xpertcash.entity.Client;
+import com.xpertcash.entity.EntrepriseClient;
 import com.xpertcash.entity.ModePaiement;
 import com.xpertcash.entity.User;
 
@@ -63,5 +65,14 @@ public class Vente {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "caisse_id")
     private Caisse caisse;
+
+    @ManyToOne
+    @JoinColumn(name = "client_id")
+    private Client client;
+
+    @ManyToOne
+    @JoinColumn(name = "entreprise_client_id")
+    private EntrepriseClient entrepriseClient;
+
 
 }

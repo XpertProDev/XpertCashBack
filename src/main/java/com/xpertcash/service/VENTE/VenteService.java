@@ -1,7 +1,9 @@
 package com.xpertcash.service.VENTE;
 
+import com.xpertcash.DTOs.CLIENT.VenteParClientResponse;
 import com.xpertcash.DTOs.VENTE.RemboursementRequest;
 import com.xpertcash.DTOs.VENTE.RemboursementResponse;
+import com.xpertcash.DTOs.VENTE.VenteLigneResponse;
 import com.xpertcash.DTOs.VENTE.VenteRequest;
 import com.xpertcash.DTOs.VENTE.VenteResponse;
 import com.xpertcash.composant.Utilitaire;
@@ -27,6 +29,7 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 import com.xpertcash.entity.Enum.RoleType;
+import com.xpertcash.entity.VENTE.StatutCaisse;
 import com.xpertcash.entity.VENTE.TypeMouvementCaisse;
 import com.xpertcash.entity.VENTE.Vente;
 import com.xpertcash.entity.VENTE.VenteHistorique;
@@ -66,6 +69,11 @@ public class VenteService {
 
     @Autowired
     private FactureVenteService factureVenteService;
+
+    @Autowired
+    private ClientRepository clientRepository;
+    @Autowired
+    private EntrepriseClientRepository entrepriseClientRepository;
 
 
  @Transactional
@@ -120,6 +128,23 @@ public VenteResponse enregistrerVente(VenteRequest request, HttpServletRequest h
     vente.setDescription(request.getDescription());
     vente.setClientNom(request.getClientNom());
     vente.setClientNumero(request.getClientNumero());
+
+    // ✅ Ici, ajouter la gestion du client
+    if (request.getClientId() != null) {
+        Client client = clientRepository.findById(request.getClientId())
+                .orElseThrow(() -> new RuntimeException("Client introuvable"));
+        vente.setClient(client);
+        vente.setEntrepriseClient(null);
+    } else if (request.getEntrepriseClientId() != null) {
+        EntrepriseClient entrepriseClient = entrepriseClientRepository.findById(request.getEntrepriseClientId())
+                .orElseThrow(() -> new RuntimeException("Entreprise client introuvable"));
+        vente.setEntrepriseClient(entrepriseClient);
+        vente.setClient(null);
+    } else {
+        // Client passant
+        vente.setClient(null);
+        vente.setEntrepriseClient(null);
+    }
 
     double montantTotalSansRemise = 0.0;
     List<VenteProduit> lignes = new ArrayList<>();
@@ -213,6 +238,7 @@ public VenteResponse enregistrerVente(VenteRequest request, HttpServletRequest h
     vente.setProduits(lignes);
     vente.setStatus(VenteStatus.PAYEE);
     vente.setMontantPaye(montantTotal);
+    vente.setCaisse(caisse);
 
     // ✅ Persist groupé
     venteRepository.save(vente);
@@ -267,7 +293,7 @@ public VenteResponse enregistrerVente(VenteRequest request, HttpServletRequest h
 
     //Remboursement
     @Transactional
-        public VenteResponse rembourserVente(RemboursementRequest request, HttpServletRequest httpRequest) {
+    public VenteResponse rembourserVente(RemboursementRequest request, HttpServletRequest httpRequest) {
         String token = httpRequest.getHeader("Authorization");
         if (token == null || !token.startsWith("Bearer ")) {
             throw new RuntimeException("Token JWT manquant ou mal formaté");
@@ -281,6 +307,15 @@ public VenteResponse enregistrerVente(VenteRequest request, HttpServletRequest h
 
         Caisse caisse = caisseService.getCaisseActive(vente.getBoutique().getId(), httpRequest)
             .orElseThrow(() -> new RuntimeException("Aucune caisse ouverte pour cette boutique/vendeur"));
+
+            // ✅ Vérification de la caisse de la vente
+        Caisse caisseVente = vente.getCaisse();
+        if (caisseVente == null) {
+            throw new RuntimeException("Impossible de rembourser, la caisse de la vente est fermée !");
+        }
+        if (caisseVente.getStatut() == StatutCaisse.FERMEE) {
+            throw new RuntimeException("Impossible de rembourser : la caisse dans laquelle la vente a été encaissée est fermée !");
+        }
 
         if (request.getRescodePin() == null || request.getRescodePin().isBlank()) {
             throw new RuntimeException("Vous devez rentrer le code d'un responsable de l'entreprise");
@@ -543,7 +578,16 @@ public List<VenteResponse> getVentesByVendeur(Long vendeurId, HttpServletRequest
     private VenteResponse toVenteResponse(Vente vente) {
         VenteResponse response = new VenteResponse();
         response.setVenteId(vente.getId());
-        response.setCaisse(vente.getCaisse());
+         // ✅ Eviter récursion : ne pas renvoyer l’entité caisse entière
+        if (vente.getCaisse() != null) {
+            VenteResponse.CaisseDTO caisseDTO = new VenteResponse.CaisseDTO();
+            caisseDTO.setId(vente.getCaisse().getId());
+            caisseDTO.setMontantCourant(vente.getCaisse().getMontantCourant());
+            caisseDTO.setStatut(vente.getCaisse().getStatut().name());
+            caisseDTO.setDateOuverture(vente.getCaisse().getDateOuverture());
+            caisseDTO.setDateFermeture(vente.getCaisse().getDateFermeture());
+            response.setCaisse(caisseDTO);
+        }
         response.setBoutiqueId(vente.getBoutique() != null ? vente.getBoutique().getId() : null);
         response.setVendeurId(vente.getVendeur() != null ? vente.getVendeur().getId() : null);
         response.setDateVente(vente.getDateVente());
@@ -913,6 +957,100 @@ public double calculerBeneficeNetAnnuel(Long entrepriseId) {
 }
 
 
+
+// Methode pour Achat de client 
+
+@Transactional(readOnly = true)
+public List<VenteParClientResponse> getVentesParClient(Long clientId, Long entrepriseClientId, HttpServletRequest request) {
+    User user = utilitaire.getAuthenticatedUser(request);
+
+    if (clientId == null && entrepriseClientId == null) {
+        throw new RuntimeException("Vous devez fournir soit un clientId soit un entrepriseClientId.");
+    }
+
+    List<Vente> ventes;
+
+    if (clientId != null) {
+        Client client = clientRepository.findById(clientId)
+                .orElseThrow(() -> new RuntimeException("Client introuvable"));
+        if (!client.getEntreprise().getId().equals(user.getEntreprise().getId())) {
+            throw new RuntimeException("Accès interdit : ce client n'appartient pas à votre entreprise.");
+        }
+        ventes = venteRepository.findByClientId(clientId);
+    } else {
+        EntrepriseClient entrepriseClient = entrepriseClientRepository.findById(entrepriseClientId)
+                .orElseThrow(() -> new RuntimeException("EntrepriseClient introuvable"));
+        if (!entrepriseClient.getEntreprise().getId().equals(user.getEntreprise().getId())) {
+            throw new RuntimeException("Accès interdit : cette entreprise cliente n'appartient pas à votre entreprise.");
+        }
+        ventes = venteRepository.findByEntrepriseClientId(entrepriseClientId);
+    }
+
+    return ventes.stream()
+            .map(this::toVenteParClientResponse)
+            .collect(Collectors.toList());
+}
+
+// Methode pour Achat de tout client confondu
+
+@Transactional(readOnly = true)
+public List<VenteParClientResponse> getVentesClientsAffilies(HttpServletRequest request) {
+    User user = utilitaire.getAuthenticatedUser(request);
+
+    // Récupère toutes les ventes de l'entreprise
+    List<Vente> ventes = venteRepository.findAllByEntrepriseId(user.getEntreprise().getId());
+
+    // Filtrer seulement les ventes avec client ou entreprise client
+    List<Vente> ventesAffilies = ventes.stream()
+        .filter(v -> (v.getClientNom() != null && v.getClientNumero() != null)
+                  || v.getEntrepriseClient() != null)
+        .collect(Collectors.toList());
+
+    return ventesAffilies.stream()
+            .map(this::toVenteParClientResponse)
+            .collect(Collectors.toList());
+}
+
+
+
+
+
+private VenteParClientResponse toVenteParClientResponse(Vente vente) {
+    VenteParClientResponse dto = new VenteParClientResponse();
+    dto.setVenteId(vente.getId());
+    dto.setCaisseId(vente.getCaisse() != null ? vente.getCaisse().getId() : null);
+    dto.setBoutiqueId(vente.getBoutique() != null ? vente.getBoutique().getId() : null);
+    dto.setVendeurId(vente.getVendeur() != null ? vente.getVendeur().getId() : null);
+    dto.setDateVente(vente.getDateVente());
+    dto.setMontantTotal(vente.getMontantTotal());
+    dto.setDescription(vente.getDescription());
+    dto.setNomVendeur(vente.getVendeur() != null ? vente.getVendeur().getNomComplet() : null);
+    dto.setNomBoutique(vente.getBoutique() != null ? vente.getBoutique().getNomBoutique() : null);
+    dto.setClientNom(vente.getClientNom());
+    dto.setClientNumero(vente.getClientNumero());
+    dto.setModePaiement(vente.getModePaiement());
+    dto.setMontantPaye(vente.getMontantPaye());
+
+    if (vente.getProduits() != null) {
+        List<VenteLigneResponse> lignes = vente.getProduits().stream().map(vp -> {
+            VenteLigneResponse ligne = new VenteLigneResponse();
+            ligne.setProduitId(vp.getProduit() != null ? vp.getProduit().getId() : null);
+            ligne.setNomProduit(vp.getProduit() != null ? vp.getProduit().getNom() : null);
+            ligne.setQuantite(vp.getQuantite());
+            ligne.setPrixUnitaire(vp.getPrixUnitaire());
+            ligne.setMontantLigne(vp.getMontantLigne());
+            ligne.setRemise(vp.getRemise());
+            return ligne;
+        }).collect(Collectors.toList());
+        dto.setLignes(lignes);
+    }
+
+    dto.setRemiseGlobale(vente.getRemiseGlobale());
+    FactureVente facture = factureVenteRepository.findByVente(vente).orElse(null);
+    dto.setNumeroFacture(facture != null ? facture.getNumeroFacture() : null);
+
+    return dto;
+}   
 
 
 }

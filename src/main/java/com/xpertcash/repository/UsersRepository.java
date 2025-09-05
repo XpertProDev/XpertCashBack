@@ -46,6 +46,14 @@ public interface UsersRepository extends JpaRepository<User, Long> {
 
 
 
+// Récupérer l'utilisateur avec entreprise et role en une seule requête
+@Query("SELECT u FROM User u " +
+       "JOIN FETCH u.entreprise e " +
+       "JOIN FETCH u.role r " +
+       "LEFT JOIN FETCH r.permissions p " +
+       "WHERE u.id = :userId")
+Optional<User> findByIdWithEntrepriseAndRole(@Param("userId") Long userId);
+
 
 
 
