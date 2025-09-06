@@ -445,6 +445,7 @@ public class UsersService {
 
     //Admin addUserToEntreprise
     @Transactional
+    @CacheEvict(value = "user-info", allEntries = true)
     public User addUserToEntreprise(HttpServletRequest request, UserRequest userRequest) {
                 // Vérifier la présence du token JWT dans l'entête de la requête
                 String token = request.getHeader("Authorization");
@@ -569,6 +570,7 @@ public class UsersService {
 
     //Attribution des permissions à un utilisateur
     @Transactional
+    @CacheEvict(value = "user-info", key = "#userId")
     public UserDTO assignPermissionsToUser(Long userId, Map<PermissionType, Boolean> permissions, HttpServletRequest request) {
         User currentUser = authHelper.getAuthenticatedUserWithFallback(request);
 
@@ -656,6 +658,7 @@ public class UsersService {
 
     //Suprim UserToEntreprise 
     @Transactional
+    @CacheEvict(value = "user-info", allEntries = true)
     public void deleteUserFromEntreprise(HttpServletRequest request, Long userId) {
     User admin = authHelper.getAuthenticatedUserWithFallback(request);
 

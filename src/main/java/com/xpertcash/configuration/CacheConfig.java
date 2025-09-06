@@ -23,7 +23,11 @@ public class CacheConfig {
             "produits-entreprise", 
             "stock-historique",
             "stock-entreprise",
-            "user-info"
+            "user-info",
+            "ventes-stats",
+            "factures-reelles",
+            "categories",
+            "factures-proforma"
         ));
         
         // Activer le stockage des valeurs null

@@ -73,6 +73,7 @@ public class NotificationService {
                                 facture.setNotifie(true);
                                 facture.setDernierRappelEnvoye(maintenant);
                                 factureProformaRepository.save(facture);
+                                // Note: Cache invalidation handled by the calling service
                             
                                 System.out.println("✅ Notification envoyée pour la facture " + facture.getNumeroFacture());
                             } catch (Exception e) {

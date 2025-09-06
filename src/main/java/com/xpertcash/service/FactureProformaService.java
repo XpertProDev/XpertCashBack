@@ -10,6 +10,8 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
@@ -110,6 +112,7 @@ public class FactureProformaService {
 //    private NotificationService notificationService;
     
     // Methode pour creer une facture pro forma
+    @CacheEvict(value = "factures-proforma", allEntries = true)
     public FactureProForma ajouterFacture(FactureProForma facture, Double remisePourcentage, Boolean appliquerTVA, HttpServletRequest request) {
     if (facture == null) {
         throw new RuntimeException("La facture ne peut pas être vide !");
@@ -311,6 +314,7 @@ public class FactureProformaService {
 
     // Méthode pour modifier une facture pro forma
     @Transactional
+    @CacheEvict(value = "factures-proforma", allEntries = true)
     public FactureProFormaDTO modifierFacture(Long factureId, Double remisePourcentage, Boolean appliquerTVA, FactureProForma modifications, List<Long> idsApprobateurs, HttpServletRequest request) {
         // 🔐 Récupération de la facture
         FactureProForma facture = factureProformaRepository.findById(factureId)
@@ -698,6 +702,7 @@ public class FactureProformaService {
 
     //Supression dune facture proforma en brouillon
      @Transactional
+     @CacheEvict(value = "factures-proforma", allEntries = true)
     public void supprimerFactureProforma(Long factureId, HttpServletRequest request) {
         User user = authHelper.getAuthenticatedUserWithFallback(request);
 
@@ -744,6 +749,7 @@ public class FactureProformaService {
 
     // Méthode scalable avec pagination pour récupérer les factures proforma d'une entreprise
     @Transactional
+    @Cacheable(value = "factures-proforma", key = "#userIdRequete + '_' + #page + '_' + #size")
     public FactureProformaPaginatedResponseDTO getFacturesParEntrepriseParUtilisateurPaginated(
             Long userIdRequete, 
             int page, 

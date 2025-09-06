@@ -5,6 +5,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -12,6 +13,8 @@ import java.util.Comparator;
 
 import org.hibernate.Hibernate;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -79,6 +82,7 @@ public class FactureReelleService {
 
 
 
+    @CacheEvict(value = "factures-reelles", allEntries = true)
     public FactureReelle genererFactureReelle(FactureProForma factureProForma) {
         FactureReelle factureReelle = new FactureReelle();
 
@@ -190,6 +194,7 @@ public void supprimerFactureReelleLiee(FactureProForma proforma) {
   }
 
   // Méthode scalable avec pagination pour lister les factures réelles
+  @Cacheable(value = "factures-reelles", key = "#request.getHeader('Authorization').hashCode() + '_' + #page + '_' + #size")
   public PaginatedResponseDTO<FactureReelleDTO> listerMesFacturesReellesPaginated(int page, int size, HttpServletRequest request) {
     // --- 1. Validation des paramètres de pagination ---
     if (page < 0) page = 0;
@@ -227,20 +232,32 @@ public void supprimerFactureReelleLiee(FactureProForma proforma) {
     // --- 3. Récupération paginée des factures ---
     Page<FactureReelle> facturesPage = factureReelleRepository.findByEntrepriseOrderByDateCreationDescPaginated(entreprise, pageable);
 
-    // --- 4. Transformation des factures en DTO ---
+    // --- 4. Optimisation N+1 : Récupérer tous les paiements d'un coup ---
+    List<Long> factureIds = facturesPage.getContent().stream()
+            .map(FactureReelle::getId)
+            .collect(Collectors.toList());
+    
+    Map<Long, BigDecimal> paiementsMap = paiementRepository.sumMontantsByFactureReelleIds(factureIds)
+            .stream()
+            .collect(Collectors.toMap(
+                obj -> (Long) obj[0],
+                obj -> (BigDecimal) obj[1]
+            ));
+
+    // --- 5. Transformation des factures en DTO ---
     Page<FactureReelleDTO> facturesDTO = facturesPage.map(facture -> {
         BigDecimal totalFacture = BigDecimal.valueOf(facture.getTotalFacture());
-        BigDecimal totalPaye = paiementRepository.sumMontantsByFactureReelle(facture.getId());
-        if (totalPaye == null) totalPaye = BigDecimal.ZERO;
+        BigDecimal totalPaye = paiementsMap.getOrDefault(facture.getId(), BigDecimal.ZERO);
         BigDecimal montantRestant = totalFacture.subtract(totalPaye);
         return new FactureReelleDTO(facture, montantRestant);
     });
 
-    // --- 5. Retour de la réponse paginée ---
+    // --- 6. Retour de la réponse paginée ---
     return PaginatedResponseDTO.fromPage(facturesDTO);
 }
  
     // Trier les facture par mois/année
+   @Cacheable(value = "factures-reelles", key = "#request.getHeader('Authorization').hashCode() + '_filtre_' + #mois + '_' + #annee")
    public ResponseEntity<?> filtrerFacturesParMoisEtAnnee(Integer mois, Integer annee, HttpServletRequest request) {
     User user = authHelper.getAuthenticatedUserWithFallback(request);
 
@@ -272,13 +289,24 @@ public void supprimerFactureReelleLiee(FactureProForma proforma) {
         factures = factureReelleRepository.findByEntrepriseId(entrepriseId);
     }
 
-    // 4. Mapper vers DTO et nettoyer
+    // 4. Optimisation N+1 : Récupérer tous les paiements d'un coup
+    List<Long> factureIds = factures.stream()
+            .map(FactureReelle::getId)
+            .collect(Collectors.toList());
+    
+    Map<Long, BigDecimal> paiementsMap = paiementRepository.sumMontantsByFactureReelleIds(factureIds)
+            .stream()
+            .collect(Collectors.toMap(
+                obj -> (Long) obj[0],
+                obj -> (BigDecimal) obj[1]
+            ));
+
+    // 5. Mapper vers DTO et nettoyer
     List<FactureReelleDTO> factureDTOs = factures.stream().map(facture -> {
         BigDecimal totalFacture = BigDecimal.valueOf(facture.getTotalFacture());
-        BigDecimal totalPaye = paiementRepository.sumMontantsByFactureReelle(facture.getId());
-        if (totalPaye == null) totalPaye = BigDecimal.ZERO;
-
+        BigDecimal totalPaye = paiementsMap.getOrDefault(facture.getId(), BigDecimal.ZERO);
         BigDecimal montantRestant = totalFacture.subtract(totalPaye);
+        
         FactureReelleDTO dto = new FactureReelleDTO(facture, montantRestant);
 
         // On ignore les champs inutiles
@@ -345,6 +373,7 @@ public void supprimerFactureReelleLiee(FactureProForma proforma) {
 }
 
 
+  @CacheEvict(value = "factures-reelles", allEntries = true)
   public FactureReelle enregistrerPaiement(Long factureId, BigDecimal montant, String modePaiement, HttpServletRequest request) {
     // 🔐 Vérification du token
     String token = request.getHeader("Authorization");
@@ -522,6 +551,7 @@ public void supprimerFactureReelleLiee(FactureProForma proforma) {
 
 //Modifier le statut d'une facture
 @Transactional
+@CacheEvict(value = "factures-reelles", allEntries = true)
 public FactureProForma annulerFactureReelle(FactureReelle modifications, HttpServletRequest request) {
     User user = authHelper.getAuthenticatedUserWithFallback(request);
 
@@ -662,6 +692,17 @@ public List<FactureReelleDTO> getFacturesParPeriode(Long userIdRequete, HttpServ
             return factureDTO; // Retourne le DTO créé
         })
         .collect(Collectors.toList());
+}
+
+// ==================== MÉTHODES D'INVALIDATION DU CACHE FACTURES RÉELLES ====================
+
+/**
+ * Invalide le cache des factures réelles
+ */
+@CacheEvict(value = "factures-reelles", allEntries = true)
+public void evictFacturesReellesCache() {
+    // Méthode pour vider le cache des factures réelles
+    System.out.println("🔄 Cache des factures réelles vidé");
 }
 
 }
