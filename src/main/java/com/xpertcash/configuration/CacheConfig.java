@@ -22,7 +22,8 @@ public class CacheConfig {
             "produits-boutique",
             "produits-entreprise", 
             "stock-historique",
-            "stock-entreprise"
+            "stock-entreprise",
+            "user-info"
         ));
         
         // Activer le stockage des valeurs null

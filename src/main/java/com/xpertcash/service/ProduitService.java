@@ -124,6 +124,8 @@ public class ProduitService {
 
 
     // Créer un nouveau produit dans plusieurs boutiques
+    @Transactional
+    @CacheEvict(value = {"produits-boutique", "produits-entreprise"}, allEntries = true)
     public List<ProduitDTO> createProduit(HttpServletRequest request, List<Long> boutiqueIds,
                                       List<Integer> quantites, List<Integer> seuilAlert, ProduitRequest produitRequest, boolean addToStock, String image) {
             // ✅ Extraction et validation du token
@@ -162,6 +164,10 @@ public class ProduitService {
             ProduitDTO dto = convertToProduitDTO(produit);
             produitsCreated.add(dto);
         }
+        
+        // Invalidation explicite du cache après création
+        evictProduitsBoutiqueCache();
+        evictProduitsEntrepriseCache();
         
         return produitsCreated;
     }
@@ -239,6 +245,7 @@ public class ProduitService {
     }
 
     //Methode pour ajuster la quantiter du produit en stock
+    @CacheEvict(value = {"produits-boutique", "produits-entreprise", "stock-historique"}, allEntries = true)
     public Facture ajouterStock(Long boutiqueId, Map<Long, Integer> produitsQuantites, String description, String codeFournisseur, Long fournisseurId, HttpServletRequest request) {
 
         User user = authHelper.getAuthenticatedUserWithFallback(request);
@@ -354,6 +361,7 @@ public class ProduitService {
     }
 
     // Méthode pour ajuster la quantité du produit en stock (retirer des produits)
+    @CacheEvict(value = {"produits-boutique", "produits-entreprise", "stock-historique"}, allEntries = true)
     public FactureDTO retirerStock(Long boutiqueId, Map<Long, Integer> produitsQuantites, String description, HttpServletRequest request) {
 
         // 🔐 Extraction et vérification du token JWT
@@ -533,6 +541,7 @@ public class ProduitService {
 }
 
      //Methode liste Historique sur Stock
+  @Cacheable(value = "stock-historique", key = "#produitId")
   public List<StockHistoryDTO> getStockHistory(Long produitId, HttpServletRequest request) {
 
     User user = authHelper.getAuthenticatedUserWithFallback(request);
@@ -681,6 +690,7 @@ public class ProduitService {
 
 
    // Update Produit
+    @CacheEvict(value = {"produits-boutique", "produits-entreprise"}, allEntries = true)
     public ProduitDTO updateProduct(Long produitId, ProduitRequest produitRequest, MultipartFile imageFile, boolean addToStock, HttpServletRequest request)
  {
     User admin = authHelper.getAuthenticatedUserWithFallback(request);
@@ -847,6 +857,7 @@ public class ProduitService {
 
     // Méthode pour "supprimer" (mettre dans la corbeille) le produit s'il n'est pas en stock
      @Transactional
+     @CacheEvict(value = {"produits-boutique", "produits-entreprise"}, allEntries = true)
     public void corbeille(Long produitId, HttpServletRequest request) {
         // 1. Vérification du produit
         Produit produit = produitRepository.findById(produitId)
@@ -899,6 +910,7 @@ public class ProduitService {
     }
 
     //Methoce Supprimer uniquement le stock
+    @CacheEvict(value = {"produits-boutique", "produits-entreprise", "stock-historique"}, allEntries = true)
     public void deleteStock(Long produitId) {
         Produit produit = produitRepository.findById(produitId)
                 .orElseThrow(() -> new RuntimeException("Produit non trouvé"));
@@ -920,6 +932,7 @@ public class ProduitService {
 
     // Méthode pour restaurer un ou plusieurs produit depuis la corbeille
     @Transactional
+    @CacheEvict(value = {"produits-boutique", "produits-entreprise"}, allEntries = true)
     public void restaurerProduitsDansBoutique(Long boutiqueId, List<Long> produitIds, HttpServletRequest request) {
 
         // Vérifications habituelles (token, user, permissions)
@@ -966,6 +979,7 @@ public class ProduitService {
 
     //Methode pour vide Corbeille dune boutique
     @Transactional
+    @CacheEvict(value = {"produits-boutique", "produits-entreprise"}, allEntries = true)
     public void viderCorbeille(Long boutiqueId, HttpServletRequest request) {
 
         // 1. Vérification du token
@@ -1012,6 +1026,9 @@ public class ProduitService {
             int page, 
             int size, 
             HttpServletRequest request) {
+        
+        // Log pour vérifier si le cache est utilisé
+        System.out.println("🔍 CACHE DEBUG: Exécution de getProduitsParStockPaginated - Boutique: " + boutiqueId + ", Page: " + page + ", Size: " + size);
         
         
         // --- 1. Validation des paramètres de pagination ---
@@ -1288,6 +1305,7 @@ public class ProduitService {
     }
 
     // Méthode scalable avec pagination pour récupérer les produits d'une entreprise
+    @Cacheable(value = "produits-entreprise", key = "#entrepriseId + '_' + #page + '_' + #size")
     public ProduitEntreprisePaginatedResponseDTO getProduitsParEntreprisePaginated(
             Long entrepriseId, 
             int page, 
@@ -1687,6 +1705,40 @@ public class ProduitService {
         sansCategory.setEntreprise(entreprise);
         
         return categorieRepository.save(sansCategory);
+    }
+
+    // ==================== MÉTHODES D'INVALIDATION DU CACHE ====================
+    
+    /**
+     * Invalide le cache des produits par boutique
+     */
+    @CacheEvict(value = "produits-boutique", allEntries = true)
+    public void evictProduitsBoutiqueCache() {
+        // Méthode pour vider le cache des produits par boutique
+    }
+    
+    /**
+     * Invalide le cache des produits par entreprise
+     */
+    @CacheEvict(value = "produits-entreprise", allEntries = true)
+    public void evictProduitsEntrepriseCache() {
+        // Méthode pour vider le cache des produits par entreprise
+    }
+    
+    /**
+     * Invalide le cache de l'historique des stocks
+     */
+    @CacheEvict(value = "stock-historique", allEntries = true)
+    public void evictStockHistoriqueCache() {
+        // Méthode pour vider le cache de l'historique des stocks
+    }
+    
+    /**
+     * Invalide tous les caches liés aux produits et stocks
+     */
+    @CacheEvict(value = {"produits-boutique", "produits-entreprise", "stock-historique", "stock-entreprise"}, allEntries = true)
+    public void evictAllProduitsCache() {
+        // Méthode pour vider tous les caches liés aux produits et stocks
     }
 
 }
