@@ -175,6 +175,138 @@ public ResponseEntity<?> consulterTempsEssaiModules(HttpServletRequest request) 
                 .body("Erreur lors de la vérification : " + e.getMessage());
         }
     }
+
+    //Endpoint pour renouveler un abonnement expiré
+    @PostMapping("/modules/renouveler")
+    public ResponseEntity<?> renouvelerAbonnement(
+            @RequestBody Map<String, Object> body,
+            HttpServletRequest request) {
+        
+        String token = request.getHeader("Authorization");
+        if (token == null || !token.startsWith("Bearer ")) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Token JWT manquant ou mal formaté");
+        }
+
+        User user = authHelper.getAuthenticatedUserWithFallback(request);
+        RoleType role = user.getRole().getName();
+        
+        if (role != RoleType.ADMIN && role != RoleType.MANAGER) {
+            return ResponseEntity.status(403).body("Accès refusé");
+        }
+
+        Entreprise entreprise = user.getEntreprise();
+        if (entreprise == null) {
+            return ResponseEntity.badRequest().body("Aucune entreprise associée à cet utilisateur");
+        }
+
+        try {
+            String nomModule = (String) body.get("nomModule");
+            int dureeMois = (Integer) body.get("dureeMois");
+            String numeroCarte = (String) body.get("numeroCarte");
+            String cvc = (String) body.get("cvc");
+            String dateExpiration = (String) body.get("dateExpiration");
+            String nomCompletProprietaire = (String) body.get("nomCompletProprietaire");
+            String emailProprietaireCarte = (String) body.get("emailProprietaireCarte");
+            String pays = (String) body.get("pays");
+            String adresse = (String) body.get("adresse");
+            String ville = (String) body.get("ville");
+
+            // Appeler le service pour renouveler l'abonnement
+            moduleActivationService.activerModuleAvecPaiement(
+                user.getId(),
+                nomModule,
+                dureeMois,
+                numeroCarte,
+                cvc,
+                dateExpiration,
+                nomCompletProprietaire,
+                emailProprietaireCarte,
+                pays,
+                adresse,
+                ville
+            );
+
+            return ResponseEntity.ok("Abonnement renouvelé avec succès !");
+            
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body("Erreur lors du renouvellement : " + e.getMessage());
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body("Erreur interne lors du renouvellement : " + e.getMessage());
+        }
+    }
+
+    //Endpoint pour consulter les abonnements actifs d'une entreprise
+    @GetMapping("/entreprise/abonnements")
+    public ResponseEntity<?> consulterAbonnementsActifs(HttpServletRequest request) {
+        
+        String token = request.getHeader("Authorization");
+        if (token == null || !token.startsWith("Bearer ")) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Token JWT manquant ou mal formaté");
+        }
+
+        User user = authHelper.getAuthenticatedUserWithFallback(request);
+        Entreprise entreprise = user.getEntreprise();
+        
+        if (entreprise == null) {
+            return ResponseEntity.badRequest().body("Aucune entreprise associée à cet utilisateur");
+        }
+
+        try {
+            List<Map<String, Object>> abonnements = moduleActivationService.consulterAbonnementsActifs(entreprise);
+            return ResponseEntity.ok(abonnements);
+            
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body("Erreur lors de la consultation : " + e.getMessage());
+        }
+    }
+
+    //Endpoint pour désactiver manuellement un module
+    @PostMapping("/modules/desactiver")
+    public ResponseEntity<?> desactiverModule(
+            @RequestBody Map<String, String> body,
+            HttpServletRequest request) {
+        
+        String token = request.getHeader("Authorization");
+        if (token == null || !token.startsWith("Bearer ")) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Token JWT manquant ou mal formaté");
+        }
+
+        User user = authHelper.getAuthenticatedUserWithFallback(request);
+        RoleType role = user.getRole().getName();
+        
+        if (role != RoleType.ADMIN) {
+            return ResponseEntity.status(403).body("Seuls les ADMIN peuvent désactiver des modules");
+        }
+
+        Entreprise entreprise = user.getEntreprise();
+        if (entreprise == null) {
+            return ResponseEntity.badRequest().body("Aucune entreprise associée à cet utilisateur");
+        }
+
+        try {
+            String codeModule = body.get("codeModule");
+            
+            if (codeModule == null || codeModule.trim().isEmpty()) {
+                return ResponseEntity.badRequest().body("Le code du module est requis");
+            }
+
+            boolean desactive = moduleActivationService.desactiverModulePourEntreprise(entreprise, codeModule);
+            
+            if (desactive) {
+                return ResponseEntity.ok("Module désactivé avec succès");
+            } else {
+                return ResponseEntity.badRequest().body("Module non trouvé ou déjà inactif");
+            }
+            
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body("Erreur lors de la désactivation : " + e.getMessage());
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body("Erreur interne lors de la désactivation : " + e.getMessage());
+        }
+    }
   
 
     //Total des paiements par module.

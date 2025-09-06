@@ -14,6 +14,7 @@ import java.util.stream.Collectors;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.xpertcash.DTOs.Module.ModuleDTO;
 import com.xpertcash.configuration.JwtUtil;
@@ -31,7 +32,6 @@ import com.xpertcash.repository.Module.ModuleRepository;
 import com.xpertcash.service.MailService;
 
 import jakarta.servlet.http.HttpServletRequest;
-import jakarta.transaction.Transactional;
 import com.xpertcash.service.AuthenticationHelper;
 
 @Service
@@ -464,6 +464,66 @@ public void activerModuleAvecPaiement(Long userId,
 
 public boolean dejaEssaiPourEntreprise(Entreprise entreprise, AppModule module) {
     return entrepriseModuleEssaiRepository.findByEntrepriseAndModule(entreprise, module).isPresent();
+}
+
+// Consulter les abonnements actifs d'une entreprise
+public List<Map<String, Object>> consulterAbonnementsActifs(Entreprise entreprise) {
+    List<EntrepriseModuleAbonnement> abonnements = entrepriseModuleAbonnementRepository.findByEntrepriseAndActifTrue(entreprise);
+    
+    return abonnements.stream()
+        .map(abonnement -> {
+            Map<String, Object> abonnementData = new HashMap<>();
+            abonnementData.put("id", abonnement.getId());
+            abonnementData.put("moduleCode", abonnement.getModule().getCode());
+            abonnementData.put("moduleNom", abonnement.getModule().getNom());
+            abonnementData.put("dateDebut", abonnement.getDateDebut());
+            abonnementData.put("dateFin", abonnement.getDateFin());
+            abonnementData.put("actif", abonnement.isActif());
+            abonnementData.put("joursRestants", calculerJoursRestants(abonnement.getDateFin()));
+            return abonnementData;
+        })
+        .collect(Collectors.toList());
+}
+
+// Calculer les jours restants avant expiration
+private long calculerJoursRestants(LocalDateTime dateFin) {
+    if (dateFin == null) return -1; // Abonnement permanent
+    
+    LocalDateTime maintenant = LocalDateTime.now();
+    if (dateFin.isBefore(maintenant)) return 0; // Expiré
+    
+    return java.time.Duration.between(maintenant, dateFin).toDays();
+}
+
+// Désactiver manuellement un module pour une entreprise
+@Transactional
+public boolean desactiverModulePourEntreprise(Entreprise entreprise, String codeModule) {
+    Optional<AppModule> moduleOpt = moduleRepository.findByCode(codeModule);
+    if (moduleOpt.isEmpty()) {
+        return false; // Module non trouvé
+    }
+    
+    AppModule module = moduleOpt.get();
+    
+    // Retirer le module de la liste des modules actifs
+    boolean moduleRetire = entreprise.getModulesActifs().remove(module);
+    
+    // Désactiver l'abonnement s'il existe
+    Optional<EntrepriseModuleAbonnement> abonnementOpt = entrepriseModuleAbonnementRepository
+            .findByEntrepriseAndModuleAndActifTrue(entreprise, module);
+    
+    if (abonnementOpt.isPresent()) {
+        EntrepriseModuleAbonnement abonnement = abonnementOpt.get();
+        abonnement.setActif(false);
+        entrepriseModuleAbonnementRepository.save(abonnement);
+    }
+    
+    // Sauvegarder l'entreprise si le module a été retiré
+    if (moduleRetire) {
+        entrepriseRepository.save(entreprise);
+    }
+    
+    return moduleRetire;
 }
 
 }
