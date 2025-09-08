@@ -74,7 +74,7 @@ public class FactureProformaController {
             HttpServletRequest request) {
 
         try {
-            // Appel du service pour ajouter la facture
+            // Appel du serviceupdateFactureProforma pour ajouter la facture
             FactureProForma nouvelleFacture = factureProformaService.ajouterFacture(facture, remisePourcentage, appliquerTVA, request);
 
             // Retourner la facture créée en réponse HTTP 201 (CREATED)
