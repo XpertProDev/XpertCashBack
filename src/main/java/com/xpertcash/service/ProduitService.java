@@ -174,8 +174,8 @@ public class ProduitService {
     
     // Méthode helper pour créer un seul produit
     private Produit createSingleProduit(ProduitRequest produitRequest, Boutique boutique, Integer quantite, Integer seuilAlert, boolean addToStock, String image) {
-        // Générer code générique unique basé sur le nom du produit
-        String codeGenerique = "PROD_" + System.currentTimeMillis();
+        // Générer code générique unique par entreprise (6 caractères)
+        String codeGenerique = generateUniqueCode(boutique.getEntreprise().getId());
         
         // Créer le produit
         Produit produit = new Produit();
@@ -1739,6 +1739,42 @@ public class ProduitService {
     @CacheEvict(value = {"produits-boutique", "produits-entreprise", "stock-historique", "stock-entreprise"}, allEntries = true)
     public void evictAllProduitsCache() {
         // Méthode pour vider tous les caches liés aux produits et stocks
+    }
+
+    /**
+     * Génère un code unique de 6 caractères pour une entreprise
+     * Format: P + ID entreprise + 3 chiffres (timestamp + compteur si nécessaire)
+     */
+    private String generateUniqueCode(Long entrepriseId) {
+        String baseCode = "P" + entrepriseId;
+        String timestamp = String.valueOf(System.currentTimeMillis()).substring(10);
+        String codeGenerique = baseCode + timestamp;
+        // Vérifier si ce code existe déjà dans l'entreprise
+        int attempts = 0;
+        while (codeExistsInEntreprise(codeGenerique, entrepriseId) && attempts < 100) {
+            // Si le code existe, ajouter un compteur
+            attempts++;
+            String counter = String.format("%05d", attempts);
+            codeGenerique = baseCode + counter;
+        }
+        
+        if (attempts >= 100) {
+            // En cas d'échec, utiliser un timestamp plus long
+            codeGenerique = baseCode + String.valueOf(System.nanoTime()).substring(10);
+        }
+        
+        return codeGenerique;
+    }
+    
+    /**
+     * Vérifie si un code générique existe déjà dans une entreprise
+     */
+    private boolean codeExistsInEntreprise(String codeGenerique, Long entrepriseId) {
+        List<Produit> produits = produitRepository.findByCodeGenerique(codeGenerique);
+        return produits.stream()
+                .anyMatch(produit -> produit.getBoutique() != null 
+                        && produit.getBoutique().getEntreprise() != null
+                        && produit.getBoutique().getEntreprise().getId().equals(entrepriseId));
     }
 
 }

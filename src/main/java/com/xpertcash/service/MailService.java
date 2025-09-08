@@ -380,7 +380,7 @@ public class MailService {
                 <h4 style="text-align: left; font-size: 10px">Coordonnées du titulaire de la carte :</h4>
                 <p style="text-align: left; font-size: 10px;">
                     <span>%s</span><br>
-                    %s, %s
+                    %s, %s, %s
                 </p>
 
                 <p style="text-align: left; font-size: 10px;">

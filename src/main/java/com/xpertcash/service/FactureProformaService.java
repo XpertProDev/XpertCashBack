@@ -59,7 +59,6 @@ import jakarta.transaction.Transactional;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import com.xpertcash.service.AuthenticationHelper;
 
 @Service
 public class FactureProformaService {
@@ -252,8 +251,33 @@ public class FactureProformaService {
 
     facture.setUtilisateurCreateur(user);
 
+    // Sauvegarder la facture d'abord pour avoir un ID
+    System.out.println("🔄 Sauvegarde de la facture...");
+    FactureProForma factureSauvegardee = factureProformaRepository.save(facture);
+    System.out.println("✅ Facture sauvegardée avec ID: " + factureSauvegardee.getId());
 
-    return factureProformaRepository.save(facture);
+    // Enregistrer l'action "Création" dans l'historique
+    try {
+        System.out.println("🔄 Enregistrement de l'historique...");
+        // Formater les montants (avec point comme séparateur de milliers)
+        String montantHTFormate = String.format(Locale.GERMAN, "%,.0f", factureSauvegardee.getTotalHT());
+        String montantTTCFormate = String.format(Locale.GERMAN, "%,.0f", factureSauvegardee.getTotalFacture());
+        
+        factProHistoriqueService.enregistrerActionHistorique(
+                factureSauvegardee,
+                user,
+                "Création",
+                "Facture proforma cré   e avec un montant total HT de " + montantHTFormate + "\n" +
+                "montant total TTC à payer de " + montantTTCFormate
+        );
+        System.out.println("✅ Historique enregistré avec succès");
+    } catch (Exception e) {
+        // Log l'erreur mais ne pas faire échouer la création de facture
+        System.err.println("❌ Erreur lors de l'enregistrement de l'historique de création: " + e.getMessage());
+        e.printStackTrace();
+    }
+
+    return factureSauvegardee;
 }
 
     // Méthode pour générer un numéro de facture unique
@@ -673,11 +697,14 @@ public class FactureProformaService {
 
         // 📝 Enregistrement de l'action "Modification" uniquement si le montant a changé
         if (montantTotalHT != ancienTotalHT) {
+            // Formater le montant
+            String montantFormate = String.format(Locale.GERMAN, "%,.0f", montantTotalHT);
+            
             factProHistoriqueService.enregistrerActionHistorique(
                     facture,
                     user,
                     "Modification",
-                    "La facture a été modifiée (montant: " + montantTotalHT + ")"
+                    "La facture a été modifiée (montant: " + montantFormate + ")"
             );
         }
 
