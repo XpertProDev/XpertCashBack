@@ -202,26 +202,46 @@ public class FactureProformaService {
 
     double montantTotalHT = 0;
     if (facture.getLignesFacture() != null) {
-        for (LigneFactureProforma ligne : facture.getLignesFacture()) {
-            Produit produit = produitRepository.findById(ligne.getProduit().getId())
-                    .orElseThrow(() -> new RuntimeException("Produit avec ID " + ligne.getProduit().getId() + " introuvable !"));
+            for (LigneFactureProforma ligne : facture.getLignesFacture()) {
+                Produit produit = produitRepository.findById(ligne.getProduit().getId())
+                        .orElseThrow(() -> new RuntimeException("Produit avec ID " + ligne.getProduit().getId() + " introuvable !"));
 
-            ligne.setFactureProForma(facture);
-            ligne.setProduit(produit);
-            ligne.setPrixUnitaire(produit.getPrixVente());
+                ligne.setFactureProForma(facture);
+                ligne.setProduit(produit);
 
-            ligne.setMontantTotal(ligne.getQuantite() * ligne.getPrixUnitaire());
+                // Traitement du prix unitaire comme la ligneDescription
+                if (ligne.getPrixUnitaire() != null) {
+                    // Si un prix unitaire est fourni, l'utiliser directement
+                    ligne.setPrixUnitaire(ligne.getPrixUnitaire());
+                } else {
+                    // Sinon, utiliser le prix du produit
+                    ligne.setPrixUnitaire(produit.getPrixVente());
+                }
 
-            if (ligne.getLigneDescription() != null) {
-                ligne.setLigneDescription(ligne.getLigneDescription());
-            } else {
-                ligne.setLigneDescription(produit.getDescription());
+                // Pour les produits de type SERVICE, mettre à jour le prix global du produit
+                if ("SERVICE".equals(produit.getTypeProduit()) &&
+                        ligne.getPrixUnitaire() != null &&
+                        !ligne.getPrixUnitaire().equals(produit.getPrixVente())) {
+
+                    // Mettre à jour le prix du produit global
+                    produit.setPrixVente(ligne.getPrixUnitaire());
+                    produit.setLastUpdated(LocalDateTime.now());
+                    produitRepository.save(produit);
+                }
+
+                ligne.setMontantTotal(ligne.getQuantite() * ligne.getPrixUnitaire());
+
+                // Traitement de la description (comme avant)
+                if (ligne.getLigneDescription() != null) {
+                    ligne.setLigneDescription(ligne.getLigneDescription());
+                } else {
+                    ligne.setLigneDescription(produit.getDescription());
+                }
+
+                // Ajout au montant total HT
+                montantTotalHT += ligne.getMontantTotal();
             }
-
-            // Ajout au montant total HT
-            montantTotalHT += ligne.getMontantTotal();
         }
-    }
 
     // Calcul de la remise
     double remiseMontant = (remisePourcentage > 0) ? montantTotalHT * (remisePourcentage / 100) : 0;

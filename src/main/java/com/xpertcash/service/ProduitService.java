@@ -1033,7 +1033,7 @@ public class ProduitService {
         
         // --- 1. Validation des paramètres de pagination ---
         if (page < 0) page = 0;
-        if (size <= 0) size = 20; // Taille par défaut
+        if (size <= 0) size = 10; // Taille par défaut
         if (size > 100) size = 100; // Limite maximale pour éviter la surcharge
         
         // Validation de l'ID de la boutique
@@ -1314,7 +1314,7 @@ public class ProduitService {
         
         // --- 1. Validation des paramètres de pagination ---
         if (page < 0) page = 0;
-        if (size <= 0) size = 20; // Taille par défaut
+        if (size <= 0) size = 10; // Taille par défaut
         if (size > 100) size = 100; // Limite maximale pour éviter la surcharge
         
         // Validation de l'ID de l'entreprise

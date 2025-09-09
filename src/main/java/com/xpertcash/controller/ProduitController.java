@@ -562,13 +562,13 @@ public ResponseEntity<?> updateProduit(
     public ResponseEntity<ProduitEntreprisePaginatedResponseDTO> getProduitsParEntreprisePaginated(
             @PathVariable Long entrepriseId,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(defaultValue = "10") int size,
             HttpServletRequest request) {
         
         try {
             // Validation des paramètres
             if (page < 0) page = 0;
-            if (size <= 0) size = 20;
+            if (size <= 0) size = 10;
             if (size > 100) size = 100; // Limite maximale
             
             ProduitEntreprisePaginatedResponseDTO response = produitService.getProduitsParEntreprisePaginated(
@@ -587,13 +587,13 @@ public ResponseEntity<?> updateProduit(
     public ResponseEntity<ProduitStockPaginatedResponseDTO> getProduitsParStockPaginated(
             @PathVariable Long boutiqueId,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(defaultValue = "10") int size,
             HttpServletRequest request) {
         
         try {
             // Validation des paramètres
             if (page < 0) page = 0;
-            if (size <= 0) size = 20;
+            if (size <= 0) size = 10;
             if (size > 100) size = 100; // Limite maximale
             
             ProduitStockPaginatedResponseDTO response = produitService.getProduitsParStockPaginated(

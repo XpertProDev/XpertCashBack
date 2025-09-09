@@ -4,6 +4,5 @@ public enum VenteStatus {
     EN_COURS,
     REMBOURSEE,
     PARTIELLEMENT_REMBOURSEE,
-    ANNULEE,
     PAYEE
 }
