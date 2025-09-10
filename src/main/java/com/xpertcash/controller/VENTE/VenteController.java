@@ -167,4 +167,33 @@ public ResponseEntity<List<VenteParClientResponse>> getVentesClientsAffilies(Htt
     return ResponseEntity.ok(ventes);
 }
 
+// ==================== ENDPOINTS DE GESTION DU CACHE VENTES ====================
+
+/**
+ * Endpoint pour vider le cache des statistiques de ventes
+ * 
+ * ⚠️  ATTENTION : Ce cache se vide AUTOMATIQUEMENT lors des ventes et remboursements.
+ * Utiliser uniquement pour :
+ * - Debug/Test des performances
+ * - Maintenance après modifications externes
+ * - Résolution de problèmes de cohérence
+ * 
+ * Ne PAS appeler en routine !
+ */
+@PostMapping("/cache/evict/ventes-stats")
+public ResponseEntity<Map<String, String>> evictVentesStatsCache() {
+    try {
+        venteService.evictVentesStatsCache();
+        Map<String, String> response = new HashMap<>();
+        response.put("message", "Cache des statistiques de ventes vidé avec succès");
+        response.put("timestamp", java.time.LocalDateTime.now().toString());
+        response.put("info", "⚠️ Ce cache se vide automatiquement lors des ventes/remboursements. Ne pas appeler en routine !");
+        return ResponseEntity.ok(response);
+    } catch (Exception e) {
+        Map<String, String> error = new HashMap<>();
+        error.put("error", "Erreur lors du vidage du cache: " + e.getMessage());
+        return ResponseEntity.status(500).body(error);
+    }
+}
+
 }

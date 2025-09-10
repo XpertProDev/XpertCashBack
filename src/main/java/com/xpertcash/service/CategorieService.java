@@ -9,6 +9,8 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
@@ -49,6 +51,7 @@ public class CategorieService {
     @Autowired EntrepriseRepository entrepriseRepository;
 
      // Ajouter une nouvelle catégorie (seul ADMIN peut le faire)
+  @CacheEvict(value = "categories", allEntries = true)
   public Categorie createCategorie(String nom, Long entrepriseId) {
     if (categorieRepository.existsByNom(nom)) {
         throw new RuntimeException("Cette catégorie existe déjà !");
@@ -69,6 +72,7 @@ public class CategorieService {
 
 
     // Récupérer toutes les catégories avec comptage des produits (sans pagination)
+    @Cacheable(value = "categories", key = "#request.getHeader('Authorization').hashCode() + '_all_categories'")
     public List<CategorieResponseDTO> getAllCategoriesWithProduitCount(HttpServletRequest request) {
         // --- JWT & utilisateur inchangé ---
         String token = request.getHeader("Authorization");
@@ -184,6 +188,7 @@ public class CategorieService {
     }
 
     // Récupérer toutes les catégories et ses produits avec pagination (méthode scalable pour SaaS)
+    @Cacheable(value = "categories", key = "#request.getHeader('Authorization').hashCode() + '_paginated_' + #page + '_' + #size")
     public CategoriePaginatedResponseDTO getCategoriesWithProduitCountPaginated(HttpServletRequest request, int page, int size) {
         // --- JWT & utilisateur inchangé ---
         String token = request.getHeader("Authorization");
@@ -331,6 +336,7 @@ private ProduitDetailsResponseDTO toProduitDTO(Produit produit) {
 
 
      // Supprimer une catégorie
+   @CacheEvict(value = "categories", allEntries = true)
    public void supprimerCategorieSiVide(Long categorieId, HttpServletRequest request) {
     // 1. Récupérer l'utilisateur depuis le token
     String token = request.getHeader("Authorization");
@@ -369,6 +375,7 @@ private ProduitDetailsResponseDTO toProduitDTO(Produit produit) {
 
 
     // Mettre à jour categorie
+    @CacheEvict(value = "categories", allEntries = true)
     public Categorie updateCategorie(HttpServletRequest request, Long categorieId, Categorie categorieDetails) {
         try {
             Categorie categorie = categorieRepository.findById(categorieId)
@@ -434,5 +441,15 @@ private ProduitDetailsResponseDTO toProduitDTO(Produit produit) {
         return result;
     }
 
-  
+// ==================== MÉTHODES D'INVALIDATION DU CACHE CATÉGORIES ====================
+
+/**
+ * Invalide le cache des catégories
+ */
+@CacheEvict(value = "categories", allEntries = true)
+public void evictCategoriesCache() {
+    // Méthode pour vider le cache des catégories
+    System.out.println("🔄 Cache des catégories vidé");
+}
+
 }

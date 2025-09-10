@@ -44,15 +44,23 @@ public class FactProHistoriqueService {
 
 
 public void enregistrerActionHistorique(FactureProForma facture, User user, String action, String details) {
-    FactProHistoriqueAction historique = new FactProHistoriqueAction();
-    historique.setFacture(facture);
-    historique.setUtilisateur(user);
-    historique.setAction(action);
-    historique.setDateAction(LocalDateTime.now());
-    historique.setMontantFacture(BigDecimal.valueOf(facture.getTotalHT()));
-    historique.setDetails(details);
-
-     factProHistoriqueActionRepository.save(historique);
+    try {
+        System.out.println("🔄 Insertion historique - Action: " + action + ", Facture ID: " + facture.getId() + ", User ID: " + user.getId());
+        // Utiliser la requête SQL native pour éviter les références circulaires
+        factProHistoriqueActionRepository.insertHistoriqueAction(
+            action,
+            LocalDateTime.now(),
+            details,
+            facture.getId(),
+            BigDecimal.valueOf(facture.getTotalHT()),
+            user.getId()
+        );
+        System.out.println("✅ Insertion historique réussie");
+    } catch (Exception e) {
+        // Log l'erreur mais ne pas faire échouer la création de facture
+        System.err.println("❌ Erreur lors de l'enregistrement de l'historique: " + e.getMessage());
+        e.printStackTrace();
+    }
 }
 
 

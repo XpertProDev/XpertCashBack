@@ -7,6 +7,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
 
 import com.xpertcash.configuration.JwtUtil;
@@ -136,6 +137,7 @@ public class RoleService {
 
 
     @Transactional
+    @CacheEvict(value = "user-info", key = "#userId")
     public User updateUserRole(String token, Long userId, String newRoleName) {
         // Vérifier la présence du token JWT
         if (token == null || !token.startsWith("Bearer ")) {

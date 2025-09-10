@@ -10,6 +10,8 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
@@ -57,7 +59,6 @@ import jakarta.transaction.Transactional;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import com.xpertcash.service.AuthenticationHelper;
 
 @Service
 public class FactureProformaService {
@@ -110,6 +111,7 @@ public class FactureProformaService {
 //    private NotificationService notificationService;
     
     // Methode pour creer une facture pro forma
+    @CacheEvict(value = "factures-proforma", allEntries = true)
     public FactureProForma ajouterFacture(FactureProForma facture, Double remisePourcentage, Boolean appliquerTVA, HttpServletRequest request) {
     if (facture == null) {
         throw new RuntimeException("La facture ne peut pas être vide !");
@@ -269,8 +271,33 @@ public class FactureProformaService {
 
     facture.setUtilisateurCreateur(user);
 
+    // Sauvegarder la facture d'abord pour avoir un ID
+    System.out.println("🔄 Sauvegarde de la facture...");
+    FactureProForma factureSauvegardee = factureProformaRepository.save(facture);
+    System.out.println("✅ Facture sauvegardée avec ID: " + factureSauvegardee.getId());
 
-    return factureProformaRepository.save(facture);
+    // Enregistrer l'action "Création" dans l'historique
+    try {
+        System.out.println("🔄 Enregistrement de l'historique...");
+        // Formater les montants (avec point comme séparateur de milliers)
+        String montantHTFormate = String.format(Locale.GERMAN, "%,.0f", factureSauvegardee.getTotalHT());
+        String montantTTCFormate = String.format(Locale.GERMAN, "%,.0f", factureSauvegardee.getTotalFacture());
+        
+        factProHistoriqueService.enregistrerActionHistorique(
+                factureSauvegardee,
+                user,
+                "Création",
+                "Facture proforma cré   e avec un montant total HT de " + montantHTFormate + "\n" +
+                "montant total TTC à payer de " + montantTTCFormate
+        );
+        System.out.println("✅ Historique enregistré avec succès");
+    } catch (Exception e) {
+        // Log l'erreur mais ne pas faire échouer la création de facture
+        System.err.println("❌ Erreur lors de l'enregistrement de l'historique de création: " + e.getMessage());
+        e.printStackTrace();
+    }
+
+    return factureSauvegardee;
 }
 
     // Méthode pour générer un numéro de facture unique
@@ -331,6 +358,7 @@ public class FactureProformaService {
 
     // Méthode pour modifier une facture pro forma
     @Transactional
+    @CacheEvict(value = "factures-proforma", allEntries = true)
     public FactureProFormaDTO modifierFacture(Long factureId, Double remisePourcentage, Boolean appliquerTVA, FactureProForma modifications, List<Long> idsApprobateurs, HttpServletRequest request) {
         // 🔐 Récupération de la facture
         FactureProForma facture = factureProformaRepository.findById(factureId)
@@ -689,11 +717,14 @@ public class FactureProformaService {
 
         // 📝 Enregistrement de l'action "Modification" uniquement si le montant a changé
         if (montantTotalHT != ancienTotalHT) {
+            // Formater le montant
+            String montantFormate = String.format(Locale.GERMAN, "%,.0f", montantTotalHT);
+            
             factProHistoriqueService.enregistrerActionHistorique(
                     facture,
                     user,
                     "Modification",
-                    "La facture a été modifiée (montant: " + montantTotalHT + ")"
+                    "La facture a été modifiée (montant: " + montantFormate + ")"
             );
         }
 
@@ -718,6 +749,7 @@ public class FactureProformaService {
 
     //Supression dune facture proforma en brouillon
      @Transactional
+     @CacheEvict(value = "factures-proforma", allEntries = true)
     public void supprimerFactureProforma(Long factureId, HttpServletRequest request) {
         User user = authHelper.getAuthenticatedUserWithFallback(request);
 
@@ -764,6 +796,7 @@ public class FactureProformaService {
 
     // Méthode scalable avec pagination pour récupérer les factures proforma d'une entreprise
     @Transactional
+    @Cacheable(value = "factures-proforma", key = "#userIdRequete + '_' + #page + '_' + #size")
     public FactureProformaPaginatedResponseDTO getFacturesParEntrepriseParUtilisateurPaginated(
             Long userIdRequete, 
             int page, 

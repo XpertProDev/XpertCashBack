@@ -9,10 +9,12 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.xpertcash.entity.Enum.TypeProduit;
 
 import jakarta.persistence.*;
-import lombok.Data;
+import lombok.Getter;
+import lombok.Setter;
 
 @Entity
-@Data
+@Getter
+@Setter
 @Table(
     uniqueConstraints = @UniqueConstraint(columnNames = {"codeGenerique", "boutique_id"})
 )

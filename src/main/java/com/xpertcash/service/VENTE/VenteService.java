@@ -14,6 +14,8 @@ import com.xpertcash.repository.VENTE.VenteProduitRepository;
 import com.xpertcash.repository.VENTE.VenteRepository;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -80,6 +82,7 @@ public class VenteService {
 
 
  @Transactional
+@CacheEvict(value = {"ventes-stats", "produits-boutique", "produits-entreprise"}, allEntries = true)
 public VenteResponse enregistrerVente(VenteRequest request, HttpServletRequest httpRequest) {
     // 🔐 Extraction et vérification du token JWT
     String token = httpRequest.getHeader("Authorization");
@@ -286,6 +289,7 @@ public VenteResponse enregistrerVente(VenteRequest request, HttpServletRequest h
 
     //Remboursement
     @Transactional
+    @CacheEvict(value = {"ventes-stats", "produits-boutique", "produits-entreprise"}, allEntries = true)
     public VenteResponse rembourserVente(RemboursementRequest request, HttpServletRequest httpRequest) {
         String token = httpRequest.getHeader("Authorization");
         if (token == null || !token.startsWith("Bearer ")) {
@@ -641,6 +645,7 @@ public List<VenteResponse> getVentesByVendeur(Long vendeurId, HttpServletRequest
     }
 
 @Transactional(readOnly = true)
+@Cacheable(value = "ventes-stats", key = "#entrepriseId + '_ventes_jour_' + T(java.time.LocalDate).now()")
 public double getMontantTotalVentesDuJour(Long entrepriseId) {
     LocalDate today = LocalDate.now();
     LocalDateTime startOfDay = today.atStartOfDay();
@@ -652,19 +657,20 @@ public double getMontantTotalVentesDuJour(Long entrepriseId) {
             endOfDay
     );
 
+    // Optimisation N+1 : Récupérer tous les remboursements d'un coup
+    List<Long> venteIds = ventes.stream().map(Vente::getId).collect(Collectors.toList());
+    Map<Long, Double> remboursementsMap = venteHistoriqueRepository.sumRemboursementsByVenteIds(venteIds)
+            .stream()
+            .collect(Collectors.toMap(
+                obj -> (Long) obj[0],
+                obj -> ((Number) obj[1]).doubleValue()
+            ));
+
     double total = 0.0;
 
     for (Vente vente : ventes) {
         double montantVente = vente.getMontantTotal() != null ? vente.getMontantTotal() : 0.0;
-
-        // Déduire les remboursements
-        double remboursements = venteHistoriqueRepository
-                .findByVenteId(vente.getId())
-                .stream()
-                .filter(h -> h.getAction().equals("REMBOURSEMENT_VENTE"))
-                .mapToDouble(VenteHistorique::getMontant)
-                .sum();
-
+        double remboursements = remboursementsMap.getOrDefault(vente.getId(), 0.0);
         total += montantVente - remboursements;
     }
 
@@ -698,6 +704,7 @@ public double getMontantTotalVentesDuMoisConnecte(HttpServletRequest request) {
 }
 
 @Transactional(readOnly = true)
+@Cacheable(value = "ventes-stats", key = "#entrepriseId + '_ventes_mois_' + T(java.time.LocalDate).now().getMonthValue()")
 public double getMontantTotalVentesDuMois(Long entrepriseId) {
     LocalDate today = LocalDate.now();
     LocalDateTime startOfMonth = today.withDayOfMonth(1).atStartOfDay();
@@ -709,19 +716,20 @@ public double getMontantTotalVentesDuMois(Long entrepriseId) {
             endOfMonth
     );
 
+    // Optimisation N+1 : Récupérer tous les remboursements d'un coup
+    List<Long> venteIds = ventes.stream().map(Vente::getId).collect(Collectors.toList());
+    Map<Long, Double> remboursementsMap = venteHistoriqueRepository.sumRemboursementsByVenteIds(venteIds)
+            .stream()
+            .collect(Collectors.toMap(
+                obj -> (Long) obj[0],
+                obj -> ((Number) obj[1]).doubleValue()
+            ));
+
     double total = 0.0;
 
     for (Vente vente : ventes) {
         double montantVente = vente.getMontantTotal() != null ? vente.getMontantTotal() : 0.0;
-
-        // Déduire les remboursements
-        double remboursements = venteHistoriqueRepository
-                .findByVenteId(vente.getId())
-                .stream()
-                .filter(h -> h.getAction().equals("REMBOURSEMENT_VENTE"))
-                .mapToDouble(VenteHistorique::getMontant)
-                .sum();
-
+        double remboursements = remboursementsMap.getOrDefault(vente.getId(), 0.0);
         total += montantVente - remboursements;
     }
 
@@ -752,6 +760,7 @@ public double getMontantTotalVentesDuMois(Long entrepriseId) {
     }
 
     @Transactional(readOnly = true)
+    @Cacheable(value = "ventes-stats", key = "#entrepriseId + '_benefice_global'")
     public double calculerBeneficeNetEntreprise(Long entrepriseId) {
         List<Vente> ventes = venteRepository.findByBoutiqueEntrepriseId(entrepriseId);
         double beneficeNet = 0.0;
@@ -906,6 +915,15 @@ public double calculerBeneficeNetAnnuel(Long entrepriseId) {
             endOfYear
     );
 
+    // Optimisation N+1 : Récupérer tous les remboursements d'un coup
+    List<Long> venteIds = ventes.stream().map(Vente::getId).collect(Collectors.toList());
+    Map<Long, Double> remboursementsMap = venteHistoriqueRepository.sumRemboursementsByVenteIds(venteIds)
+            .stream()
+            .collect(Collectors.toMap(
+                obj -> (Long) obj[0],
+                obj -> ((Number) obj[1]).doubleValue()
+            ));
+
     double beneficeNet = 0.0;
 
     for (Vente vente : ventes) {
@@ -918,13 +936,7 @@ public double calculerBeneficeNetAnnuel(Long entrepriseId) {
         }
 
         // Déduire les remboursements
-        double remboursements = venteHistoriqueRepository
-                .findByVenteId(vente.getId())
-                .stream()
-                .filter(h -> h.getAction().equals("REMBOURSEMENT_VENTE"))
-                .mapToDouble(VenteHistorique::getMontant)
-                .sum();
-
+        double remboursements = remboursementsMap.getOrDefault(vente.getId(), 0.0);
         beneficeVente -= remboursements;
         beneficeNet += beneficeVente;
     }
@@ -932,7 +944,16 @@ public double calculerBeneficeNetAnnuel(Long entrepriseId) {
     return beneficeNet;
 }
 
+// ==================== MÉTHODES D'INVALIDATION DU CACHE VENTES ====================
 
+/**
+ * Invalide le cache des statistiques de ventes
+ */
+@CacheEvict(value = "ventes-stats", allEntries = true)
+public void evictVentesStatsCache() {
+    // Méthode pour vider le cache des statistiques de ventes
+    System.out.println("🔄 Cache des statistiques de ventes vidé");
+}
 
 // Methode pour Achat de client 
 
