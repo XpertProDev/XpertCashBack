@@ -78,10 +78,6 @@ public class ProduitService {
     private BoutiqueRepository boutiqueRepository;
 
 
-
-    @Autowired
-    private UsersRepository usersRepository;
-
     @Autowired
     private ProduitRepository produitRepository;
 
@@ -686,7 +682,6 @@ public class ProduitService {
                 })
                 .collect(Collectors.toList());
     }
-
 
 
    // Update Produit

@@ -1108,9 +1108,15 @@ public List<FactureProFormaDTO> getFacturesParPeriode(Long userIdRequete, HttpSe
             throw new RuntimeException("Type de période invalide.");
     }
 
-    // 🔹 Récupérer toutes les factures de l’entreprise dans la période avec les relations nécessaires
+    // 🔹 Récupérer toutes les factures de l'entreprise dans la période avec les relations nécessaires
     List<FactureProForma> factures = factureProformaRepository
             .findFacturesAvecRelationsParEntrepriseEtPeriode(entrepriseCourante.getId(), dateStart, dateEnd);
+
+    // 🔹 Charger les lignesFacture pour chaque facture (évite MultipleBagFetchException)
+    for (FactureProForma facture : factures) {
+        // Force le chargement des lignesFacture
+        facture.getLignesFacture().size();
+    }
 
     // 🔹 Filtrage selon les rôles et permissions
             if (!(isAdmin || isManager)) {

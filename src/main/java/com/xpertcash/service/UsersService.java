@@ -384,26 +384,29 @@ public class UsersService {
 
     // Activation du compte via le lien d'activation (email + code PIN)
     @Transactional
-    public void activateAccount(String email, String code) {
-                User user = usersRepository.findByEmail(email)
-                        .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+    @CacheEvict(value = "user-info", key = "#result.id", condition = "#result != null")
+    public User activateAccount(String email, String code) {
+        User user = usersRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
 
-                if (!user.getActivationCode().equals(code)) {
-                    throw new RuntimeException("Code d'activation invalide.");
-                }
+        if (!user.getActivationCode().equals(code)) {
+            throw new RuntimeException("Code d'activation invalide.");
+        }
 
-                // Activer le compte de l'utilisateur
-                user.setActivatedLien(true);
-                user.setEnabledLien(true);
-                usersRepository.save(user);
+        // Activer le compte de l'utilisateur
+        user.setActivatedLien(true);
+        user.setEnabledLien(true);
+        user = usersRepository.save(user);
 
-                // Si c'est un ADMIN, activer tous ses employés
-                if (user.getRole() != null && user.getRole().getName().equals(RoleType.ADMIN)) {
-                    List<User> usersToActivate = usersRepository.findByEntreprise(user.getEntreprise());
-                    usersToActivate.forEach(u -> u.setEnabledLien(true));
-                    usersRepository.saveAll(usersToActivate);
-                }
-            }
+        // Si c'est un ADMIN, activer tous ses employés
+        if (user.getRole() != null && user.getRole().getName().equals(RoleType.ADMIN)) {
+            List<User> usersToActivate = usersRepository.findByEntreprise(user.getEntreprise());
+            usersToActivate.forEach(u -> u.setEnabledLien(true));
+            usersRepository.saveAll(usersToActivate);
+        }
+        
+        return user;
+    }
 
     // Pour récupérer le statut du compte d'un utilisateur
     public Map<String, Object> getAccountStatus(String email) {

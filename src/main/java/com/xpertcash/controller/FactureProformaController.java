@@ -329,25 +329,30 @@ public class FactureProformaController {
 
 
     // Endpoint pour trier
-@GetMapping("/mes-factures/par-periode")
-public ResponseEntity<List<FactureProFormaDTO>> getFacturesParPeriode(
-        @RequestParam(name = "type") String typePeriode,
-        @RequestParam(name = "dateDebut", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateDebut,
-        @RequestParam(name = "dateFin", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateFin,
+    @GetMapping("/mes-factures/par-periode")
+public ResponseEntity<?> getFacturesParPeriode(
+        @RequestParam String type,
+        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateDebut,
+        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateFin,
         HttpServletRequest request
 ) {
     try {
         User user = authHelper.getAuthenticatedUserWithFallback(request);
-        // Appeler le service pour obtenir les factures en fonction de la période
-        List<FactureProFormaDTO> facturesDTO = factureProformaService.getFacturesParPeriode(
-                user.getId(), request, typePeriode, dateDebut, dateFin);
         
-        return ResponseEntity.ok(facturesDTO);  // Retourner la liste des DTOs
+        List<FactureProFormaDTO> facturesDTO = factureProformaService.getFacturesParPeriode(
+                user.getId(), request, type, dateDebut, dateFin
+        );
+
+        return ResponseEntity.ok(facturesDTO);
     } catch (Exception e) {
-        // Gérer les exceptions
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
+        e.printStackTrace();
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
+                "status", 500,
+                "message", "Une erreur interne est survenue : " + e.getMessage()
+        ));
     }
 }
+
 
     // Endpoint scalable avec pagination pour récupérer les factures proforma de l'utilisateur connecté
     @GetMapping("/mes-factures/paginated")

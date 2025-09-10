@@ -92,7 +92,6 @@ List<FactureProForma> findFacturesAvecRelationsParEntreprise(@Param("entrepriseI
 @Query("SELECT f FROM FactureProForma f " +
        "LEFT JOIN FETCH f.utilisateurCreateur u " +
        "LEFT JOIN FETCH f.approbateurs a " +
-       "LEFT JOIN FETCH f.lignesFacture lf " +
        "LEFT JOIN FETCH f.client c " +
        "LEFT JOIN FETCH f.entrepriseClient ec " +
        "WHERE f.entreprise.id = :entrepriseId " +
