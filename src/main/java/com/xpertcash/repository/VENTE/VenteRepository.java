@@ -51,6 +51,7 @@ public interface VenteRepository extends JpaRepository<Vente, Long> {
     List<Vente> findAllByEntrepriseId(@Param("entrepriseId") Long entrepriseId);
 
 
+
     
     
 

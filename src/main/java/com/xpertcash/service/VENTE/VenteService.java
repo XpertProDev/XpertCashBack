@@ -1009,9 +1009,6 @@ public List<VenteParClientResponse> getVentesClientsAffilies(HttpServletRequest 
 }
 
 
-
-
-
 private VenteParClientResponse toVenteParClientResponse(Vente vente) {
     VenteParClientResponse dto = new VenteParClientResponse();
     dto.setVenteId(vente.getId());

@@ -172,7 +172,7 @@ public ResponseEntity<List<VenteParClientResponse>> getVentesClientsAffilies(Htt
 /**
  * Endpoint pour vider le cache des statistiques de ventes
  * 
- * ⚠️  ATTENTION : Ce cache se vide AUTOMATIQUEMENT lors des ventes et remboursements.
+ *  Ce cache se vide AUTOMATIQUEMENT lors des ventes et remboursements.
  * Utiliser uniquement pour :
  * - Debug/Test des performances
  * - Maintenance après modifications externes
@@ -195,5 +195,10 @@ public ResponseEntity<Map<String, String>> evictVentesStatsCache() {
         return ResponseEntity.status(500).body(error);
     }
 }
+
+
+
+
+
 
 }
