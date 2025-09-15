@@ -154,7 +154,7 @@ public class MailService {
                     <p><strong>Code PIN :</strong> %s</p>
                 </div>
                 <p style="margin-top: 8px;">Nous vous recommandons de changer votre mot de passe dès votre première connexion.</p>
-                <a href="https://tchakeda.com/connexion" style="display: inline-block; padding: 12px 20px; background-color: #007bff; color: white; text-decoration: none; border-radius: 5px; font-weight: bold; margin-top: 10px;">
+                <a href="https://fere.tchakeda.com/connexion" style="display: inline-block; padding: 12px 20px; background-color: #007bff; color: white; text-decoration: none; border-radius: 5px; font-weight: bold; margin-top: 10px;">
                     Se connecter
                 </a>
                 <p style="font-size: 10px; color: #777;">L'équipe Tchakeda</p>

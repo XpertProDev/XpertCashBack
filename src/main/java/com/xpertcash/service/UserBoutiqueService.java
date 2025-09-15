@@ -356,6 +356,19 @@ public List<String> retirerVendeurDesBoutiques(HttpServletRequest request, Long 
         List<VendeurDTO> vendeursDTO = userBoutiques.stream().map(userBoutique -> {
             User user = userBoutique.getUser();
             LocalDateTime assignedAt = userBoutique.getAssignedAt();
+            
+            // Déterminer le statut de l'utilisateur
+            String statut;
+            if (user.isLocked()) {
+                statut = "Bloqué";
+            } else if (!user.isEnabledLien()) {
+                statut = "Inactif";
+            } else if (!user.isActivatedLien()) {
+                statut = "Non activé";
+            } else {
+                statut = "Actif";
+            }
+            
             return new VendeurDTO(
                     user.getId(),
                     user.getNomComplet(),
@@ -363,7 +376,8 @@ public List<String> retirerVendeurDesBoutiques(HttpServletRequest request, Long 
                     user.getPhone(),
                     user.getPays(),
                     user.getPhoto(),
-                    assignedAt
+                    assignedAt,
+                    statut
             );
         }).collect(Collectors.toList());
 

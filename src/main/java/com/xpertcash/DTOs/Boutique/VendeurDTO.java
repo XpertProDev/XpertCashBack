@@ -15,5 +15,6 @@ public class VendeurDTO {
     private String pays;
     private String photo;
     private LocalDateTime assignedAt;
+    private String statut;
 
 }
