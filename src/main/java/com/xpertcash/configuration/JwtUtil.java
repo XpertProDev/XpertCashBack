@@ -36,10 +36,10 @@ public class JwtUtil {
         try {
             return Long.parseLong(extractClaim(token, Claims::getSubject));
         } catch (ExpiredJwtException e) {
-            System.out.println("⚠️ Token expiré : impossible d'extraire l'ID utilisateur.");
+            System.out.println("⚠️ Token expiré");
             return null;
         } catch (JwtException | IllegalArgumentException e) {
-            System.out.println("⚠️ Token invalide ou mal formé : " + e.getMessage());
+            System.out.println("⚠️ Token invalide : " + e.getMessage());
             return null;
         }
     }

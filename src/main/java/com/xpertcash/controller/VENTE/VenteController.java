@@ -6,6 +6,7 @@ import com.xpertcash.DTOs.VENTE.RemboursementRequest;
 import com.xpertcash.DTOs.VENTE.RemboursementResponse;
 import com.xpertcash.DTOs.VENTE.VenteRequest;
 import com.xpertcash.DTOs.VENTE.VenteResponse;
+import com.xpertcash.configuration.RateLimit;
 import com.xpertcash.service.VENTE.VenteService;
 import jakarta.servlet.http.HttpServletRequest;
 
@@ -25,6 +26,7 @@ public class VenteController {
     private VenteService venteService;
 
     @PostMapping("/vente/enregistrer")
+    @RateLimit(requests = 100, window = "1h", key = "user", message = "Trop de ventes enregistrées. Réessayez plus tard.")
     public ResponseEntity<VenteResponse> enregistrerVente(@RequestBody VenteRequest request, HttpServletRequest httpRequest) {
         VenteResponse response = venteService.enregistrerVente(request, httpRequest);
         return ResponseEntity.ok(response);
@@ -172,7 +174,7 @@ public ResponseEntity<List<VenteParClientResponse>> getVentesClientsAffilies(Htt
 /**
  * Endpoint pour vider le cache des statistiques de ventes
  * 
- * ⚠️  ATTENTION : Ce cache se vide AUTOMATIQUEMENT lors des ventes et remboursements.
+ *  Ce cache se vide AUTOMATIQUEMENT lors des ventes et remboursements.
  * Utiliser uniquement pour :
  * - Debug/Test des performances
  * - Maintenance après modifications externes
@@ -195,5 +197,10 @@ public ResponseEntity<Map<String, String>> evictVentesStatsCache() {
         return ResponseEntity.status(500).body(error);
     }
 }
+
+
+
+
+
 
 }

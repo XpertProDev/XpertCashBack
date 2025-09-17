@@ -6,6 +6,7 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 
+import com.xpertcash.configuration.RateLimit;
 import jakarta.servlet.http.HttpServletResponse;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
@@ -434,6 +435,7 @@ public ResponseEntity<?> updateProduit(
 
         //
         @PostMapping(value = "/import-produits-excel", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+        @RateLimit(requests = 10, window = "1h", key = "user", message = "Trop d'imports de fichiers. Réessayez dans 1 heure.")
         public ResponseEntity<?> importProduitsFromExcel(
                 @RequestParam("file") MultipartFile file,
                 @RequestParam Long entrepriseId,
