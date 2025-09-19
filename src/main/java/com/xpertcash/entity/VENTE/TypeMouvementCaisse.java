@@ -5,5 +5,6 @@ public enum TypeMouvementCaisse {
     AJOUT,
     RETRAIT,
     FERMETURE,
-    REMBOURSEMENT
+    REMBOURSEMENT,
+    DEPENSE
 }

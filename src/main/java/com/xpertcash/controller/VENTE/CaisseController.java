@@ -5,6 +5,10 @@ import com.xpertcash.service.VENTE.CaisseService;
 import com.xpertcash.DTOs.VENTE.CaisseResponseDTO;
 import com.xpertcash.DTOs.VENTE.OuvrirCaisseRequest;
 import com.xpertcash.DTOs.VENTE.GetCaisseActiveRequest;
+import com.xpertcash.DTOs.VENTE.DepenseRequest;
+import com.xpertcash.DTOs.VENTE.DepenseResponseDTO;
+import com.xpertcash.DTOs.VENTE.FermerCaisseRequest;
+import com.xpertcash.DTOs.VENTE.FermerCaisseResponseDTO;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -27,6 +31,8 @@ public class CaisseController {
         dto.setId(caisse.getId());
         dto.setMontantInitial(caisse.getMontantInitial());
         dto.setMontantCourant(caisse.getMontantCourant());
+        dto.setMontantEnMain(caisse.getMontantEnMain());
+        dto.setEcart(caisse.getEcart());
         dto.setStatut(caisse.getStatut().name());
         dto.setDateOuverture(caisse.getDateOuverture());
         dto.setDateFermeture(caisse.getDateFermeture());
@@ -38,24 +44,15 @@ public class CaisseController {
     }
 
     @PostMapping("/fermer")
-    public ResponseEntity<CaisseResponseDTO> fermerCaisse(@RequestBody CaisseResponseDTO caisseResponseDTO, HttpServletRequest request) {
-        Long boutiqueId = caisseResponseDTO.getBoutiqueId();
-        Caisse caisse = caisseService.fermerCaisse(boutiqueId, request);
-
-        // Créer un DTO pour renvoyer les informations de la caisse fermée
-        CaisseResponseDTO dto = new CaisseResponseDTO();
-        dto.setId(caisse.getId());
-        dto.setMontantInitial(caisse.getMontantInitial());
-        dto.setMontantCourant(caisse.getMontantCourant());
-        dto.setStatut(caisse.getStatut().name());
-        dto.setDateOuverture(caisse.getDateOuverture());
-        dto.setDateFermeture(caisse.getDateFermeture());
-        dto.setVendeurId(caisse.getVendeur() != null ? caisse.getVendeur().getId() : null);
-        dto.setNomVendeur(caisse.getVendeur() != null ? caisse.getVendeur().getNomComplet() : null);
-        dto.setBoutiqueId(caisse.getBoutique() != null ? caisse.getBoutique().getId() : null);
-        dto.setNomBoutique(caisse.getBoutique() != null ? caisse.getBoutique().getNomBoutique() : null);
-
-        return ResponseEntity.ok(dto);
+    public ResponseEntity<?> fermerCaisse(@RequestBody FermerCaisseRequest request, HttpServletRequest httpRequest) {
+        try {
+            FermerCaisseResponseDTO response = caisseService.fermerCaisse(request, httpRequest);
+            return ResponseEntity.ok(response);
+        } catch (RuntimeException e) {
+            HashMap<String, String> error = new HashMap<>();
+            error.put("error", e.getMessage());
+            return ResponseEntity.badRequest().body(error);
+        }
     }
 
     @PostMapping("/active")
@@ -71,6 +68,8 @@ public class CaisseController {
         dto.setId(caisse.getId());
         dto.setMontantInitial(caisse.getMontantInitial());
         dto.setMontantCourant(caisse.getMontantCourant());
+        dto.setMontantEnMain(caisse.getMontantEnMain());
+        dto.setEcart(caisse.getEcart());
         dto.setStatut(caisse.getStatut().name());
         dto.setDateOuverture(caisse.getDateOuverture());
         dto.setDateFermeture(caisse.getDateFermeture());
@@ -100,6 +99,8 @@ public class CaisseController {
         dto.setId(caisse.getId());
         dto.setMontantInitial(caisse.getMontantInitial());
         dto.setMontantCourant(caisse.getMontantCourant());
+        dto.setMontantEnMain(caisse.getMontantEnMain());
+        dto.setEcart(caisse.getEcart());
         dto.setStatut(caisse.getStatut().name());
         dto.setDateOuverture(caisse.getDateOuverture());
         dto.setDateFermeture(caisse.getDateFermeture());
@@ -170,6 +171,58 @@ public class CaisseController {
             HttpServletRequest request) {
         CaisseResponseDTO dto = caisseService.getEtatActuelCaisse(boutiqueId, request);
         return ResponseEntity.ok(dto);
+    }
+
+    /**
+     * Endpoint pour enregistrer une dépense depuis la caisse
+     * Permet au vendeur de faire des dépenses comme réparation de chaise, achat de matériel, etc.
+     */
+    @PostMapping("/depense")
+    public ResponseEntity<?> enregistrerDepense(
+            @RequestBody DepenseRequest request,
+            HttpServletRequest httpRequest) {
+        try {
+            CaisseResponseDTO dto = caisseService.enregistrerDepense(request, httpRequest);
+            return ResponseEntity.ok(dto);
+        } catch (RuntimeException e) {
+            HashMap<String, String> error = new HashMap<>();
+            error.put("error", e.getMessage());
+            return ResponseEntity.badRequest().body(error);
+        }
+    }
+
+    /**
+     * Endpoint pour lister toutes les dépenses d'une caisse spécifique
+     */
+    @GetMapping("/depenses/caisse/{caisseId}")
+    public ResponseEntity<?> listerDepensesCaisse(
+            @PathVariable Long caisseId,
+            HttpServletRequest request) {
+        try {
+            List<DepenseResponseDTO> depenses = caisseService.listerDepensesCaisse(caisseId, request);
+            return ResponseEntity.ok(depenses);
+        } catch (RuntimeException e) {
+            HashMap<String, String> error = new HashMap<>();
+            error.put("error", e.getMessage());
+            return ResponseEntity.badRequest().body(error);
+        }
+    }
+
+    /**
+     * Endpoint pour lister toutes les dépenses d'un vendeur dans une boutique
+     */
+    @GetMapping("/depenses/boutique/{boutiqueId}")
+    public ResponseEntity<?> listerDepensesVendeur(
+            @PathVariable Long boutiqueId,
+            HttpServletRequest request) {
+        try {
+            List<DepenseResponseDTO> depenses = caisseService.listerDepensesVendeur(boutiqueId, request);
+            return ResponseEntity.ok(depenses);
+        } catch (RuntimeException e) {
+            HashMap<String, String> error = new HashMap<>();
+            error.put("error", e.getMessage());
+            return ResponseEntity.badRequest().body(error);
+        }
     }
 
 

@@ -12,6 +12,10 @@ import org.springframework.transaction.annotation.Transactional;
 import jakarta.servlet.http.HttpServletRequest;
 
 import com.xpertcash.DTOs.VENTE.CaisseResponseDTO;
+import com.xpertcash.DTOs.VENTE.DepenseRequest;
+import com.xpertcash.DTOs.VENTE.DepenseResponseDTO;
+import com.xpertcash.DTOs.VENTE.FermerCaisseRequest;
+import com.xpertcash.DTOs.VENTE.FermerCaisseResponseDTO;
 import com.xpertcash.composant.Utilitaire;
 import com.xpertcash.configuration.JwtUtil;
 import java.time.LocalDateTime;
@@ -92,12 +96,12 @@ public class CaisseService {
     }
 
 @Transactional
-public Caisse fermerCaisse(Long boutiqueId, HttpServletRequest request) {
-    User user = getUserFromRequest(request); // Récupérer l'utilisateur connecté à partir de la requête
+public FermerCaisseResponseDTO fermerCaisse(FermerCaisseRequest request, HttpServletRequest httpRequest) {
+    User user = getUserFromRequest(httpRequest);
 
     // 1️⃣ Récupérer la caisse ouverte pour cet utilisateur et cette boutique
     Caisse caisse = caisseRepository.findByVendeurIdAndStatutAndBoutiqueId(
-            user.getId(), StatutCaisse.OUVERTE, boutiqueId)
+            user.getId(), StatutCaisse.OUVERTE, request.getBoutiqueId())
             .orElseThrow(() -> new RuntimeException("Aucune caisse ouverte pour cet utilisateur dans cette boutique ou la caisse est déjà fermée."));
 
     // 2️⃣ Sécurité : Vérification des droits d'accès de l'utilisateur
@@ -116,30 +120,70 @@ public Caisse fermerCaisse(Long boutiqueId, HttpServletRequest request) {
         throw new RuntimeException("Vous n'êtes pas autorisé à fermer cette caisse.");
     }
 
-    // 3️⃣ Mise à jour de la caisse (fermeture)
+    // 3️⃣ Vérifier que le montant en main est positif
+    if (request.getMontantEnMain() < 0) {
+        throw new RuntimeException("Le montant en main ne peut pas être négatif.");
+    }
+
+    // 4️⃣ Calculer les statistiques des dépenses
+    List<MouvementCaisse> depenses = mouvementCaisseRepository.findByCaisseIdAndTypeMouvement(
+            caisse.getId(), TypeMouvementCaisse.DEPENSE);
+    
+    Double totalDepenses = depenses.stream()
+            .mapToDouble(MouvementCaisse::getMontant)
+            .sum();
+    Integer nombreDepenses = depenses.size();
+
+    // 5️⃣ Calculer l'écart
+    Double montantTheorique = caisse.getMontantCourant();
+    Double montantReel = request.getMontantEnMain();
+    Double ecart = montantReel - montantTheorique;
+
+    // 6️⃣ Mise à jour de la caisse (fermeture)
     caisse.setStatut(StatutCaisse.FERMEE);
     caisse.setDateFermeture(LocalDateTime.now());
+    caisse.setMontantEnMain(montantReel);
+    caisse.setEcart(ecart);
     caisseRepository.save(caisse);
 
-    // 4️⃣ Mouvement de fermeture (enregistrement du mouvement dans la caisse)
+    // 7️⃣ Mouvement de fermeture (enregistrement du mouvement dans la caisse)
     MouvementCaisse mouvement = new MouvementCaisse();
     mouvement.setCaisse(caisse);
     mouvement.setTypeMouvement(TypeMouvementCaisse.FERMETURE);
-    mouvement.setMontant(caisse.getMontantCourant());
+    mouvement.setMontant(montantReel); // Utiliser le montant réel en main
     mouvement.setDateMouvement(LocalDateTime.now());
-    mouvement.setDescription("Fermeture de la caisse");
+    mouvement.setDescription("Fermeture de la caisse - Montant théorique: " + montantTheorique + 
+                           ", Montant en main: " + montantReel + 
+                           ", Écart: " + ecart);
     mouvementCaisseRepository.save(mouvement);
 
-    // 5️⃣ Création du versement comptable en attente
+    // 8️⃣ Création du versement comptable en attente
     VersementComptable versement = new VersementComptable();
     versement.setCaisse(caisse);
-    versement.setMontant(caisse.getMontantCourant());
+    versement.setMontant(montantReel); // Utiliser le montant réel en main
     versement.setDateVersement(LocalDateTime.now());
     versement.setStatut(StatutVersement.EN_ATTENTE); // En attente
     versement.setCreePar(user);
     versementComptableRepository.save(versement);
 
-    return caisse;
+    // 9️⃣ Créer la réponse avec toutes les informations
+    FermerCaisseResponseDTO response = new FermerCaisseResponseDTO();
+    response.setId(caisse.getId());
+    response.setMontantInitial(caisse.getMontantInitial());
+    response.setMontantCourant(montantTheorique);
+    response.setMontantEnMain(montantReel);
+    response.setEcart(ecart);
+    response.setStatut(caisse.getStatut().name());
+    response.setDateOuverture(caisse.getDateOuverture());
+    response.setDateFermeture(caisse.getDateFermeture());
+    response.setVendeurId(caisse.getVendeur().getId());
+    response.setNomVendeur(caisse.getVendeur().getNomComplet());
+    response.setBoutiqueId(caisse.getBoutique().getId());
+    response.setNomBoutique(caisse.getBoutique().getNomBoutique());
+    response.setTotalDepenses(totalDepenses);
+    response.setNombreDepenses(nombreDepenses);
+
+    return response;
 }
 
   
@@ -289,6 +333,8 @@ public Caisse fermerCaisse(Long boutiqueId, HttpServletRequest request) {
         dto.setId(caisse.getId());
         dto.setMontantInitial(caisse.getMontantInitial());
         dto.setMontantCourant(caisse.getMontantCourant());
+        dto.setMontantEnMain(caisse.getMontantEnMain());
+        dto.setEcart(caisse.getEcart());
         dto.setStatut(caisse.getStatut().name());
         dto.setDateOuverture(caisse.getDateOuverture());
         dto.setDateFermeture(caisse.getDateFermeture());
@@ -375,7 +421,155 @@ public Caisse fermerCaisse(Long boutiqueId, HttpServletRequest request) {
     return responses;
 }
 
+    /**
+     * Enregistre une dépense depuis la caisse ouverte du vendeur
+     * Permet au vendeur de faire des dépenses comme réparation de chaise, achat de matériel, etc.
+     */
+    @Transactional
+    public CaisseResponseDTO enregistrerDepense(DepenseRequest request, HttpServletRequest httpRequest) {
+        User user = getUserFromRequest(httpRequest);
 
+        // Vérification des droits
+        RoleType role = user.getRole().getName();
+        boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
+        boolean hasPermission = user.getRole().hasPermission(PermissionType.VENDRE_PRODUITS);
+        if (!isAdminOrManager && !hasPermission) {
+            throw new RuntimeException("Vous n'avez pas les droits nécessaires pour effectuer une dépense !");
+        }
 
+        // Vérification de la boutique
+        Boutique boutique = boutiqueRepository.findById(request.getBoutiqueId())
+                .orElseThrow(() -> new RuntimeException("Boutique introuvable"));
+        
+        if (!boutique.getEntreprise().getId().equals(user.getEntreprise().getId())) {
+            throw new RuntimeException("Accès interdit : cette boutique n'appartient pas à votre entreprise.");
+        }
+
+        // Vérifier qu'une caisse OUVERTE existe pour ce vendeur/boutique
+        Caisse caisse = caisseRepository.findByVendeurIdAndStatutAndBoutiqueId(
+                user.getId(), StatutCaisse.OUVERTE, request.getBoutiqueId())
+                .orElseThrow(() -> new RuntimeException("Aucune caisse ouverte pour ce vendeur dans cette boutique. Veuillez ouvrir une caisse avant de faire une dépense."));
+
+        // Vérifier que le montant de la dépense ne dépasse pas le montant disponible
+        if (request.getMontant() > caisse.getMontantCourant()) {
+            throw new RuntimeException("Montant insuffisant dans la caisse. Montant disponible: " + caisse.getMontantCourant() + ", Montant demandé: " + request.getMontant());
+        }
+
+        // Vérifier que le montant est positif
+        if (request.getMontant() <= 0) {
+            throw new RuntimeException("Le montant de la dépense doit être positif.");
+        }
+
+        // Créer le mouvement de dépense
+        MouvementCaisse mouvement = new MouvementCaisse();
+        mouvement.setCaisse(caisse);
+        mouvement.setTypeMouvement(TypeMouvementCaisse.DEPENSE);
+        mouvement.setMontant(request.getMontant());
+        mouvement.setDateMouvement(LocalDateTime.now());
+        mouvement.setDescription("Dépense: " + request.getMotif());
+        mouvementCaisseRepository.save(mouvement);
+
+        // Mettre à jour le montant courant de la caisse (diminuer)
+        caisse.setMontantCourant(caisse.getMontantCourant() - request.getMontant());
+        caisseRepository.save(caisse);
+
+        // Retourner l'état actuel de la caisse
+        return mapToCaisseResponseDTO(caisse);
+    }
+
+    /**
+     * Liste toutes les dépenses d'une caisse spécifique
+     */
+    public List<DepenseResponseDTO> listerDepensesCaisse(Long caisseId, HttpServletRequest request) {
+        User user = getUserFromRequest(request);
+
+        // Vérification des droits
+        RoleType role = user.getRole().getName();
+        boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
+        boolean hasPermission = user.getRole().hasPermission(PermissionType.VENDRE_PRODUITS);
+        if (!isAdminOrManager && !hasPermission) {
+            throw new RuntimeException("Vous n'avez pas les droits nécessaires pour consulter les dépenses !");
+        }
+
+        // Récupérer la caisse
+        Caisse caisse = caisseRepository.findById(caisseId)
+                .orElseThrow(() -> new RuntimeException("Caisse introuvable"));
+
+        // Vérification d'appartenance à l'entreprise
+        if (!caisse.getBoutique().getEntreprise().getId().equals(user.getEntreprise().getId())) {
+            throw new RuntimeException("Accès interdit : cette caisse n'appartient pas à votre entreprise.");
+        }
+
+        // Si c'est un vendeur, il ne peut voir que ses propres dépenses
+        if (!isAdminOrManager && !caisse.getVendeur().getId().equals(user.getId())) {
+            throw new RuntimeException("Vous n'êtes pas autorisé à consulter les dépenses de cette caisse.");
+        }
+
+        // Récupérer tous les mouvements de type DEPENSE pour cette caisse
+        List<MouvementCaisse> mouvements = mouvementCaisseRepository.findByCaisseIdAndTypeMouvement(
+                caisseId, TypeMouvementCaisse.DEPENSE);
+
+        // Transformer en DTO
+        List<DepenseResponseDTO> depenses = new ArrayList<>();
+        for (MouvementCaisse mouvement : mouvements) {
+            DepenseResponseDTO dto = new DepenseResponseDTO();
+            dto.setId(mouvement.getId());
+            dto.setCaisseId(mouvement.getCaisse().getId());
+            dto.setMontant(mouvement.getMontant());
+            dto.setDescription(mouvement.getDescription());
+            dto.setDateMouvement(mouvement.getDateMouvement());
+            dto.setNomVendeur(mouvement.getCaisse().getVendeur().getNomComplet());
+            dto.setNomBoutique(mouvement.getCaisse().getBoutique().getNomBoutique());
+            depenses.add(dto);
+        }
+
+        return depenses;
+    }
+
+    /**
+     * Liste toutes les dépenses d'un vendeur dans une boutique
+     */
+    public List<DepenseResponseDTO> listerDepensesVendeur(Long boutiqueId, HttpServletRequest request) {
+        User user = getUserFromRequest(request);
+
+        // Vérification des droits
+        RoleType role = user.getRole().getName();
+        boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
+        boolean hasPermission = user.getRole().hasPermission(PermissionType.VENDRE_PRODUITS);
+        if (!isAdminOrManager && !hasPermission) {
+            throw new RuntimeException("Vous n'avez pas les droits nécessaires pour consulter les dépenses !");
+        }
+
+        // Vérification de la boutique
+        Boutique boutique = boutiqueRepository.findById(boutiqueId)
+                .orElseThrow(() -> new RuntimeException("Boutique introuvable"));
+
+        if (!boutique.getEntreprise().getId().equals(user.getEntreprise().getId())) {
+            throw new RuntimeException("Accès interdit : cette boutique n'appartient pas à votre entreprise.");
+        }
+
+        // Récupérer toutes les caisses du vendeur dans cette boutique
+        List<Caisse> caisses = caisseRepository.findByVendeurIdAndBoutiqueId(user.getId(), boutiqueId);
+
+        List<DepenseResponseDTO> toutesDepenses = new ArrayList<>();
+        for (Caisse caisse : caisses) {
+            List<MouvementCaisse> mouvements = mouvementCaisseRepository.findByCaisseIdAndTypeMouvement(
+                    caisse.getId(), TypeMouvementCaisse.DEPENSE);
+            
+            for (MouvementCaisse mouvement : mouvements) {
+                DepenseResponseDTO dto = new DepenseResponseDTO();
+                dto.setId(mouvement.getId());
+                dto.setCaisseId(mouvement.getCaisse().getId());
+                dto.setMontant(mouvement.getMontant());
+                dto.setDescription(mouvement.getDescription());
+                dto.setDateMouvement(mouvement.getDateMouvement());
+                dto.setNomVendeur(mouvement.getCaisse().getVendeur().getNomComplet());
+                dto.setNomBoutique(mouvement.getCaisse().getBoutique().getNomBoutique());
+                toutesDepenses.add(dto);
+            }
+        }
+
+        return toutesDepenses;
+    }
 
 }
