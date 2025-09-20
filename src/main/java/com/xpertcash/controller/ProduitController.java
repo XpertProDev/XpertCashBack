@@ -6,7 +6,6 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 
-import com.xpertcash.configuration.RateLimit;
 import jakarta.servlet.http.HttpServletResponse;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
@@ -435,7 +434,6 @@ public ResponseEntity<?> updateProduit(
 
         //
         @PostMapping(value = "/import-produits-excel", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-        @RateLimit(requests = 10, window = "1h", key = "user", message = "Trop d'imports de fichiers. Réessayez dans 1 heure.")
         public ResponseEntity<?> importProduitsFromExcel(
                 @RequestParam("file") MultipartFile file,
                 @RequestParam Long entrepriseId,
@@ -609,78 +607,6 @@ public ResponseEntity<?> updateProduit(
         }
     }
 
-    // ==================== ENDPOINTS DE GESTION DU CACHE ====================
     
-    /**
-     * Endpoint pour vider le cache des produits par boutique
-     */
-    @PostMapping("/cache/evict/produits-boutique")
-    public ResponseEntity<Map<String, String>> evictProduitsBoutiqueCache() {
-        try {
-            produitService.evictProduitsBoutiqueCache();
-            Map<String, String> response = new HashMap<>();
-            response.put("message", "Cache des produits par boutique vidé avec succès");
-            response.put("timestamp", java.time.LocalDateTime.now().toString());
-            return ResponseEntity.ok(response);
-        } catch (Exception e) {
-            Map<String, String> error = new HashMap<>();
-            error.put("error", "Erreur lors du vidage du cache: " + e.getMessage());
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(error);
-        }
-    }
-    
-    /**
-     * Endpoint pour vider le cache des produits par entreprise
-     */
-    @PostMapping("/cache/evict/produits-entreprise")
-    public ResponseEntity<Map<String, String>> evictProduitsEntrepriseCache() {
-        try {
-            produitService.evictProduitsEntrepriseCache();
-            Map<String, String> response = new HashMap<>();
-            response.put("message", "Cache des produits par entreprise vidé avec succès");
-            response.put("timestamp", java.time.LocalDateTime.now().toString());
-            return ResponseEntity.ok(response);
-        } catch (Exception e) {
-            Map<String, String> error = new HashMap<>();
-            error.put("error", "Erreur lors du vidage du cache: " + e.getMessage());
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(error);
-        }
-    }
-    
-    /**
-     * Endpoint pour vider le cache de l'historique des stocks
-     */
-    @PostMapping("/cache/evict/stock-historique")
-    public ResponseEntity<Map<String, String>> evictStockHistoriqueCache() {
-        try {
-            produitService.evictStockHistoriqueCache();
-            Map<String, String> response = new HashMap<>();
-            response.put("message", "Cache de l'historique des stocks vidé avec succès");
-            response.put("timestamp", java.time.LocalDateTime.now().toString());
-            return ResponseEntity.ok(response);
-        } catch (Exception e) {
-            Map<String, String> error = new HashMap<>();
-            error.put("error", "Erreur lors du vidage du cache: " + e.getMessage());
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(error);
-        }
-    }
-    
-    /**
-     * Endpoint pour vider tous les caches liés aux produits
-     */
-    @PostMapping("/cache/evict/all")
-    public ResponseEntity<Map<String, String>> evictAllProduitsCache() {
-        try {
-            produitService.evictAllProduitsCache();
-            Map<String, String> response = new HashMap<>();
-            response.put("message", "Tous les caches des produits vidés avec succès");
-            response.put("timestamp", java.time.LocalDateTime.now().toString());
-            return ResponseEntity.ok(response);
-        } catch (Exception e) {
-            Map<String, String> error = new HashMap<>();
-            error.put("error", "Erreur lors du vidage des caches: " + e.getMessage());
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(error);
-        }
-    }
        
 } 

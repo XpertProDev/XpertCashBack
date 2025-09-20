@@ -58,8 +58,6 @@ import java.util.stream.Collectors;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 import com.xpertcash.service.AuthenticationHelper;
-import org.springframework.cache.annotation.Cacheable;
-import org.springframework.cache.annotation.CacheEvict;
 
 
 
@@ -384,7 +382,6 @@ public class UsersService {
 
     // Activation du compte via le lien d'activation (email + code PIN)
     @Transactional
-    @CacheEvict(value = "user-info", key = "#result.id", condition = "#result != null")
     public User activateAccount(String email, String code) {
         User user = usersRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
@@ -448,7 +445,6 @@ public class UsersService {
 
     //Admin addUserToEntreprise
     @Transactional
-    @CacheEvict(value = "user-info", allEntries = true)
     public User addUserToEntreprise(HttpServletRequest request, UserRequest userRequest) {
                 // Vérifier la présence du token JWT dans l'entête de la requête
                 String token = request.getHeader("Authorization");
@@ -573,7 +569,6 @@ public class UsersService {
 
     //Attribution des permissions à un utilisateur
     @Transactional
-    @CacheEvict(value = "user-info", key = "#userId")
     public UserDTO assignPermissionsToUser(Long userId, Map<PermissionType, Boolean> permissions, HttpServletRequest request) {
         User currentUser = authHelper.getAuthenticatedUserWithFallback(request);
 
@@ -661,7 +656,6 @@ public class UsersService {
 
     //Suprim UserToEntreprise 
     @Transactional
-    @CacheEvict(value = "user-info", allEntries = true)
     public void deleteUserFromEntreprise(HttpServletRequest request, Long userId) {
     User admin = authHelper.getAuthenticatedUserWithFallback(request);
 
@@ -719,7 +713,6 @@ public class UsersService {
 
     // Pour la modification de utilisateur
    @Transactional
-   @CacheEvict(value = "user-info", key = "#userId")
     public User updateUser(Long userId, UpdateUserRequest request, MultipartFile imageUserFile, Boolean deletePhoto) {
     User user = usersRepository.findById(userId)
             .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
@@ -810,7 +803,6 @@ public class UsersService {
 }
 
     //Get user info
-    @Cacheable(value = "user-info", key = "#userId")
     public UserRequest getInfo(Long userId) {
         
         // --- 1. Récupérer l'utilisateur avec entreprise et role join fetch ---
@@ -1000,7 +992,6 @@ public class UsersService {
 
     // Méthode pour suspendre ou réactiver un utilisateur
     @Transactional
-    @CacheEvict(value = "user-info", key = "#userId")
     public void suspendUser(HttpServletRequest request, Long userId, boolean suspend) {
         User currentUser = authHelper.getAuthenticatedUserWithFallback(request);
 

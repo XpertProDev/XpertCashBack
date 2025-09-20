@@ -6,7 +6,6 @@ import com.xpertcash.DTOs.USER.UserDTO;
 import com.xpertcash.DTOs.USER.UserRequest;
 import com.xpertcash.configuration.JwtConfig;
 import com.xpertcash.configuration.JwtUtil;
-import com.xpertcash.configuration.RateLimit;
 import com.xpertcash.entity.PermissionType;
 import com.xpertcash.entity.User;
 import com.xpertcash.repository.UsersRepository;
@@ -53,7 +52,6 @@ public class UsersController {
 
     // Inscription
 @PostMapping("/register")
-@RateLimit(requests = 3, window = "1h", key = "ip", message = "Trop de tentatives d'inscription. Réessayez dans 1 heure.")
 public ResponseEntity<RegisterResponse> register(@RequestBody RegistrationRequest request) {
     RegisterResponse response = new RegisterResponse();
     try {
@@ -80,7 +78,6 @@ public ResponseEntity<RegisterResponse> register(@RequestBody RegistrationReques
 
     // Connexion
     @PostMapping("/login")
-    @RateLimit(requests = 5, window = "15m", key = "ip", message = "Trop de tentatives de connexion. Réessayez dans 15 minutes.")
     public ResponseEntity<Map<String, String>> login(@RequestBody LoginRequest request) {
         try {
             Map<String, String> tokens = usersService.login(request.getEmail(), request.getPassword());

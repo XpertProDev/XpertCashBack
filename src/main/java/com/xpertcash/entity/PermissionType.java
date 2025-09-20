@@ -14,7 +14,9 @@ public enum PermissionType {
     ACTIVER_BOUTIQUE,
     DESACTIVER_BOUTIQUE,
     COMPTABILITE,
-    VOIR_FLUX_COMPTABLE;
+    VOIR_FLUX_COMPTABLE,
+    GERER_MARKETING;
+
 
     @JsonCreator
     public static PermissionType fromString(String value) {

@@ -210,33 +210,5 @@ public class CategorieController {
         }
     }
 
-// ==================== ENDPOINTS DE GESTION DU CACHE CATÉGORIES ====================
-
-/**
- * Endpoint pour vider le cache des catégories
- * 
- * ⚠️  ATTENTION : Ce cache se vide AUTOMATIQUEMENT lors des modifications de catégories.
- * Utiliser uniquement pour :
- * - Debug/Test des performances
- * - Maintenance après modifications externes
- * - Résolution de problèmes de cohérence
- * 
- * Ne PAS appeler en routine !
- */
-@PostMapping("/cache/evict/categories")
-public ResponseEntity<Map<String, String>> evictCategoriesCache() {
-    try {
-        categorieService.evictCategoriesCache();
-        Map<String, String> response = new HashMap<>();
-        response.put("message", "Cache des catégories vidé avec succès");
-        response.put("timestamp", java.time.LocalDateTime.now().toString());
-        response.put("info", "⚠️ Ce cache se vide automatiquement lors des modifications de catégories. Ne pas appeler en routine !");
-        return ResponseEntity.ok(response);
-    } catch (Exception e) {
-        Map<String, String> error = new HashMap<>();
-        error.put("error", "Erreur lors du vidage du cache: " + e.getMessage());
-        return ResponseEntity.status(500).body(error);
-    }
-}
 
 }

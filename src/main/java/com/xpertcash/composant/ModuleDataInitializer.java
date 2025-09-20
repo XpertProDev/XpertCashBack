@@ -41,6 +41,8 @@ public class ModuleDataInitializer implements CommandLineRunner {
             creerModule("BOUTIQUE", "Gestion des Boutiques", "", true, false, null),
             creerModule("PRODUIT", "Gestion des Produits", "", true, false, null),
             creerModule("STOCK", "Gestion des Stocks", "Gestion des stocks", true, false, null),
+            creerModule("MARKETING", "Gestion du Marketing", "Gestion du marketing", true, false, null),
+        
 
             creerModule("GESTION_FACTURATION", "Gestion de Facturation", "Gestion centralisée des factures", false, true, new BigDecimal("10000")),
             // Sous-modules structurels

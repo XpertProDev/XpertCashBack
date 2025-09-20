@@ -159,29 +159,6 @@
 
 	<!-- end -->
 
-		<!-- Cache Dependencies -->
-	<dependency>
-		<groupId>org.springframework.boot</groupId>
-		<artifactId>spring-boot-starter-cache</artifactId>
-	</dependency>
-
-	<!-- Redis Dependencies for Rate Limiting -->
-	<dependency>
-		<groupId>org.springframework.boot</groupId>
-		<artifactId>spring-boot-starter-data-redis</artifactId>
-	</dependency>
-	
-	<!-- Lettuce Redis Client -->
-	<dependency>
-		<groupId>io.lettuce</groupId>
-		<artifactId>lettuce-core</artifactId>
-	</dependency>
-
-	<!-- Spring Boot Actuator for Health Checks -->
-	<dependency>
-		<groupId>org.springframework.boot</groupId>
-		<artifactId>spring-boot-starter-actuator</artifactId>
-	</dependency>
 
 	</dependencies>
 

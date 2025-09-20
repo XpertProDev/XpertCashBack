@@ -4,7 +4,6 @@ import java.time.LocalDateTime;
 import java.util.Random;
 
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -73,7 +72,6 @@ private void sendResetEmail(User user, String otp) {
 
     // Étape 2 : Réinitialiser le mot de passe
     @Transactional
-    @CacheEvict(value = "user-info", allEntries = true)
     public void resetPassword(String token, String newPassword) {
     PasswordResetToken resetToken = passwordResetTokenRepository.findByToken(token)
             .orElseThrow(() -> new RuntimeException("Code invalide ou expiré."));
