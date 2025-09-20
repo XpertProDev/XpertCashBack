@@ -4,11 +4,11 @@ import lombok.Data;
 import java.time.LocalDateTime;
 
 @Data
-public class CaisseResponseDTO {
+public class FermerCaisseResponseDTO {
     private Long id;
     private Double montantInitial;
-    private Double montantCourant;
-    private Double montantEnMain; // Montant réel saisi lors de la fermeture
+    private Double montantCourant; // Montant théorique avant fermeture
+    private Double montantEnMain; // Montant réel saisi par le vendeur
     private Double ecart; // Différence entre montantCourant et montantEnMain
     private String statut;
     private LocalDateTime dateOuverture;
@@ -17,4 +17,8 @@ public class CaisseResponseDTO {
     private String nomVendeur;
     private Long boutiqueId;
     private String nomBoutique;
+    
+    // Statistiques des dépenses
+    private Double totalDepenses;
+    private Integer nombreDepenses;
 }

@@ -58,8 +58,6 @@ public class JwtUtil {
     }
 
 
-
-
     // Méthode générique pour extraire une information spécifique du token
     private <T> T extractClaim(String token, Function<Claims, T> claimsResolver) {
         final Claims claims = extractAllClaims(token);
@@ -69,7 +67,7 @@ public class JwtUtil {
     // Méthode pour extraire toutes les informations du token (claims)
     private Claims extractAllClaims(String token) {
         return Jwts.parserBuilder()
-                .setSigningKey(jwtConfig.getSecretKey()) // Utilisation de la clé sécurisée
+                .setSigningKey(jwtConfig.getSecretKey()) 
                 .build()
                 .parseClaimsJws(token)
                 .getBody();

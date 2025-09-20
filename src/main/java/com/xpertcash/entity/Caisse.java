@@ -15,6 +15,8 @@ public class Caisse {
 
     private Double montantInitial;
     private Double montantCourant;
+    private Double montantEnMain; // Montant réel saisi lors de la fermeture
+    private Double ecart; // Différence entre montantCourant et montantEnMain
 
     @Enumerated(EnumType.STRING)
     private StatutCaisse statut; // OUVERTE, FERMEE
