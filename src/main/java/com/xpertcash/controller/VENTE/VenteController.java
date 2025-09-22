@@ -6,7 +6,6 @@ import com.xpertcash.DTOs.VENTE.RemboursementRequest;
 import com.xpertcash.DTOs.VENTE.RemboursementResponse;
 import com.xpertcash.DTOs.VENTE.VenteRequest;
 import com.xpertcash.DTOs.VENTE.VenteResponse;
-import com.xpertcash.configuration.RateLimit;
 import com.xpertcash.service.VENTE.VenteService;
 import jakarta.servlet.http.HttpServletRequest;
 
@@ -26,7 +25,6 @@ public class VenteController {
     private VenteService venteService;
 
     @PostMapping("/vente/enregistrer")
-    @RateLimit(requests = 100, window = "1h", key = "user", message = "Trop de ventes enregistrées. Réessayez plus tard.")
     public ResponseEntity<VenteResponse> enregistrerVente(@RequestBody VenteRequest request, HttpServletRequest httpRequest) {
         VenteResponse response = venteService.enregistrerVente(request, httpRequest);
         return ResponseEntity.ok(response);
@@ -169,34 +167,6 @@ public ResponseEntity<List<VenteParClientResponse>> getVentesClientsAffilies(Htt
     return ResponseEntity.ok(ventes);
 }
 
-// ==================== ENDPOINTS DE GESTION DU CACHE VENTES ====================
-
-/**
- * Endpoint pour vider le cache des statistiques de ventes
- * 
- *  Ce cache se vide AUTOMATIQUEMENT lors des ventes et remboursements.
- * Utiliser uniquement pour :
- * - Debug/Test des performances
- * - Maintenance après modifications externes
- * - Résolution de problèmes de cohérence
- * 
- * Ne PAS appeler en routine !
- */
-@PostMapping("/cache/evict/ventes-stats")
-public ResponseEntity<Map<String, String>> evictVentesStatsCache() {
-    try {
-        venteService.evictVentesStatsCache();
-        Map<String, String> response = new HashMap<>();
-        response.put("message", "Cache des statistiques de ventes vidé avec succès");
-        response.put("timestamp", java.time.LocalDateTime.now().toString());
-        response.put("info", "⚠️ Ce cache se vide automatiquement lors des ventes/remboursements. Ne pas appeler en routine !");
-        return ResponseEntity.ok(response);
-    } catch (Exception e) {
-        Map<String, String> error = new HashMap<>();
-        error.put("error", "Erreur lors du vidage du cache: " + e.getMessage());
-        return ResponseEntity.status(500).body(error);
-    }
-}
 
 
 

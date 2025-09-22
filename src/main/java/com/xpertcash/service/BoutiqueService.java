@@ -12,7 +12,6 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -202,7 +201,6 @@ public class BoutiqueService {
 
     //Methode pour Transfert
     @Transactional
-    @CacheEvict(value = {"produits-boutique", "produits-entreprise", "stock-historique"}, allEntries = true)
     public void transfererProduits(HttpServletRequest request, Long boutiqueSourceId, Long boutiqueDestinationId, Long produitId, int quantite) {
 
         // 🔐 Vérification JWT
@@ -327,7 +325,6 @@ public class BoutiqueService {
 
     //Copie
     @Transactional
-    @CacheEvict(value = {"produits-boutique", "produits-entreprise"}, allEntries = true)
     public int copierProduits(HttpServletRequest request, Long boutiqueSourceId, Long boutiqueDestinationId, List<Long> listeProduitIds, boolean toutCopier) {
         // 🔐 Vérifier la présence et le format du token JWT
         String token = request.getHeader("Authorization");

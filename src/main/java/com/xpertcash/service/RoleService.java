@@ -7,7 +7,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
-import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
 
 import com.xpertcash.configuration.JwtUtil;
@@ -71,7 +70,8 @@ public class RoleService {
                 permissionMap.get(PermissionType.DESACTIVER_BOUTIQUE),
                 permissionMap.get(PermissionType.COMPTABILITE),
                 permissionMap.get(PermissionType.VOIR_FLUX_COMPTABLE),
-                permissionMap.get(PermissionType.GERER_FOURNISSEURS)
+                permissionMap.get(PermissionType.GERER_FOURNISSEURS),
+                permissionMap.get(PermissionType.GERER_MARKETING)
 
             ));
 
@@ -86,7 +86,8 @@ public class RoleService {
                 permissionMap.get(PermissionType.APPROVISIONNER_STOCK),
                 permissionMap.get(PermissionType.GERER_BOUTIQUE),
                 permissionMap.get(PermissionType.VOIR_FLUX_COMPTABLE),
-                permissionMap.get(PermissionType.GERER_FOURNISSEURS)
+                permissionMap.get(PermissionType.GERER_FOURNISSEURS),
+                permissionMap.get(PermissionType.GERER_MARKETING)
 
             ));
 
@@ -137,7 +138,6 @@ public class RoleService {
 
 
     @Transactional
-    @CacheEvict(value = "user-info", key = "#userId")
     public User updateUserRole(String token, Long userId, String newRoleName) {
         // Vérifier la présence du token JWT
         if (token == null || !token.startsWith("Bearer ")) {

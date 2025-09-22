@@ -178,33 +178,6 @@ public ResponseEntity<?> getFacturesParPeriode(
     }
 }
 
-// ==================== ENDPOINTS DE GESTION DU CACHE FACTURES RÉELLES ====================
 
-/**
- * Endpoint pour vider le cache des factures réelles
- * 
- * ⚠️  ATTENTION : Ce cache se vide AUTOMATIQUEMENT lors des modifications de factures.
- * Utiliser uniquement pour :
- * - Debug/Test des performances
- * - Maintenance après modifications externes
- * - Résolution de problèmes de cohérence
- * 
- * Ne PAS appeler en routine !
- */
-@PostMapping("/cache/evict/factures-reelles")
-public ResponseEntity<Map<String, String>> evictFacturesReellesCache() {
-    try {
-        factureReelleService.evictFacturesReellesCache();
-        Map<String, String> response = new HashMap<>();
-        response.put("message", "Cache des factures réelles vidé avec succès");
-        response.put("timestamp", java.time.LocalDateTime.now().toString());
-        response.put("info", "⚠️ Ce cache se vide automatiquement lors des modifications de factures. Ne pas appeler en routine !");
-        return ResponseEntity.ok(response);
-    } catch (Exception e) {
-        Map<String, String> error = new HashMap<>();
-        error.put("error", "Erreur lors du vidage du cache: " + e.getMessage());
-        return ResponseEntity.status(500).body(error);
-    }
-}
 
 }

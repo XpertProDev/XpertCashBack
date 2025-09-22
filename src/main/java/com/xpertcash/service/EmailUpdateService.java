@@ -8,7 +8,6 @@ import com.xpertcash.repository.UsersRepository;
 import jakarta.mail.MessagingException;
 
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -68,7 +67,6 @@ public class EmailUpdateService {
      * Confirmation de la mise à jour d'email.
      * Vérifie le code et met à jour l'email de l'utilisateur.
      */
-    @CacheEvict(value = "user-info", key = "#userId")
     public void confirmEmailUpdate(Long userId, EmailUpdateConfirmationRequest confirmationRequest) {
         PendingEmailUpdate pendingUpdate = pendingEmailUpdates.get(userId);
         if (pendingUpdate == null) {

@@ -9,7 +9,6 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
@@ -59,7 +58,6 @@ public class UserBoutiqueService {
     private PermissionRepository permissionRepository;
 
 @Transactional
-@CacheEvict(value = "user-info", key = "#userId")
 public List<String> assignerVendeurAuxBoutiques(HttpServletRequest request, Long userId, List<Long> boutiqueIds) {
     List<String> resultMessages = new ArrayList<>();
 

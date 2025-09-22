@@ -3,7 +3,6 @@ package com.xpertcash.controller.PASSWORD;
 import java.util.Collections;
 import java.util.Map;
 
-import com.xpertcash.configuration.RateLimit;
 import com.xpertcash.entity.PASSWORD.PasswordResetToken;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -24,7 +23,6 @@ public class AuthControllerPassword {
 
         // Étape 1 : Demander un code de réinitialisation
         @PostMapping("/forgot-password")
-        @RateLimit(requests = 3, window = "1h", key = "ip", message = "Trop de demandes de réinitialisation. Réessayez dans 1 heure.")
         public ResponseEntity<?> forgotPassword(@RequestBody Map<String, String> request) {
             String email = request.get("email");
             try {
@@ -42,7 +40,6 @@ public class AuthControllerPassword {
 
         // Étape 2 : Modifier le mot de passe
         @PostMapping("/reset-password")
-        @RateLimit(requests = 5, window = "15m", key = "ip", message = "Trop de tentatives de réinitialisation. Réessayez dans 15 minutes.")
         public ResponseEntity<?> resetPassword(@RequestBody Map<String, String> request) {
             try {
                 String token = request.get("token");
