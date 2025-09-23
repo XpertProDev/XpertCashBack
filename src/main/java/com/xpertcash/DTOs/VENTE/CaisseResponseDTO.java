@@ -2,6 +2,7 @@ package com.xpertcash.DTOs.VENTE;
 
 import lombok.Data;
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Data
 public class CaisseResponseDTO {
@@ -17,4 +18,6 @@ public class CaisseResponseDTO {
     private String nomVendeur;
     private Long boutiqueId;
     private String nomBoutique;
+    private List<DepenseResponseDTO> depenses; // Liste des dépenses de la caisse
+
 }

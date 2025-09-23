@@ -261,6 +261,31 @@ public FermerCaisseResponseDTO fermerCaisse(FermerCaisseRequest request, HttpSer
         return caisseRepository.findByBoutiqueId(boutiqueId);
     }
 
+    //Get mes propres caisses
+    public List<Caisse> getMesCaisses(Long boutiqueId, HttpServletRequest request) {
+        User user = getUserFromRequest(request);
+        
+        Boutique boutique = boutiqueRepository.findById(boutiqueId)
+                .orElseThrow(() -> new RuntimeException("Boutique introuvable"));
+
+        // Vérification d'appartenance à l'entreprise
+        if (!boutique.getEntreprise().getId().equals(user.getEntreprise().getId())) {
+            throw new RuntimeException("Accès interdit : cette boutique n'appartient pas à votre entreprise.");
+        }
+
+        // Sécurité : rôle ou permission - Plus permissif que getToutesLesCaisses
+        RoleType role = user.getRole().getName();
+        boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
+        boolean hasPermission = user.getRole().hasPermission(PermissionType.VENDRE_PRODUITS);
+        
+        if (!isAdminOrManager && !hasPermission) {
+            throw new RuntimeException("Vous n'avez pas les droits nécessaires pour consulter vos caisses !");
+        }
+
+        // Récupération de toutes les caisses (ouvertes et fermées) de l'utilisateur connecté dans cette boutique
+        return caisseRepository.findByVendeurIdAndBoutiqueId(user.getId(), boutiqueId);
+    }
+
     // Le vendeur get sa derniere caisse a lui
     public Optional<CaisseResponseDTO> getDerniereCaisseVendeur(Long boutiqueId, HttpServletRequest request) {
     User user = getUserFromRequest(request);
