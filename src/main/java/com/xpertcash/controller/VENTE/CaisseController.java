@@ -127,6 +127,8 @@ public class CaisseController {
             dto.setId(c.getId());
             dto.setMontantInitial(c.getMontantInitial());
             dto.setMontantCourant(c.getMontantCourant());
+            dto.setMontantEnMain(c.getMontantEnMain());
+            dto.setEcart(c.getEcart());
             dto.setStatut(c.getStatut().name());
             dto.setDateOuverture(c.getDateOuverture());
             dto.setDateFermeture(c.getDateFermeture());
