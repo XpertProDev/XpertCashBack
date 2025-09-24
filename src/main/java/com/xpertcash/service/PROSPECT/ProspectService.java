@@ -1,6 +1,9 @@
 package com.xpertcash.service.PROSPECT;
 
+import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -19,12 +22,16 @@ import com.xpertcash.DTOs.PROSPECT.ProspectDTO;
 import com.xpertcash.DTOs.PROSPECT.ProspectPaginatedResponseDTO;
 import com.xpertcash.DTOs.PROSPECT.UpdateProspectRequestDTO;
 import com.xpertcash.configuration.CentralAccess;
+import com.xpertcash.entity.Client;
 import com.xpertcash.entity.Entreprise;
+import com.xpertcash.entity.EntrepriseClient;
 import com.xpertcash.entity.Enum.PROSPECT.ProspectType;
 import com.xpertcash.entity.PROSPECT.Interaction;
 import com.xpertcash.entity.PROSPECT.Prospect;
 import com.xpertcash.entity.User;
 import com.xpertcash.entity.PermissionType;
+import com.xpertcash.repository.ClientRepository;
+import com.xpertcash.repository.EntrepriseClientRepository;
 import com.xpertcash.repository.PROSPECT.InteractionRepository;
 import com.xpertcash.repository.PROSPECT.ProspectRepository;
 import com.xpertcash.service.AuthenticationHelper;
@@ -38,6 +45,10 @@ public class ProspectService {
     private ProspectRepository prospectRepository;
     @Autowired
     private InteractionRepository interactionRepository;
+    @Autowired
+    private ClientRepository clientRepository;
+    @Autowired
+    private EntrepriseClientRepository entrepriseClientRepository;
     @Autowired
     private AuthenticationHelper authHelper;
 
@@ -72,15 +83,12 @@ public class ProspectService {
 
         // Validation selon le type
         if (request.getType() == ProspectType.ENTREPRISE) {
-            if (request.getCompanyName() == null || request.getCompanyName().trim().isEmpty()) {
+            if (request.getNom() == null || request.getNom().trim().isEmpty()) {
                 throw new IllegalArgumentException("Le nom de l'entreprise est obligatoire pour un prospect ENTREPRISE");
             }
         } else if (request.getType() == ProspectType.PARTICULIER) {
-            if (request.getFirstName() == null || request.getFirstName().trim().isEmpty()) {
+            if (request.getNomComplet() == null || request.getNomComplet().trim().isEmpty()) {
                 throw new IllegalArgumentException("Le prénom est obligatoire pour un prospect PARTICULIER");
-            }
-            if (request.getLastName() == null || request.getLastName().trim().isEmpty()) {
-                throw new IllegalArgumentException("Le nom de famille est obligatoire pour un prospect PARTICULIER");
             }
         }
 
@@ -99,20 +107,20 @@ public class ProspectService {
         
         // Remplir les champs selon le type
         if (request.getType() == ProspectType.ENTREPRISE) {
-            prospect.setCompanyName(request.getCompanyName().trim());
+            prospect.setNom(request.getNom().trim());
             prospect.setSector(request.getSecter() != null ? request.getSecter().trim() : null);
             prospect.setAddress(request.getAddress() != null ? request.getAddress().trim() : null);
             prospect.setCity(request.getCity() != null ? request.getCity().trim() : null);
             prospect.setCountry(request.getCountry() != null ? request.getCountry().trim() : null);
         } else if (request.getType() == ProspectType.PARTICULIER) {
-            prospect.setFirstName(request.getFirstName().trim());
-            prospect.setLastName(request.getLastName().trim());
-            prospect.setPosition(request.getPosition() != null ? request.getPosition().trim() : null);
+            prospect.setNomComplet(request.getNomComplet().trim());
+            prospect.setAdresse(request.getAdresse() != null ? request.getAdresse().trim() : null);
+            prospect.setPays(request.getPays() != null ? request.getPays().trim() : null);
         }
         
         // Champs communs
         prospect.setEmail(request.getEmail() != null ? request.getEmail().trim() : null);
-        prospect.setPhone(request.getPhone() != null ? request.getPhone().trim() : null);
+        prospect.setTelephone(request.getTelephone() != null ? request.getTelephone().trim() : null);
         prospect.setNotes(request.getNotes() != null ? request.getNotes().trim() : null);
 
         Prospect savedProspect = prospectRepository.save(prospect);
@@ -260,11 +268,11 @@ public class ProspectService {
         if (size > 100) size = 100; // Limite maximale
 
         // --- 4. Créer le Pageable avec tri par nom d'entreprise ---
-        Pageable pageable = PageRequest.of(page, size, Sort.by("companyName").ascending());
+        Pageable pageable = PageRequest.of(page, size, Sort.by("nom").ascending());
 
         // --- 5. Rechercher les prospects avec filtrage par entreprise ---
         // Recherche dans les noms d'entreprise ET les noms/prénoms
-        Page<Prospect> prospectsPage = prospectRepository.findByEntrepriseIdAndCompanyNameContainingIgnoreCase(entreprise.getId(), query, pageable);
+        Page<Prospect> prospectsPage = prospectRepository.findByEntrepriseIdAndNomContainingIgnoreCase(entreprise.getId(), query, pageable);
 
         // --- 6. Convertir en DTOs ---
         Page<ProspectDTO> prospectDTOPage = prospectsPage.map(this::convertToDTO);
@@ -306,16 +314,14 @@ public class ProspectService {
 
         // Validation selon le type
         if (request.getType() == ProspectType.ENTREPRISE) {
-            if (request.getCompanyName() == null || request.getCompanyName().trim().isEmpty()) {
+            if (request.getNom() == null || request.getNom().trim().isEmpty()) {
                 throw new IllegalArgumentException("Le nom de l'entreprise est obligatoire pour un prospect ENTREPRISE");
             }
         } else if (request.getType() == ProspectType.PARTICULIER) {
-            if (request.getFirstName() == null || request.getFirstName().trim().isEmpty()) {
+            if (request.getNomComplet() == null || request.getNomComplet().trim().isEmpty()) {
                 throw new IllegalArgumentException("Le prénom est obligatoire pour un prospect PARTICULIER");
             }
-            if (request.getLastName() == null || request.getLastName().trim().isEmpty()) {
-                throw new IllegalArgumentException("Le nom de famille est obligatoire pour un prospect PARTICULIER");
-            }
+            
         }
 
         // --- 5. Vérifier si un autre prospect avec le même email existe déjà dans l'entreprise ---
@@ -331,21 +337,21 @@ public class ProspectService {
         
         // Remplir les champs selon le type
         if (request.getType() == ProspectType.ENTREPRISE) {
-            prospect.setCompanyName(request.getCompanyName().trim());
+            prospect.setNom(request.getNom().trim());
             prospect.setSector(request.getSector() != null ? request.getSector().trim() : null);
             prospect.setAddress(request.getAddress() != null ? request.getAddress().trim() : null);
             prospect.setCity(request.getCity() != null ? request.getCity().trim() : null);
             prospect.setCountry(request.getCountry() != null ? request.getCountry().trim() : null);
             // Vider les champs particulier
-            prospect.setFirstName(null);
-            prospect.setLastName(null);
-            prospect.setPosition(null);
+            prospect.setNomComplet(null);
+            prospect.setAdresse(null);
+            prospect.setPays(null);
         } else if (request.getType() == ProspectType.PARTICULIER) {
-            prospect.setFirstName(request.getFirstName().trim());
-            prospect.setLastName(request.getLastName().trim());
-            prospect.setPosition(request.getPosition() != null ? request.getPosition().trim() : null);
+            prospect.setNomComplet(request.getNomComplet().trim());
+            prospect.setAdresse(request.getAdresse() != null ? request.getAdresse().trim() : null);
+            prospect.setPays(request.getPays() != null ? request.getPays().trim() : null);
             // Vider les champs entreprise
-            prospect.setCompanyName(null);
+            prospect.setNom(null);
             prospect.setSector(null);
             prospect.setAddress(null);
             prospect.setCity(null);
@@ -354,7 +360,7 @@ public class ProspectService {
         
         // Champs communs
         prospect.setEmail(request.getEmail() != null ? request.getEmail().trim() : null);
-        prospect.setPhone(request.getPhone() != null ? request.getPhone().trim() : null);
+        prospect.setTelephone(request.getTelephone() != null ? request.getTelephone().trim() : null);
         prospect.setNotes(request.getNotes() != null ? request.getNotes().trim() : null);
 
         Prospect updatedProspect = prospectRepository.save(prospect);
@@ -506,6 +512,93 @@ public class ProspectService {
     }
 
     /**
+     * Convertir un prospect en client (après achat)
+     */
+    public Map<String, Object> convertProspectToClient(Long prospectId, HttpServletRequest httpRequest) {
+        Map<String, Object> response = new HashMap<>();
+        
+        // --- 1. Extraction et validation du token JWT ---
+        String token = httpRequest.getHeader("Authorization");
+        if (token == null || !token.startsWith("Bearer ")) {
+            throw new RuntimeException("Token JWT manquant ou mal formaté");
+        }
+
+        User user = authHelper.getAuthenticatedUserWithFallback(httpRequest);
+        Entreprise entreprise = user.getEntreprise();
+        if (entreprise == null) {
+            throw new RuntimeException("L'utilisateur n'est associé à aucune entreprise");
+        }
+
+        // --- 2. Vérification des permissions ---
+        boolean isAdminOrManager = CentralAccess.isAdminOrManagerOfEntreprise(user, entreprise.getId());
+        boolean hasPermission = user.getRole().hasPermission(PermissionType.GERER_CLIENTS);
+        
+        if (!isAdminOrManager && !hasPermission) {
+            throw new RuntimeException("Accès refusé : Vous n'avez pas les permissions nécessaires pour convertir un prospect en client");
+        }
+
+        // --- 3. Récupérer le prospect avec vérification d'appartenance ---
+        Prospect prospect = prospectRepository.findByIdAndEntrepriseId(prospectId, entreprise.getId())
+                .orElseThrow(() -> new IllegalArgumentException("Prospect non trouvé avec l'ID: " + prospectId));
+
+        // --- 4. Vérifier si le prospect n'est pas déjà converti ---
+        if (prospect.getEmail() != null) {
+            Optional<Client> existingClient = clientRepository.findByEmail(prospect.getEmail());
+            if (existingClient.isPresent()) {
+                throw new IllegalArgumentException("Ce prospect a déjà été converti en client");
+            }
+        }
+
+        // --- 5. Conversion selon le type ---
+        if (prospect.getType() == ProspectType.ENTREPRISE) {
+            // Convertir directement en EntrepriseClient (pas de Client associé)
+            EntrepriseClient entrepriseClient = new EntrepriseClient();
+            entrepriseClient.setNom(prospect.getNom());
+            entrepriseClient.setEmail(prospect.getEmail());
+            entrepriseClient.setTelephone(prospect.getTelephone());
+            entrepriseClient.setAdresse(prospect.getAddress());
+            entrepriseClient.setPays(prospect.getCountry());
+            entrepriseClient.setSecteur(prospect.getSector());
+            entrepriseClient.setEntreprise(entreprise);
+            entrepriseClient.setCreatedAt(LocalDateTime.now());
+
+            EntrepriseClient savedEntrepriseClient = entrepriseClientRepository.save(entrepriseClient);
+            
+            response.put("message", "Prospect ENTREPRISE converti en EntrepriseClient avec succès");
+            response.put("entrepriseClientId", savedEntrepriseClient.getId());
+            response.put("type", "ENTREPRISE");
+            
+        } else if (prospect.getType() == ProspectType.PARTICULIER) {
+            // Convertir en Client particulier
+            Client client = new Client();
+            client.setNomComplet(prospect.getNomComplet());
+            client.setEmail(prospect.getEmail());
+            client.setTelephone(prospect.getTelephone());
+            client.setAdresse(prospect.getAdresse());
+            client.setPays(prospect.getPays());
+            client.setEntreprise(entreprise);
+            client.setCreatedAt(LocalDateTime.now());
+
+            Client savedClient = clientRepository.save(client);
+            
+            response.put("message", "Prospect PARTICULIER converti en Client avec succès");
+            response.put("clientId", savedClient.getId());
+            response.put("type", "PARTICULIER");
+        }
+
+        // --- 6. Supprimer le prospect (optionnel - vous pouvez aussi le marquer comme converti) ---
+        // Option 1: Supprimer complètement
+        prospectRepository.delete(prospect);
+        
+        // Option 2: Marquer comme converti (si vous voulez garder l'historique)
+        // prospect.setConvertedToClient(true);
+        // prospect.setConvertedAt(LocalDateTime.now());
+        // prospectRepository.save(prospect);
+
+        return response;
+    }
+
+    /**
      * Convertir une entité Prospect en DTO
      */
     private ProspectDTO convertToDTO(Prospect prospect) {
@@ -514,20 +607,21 @@ public class ProspectService {
         dto.type = prospect.getType();
         
         // Champs pour ENTREPRISE
-        dto.companyName = prospect.getCompanyName();
+        dto.nom = prospect.getNom();
         dto.sector = prospect.getSector();
         dto.address = prospect.getAddress();
         dto.city = prospect.getCity();
         dto.country = prospect.getCountry();
         
         // Champs pour PARTICULIER
-        dto.firstName = prospect.getFirstName();
-        dto.lastName = prospect.getLastName();
-        dto.position = prospect.getPosition();
+        dto.nomComplet = prospect.getNomComplet();
+        dto.adresse = prospect.getAdresse();
+        dto.pays = prospect.getPays();
+      
         
         // Champs communs
         dto.email = prospect.getEmail();
-        dto.phone = prospect.getPhone();
+        dto.phone = prospect.getTelephone();
         dto.notes = prospect.getNotes();
         dto.createdAt = prospect.getCreatedAt();
 

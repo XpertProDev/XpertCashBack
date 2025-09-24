@@ -254,4 +254,22 @@ public class ProspectController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
         }
     }
+
+    /**
+     * Convertir un prospect en client (après achat)
+     */
+    @PostMapping("/convert-prospect/{prospectId}")
+    public ResponseEntity<?> convertProspectToClient(@PathVariable Long prospectId, HttpServletRequest httpRequest) {
+        Map<String, Object> response = new HashMap<>();
+        try {
+            Map<String, Object> conversionResult = prospectService.convertProspectToClient(prospectId, httpRequest);
+            return ResponseEntity.ok(conversionResult);
+        } catch (RuntimeException e) {
+            response.put("error", e.getMessage());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+        } catch (Exception e) {
+            response.put("error", "Erreur lors de la conversion du prospect: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+        }
+    }
 }

@@ -10,16 +10,16 @@ public class ProspectDTO {
     public ProspectType type;
     
     // Champs pour ENTREPRISE
-    public String companyName;
+    public String nom;
     public String sector;
     public String address;
     public String city;
     public String country;
     
     // Champs pour PARTICULIER
-    public String firstName;
-    public String lastName;
-    public String position;
+    public String nomComplet;
+    public String adresse;
+    public String pays;
     
     // Champs communs
     public String email;
