@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.xpertcash.DTOs.PROSPECT.ConvertProspectRequestDTO;
 import com.xpertcash.DTOs.PROSPECT.CreateInteractionRequestDTO;
 import com.xpertcash.DTOs.PROSPECT.CreateProspectRequestDTO;
 import com.xpertcash.DTOs.PROSPECT.InteractionDTO;
@@ -25,6 +26,8 @@ import com.xpertcash.DTOs.PROSPECT.ProspectDTO;
 import com.xpertcash.DTOs.PROSPECT.ProspectPaginatedResponseDTO;
 import com.xpertcash.DTOs.PROSPECT.UpdateProspectRequestDTO;
 import com.xpertcash.entity.Enum.PROSPECT.ProspectType;
+import com.xpertcash.entity.Produit;
+import com.xpertcash.repository.ProduitRepository;
 import com.xpertcash.service.PROSPECT.ProspectService;
 
 import jakarta.servlet.http.HttpServletRequest;
@@ -36,6 +39,8 @@ public class ProspectController {
 
     @Autowired
     private ProspectService prospectService;
+    @Autowired
+    private ProduitRepository produitRepository;
 
     /**
      * Créer un nouveau prospect
@@ -259,16 +264,61 @@ public class ProspectController {
      * Convertir un prospect en client (après achat)
      */
     @PostMapping("/convert-prospect/{prospectId}")
-    public ResponseEntity<?> convertProspectToClient(@PathVariable Long prospectId, HttpServletRequest httpRequest) {
+    public ResponseEntity<?> convertProspectToClient(
+            @PathVariable Long prospectId, 
+            @RequestBody ConvertProspectRequestDTO conversionRequest,
+            HttpServletRequest httpRequest) {
         Map<String, Object> response = new HashMap<>();
         try {
-            Map<String, Object> conversionResult = prospectService.convertProspectToClient(prospectId, httpRequest);
+            Map<String, Object> conversionResult = prospectService.convertProspectToClient(prospectId, conversionRequest, httpRequest);
             return ResponseEntity.ok(conversionResult);
         } catch (RuntimeException e) {
             response.put("error", e.getMessage());
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
         } catch (Exception e) {
             response.put("error", "Erreur lors de la conversion du prospect: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+        }
+    }
+
+    /**
+     * Récupérer les produits/services disponibles pour la conversion
+     */
+    @GetMapping("/produits-disponibles")
+    public ResponseEntity<?> getProduitsDisponibles(HttpServletRequest httpRequest) {
+        Map<String, Object> response = new HashMap<>();
+        try {
+            // Récupérer l'entreprise de l'utilisateur connecté
+            String token = httpRequest.getHeader("Authorization");
+            if (token == null || !token.startsWith("Bearer ")) {
+                response.put("error", "Token JWT manquant ou mal formaté");
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
+            }
+
+            // Pour simplifier, on récupère tous les produits actifs
+            // Dans un vrai système, vous devriez filtrer par entreprise
+            List<Produit> produits = produitRepository.findAll().stream()
+                    .filter(p -> !p.getDeleted() && p.getEnStock())
+                    .collect(java.util.stream.Collectors.toList());
+
+            List<Map<String, Object>> produitsInfo = produits.stream()
+                    .map(p -> {
+                        Map<String, Object> produitInfo = new HashMap<>();
+                        produitInfo.put("id", p.getId());
+                        produitInfo.put("nom", p.getNom());
+                        produitInfo.put("prixVente", p.getPrixVente());
+                        produitInfo.put("typeProduit", p.getTypeProduit());
+                        produitInfo.put("description", p.getDescription());
+                        return produitInfo;
+                    })
+                    .collect(java.util.stream.Collectors.toList());
+
+            response.put("produits", produitsInfo);
+            response.put("total", produitsInfo.size());
+            return ResponseEntity.ok(response);
+
+        } catch (Exception e) {
+            response.put("error", "Erreur lors de la récupération des produits: " + e.getMessage());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
         }
     }

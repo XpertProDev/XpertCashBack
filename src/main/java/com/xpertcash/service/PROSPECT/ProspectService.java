@@ -15,6 +15,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.xpertcash.DTOs.PROSPECT.ConvertProspectRequestDTO;
 import com.xpertcash.DTOs.PROSPECT.CreateInteractionRequestDTO;
 import com.xpertcash.DTOs.PROSPECT.CreateProspectRequestDTO;
 import com.xpertcash.DTOs.PROSPECT.InteractionDTO;
@@ -28,12 +29,14 @@ import com.xpertcash.entity.EntrepriseClient;
 import com.xpertcash.entity.Enum.PROSPECT.ProspectType;
 import com.xpertcash.entity.PROSPECT.Interaction;
 import com.xpertcash.entity.PROSPECT.Prospect;
+import com.xpertcash.entity.Produit;
 import com.xpertcash.entity.User;
 import com.xpertcash.entity.PermissionType;
 import com.xpertcash.repository.ClientRepository;
 import com.xpertcash.repository.EntrepriseClientRepository;
 import com.xpertcash.repository.PROSPECT.InteractionRepository;
 import com.xpertcash.repository.PROSPECT.ProspectRepository;
+import com.xpertcash.repository.ProduitRepository;
 import com.xpertcash.service.AuthenticationHelper;
 
 import jakarta.servlet.http.HttpServletRequest;
@@ -49,6 +52,8 @@ public class ProspectService {
     private ClientRepository clientRepository;
     @Autowired
     private EntrepriseClientRepository entrepriseClientRepository;
+    @Autowired
+    private ProduitRepository produitRepository;
     @Autowired
     private AuthenticationHelper authHelper;
 
@@ -514,7 +519,7 @@ public class ProspectService {
     /**
      * Convertir un prospect en client (après achat)
      */
-    public Map<String, Object> convertProspectToClient(Long prospectId, HttpServletRequest httpRequest) {
+    public Map<String, Object> convertProspectToClient(Long prospectId, ConvertProspectRequestDTO conversionRequest, HttpServletRequest httpRequest) {
         Map<String, Object> response = new HashMap<>();
         
         // --- 1. Extraction et validation du token JWT ---
@@ -541,7 +546,29 @@ public class ProspectService {
         Prospect prospect = prospectRepository.findByIdAndEntrepriseId(prospectId, entreprise.getId())
                 .orElseThrow(() -> new IllegalArgumentException("Prospect non trouvé avec l'ID: " + prospectId));
 
-        // --- 4. Vérifier si le prospect n'est pas déjà converti ---
+        // --- 4. Vérifier le produit/service acheté ---
+        if (conversionRequest.getProduitId() == null) {
+            throw new IllegalArgumentException("L'ID du produit/service acheté est obligatoire");
+        }
+        
+        Produit produit = produitRepository.findById(conversionRequest.getProduitId())
+                .orElseThrow(() -> new IllegalArgumentException("Produit/service non trouvé avec l'ID: " + conversionRequest.getProduitId()));
+        
+        // Vérifier que le produit appartient à l'entreprise
+        if (!produit.getBoutique().getEntreprise().getId().equals(entreprise.getId())) {
+            throw new IllegalArgumentException("Ce produit/service n'appartient pas à votre entreprise");
+        }
+        
+        // Vérifier que le produit est en stock (pour les produits physiques)
+        if (produit.getTypeProduit().name().equals("PHYSIQUE") && !produit.getEnStock()) {
+            throw new IllegalArgumentException("Le produit physique '" + produit.getNom() + "' n'est pas en stock");
+        }
+        
+        // Utiliser le montant fourni ou le prix de vente du produit
+        Double montantFinal = conversionRequest.getMontantAchat() != null ? 
+            conversionRequest.getMontantAchat() : produit.getPrixVente();
+
+        // --- 5. Vérifier si le prospect n'est pas déjà converti ---
         if (prospect.getEmail() != null) {
             Optional<Client> existingClient = clientRepository.findByEmail(prospect.getEmail());
             if (existingClient.isPresent()) {
@@ -549,7 +576,7 @@ public class ProspectService {
             }
         }
 
-        // --- 5. Conversion selon le type ---
+        // --- 6. Conversion selon le type ---
         if (prospect.getType() == ProspectType.ENTREPRISE) {
             // Convertir directement en EntrepriseClient (pas de Client associé)
             EntrepriseClient entrepriseClient = new EntrepriseClient();
@@ -568,6 +595,16 @@ public class ProspectService {
             response.put("entrepriseClientId", savedEntrepriseClient.getId());
             response.put("type", "ENTREPRISE");
             
+            // Informations complètes sur le produit/service acheté
+            response.put("produitAchete", produit.getNom());
+            response.put("produitId", produit.getId());
+            response.put("typeProduit", produit.getTypeProduit().name());
+            response.put("descriptionProduit", produit.getDescription());
+            response.put("prixProduit", produit.getPrixVente());
+            response.put("montantAchat", montantFinal);
+            response.put("notesAchat", conversionRequest.getNotesAchat());
+            response.put("dateAchat", LocalDateTime.now().toString());
+            
         } else if (prospect.getType() == ProspectType.PARTICULIER) {
             // Convertir en Client particulier
             Client client = new Client();
@@ -584,9 +621,19 @@ public class ProspectService {
             response.put("message", "Prospect PARTICULIER converti en Client avec succès");
             response.put("clientId", savedClient.getId());
             response.put("type", "PARTICULIER");
+            
+            // Informations complètes sur le produit/service acheté
+            response.put("produitAchete", produit.getNom());
+            response.put("produitId", produit.getId());
+            response.put("typeProduit", produit.getTypeProduit().name());
+            response.put("descriptionProduit", produit.getDescription());
+            response.put("prixProduit", produit.getPrixVente());
+            response.put("montantAchat", montantFinal);
+            response.put("notesAchat", conversionRequest.getNotesAchat());
+            response.put("dateAchat", LocalDateTime.now().toString());
         }
 
-        // --- 6. Supprimer le prospect (optionnel - vous pouvez aussi le marquer comme converti) ---
+        // --- 7. Supprimer le prospect (optionnel - vous pouvez aussi le marquer comme converti) ---
         // Option 1: Supprimer complètement
         prospectRepository.delete(prospect);
         
