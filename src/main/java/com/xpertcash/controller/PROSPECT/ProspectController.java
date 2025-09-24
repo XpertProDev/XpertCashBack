@@ -1,0 +1,257 @@
+package com.xpertcash.controller.PROSPECT;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import com.xpertcash.DTOs.PROSPECT.CreateInteractionRequestDTO;
+import com.xpertcash.DTOs.PROSPECT.CreateProspectRequestDTO;
+import com.xpertcash.DTOs.PROSPECT.InteractionDTO;
+import com.xpertcash.DTOs.PROSPECT.ProspectDTO;
+import com.xpertcash.DTOs.PROSPECT.ProspectPaginatedResponseDTO;
+import com.xpertcash.DTOs.PROSPECT.UpdateProspectRequestDTO;
+import com.xpertcash.entity.Enum.PROSPECT.ProspectType;
+import com.xpertcash.service.PROSPECT.ProspectService;
+
+import jakarta.servlet.http.HttpServletRequest;
+
+@CrossOrigin(origins = "*")
+@RestController
+@RequestMapping("/api/auth")
+public class ProspectController {
+
+    @Autowired
+    private ProspectService prospectService;
+
+    /**
+     * Créer un nouveau prospect
+     */
+    @PostMapping("/creat-prospects")
+    public ResponseEntity<?> createProspect(@RequestBody CreateProspectRequestDTO request, HttpServletRequest httpRequest) {
+        Map<String, Object> response = new HashMap<>();
+        try {
+            ProspectDTO prospect = prospectService.createProspect(request, httpRequest);
+            response.put("message", "Prospect créé avec succès");
+            response.put("prospect", prospect);
+            return ResponseEntity.ok(response);
+        } catch (RuntimeException e) {
+            response.put("error", e.getMessage());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+        } catch (Exception e) {
+            response.put("error", "Erreur lors de la création du prospect: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+        }
+    }
+
+    /**
+     * Récupérer un prospect par son ID avec ses interactions
+     */
+    @GetMapping("/prospects/{id}")
+    public ResponseEntity<?> getProspectById(@PathVariable Long id, HttpServletRequest httpRequest) {
+        Map<String, Object> response = new HashMap<>();
+        try {
+            ProspectDTO prospect = prospectService.getProspectById(id, httpRequest);
+            response.put("prospect", prospect);
+            return ResponseEntity.ok(response);
+        } catch (RuntimeException e) {
+            response.put("error", e.getMessage());
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+        } catch (Exception e) {
+            response.put("error", "Erreur lors de la récupération du prospect: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+        }
+    }
+
+    /**
+     * Récupérer tous les prospects avec pagination
+     */
+    @GetMapping("/Allprospects")
+    public ResponseEntity<?> getAllProspects(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            HttpServletRequest httpRequest) {
+        Map<String, Object> response = new HashMap<>();
+        try {
+            ProspectPaginatedResponseDTO prospects = prospectService.getAllProspects(page, size, httpRequest);
+            response.put("prospects", prospects);
+            return ResponseEntity.ok(response);
+        } catch (RuntimeException e) {
+            response.put("error", e.getMessage());
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
+        } catch (Exception e) {
+            response.put("error", "Erreur lors de la récupération des prospects: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+        }
+    }
+
+    /**
+     * Récupérer les prospects par type (PARTICULIER ou ENTREPRISE)
+     */
+    @GetMapping("/prospects/type/{type}")
+    public ResponseEntity<?> getProspectsByType(
+            @PathVariable String type,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            HttpServletRequest httpRequest) {
+        Map<String, Object> response = new HashMap<>();
+        try {
+            ProspectType prospectType = ProspectType.valueOf(type.toUpperCase());
+            ProspectPaginatedResponseDTO prospects = prospectService.getProspectsByType(prospectType, page, size, httpRequest);
+            response.put("prospects", prospects);
+            response.put("type", type);
+            return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException e) {
+            response.put("error", "Type de prospect invalide. Utilisez 'PARTICULIER' ou 'ENTREPRISE'");
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+        } catch (RuntimeException e) {
+            response.put("error", e.getMessage());
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
+        } catch (Exception e) {
+            response.put("error", "Erreur lors de la récupération des prospects: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+        }
+    }
+
+    /**
+     * Rechercher des prospects par nom/prénom
+     */
+    @GetMapping("/prospects/search")
+    public ResponseEntity<?> searchProspects(
+            @RequestParam String query,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            HttpServletRequest httpRequest) {
+        Map<String, Object> response = new HashMap<>();
+        try {
+            ProspectPaginatedResponseDTO prospects = prospectService.searchProspects(query, page, size, httpRequest);
+            response.put("prospects", prospects);
+            response.put("query", query);
+            return ResponseEntity.ok(response);
+        } catch (RuntimeException e) {
+            response.put("error", e.getMessage());
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
+        } catch (Exception e) {
+            response.put("error", "Erreur lors de la recherche des prospects: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+        }
+    }
+
+    /**
+     * Mettre à jour un prospect
+     */
+    @PutMapping("/Updateprospects/{id}")
+    public ResponseEntity<?> updateProspect(
+            @PathVariable Long id,
+            @RequestBody UpdateProspectRequestDTO request,
+            HttpServletRequest httpRequest) {
+        Map<String, Object> response = new HashMap<>();
+        try {
+            ProspectDTO prospect = prospectService.updateProspect(id, request, httpRequest);
+            response.put("message", "Prospect mis à jour avec succès");
+            response.put("prospect", prospect);
+            return ResponseEntity.ok(response);
+        } catch (RuntimeException e) {
+            response.put("error", e.getMessage());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+        } catch (Exception e) {
+            response.put("error", "Erreur lors de la mise à jour du prospect: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+        }
+    }
+
+    /**
+     * Supprimer un prospect
+     */
+    @DeleteMapping("/deletprospects/{id}")
+    public ResponseEntity<?> deleteProspect(@PathVariable Long id, HttpServletRequest httpRequest) {
+        Map<String, Object> response = new HashMap<>();
+        try {
+            prospectService.deleteProspect(id, httpRequest);
+            response.put("message", "Prospect supprimé avec succès");
+            return ResponseEntity.ok(response);
+        } catch (RuntimeException e) {
+            response.put("error", e.getMessage());
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+        } catch (Exception e) {
+            response.put("error", "Erreur lors de la suppression du prospect: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+        }
+    }
+
+    /**
+     * Ajouter une interaction à un prospect
+     */
+    @PostMapping("/add-prospects/{prospectId}/interactions")
+    public ResponseEntity<?> addInteraction(
+            @PathVariable Long prospectId,
+            @RequestBody CreateInteractionRequestDTO request,
+            HttpServletRequest httpRequest) {
+        Map<String, Object> response = new HashMap<>();
+        try {
+            InteractionDTO interaction = prospectService.addInteraction(prospectId, request, httpRequest);
+            response.put("message", "Interaction ajoutée avec succès");
+            response.put("interaction", interaction);
+            return ResponseEntity.ok(response);
+        } catch (RuntimeException e) {
+            response.put("error", e.getMessage());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+        } catch (Exception e) {
+            response.put("error", "Erreur lors de l'ajout de l'interaction: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+        }
+    }
+
+    /**
+     * Récupérer les interactions d'un prospect
+     */
+    @GetMapping("/prospects/{prospectId}/interactions")
+    public ResponseEntity<?> getProspectInteractions(@PathVariable Long prospectId, HttpServletRequest httpRequest) {
+        Map<String, Object> response = new HashMap<>();
+        try {
+            List<InteractionDTO> interactions = prospectService.getProspectInteractions(prospectId, httpRequest);
+            response.put("interactions", interactions);
+            response.put("prospectId", prospectId);
+            response.put("total", interactions.size());
+            return ResponseEntity.ok(response);
+        } catch (RuntimeException e) {
+            response.put("error", e.getMessage());
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+        } catch (Exception e) {
+            response.put("error", "Erreur lors de la récupération des interactions: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+        }
+    }
+
+    /**
+     * Supprimer une interaction
+     */
+    @DeleteMapping("/delet-interactions/{interactionId}")
+    public ResponseEntity<?> deleteInteraction(@PathVariable Long interactionId, HttpServletRequest httpRequest) {
+        Map<String, Object> response = new HashMap<>();
+        try {
+            prospectService.deleteInteraction(interactionId, httpRequest);
+            response.put("message", "Interaction supprimée avec succès");
+            return ResponseEntity.ok(response);
+        } catch (RuntimeException e) {
+            response.put("error", e.getMessage());
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
+        } catch (Exception e) {
+            response.put("error", "Erreur lors de la suppression de l'interaction: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+        }
+    }
+}
