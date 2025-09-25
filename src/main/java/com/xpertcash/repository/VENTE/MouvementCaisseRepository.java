@@ -14,4 +14,8 @@ public interface MouvementCaisseRepository extends JpaRepository<MouvementCaisse
     // Méthodes pour le résumé des transactions
     List<MouvementCaisse> findByCaisse_Boutique_Entreprise_IdAndTypeMouvementAndDateMouvementBetween(
         Long entrepriseId, TypeMouvementCaisse typeMouvement, LocalDateTime dateDebut, LocalDateTime dateFin);
+    
+    // Récupère les mouvements pour plusieurs caisses
+    List<MouvementCaisse> findByCaisseIdInAndTypeMouvementAndDateMouvementBetween(
+        List<Long> caisseIds, TypeMouvementCaisse typeMouvement, LocalDateTime dateDebut, LocalDateTime dateFin);
 }

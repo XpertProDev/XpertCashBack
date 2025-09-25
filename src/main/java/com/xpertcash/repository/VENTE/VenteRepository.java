@@ -38,6 +38,13 @@ public interface VenteRepository extends JpaRepository<Vente, Long> {
             LocalDateTime startOfDay,
             LocalDateTime endOfDay
     );
+    
+    // Récupère les ventes d'un vendeur spécifique dans une période
+    List<Vente> findByVendeur_IdAndDateVenteBetween(
+            Long vendeurId,
+            LocalDateTime startDate,
+            LocalDateTime endDate
+    );
         
     List<Vente> findByBoutiqueEntrepriseId(Long entrepriseId);
 
