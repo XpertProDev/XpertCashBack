@@ -43,8 +43,17 @@ public class Prospect {
     private String telephone;
     private String notes; // notes générales sur le prospect
 
+    // Statut de conversion
+    private Boolean convertedToClient = false;
+    private LocalDateTime convertedAt;
+    private Long clientId; // ID du client créé (Client ou EntrepriseClient)
+    private String clientType; // "CLIENT" ou "ENTREPRISE_CLIENT"
+
     @OneToMany(mappedBy = "prospect", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Interaction> interactions = new ArrayList<>();
+
+    @OneToMany(mappedBy = "prospect", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<ProspectAchat> achats = new ArrayList<>();
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "entreprise_id")

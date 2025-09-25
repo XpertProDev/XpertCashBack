@@ -27,4 +27,11 @@ public class ProspectDTO {
     public String notes;
     public LocalDateTime createdAt;
     public List<InteractionDTO> interactions;
+    
+    // Statut de conversion
+    public Boolean convertedToClient;
+    public LocalDateTime convertedAt;
+    public Long clientId;
+    public String clientType;
+    public List<ProspectAchatDTO> achats;
 }

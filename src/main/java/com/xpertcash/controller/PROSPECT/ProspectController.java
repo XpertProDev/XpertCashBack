@@ -25,9 +25,6 @@ import com.xpertcash.DTOs.PROSPECT.InteractionDTO;
 import com.xpertcash.DTOs.PROSPECT.ProspectDTO;
 import com.xpertcash.DTOs.PROSPECT.ProspectPaginatedResponseDTO;
 import com.xpertcash.DTOs.PROSPECT.UpdateProspectRequestDTO;
-import com.xpertcash.entity.Enum.PROSPECT.ProspectType;
-import com.xpertcash.entity.Produit;
-import com.xpertcash.repository.ProduitRepository;
 import com.xpertcash.service.PROSPECT.ProspectService;
 
 import jakarta.servlet.http.HttpServletRequest;
@@ -39,8 +36,6 @@ public class ProspectController {
 
     @Autowired
     private ProspectService prospectService;
-    @Autowired
-    private ProduitRepository produitRepository;
 
     /**
      * Créer un nouveau prospect
@@ -103,57 +98,8 @@ public class ProspectController {
         }
     }
 
-    /**
-     * Récupérer les prospects par type (PARTICULIER ou ENTREPRISE)
-     */
-    @GetMapping("/prospects/type/{type}")
-    public ResponseEntity<?> getProspectsByType(
-            @PathVariable String type,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size,
-            HttpServletRequest httpRequest) {
-        Map<String, Object> response = new HashMap<>();
-        try {
-            ProspectType prospectType = ProspectType.valueOf(type.toUpperCase());
-            ProspectPaginatedResponseDTO prospects = prospectService.getProspectsByType(prospectType, page, size, httpRequest);
-            response.put("prospects", prospects);
-            response.put("type", type);
-            return ResponseEntity.ok(response);
-        } catch (IllegalArgumentException e) {
-            response.put("error", "Type de prospect invalide. Utilisez 'PARTICULIER' ou 'ENTREPRISE'");
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
-        } catch (RuntimeException e) {
-            response.put("error", e.getMessage());
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
-        } catch (Exception e) {
-            response.put("error", "Erreur lors de la récupération des prospects: " + e.getMessage());
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
-        }
-    }
 
-    /**
-     * Rechercher des prospects par nom/prénom
-     */
-    @GetMapping("/prospects/search")
-    public ResponseEntity<?> searchProspects(
-            @RequestParam String query,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size,
-            HttpServletRequest httpRequest) {
-        Map<String, Object> response = new HashMap<>();
-        try {
-            ProspectPaginatedResponseDTO prospects = prospectService.searchProspects(query, page, size, httpRequest);
-            response.put("prospects", prospects);
-            response.put("query", query);
-            return ResponseEntity.ok(response);
-        } catch (RuntimeException e) {
-            response.put("error", e.getMessage());
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(response);
-        } catch (Exception e) {
-            response.put("error", "Erreur lors de la recherche des prospects: " + e.getMessage());
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
-        }
-    }
+
 
     /**
      * Mettre à jour un prospect
@@ -281,44 +227,27 @@ public class ProspectController {
         }
     }
 
+
+   
+
+
     /**
-     * Récupérer les produits/services disponibles pour la conversion
+     * Ajouter un nouvel achat à un prospect déjà converti
      */
-    @GetMapping("/produits-disponibles")
-    public ResponseEntity<?> getProduitsDisponibles(HttpServletRequest httpRequest) {
+    @PostMapping("/add-achat-prospect/{prospectId}")
+    public ResponseEntity<?> addAchatToConvertedProspect(
+            @PathVariable Long prospectId,
+            @RequestBody ConvertProspectRequestDTO conversionRequest,
+            HttpServletRequest httpRequest) {
         Map<String, Object> response = new HashMap<>();
         try {
-            // Récupérer l'entreprise de l'utilisateur connecté
-            String token = httpRequest.getHeader("Authorization");
-            if (token == null || !token.startsWith("Bearer ")) {
-                response.put("error", "Token JWT manquant ou mal formaté");
-                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
-            }
-
-            // Pour simplifier, on récupère tous les produits actifs
-            // Dans un vrai système, vous devriez filtrer par entreprise
-            List<Produit> produits = produitRepository.findAll().stream()
-                    .filter(p -> !p.getDeleted() && p.getEnStock())
-                    .collect(java.util.stream.Collectors.toList());
-
-            List<Map<String, Object>> produitsInfo = produits.stream()
-                    .map(p -> {
-                        Map<String, Object> produitInfo = new HashMap<>();
-                        produitInfo.put("id", p.getId());
-                        produitInfo.put("nom", p.getNom());
-                        produitInfo.put("prixVente", p.getPrixVente());
-                        produitInfo.put("typeProduit", p.getTypeProduit());
-                        produitInfo.put("description", p.getDescription());
-                        return produitInfo;
-                    })
-                    .collect(java.util.stream.Collectors.toList());
-
-            response.put("produits", produitsInfo);
-            response.put("total", produitsInfo.size());
-            return ResponseEntity.ok(response);
-
+            Map<String, Object> result = prospectService.addAchatToConvertedProspect(prospectId, conversionRequest, httpRequest);
+            return ResponseEntity.ok(result);
+        } catch (RuntimeException e) {
+            response.put("error", e.getMessage());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
         } catch (Exception e) {
-            response.put("error", "Erreur lors de la récupération des produits: " + e.getMessage());
+            response.put("error", "Erreur lors de l'ajout de l'achat: " + e.getMessage());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
         }
     }

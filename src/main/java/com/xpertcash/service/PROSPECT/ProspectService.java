@@ -19,6 +19,7 @@ import com.xpertcash.DTOs.PROSPECT.ConvertProspectRequestDTO;
 import com.xpertcash.DTOs.PROSPECT.CreateInteractionRequestDTO;
 import com.xpertcash.DTOs.PROSPECT.CreateProspectRequestDTO;
 import com.xpertcash.DTOs.PROSPECT.InteractionDTO;
+import com.xpertcash.DTOs.PROSPECT.ProspectAchatDTO;
 import com.xpertcash.DTOs.PROSPECT.ProspectDTO;
 import com.xpertcash.DTOs.PROSPECT.ProspectPaginatedResponseDTO;
 import com.xpertcash.DTOs.PROSPECT.UpdateProspectRequestDTO;
@@ -29,12 +30,14 @@ import com.xpertcash.entity.EntrepriseClient;
 import com.xpertcash.entity.Enum.PROSPECT.ProspectType;
 import com.xpertcash.entity.PROSPECT.Interaction;
 import com.xpertcash.entity.PROSPECT.Prospect;
+import com.xpertcash.entity.PROSPECT.ProspectAchat;
 import com.xpertcash.entity.Produit;
 import com.xpertcash.entity.User;
 import com.xpertcash.entity.PermissionType;
 import com.xpertcash.repository.ClientRepository;
 import com.xpertcash.repository.EntrepriseClientRepository;
 import com.xpertcash.repository.PROSPECT.InteractionRepository;
+import com.xpertcash.repository.PROSPECT.ProspectAchatRepository;
 import com.xpertcash.repository.PROSPECT.ProspectRepository;
 import com.xpertcash.repository.ProduitRepository;
 import com.xpertcash.service.AuthenticationHelper;
@@ -54,6 +57,8 @@ public class ProspectService {
     private EntrepriseClientRepository entrepriseClientRepository;
     @Autowired
     private ProduitRepository produitRepository;
+    @Autowired
+    private ProspectAchatRepository prospectAchatRepository;
     @Autowired
     private AuthenticationHelper authHelper;
 
@@ -203,86 +208,7 @@ public class ProspectService {
         return ProspectPaginatedResponseDTO.fromPage(prospectDTOPage);
     }
 
-    /**
-     * Récupérer les prospects par type avec pagination
-     */
-    public ProspectPaginatedResponseDTO getProspectsByType(ProspectType type, int page, int size, HttpServletRequest httpRequest) {
-        // --- 1. Extraction et validation du token JWT ---
-        String token = httpRequest.getHeader("Authorization");
-        if (token == null || !token.startsWith("Bearer ")) {
-            throw new RuntimeException("Token JWT manquant ou mal formaté");
-        }
 
-        User user = authHelper.getAuthenticatedUserWithFallback(httpRequest);
-        Entreprise entreprise = user.getEntreprise();
-        if (entreprise == null) {
-            throw new RuntimeException("L'utilisateur n'est associé à aucune entreprise");
-        }
-
-        // --- 2. Vérification des permissions ---
-        boolean isAdminOrManager = CentralAccess.isAdminOrManagerOfEntreprise(user, entreprise.getId());
-        boolean hasPermission = user.getRole().hasPermission(PermissionType.GERER_MARKETING);
-        
-        if (!isAdminOrManager && !hasPermission) {
-            throw new RuntimeException("Accès refusé : Vous n'avez pas les permissions nécessaires pour voir les prospects");
-        }
-
-        // --- 3. Validation des paramètres de pagination ---
-        if (page < 0) page = 0;
-        if (size <= 0) size = 20; // Taille par défaut
-        if (size > 100) size = 100; // Limite maximale
-
-        // --- 4. Créer le Pageable avec tri par date de création décroissante ---
-        Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
-
-        // --- 5. Récupérer les prospects avec filtrage par type et entreprise ---
-        Page<Prospect> prospectsPage = prospectRepository.findByEntrepriseIdAndType(entreprise.getId(), type, pageable);
-
-        // --- 6. Créer la réponse paginée ---
-        Page<ProspectDTO> prospectDTOPage = prospectsPage.map(this::convertToDTO);
-        return ProspectPaginatedResponseDTO.fromPage(prospectDTOPage);
-    }
-
-    /**
-     * Rechercher des prospects par nom/prénom avec pagination
-     */
-    public ProspectPaginatedResponseDTO searchProspects(String query, int page, int size, HttpServletRequest httpRequest) {
-        // --- 1. Extraction et validation du token JWT ---
-        String token = httpRequest.getHeader("Authorization");
-        if (token == null || !token.startsWith("Bearer ")) {
-            throw new RuntimeException("Token JWT manquant ou mal formaté");
-        }
-
-        User user = authHelper.getAuthenticatedUserWithFallback(httpRequest);
-        Entreprise entreprise = user.getEntreprise();
-        if (entreprise == null) {
-            throw new RuntimeException("L'utilisateur n'est associé à aucune entreprise");
-        }
-
-        // --- 2. Vérification des permissions ---
-        boolean isAdminOrManager = CentralAccess.isAdminOrManagerOfEntreprise(user, entreprise.getId());
-        boolean hasPermission = user.getRole().hasPermission(PermissionType.GERER_MARKETING);
-        
-        if (!isAdminOrManager && !hasPermission) {
-            throw new RuntimeException("Accès refusé : Vous n'avez pas les permissions nécessaires pour rechercher des prospects");
-        }
-
-        // --- 3. Validation des paramètres de pagination ---
-        if (page < 0) page = 0;
-        if (size <= 0) size = 20; // Taille par défaut
-        if (size > 100) size = 100; // Limite maximale
-
-        // --- 4. Créer le Pageable avec tri par nom d'entreprise ---
-        Pageable pageable = PageRequest.of(page, size, Sort.by("nom").ascending());
-
-        // --- 5. Rechercher les prospects avec filtrage par entreprise ---
-        // Recherche dans les noms d'entreprise ET les noms/prénoms
-        Page<Prospect> prospectsPage = prospectRepository.findByEntrepriseIdAndNomContainingIgnoreCase(entreprise.getId(), query, pageable);
-
-        // --- 6. Convertir en DTOs ---
-        Page<ProspectDTO> prospectDTOPage = prospectsPage.map(this::convertToDTO);
-        return ProspectPaginatedResponseDTO.fromPage(prospectDTOPage);
-    }
 
     /**
      * Mettre à jour un prospect
@@ -447,7 +373,7 @@ public class ProspectService {
         interaction.setProspect(prospect);
 
         Interaction savedInteraction = interactionRepository.save(interaction);
-        return convertToDTO(savedInteraction);
+        return convertInteractionToDTO(savedInteraction);
     }
 
     /**
@@ -482,7 +408,7 @@ public class ProspectService {
         List<Interaction> interactions = interactionRepository.findByProspectIdOrderByOccurredAtDesc(prospectId);
 
         return interactions.stream()
-                .map(this::convertToDTO)
+                .map(this::convertInteractionToDTO)
                 .collect(Collectors.toList());
     }
 
@@ -559,14 +485,34 @@ public class ProspectService {
             throw new IllegalArgumentException("Ce produit/service n'appartient pas à votre entreprise");
         }
         
-        // Vérifier que le produit est en stock (pour les produits physiques)
-        if (produit.getTypeProduit().name().equals("PHYSIQUE") && !produit.getEnStock()) {
-            throw new IllegalArgumentException("Le produit physique '" + produit.getNom() + "' n'est pas en stock");
+        // Vérifier la quantité pour les produits physiques
+        Integer quantiteAchetee = conversionRequest.getQuantite() != null ? conversionRequest.getQuantite() : 1;
+        
+        if (produit.getTypeProduit().name().equals("PHYSIQUE")) {
+            // Pour les produits physiques, la quantité est obligatoire
+            if (conversionRequest.getQuantite() == null || conversionRequest.getQuantite() <= 0) {
+                throw new IllegalArgumentException("La quantité est obligatoire pour les produits physiques");
+            }
+            
+            // Vérifier le stock (informatif seulement, pas bloquant)
+            if (!produit.getEnStock()) {
+                response.put("warning", "Attention: Le produit physique '" + produit.getNom() + "' n'est pas en stock");
+            }
+            
+            if (produit.getQuantite() < quantiteAchetee) {
+                response.put("warning", "Attention: Stock insuffisant pour le produit '" + produit.getNom() + 
+                    "'. Stock disponible: " + produit.getQuantite() + ", Quantité demandée: " + quantiteAchetee);
+            }
         }
         
-        // Utiliser le montant fourni ou le prix de vente du produit
-        Double montantFinal = conversionRequest.getMontantAchat() != null ? 
-            conversionRequest.getMontantAchat() : produit.getPrixVente();
+        // Calculer le montant final
+        Double montantFinal;
+        if (conversionRequest.getMontantAchat() != null) {
+            montantFinal = conversionRequest.getMontantAchat();
+        } else {
+            // Calculer le montant total basé sur le prix unitaire et la quantité
+            montantFinal = produit.getPrixVente() * quantiteAchetee;
+        }
 
         // --- 5. Vérifier si le prospect n'est pas déjà converti ---
         if (prospect.getEmail() != null) {
@@ -577,6 +523,9 @@ public class ProspectService {
         }
 
         // --- 6. Conversion selon le type ---
+        Long clientId = null;
+        String clientType = null;
+        
         if (prospect.getType() == ProspectType.ENTREPRISE) {
             // Convertir directement en EntrepriseClient (pas de Client associé)
             EntrepriseClient entrepriseClient = new EntrepriseClient();
@@ -590,20 +539,12 @@ public class ProspectService {
             entrepriseClient.setCreatedAt(LocalDateTime.now());
 
             EntrepriseClient savedEntrepriseClient = entrepriseClientRepository.save(entrepriseClient);
+            clientId = savedEntrepriseClient.getId();
+            clientType = "ENTREPRISE_CLIENT";
             
             response.put("message", "Prospect ENTREPRISE converti en EntrepriseClient avec succès");
             response.put("entrepriseClientId", savedEntrepriseClient.getId());
             response.put("type", "ENTREPRISE");
-            
-            // Informations complètes sur le produit/service acheté
-            response.put("produitAchete", produit.getNom());
-            response.put("produitId", produit.getId());
-            response.put("typeProduit", produit.getTypeProduit().name());
-            response.put("descriptionProduit", produit.getDescription());
-            response.put("prixProduit", produit.getPrixVente());
-            response.put("montantAchat", montantFinal);
-            response.put("notesAchat", conversionRequest.getNotesAchat());
-            response.put("dateAchat", LocalDateTime.now().toString());
             
         } else if (prospect.getType() == ProspectType.PARTICULIER) {
             // Convertir en Client particulier
@@ -617,30 +558,153 @@ public class ProspectService {
             client.setCreatedAt(LocalDateTime.now());
 
             Client savedClient = clientRepository.save(client);
+            clientId = savedClient.getId();
+            clientType = "CLIENT";
             
             response.put("message", "Prospect PARTICULIER converti en Client avec succès");
             response.put("clientId", savedClient.getId());
             response.put("type", "PARTICULIER");
-            
-            // Informations complètes sur le produit/service acheté
-            response.put("produitAchete", produit.getNom());
-            response.put("produitId", produit.getId());
-            response.put("typeProduit", produit.getTypeProduit().name());
-            response.put("descriptionProduit", produit.getDescription());
-            response.put("prixProduit", produit.getPrixVente());
-            response.put("montantAchat", montantFinal);
-            response.put("notesAchat", conversionRequest.getNotesAchat());
-            response.put("dateAchat", LocalDateTime.now().toString());
+        }
+        
+        // Informations complètes sur le produit/service acheté
+        response.put("produitAchete", produit.getNom());
+        response.put("produitId", produit.getId());
+        response.put("typeProduit", produit.getTypeProduit().name());
+        response.put("descriptionProduit", produit.getDescription());
+        response.put("prixProduit", produit.getPrixVente());
+        response.put("quantiteAchetee", quantiteAchetee);
+        response.put("montantAchat", montantFinal);
+        response.put("notesAchat", conversionRequest.getNotesAchat());
+        response.put("dateAchat", LocalDateTime.now().toString());
+
+        // --- 7. IMPORTANT: Ne pas décrémenter le stock ici ---
+        // Le stock sera décrémenté lors de la vente réelle par un vendeur autorisé
+        // Cette conversion prospect → client ne fait que créer l'historique d'achat
+
+        // --- 8. Enregistrer l'achat dans l'historique ---
+        ProspectAchat achat = new ProspectAchat();
+        achat.setProspect(prospect);
+        achat.setProduit(produit);
+        achat.setQuantite(quantiteAchetee);
+        achat.setMontantAchat(montantFinal);
+        achat.setNotesAchat(conversionRequest.getNotesAchat());
+        achat.setDateAchat(LocalDateTime.now());
+        
+        achat.setClientId(clientId);
+        achat.setClientType(clientType);
+        
+        prospectAchatRepository.save(achat);
+
+        // --- 9. Marquer le prospect comme converti (garder l'historique) ---
+        prospect.setConvertedToClient(true);
+        prospect.setConvertedAt(LocalDateTime.now());
+        
+        prospect.setClientId(clientId);
+        prospect.setClientType(clientType);
+        
+        prospectRepository.save(prospect);
+
+        return response;
+    }
+
+
+
+    /**
+     * Ajouter un nouvel achat à un prospect déjà converti
+     */
+    public Map<String, Object> addAchatToConvertedProspect(Long prospectId, ConvertProspectRequestDTO conversionRequest, HttpServletRequest httpRequest) {
+        Map<String, Object> response = new HashMap<>();
+        
+        // --- 1. Extraction et validation du token JWT ---
+        String token = httpRequest.getHeader("Authorization");
+        if (token == null || !token.startsWith("Bearer ")) {
+            throw new RuntimeException("Token JWT manquant ou mal formaté");
         }
 
-        // --- 7. Supprimer le prospect (optionnel - vous pouvez aussi le marquer comme converti) ---
-        // Option 1: Supprimer complètement
-        prospectRepository.delete(prospect);
+        User user = authHelper.getAuthenticatedUserWithFallback(httpRequest);
+        Entreprise entreprise = user.getEntreprise();
+        if (entreprise == null) {
+            throw new RuntimeException("L'utilisateur n'est associé à aucune entreprise");
+        }
+
+        // --- 2. Vérification des permissions ---
+        boolean isAdminOrManager = CentralAccess.isAdminOrManagerOfEntreprise(user, entreprise.getId());
+        boolean hasPermission = user.getRole().hasPermission(PermissionType.GERER_CLIENTS);
+
+        if (!isAdminOrManager && !hasPermission) {
+            throw new RuntimeException("Accès refusé : Vous n'avez pas les permissions nécessaires pour ajouter un achat");
+        }
+
+        // --- 3. Récupérer le prospect converti ---
+        Prospect prospect = prospectRepository.findByIdAndEntrepriseId(prospectId, entreprise.getId())
+                .orElseThrow(() -> new IllegalArgumentException("Prospect non trouvé avec l'ID: " + prospectId));
+
+        if (!prospect.getConvertedToClient()) {
+            throw new IllegalArgumentException("Ce prospect n'est pas encore converti en client");
+        }
+
+        // --- 4. Vérifier le produit/service ---
+        if (conversionRequest.getProduitId() == null) {
+            throw new IllegalArgumentException("L'ID du produit/service acheté est obligatoire");
+        }
         
-        // Option 2: Marquer comme converti (si vous voulez garder l'historique)
-        // prospect.setConvertedToClient(true);
-        // prospect.setConvertedAt(LocalDateTime.now());
-        // prospectRepository.save(prospect);
+        Produit produit = produitRepository.findById(conversionRequest.getProduitId())
+                .orElseThrow(() -> new IllegalArgumentException("Produit/service non trouvé avec l'ID: " + conversionRequest.getProduitId()));
+        
+        if (!produit.getBoutique().getEntreprise().getId().equals(entreprise.getId())) {
+            throw new IllegalArgumentException("Ce produit/service n'appartient pas à votre entreprise");
+        }
+        
+        // --- 5. Vérifier la quantité pour les produits physiques ---
+        Integer quantiteAchetee = conversionRequest.getQuantite() != null ? conversionRequest.getQuantite() : 1;
+        
+        if (produit.getTypeProduit().name().equals("PHYSIQUE")) {
+            if (conversionRequest.getQuantite() == null || conversionRequest.getQuantite() <= 0) {
+                throw new IllegalArgumentException("La quantité est obligatoire pour les produits physiques");
+            }
+            
+            // Vérifier le stock (informatif seulement, pas bloquant)
+            if (!produit.getEnStock()) {
+                response.put("warning", "Attention: Le produit physique '" + produit.getNom() + "' n'est pas en stock");
+            }
+            
+            if (produit.getQuantite() < quantiteAchetee) {
+                response.put("warning", "Attention: Stock insuffisant pour le produit '" + produit.getNom() + 
+                    "'. Stock disponible: " + produit.getQuantite() + ", Quantité demandée: " + quantiteAchetee);
+            }
+        }
+        
+        // --- 6. Calculer le montant final ---
+        Double montantFinal;
+        if (conversionRequest.getMontantAchat() != null) {
+            montantFinal = conversionRequest.getMontantAchat();
+        } else {
+            montantFinal = produit.getPrixVente() * quantiteAchetee;
+        }
+
+        // --- 7. IMPORTANT: Ne pas décrémenter le stock ici ---
+        // Le stock sera décrémenté lors de la vente réelle par un vendeur autorisé
+        // Cette conversion prospect → client ne fait que créer l'historique d'achat
+
+        // --- 8. Enregistrer le nouvel achat ---
+        ProspectAchat achat = new ProspectAchat();
+        achat.setProspect(prospect);
+        achat.setProduit(produit);
+        achat.setQuantite(quantiteAchetee);
+        achat.setMontantAchat(montantFinal);
+        achat.setNotesAchat(conversionRequest.getNotesAchat());
+        achat.setDateAchat(LocalDateTime.now());
+        achat.setClientId(prospect.getClientId());
+        achat.setClientType(prospect.getClientType());
+        
+        ProspectAchat savedAchat = prospectAchatRepository.save(achat);
+
+        response.put("message", "Nouvel achat ajouté avec succès au prospect converti");
+        response.put("achatId", savedAchat.getId());
+        response.put("produitAchete", produit.getNom());
+        response.put("quantiteAchetee", quantiteAchetee);
+        response.put("montantAchat", montantFinal);
+        response.put("dateAchat", LocalDateTime.now().toString());
 
         return response;
     }
@@ -671,13 +735,27 @@ public class ProspectService {
         dto.phone = prospect.getTelephone();
         dto.notes = prospect.getNotes();
         dto.createdAt = prospect.getCreatedAt();
+        
+        // Statut de conversion
+        dto.convertedToClient = prospect.getConvertedToClient();
+        dto.convertedAt = prospect.getConvertedAt();
+        dto.clientId = prospect.getClientId();
+        dto.clientType = prospect.getClientType();
 
         // Convertir les interactions
         if (prospect.getInteractions() != null) {
             List<InteractionDTO> interactionDTOs = prospect.getInteractions().stream()
-                    .map(this::convertToDTO)
+                    .map(this::convertInteractionToDTO)
                     .collect(Collectors.toList());
             dto.interactions = interactionDTOs;
+        }
+        
+        // Historique des achats
+        if (prospect.getAchats() != null) {
+            List<ProspectAchatDTO> achatDTOs = prospect.getAchats().stream()
+                    .map(this::convertAchatToDTO)
+                    .collect(Collectors.toList());
+            dto.achats = achatDTOs;
         }
 
         return dto;
@@ -686,7 +764,7 @@ public class ProspectService {
     /**
      * Convertir une entité Interaction en DTO
      */
-    private InteractionDTO convertToDTO(Interaction interaction) {
+    private InteractionDTO convertInteractionToDTO(Interaction interaction) {
         InteractionDTO dto = new InteractionDTO();
         dto.id = interaction.getId();
         dto.type = interaction.getType();
@@ -694,6 +772,26 @@ public class ProspectService {
         dto.notes = interaction.getNotes();
         dto.assignedTo = interaction.getAssignedTo();
         dto.nextFollowUp = interaction.getNextFollowUp();
+        return dto;
+    }
+
+    /**
+     * Convertir une entité ProspectAchat en DTO
+     */
+    private ProspectAchatDTO convertAchatToDTO(ProspectAchat achat) {
+        ProspectAchatDTO dto = new ProspectAchatDTO();
+        dto.id = achat.getId();
+        dto.produitId = achat.getProduit().getId();
+        dto.produitNom = achat.getProduit().getNom();
+        dto.typeProduit = achat.getProduit().getTypeProduit().name();
+        dto.descriptionProduit = achat.getProduit().getDescription();
+        dto.prixProduit = achat.getProduit().getPrixVente();
+        dto.quantite = achat.getQuantite();
+        dto.montantAchat = achat.getMontantAchat();
+        dto.notesAchat = achat.getNotesAchat();
+        dto.dateAchat = achat.getDateAchat();
+        dto.clientId = achat.getClientId();
+        dto.clientType = achat.getClientType();
         return dto;
     }
 }
