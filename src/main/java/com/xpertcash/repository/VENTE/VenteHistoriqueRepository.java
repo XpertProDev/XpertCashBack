@@ -1,5 +1,6 @@
 package com.xpertcash.repository.VENTE;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -19,5 +20,9 @@ public interface VenteHistoriqueRepository extends JpaRepository<VenteHistorique
             "WHERE vh.vente.id IN :venteIds AND vh.action = 'REMBOURSEMENT_VENTE' " +
             "GROUP BY vh.vente.id")
      List<Object[]> sumRemboursementsByVenteIds(@Param("venteIds") List<Long> venteIds);
+     
+     // Méthodes pour le résumé des transactions
+     List<VenteHistorique> findByVente_Boutique_Entreprise_IdAndActionAndDateActionBetween(
+         Long entrepriseId, String action, LocalDateTime dateDebut, LocalDateTime dateFin);
      
 }
