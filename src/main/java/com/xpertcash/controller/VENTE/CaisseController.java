@@ -13,6 +13,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -23,6 +24,15 @@ import java.util.Optional;
 public class CaisseController {
     @Autowired
     private CaisseService caisseService;
+
+    // Méthode utilitaire pour récupérer les dépenses d'une caisse
+    private List<DepenseResponseDTO> getDepensesForCaisse(Long caisseId, HttpServletRequest request) {
+        try {
+            return caisseService.listerDepensesCaisse(caisseId, request);
+        } catch (Exception e) {
+            return new ArrayList<>();
+        }
+    }
 
     @PostMapping("/ouvrir")
     public ResponseEntity<CaisseResponseDTO> ouvrirCaisse(@RequestBody OuvrirCaisseRequest req, HttpServletRequest request) {
@@ -40,6 +50,7 @@ public class CaisseController {
         dto.setNomVendeur(caisse.getVendeur() != null ? caisse.getVendeur().getNomComplet() : null);
         dto.setBoutiqueId(caisse.getBoutique() != null ? caisse.getBoutique().getId() : null);
         dto.setNomBoutique(caisse.getBoutique() != null ? caisse.getBoutique().getNomBoutique() : null);
+        dto.setDepenses(getDepensesForCaisse(caisse.getId(), request));
         return ResponseEntity.ok(dto);
     }
 
@@ -77,6 +88,7 @@ public class CaisseController {
         dto.setNomVendeur(caisse.getVendeur() != null ? caisse.getVendeur().getNomComplet() : null);
         dto.setBoutiqueId(caisse.getBoutique() != null ? caisse.getBoutique().getId() : null);
         dto.setNomBoutique(caisse.getBoutique() != null ? caisse.getBoutique().getNomBoutique() : null);
+        dto.setDepenses(getDepensesForCaisse(caisse.getId(), request));
         return ResponseEntity.ok(dto);
     } else {
         HashMap<String, String> error = new HashMap<>();
@@ -108,6 +120,7 @@ public class CaisseController {
         dto.setNomVendeur(caisse.getVendeur() != null ? caisse.getVendeur().getNomComplet() : null);
         dto.setBoutiqueId(caisse.getBoutique() != null ? caisse.getBoutique().getId() : null);
         dto.setNomBoutique(caisse.getBoutique() != null ? caisse.getBoutique().getNomBoutique() : null);
+        dto.setDepenses(getDepensesForCaisse(caisse.getId(), request));
         return dto;
     }).toList();
 
@@ -136,10 +149,50 @@ public class CaisseController {
             dto.setNomVendeur(c.getVendeur() != null ? c.getVendeur().getNomComplet() : null);
             dto.setBoutiqueId(c.getBoutique() != null ? c.getBoutique().getId() : null);
             dto.setNomBoutique(c.getBoutique() != null ? c.getBoutique().getNomBoutique() : null);
+            dto.setDepenses(getDepensesForCaisse(c.getId(), request));
             return dto;
         }).toList();
 
         return ResponseEntity.ok(dtos);
+    }
+
+    //Get mes propres caisses
+    @GetMapping("/boutique/{boutiqueId}/mes-caisses")
+    public ResponseEntity<?> getMesCaisses(
+            @PathVariable Long boutiqueId,
+            HttpServletRequest request
+    ) {
+        try {
+            List<Caisse> caisses = caisseService.getMesCaisses(boutiqueId, request);
+
+            if (caisses.isEmpty()) {
+                return ResponseEntity.ok(Map.of("message", "Aucune caisse trouvée pour vous dans cette boutique."));
+            }
+
+            List<CaisseResponseDTO> dtos = caisses.stream().map(c -> {
+                CaisseResponseDTO dto = new CaisseResponseDTO();
+                dto.setId(c.getId());
+                dto.setMontantInitial(c.getMontantInitial());
+                dto.setMontantCourant(c.getMontantCourant());
+                dto.setMontantEnMain(c.getMontantEnMain());
+                dto.setEcart(c.getEcart());
+                dto.setStatut(c.getStatut().name());
+                dto.setDateOuverture(c.getDateOuverture());
+                dto.setDateFermeture(c.getDateFermeture());
+                dto.setVendeurId(c.getVendeur() != null ? c.getVendeur().getId() : null);
+                dto.setNomVendeur(c.getVendeur() != null ? c.getVendeur().getNomComplet() : null);
+                dto.setBoutiqueId(c.getBoutique() != null ? c.getBoutique().getId() : null);
+                dto.setNomBoutique(c.getBoutique() != null ? c.getBoutique().getNomBoutique() : null);
+                dto.setDepenses(getDepensesForCaisse(c.getId(), request));
+                return dto;
+            }).toList();
+
+            return ResponseEntity.ok(dtos);
+        } catch (RuntimeException e) {
+            HashMap<String, String> error = new HashMap<>();
+            error.put("error", e.getMessage());
+            return ResponseEntity.badRequest().body(error);
+        }
     }
 
     @GetMapping("/vendeur/{vendeurId}")
@@ -163,7 +216,10 @@ public class CaisseController {
             // Message clair si aucune caisse n'a été trouvée
             return ResponseEntity.ok("Aucune caisse trouvée pour ce vendeur dans cette boutique.");
         }
-        return ResponseEntity.ok(caisseOpt.get());
+        
+        CaisseResponseDTO caisseDTO = caisseOpt.get();
+        caisseDTO.setDepenses(getDepensesForCaisse(caisseDTO.getId(), request));
+        return ResponseEntity.ok(caisseDTO);
     }
 
     // Suivre Fluidité dargent encour dactivite
@@ -172,6 +228,7 @@ public class CaisseController {
             @PathVariable Long boutiqueId,
             HttpServletRequest request) {
         CaisseResponseDTO dto = caisseService.getEtatActuelCaisse(boutiqueId, request);
+        dto.setDepenses(getDepensesForCaisse(dto.getId(), request));
         return ResponseEntity.ok(dto);
     }
 
@@ -185,6 +242,7 @@ public class CaisseController {
             HttpServletRequest httpRequest) {
         try {
             CaisseResponseDTO dto = caisseService.enregistrerDepense(request, httpRequest);
+            dto.setDepenses(getDepensesForCaisse(dto.getId(), httpRequest));
             return ResponseEntity.ok(dto);
         } catch (RuntimeException e) {
             HashMap<String, String> error = new HashMap<>();
