@@ -14,17 +14,16 @@ public class CreateProspectRequestDTO {
     
     // Champs pour ENTREPRISE
     private String nom;
-    private String secter;
-    private String address;
-    private String city;
-    private String country;
+    private String secteur;
     
     // Champs pour PARTICULIER
     private String nomComplet;
-    private String adresse;
-    private String pays;
+    private String profession;
     
     // Champs communs
+    private String adresse;
+    private String ville;
+    private String pays;
     private String email;
     private String telephone;
     private String notes;

@@ -1,7 +1,7 @@
 package com.xpertcash.entity.Enum.PROSPECT;
 
 public enum InteractionType {
-    APPEL,
+    CALL,
     VISITE,
     EMAIL,
     TACHE

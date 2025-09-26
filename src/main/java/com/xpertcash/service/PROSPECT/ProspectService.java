@@ -118,12 +118,14 @@ public class ProspectService {
         // Remplir les champs selon le type
         if (request.getType() == ProspectType.ENTREPRISE) {
             prospect.setNom(request.getNom().trim());
-            prospect.setSector(request.getSecter() != null ? request.getSecter().trim() : null);
-            prospect.setAddress(request.getAddress() != null ? request.getAddress().trim() : null);
-            prospect.setCity(request.getCity() != null ? request.getCity().trim() : null);
-            prospect.setCountry(request.getCountry() != null ? request.getCountry().trim() : null);
+            prospect.setSecteur(request.getSecteur() != null ? request.getSecteur().trim() : null);
+            prospect.setAdresse(request.getAdresse() != null ? request.getAdresse().trim() : null);
+            prospect.setVille(request.getVille() != null ? request.getVille().trim() : null);
+            prospect.setPays(request.getPays() != null ? request.getPays().trim() : null);
         } else if (request.getType() == ProspectType.PARTICULIER) {
             prospect.setNomComplet(request.getNomComplet().trim());
+            prospect.setProfession(request.getProfession() != null ? request.getProfession().trim() : null);
+            prospect.setVille(request.getVille() != null ? request.getVille().trim() : null);
             prospect.setAdresse(request.getAdresse() != null ? request.getAdresse().trim() : null);
             prospect.setPays(request.getPays() != null ? request.getPays().trim() : null);
         }
@@ -269,24 +271,22 @@ public class ProspectService {
         // Remplir les champs selon le type
         if (request.getType() == ProspectType.ENTREPRISE) {
             prospect.setNom(request.getNom().trim());
-            prospect.setSector(request.getSector() != null ? request.getSector().trim() : null);
-            prospect.setAddress(request.getAddress() != null ? request.getAddress().trim() : null);
-            prospect.setCity(request.getCity() != null ? request.getCity().trim() : null);
-            prospect.setCountry(request.getCountry() != null ? request.getCountry().trim() : null);
+            prospect.setSecteur(request.getSecteur() != null ? request.getSecteur().trim() : null);
+            prospect.setAdresse(request.getAdresse() != null ? request.getAdresse().trim() : null);
+            prospect.setVille(request.getVille() != null ? request.getVille().trim() : null);
+            prospect.setPays(request.getPays() != null ? request.getPays().trim() : null);
             // Vider les champs particulier
             prospect.setNomComplet(null);
-            prospect.setAdresse(null);
-            prospect.setPays(null);
+            prospect.setProfession(null);
         } else if (request.getType() == ProspectType.PARTICULIER) {
             prospect.setNomComplet(request.getNomComplet().trim());
+            prospect.setProfession(request.getProfession() != null ? request.getProfession().trim() : null);
             prospect.setAdresse(request.getAdresse() != null ? request.getAdresse().trim() : null);
             prospect.setPays(request.getPays() != null ? request.getPays().trim() : null);
+            prospect.setVille(request.getVille() != null ? request.getVille().trim() : null);
             // Vider les champs entreprise
             prospect.setNom(null);
-            prospect.setSector(null);
-            prospect.setAddress(null);
-            prospect.setCity(null);
-            prospect.setCountry(null);
+            prospect.setSecteur(null);
         }
         
         // Champs communs
@@ -532,9 +532,9 @@ public class ProspectService {
             entrepriseClient.setNom(prospect.getNom());
             entrepriseClient.setEmail(prospect.getEmail());
             entrepriseClient.setTelephone(prospect.getTelephone());
-            entrepriseClient.setAdresse(prospect.getAddress());
-            entrepriseClient.setPays(prospect.getCountry());
-            entrepriseClient.setSecteur(prospect.getSector());
+            entrepriseClient.setAdresse(prospect.getAdresse());
+            entrepriseClient.setPays(prospect.getPays());
+            entrepriseClient.setSecteur(prospect.getSecteur());
             entrepriseClient.setEntreprise(entreprise);
             entrepriseClient.setCreatedAt(LocalDateTime.now());
 
@@ -719,13 +719,14 @@ public class ProspectService {
         
         // Champs pour ENTREPRISE
         dto.nom = prospect.getNom();
-        dto.sector = prospect.getSector();
-        dto.address = prospect.getAddress();
-        dto.city = prospect.getCity();
-        dto.country = prospect.getCountry();
+        dto.secteur = prospect.getSecteur();
         
         // Champs pour PARTICULIER
         dto.nomComplet = prospect.getNomComplet();
+        dto.profession = prospect.getProfession();
+        
+        // Champs communs
+        dto.ville = prospect.getVille();
         dto.adresse = prospect.getAdresse();
         dto.pays = prospect.getPays();
       

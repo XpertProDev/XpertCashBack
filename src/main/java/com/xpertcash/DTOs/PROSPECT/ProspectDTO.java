@@ -11,17 +11,16 @@ public class ProspectDTO {
     
     // Champs pour ENTREPRISE
     public String nom;
-    public String sector;
-    public String address;
-    public String city;
-    public String country;
+    public String secteur;
     
     // Champs pour PARTICULIER
     public String nomComplet;
-    public String adresse;
-    public String pays;
+    public String profession;
     
     // Champs communs
+    public String ville;
+    public String adresse;
+    public String pays;
     public String email;
     public String phone;
     public String notes;
