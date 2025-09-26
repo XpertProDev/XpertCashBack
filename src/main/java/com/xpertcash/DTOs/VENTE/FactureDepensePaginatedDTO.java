@@ -36,7 +36,7 @@ public class FactureDepensePaginatedDTO {
         private Double montant;
         private LocalDateTime date;
         private String boutique;
-        private String utilisateur;
+        private String vendeur;
         private String modePaiement;
         private String statut;
         
@@ -45,6 +45,7 @@ public class FactureDepensePaginatedDTO {
         private String clientNumero;
         private Double remiseGlobale;
         private String numeroFactureVente;
+        private Long caisseId;
         private List<VenteProduitDTO> produits;
         
         // Informations spécifiques aux dépenses
