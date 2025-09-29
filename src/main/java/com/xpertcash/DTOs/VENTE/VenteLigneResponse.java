@@ -10,4 +10,9 @@ public class VenteLigneResponse {
     private Double prixUnitaire;
     private Double montantLigne;
     private Double remise;
+    
+    // Champs pour le remboursement
+    private Integer quantiteRemboursee;
+    private Double montantRembourse;
+    private boolean estRemboursee;
 }
