@@ -14,6 +14,6 @@ import lombok.NoArgsConstructor;
 public class CreateInteractionRequestDTO {
     private InteractionType type;
     private String notes;
-    private String assignedTo;
+    // private String assignedTo;
     private LocalDateTime nextFollowUp;
 }
