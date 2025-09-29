@@ -525,7 +525,11 @@ public class ProspectService {
             montantFinal = conversionRequest.getMontantAchat();
         } else {
             // Calculer le montant total basé sur le prix unitaire et la quantité
-            montantFinal = produit.getPrixVente() * quantiteAchetee;
+            Double prixVente = produit.getPrixVente();
+            if (prixVente == null) {
+                throw new RuntimeException("Impossible de convertir le prospect car le produit '" + produit.getNom() + "' n'a pas de prix de vente défini.");
+            }
+            montantFinal = prixVente * quantiteAchetee;
         }
 
         // --- 5. Vérifier si le prospect n'est pas déjà converti ---
@@ -582,7 +586,7 @@ public class ProspectService {
         response.put("produitId", produit.getId());
         response.put("typeProduit", produit.getTypeProduit().name());
         response.put("descriptionProduit", produit.getDescription());
-        response.put("prixProduit", produit.getPrixVente());
+        response.put("prixProduit", produit.getPrixVente() != null ? produit.getPrixVente() : 0.0);
         response.put("quantiteAchetee", quantiteAchetee);
         response.put("montantAchat", montantFinal);
         response.put("notesAchat", conversionRequest.getNotesAchat());
@@ -690,7 +694,11 @@ public class ProspectService {
         if (conversionRequest.getMontantAchat() != null) {
             montantFinal = conversionRequest.getMontantAchat();
         } else {
-            montantFinal = produit.getPrixVente() * quantiteAchetee;
+            Double prixVente = produit.getPrixVente();
+            if (prixVente == null) {
+                throw new RuntimeException("Impossible de convertir le prospect car le produit '" + produit.getNom() + "' n'a pas de prix de vente défini.");
+            }
+            montantFinal = prixVente * quantiteAchetee;
         }
 
         // --- 7. IMPORTANT: Ne pas décrémenter le stock ici ---
@@ -797,7 +805,7 @@ public class ProspectService {
         dto.produitNom = achat.getProduit().getNom();
         dto.typeProduit = achat.getProduit().getTypeProduit().name();
         dto.descriptionProduit = achat.getProduit().getDescription();
-        dto.prixProduit = achat.getProduit().getPrixVente();
+        dto.prixProduit = achat.getProduit().getPrixVente() != null ? achat.getProduit().getPrixVente() : 0.0;
         dto.quantite = achat.getQuantite();
         dto.montantAchat = achat.getMontantAchat();
         dto.notesAchat = achat.getNotesAchat();

@@ -212,12 +212,17 @@ public class FactureProformaService {
                     ligne.setPrixUnitaire(ligne.getPrixUnitaire());
                 } else {
                     // Sinon, utiliser le prix du produit
-                    ligne.setPrixUnitaire(produit.getPrixVente());
+                    Double prixVente = produit.getPrixVente();
+                    if (prixVente == null) {
+                        throw new RuntimeException("Impossible de créer la facture proforma car le produit '" + produit.getNom() + "' n'a pas de prix de vente défini.");
+                    }
+                    ligne.setPrixUnitaire(prixVente);
                 }
 
                 // Pour les produits de type SERVICE, mettre à jour le prix global du produit
                 if ("SERVICE".equals(produit.getTypeProduit()) &&
                         ligne.getPrixUnitaire() != null &&
+                        produit.getPrixVente() != null &&
                         !ligne.getPrixUnitaire().equals(produit.getPrixVente())) {
 
                     // Mettre à jour le prix du produit global

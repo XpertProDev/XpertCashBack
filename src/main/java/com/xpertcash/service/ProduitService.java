@@ -498,7 +498,13 @@ public class ProduitService {
         factureProduit.setFacture(facture);
         factureProduit.setProduit(produit);
         factureProduit.setQuantite(quantites.get(produit.getId()));
-        factureProduit.setPrixUnitaire(produit.getPrixVente());
+        
+        // Gérer le cas où prixVente est null
+        Double prixUnitaire = produit.getPrixVente();
+        if (prixUnitaire == null) {
+            prixUnitaire = 0.0; // Valeur par défaut pour les produits sans prix de vente
+        }
+        factureProduit.setPrixUnitaire(prixUnitaire);
         factureProduit.setTotal(factureProduit.getQuantite() * factureProduit.getPrixUnitaire());
         factureProduits.add(factureProduit);
     }

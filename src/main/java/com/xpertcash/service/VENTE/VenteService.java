@@ -168,6 +168,11 @@ public VenteResponse enregistrerVente(VenteRequest request, HttpServletRequest h
             throw new RuntimeException("Produit non trouvé");
         }
 
+        // Validation : si le produit a déjà un prix, ne pas utiliser de prix personnalisé
+        if (produit.getPrixVente() != null && request.getPrixPersonnalises() != null && request.getPrixPersonnalises().containsKey(produitId)) {
+            throw new RuntimeException("Le produit '" + produit.getNom() + "' a déjà un prix de vente défini (" + produit.getPrixVente() + "). Utilisez le prix du produit ou modifiez-le avant la vente.");
+        }
+
         Stock stock = stockMap.get(produitId);
         if (stock == null) {
             throw new RuntimeException("Stock non trouvé pour le produit " + produit.getNom());
@@ -185,7 +190,23 @@ public VenteResponse enregistrerVente(VenteRequest request, HttpServletRequest h
         }
 
         // 💰 Calcul des montants
-        double prixUnitaire = produit.getPrixVente();
+        Double prixVente = produit.getPrixVente();
+        double prixUnitaire;
+        
+        if (prixVente == null) {
+            // Vérifier si un prix personnalisé est fourni pour ce produit
+            if (request.getPrixPersonnalises() != null && request.getPrixPersonnalises().containsKey(produitId)) {
+                Double prixPersonnalise = request.getPrixPersonnalises().get(produitId);
+                if (prixPersonnalise == null || prixPersonnalise <= 0) {
+                    throw new RuntimeException("Le prix personnalisé pour le produit '" + produit.getNom() + "' doit être supérieur à 0.");
+                }
+                prixUnitaire = prixPersonnalise;
+            } else {
+                throw new RuntimeException("Impossible de vendre le produit '" + produit.getNom() + "' car il n'a pas de prix de vente défini et aucun prix personnalisé n'a été fourni.");
+            }
+        } else {
+            prixUnitaire = prixVente;
+        }
         double remisePct = 0.0;
         if (request.getRemises() != null && request.getRemises().containsKey(produitId)
                 && (request.getRemiseGlobale() == null || request.getRemiseGlobale() == 0)) {
