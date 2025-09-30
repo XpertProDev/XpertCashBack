@@ -4,7 +4,6 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Random;
-import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -12,7 +11,6 @@ import org.springframework.stereotype.Service;
 import com.xpertcash.DTOs.VENTE.FactureVenteResponseDTO;
 import com.xpertcash.DTOs.VENTE.ProduitFactureResponse;
 import com.xpertcash.configuration.JwtUtil;
-import com.xpertcash.entity.Caisse;
 import com.xpertcash.entity.FactureVente;
 import com.xpertcash.entity.User;
 import com.xpertcash.entity.VENTE.Vente;
@@ -35,15 +33,28 @@ private FactureVenteResponseDTO toResponse(FactureVente facture) {
     Vente vente = facture.getVente();
 
     List<ProduitFactureResponse> produits = vente.getProduits().stream()
-            .map(ligne -> new ProduitFactureResponse(
-                    ligne.getProduit().getId(),
-                    ligne.getProduit().getNom(),
-                    ligne.getQuantite(),
-                    ligne.getPrixUnitaire(),
-                    ligne.getRemise(),
-                    ligne.getMontantLigne()
-            ))
+            .map(ligne -> {
+                // Pour les remboursements, afficher la quantité remboursée si elle existe
+                Integer quantiteAffichee;
+                if (ligne.isEstRemboursee() && ligne.getQuantiteRemboursee() != null && ligne.getQuantiteRemboursee() > 0) {
+                    quantiteAffichee = ligne.getQuantiteRemboursee();
+                } else {
+                    quantiteAffichee = ligne.getQuantite();
+                }
+                
+                return new ProduitFactureResponse(
+                        ligne.getProduit().getId(),
+                        ligne.getProduit().getNom(),
+                        quantiteAffichee,
+                        ligne.getPrixUnitaire(),
+                        ligne.getRemise(),
+                        ligne.getMontantLigne()
+                );
+            })
             .toList();
+
+    // Calculer le statut de remboursement
+    String statutRemboursement = calculerStatutRemboursement(vente);
 
     return new FactureVenteResponseDTO(
             facture.getId(),
@@ -53,7 +64,8 @@ private FactureVenteResponseDTO toResponse(FactureVente facture) {
             vente.getClientNom(),
             vente.getClientNumero(),
             vente.getBoutique().getNomBoutique(),
-            produits
+            produits,
+            statutRemboursement
     );
 }
 
@@ -94,7 +106,19 @@ public String genererNumeroFactureCompact(Vente vente) {
     return String.format("%03d%02d%s%c", ticketId, posId, datePart, hashChar);
 }
 
-
-
+/**
+ * Calcule le statut de remboursement d'une vente
+ */
+private String calculerStatutRemboursement(Vente vente) {
+    if (vente.getMontantTotalRembourse() == null || vente.getMontantTotalRembourse() == 0.0) {
+        return "NORMAL";
+    }
+    
+    if (vente.getMontantTotalRembourse().equals(vente.getMontantTotal())) {
+        return "ENTIEREMENT_REMBOURSEE";
+    }
+    
+    return "PARTIELLEMENT_REMBOURSEE";
+}
 
 }

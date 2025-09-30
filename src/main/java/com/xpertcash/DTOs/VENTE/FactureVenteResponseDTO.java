@@ -20,5 +20,6 @@ public class FactureVenteResponseDTO {
     private String clientNumero;
     private String boutiqueNom;
     private List<ProduitFactureResponse> produits;
+    private String statutRemboursement;
 
 }
