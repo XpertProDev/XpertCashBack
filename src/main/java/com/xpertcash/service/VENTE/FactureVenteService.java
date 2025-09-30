@@ -2,13 +2,16 @@ package com.xpertcash.service.VENTE;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
+import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import com.xpertcash.DTOs.VENTE.FactureVenteResponseDTO;
+import com.xpertcash.DTOs.VENTE.FactureVentePaginatedDTO;
 import com.xpertcash.DTOs.VENTE.ProduitFactureResponse;
 import com.xpertcash.configuration.JwtUtil;
 import com.xpertcash.entity.FactureVente;
@@ -51,7 +54,7 @@ private FactureVenteResponseDTO toResponse(FactureVente facture) {
                         ligne.getMontantLigne()
                 );
             })
-            .toList();
+            .collect(Collectors.toList());
 
     // Calculer le statut de remboursement
     String statutRemboursement = calculerStatutRemboursement(vente);
@@ -65,12 +68,24 @@ private FactureVenteResponseDTO toResponse(FactureVente facture) {
             vente.getClientNumero(),
             vente.getBoutique().getNomBoutique(),
             produits,
-            statutRemboursement
+            statutRemboursement,
+            vente.getCaisse() != null ? vente.getCaisse().getId() : null,
+            vente.getVendeur() != null ? vente.getVendeur().getNomComplet() : null
     );
 }
 
 
-public List<FactureVenteResponseDTO> getAllFacturesForConnectedUser(HttpServletRequest request) {
+
+/**
+ * Récupère toutes les factures de vente avec pagination pour l'entreprise de l'utilisateur connecté
+ */
+public FactureVentePaginatedDTO getAllFacturesWithPagination(
+        int page, 
+        int size, 
+        String sortBy, 
+        String sortDir,
+        HttpServletRequest request) {
+    
     String token = request.getHeader("Authorization");
     if (token == null || !token.startsWith("Bearer ")) {
         throw new RuntimeException("Token JWT manquant ou invalide");
@@ -81,10 +96,67 @@ public List<FactureVenteResponseDTO> getAllFacturesForConnectedUser(HttpServletR
 
     Long entrepriseId = user.getEntreprise().getId();
 
-    return factureVenteRepository.findAllByEntrepriseId(entrepriseId)
-            .stream()
+    // Récupérer toutes les factures de l'entreprise
+    List<FactureVente> allFactures = factureVenteRepository.findAllByEntrepriseId(entrepriseId);
+    
+    // Convertir en DTOs
+    List<FactureVenteResponseDTO> allItems = allFactures.stream()
             .map(this::toResponse)
-            .toList();
+            .collect(Collectors.toList());
+    
+    // Trier par date (par défaut)
+    allItems.sort((item1, item2) -> {
+        if (sortDir.equalsIgnoreCase("desc")) {
+            return item2.getDateEmission().compareTo(item1.getDateEmission());
+        } else {
+            return item1.getDateEmission().compareTo(item2.getDateEmission());
+        }
+    });
+    
+    // Calculer les statistiques
+    double totalMontantFactures = allItems.stream()
+            .mapToDouble(item -> item.getMontantTotal() != null ? item.getMontantTotal() : 0.0)
+            .sum();
+    
+    int nombreFacturesRemboursees = (int) allItems.stream()
+            .filter(item -> "ENTIEREMENT_REMBOURSEE".equals(item.getStatutRemboursement()))
+            .count();
+    
+    int nombreFacturesPartiellementRemboursees = (int) allItems.stream()
+            .filter(item -> "PARTIELLEMENT_REMBOURSEE".equals(item.getStatutRemboursement()))
+            .count();
+    
+    int nombreFacturesNormales = (int) allItems.stream()
+            .filter(item -> "NORMAL".equals(item.getStatutRemboursement()))
+            .count();
+    
+    // Appliquer la pagination manuelle
+    int totalElements = allItems.size();
+    int totalPages = (int) Math.ceil((double) totalElements / size);
+    int startIndex = page * size;
+    int endIndex = Math.min(startIndex + size, totalElements);
+    
+    List<FactureVenteResponseDTO> pagedItems = 
+        startIndex < totalElements ? allItems.subList(startIndex, endIndex) : new ArrayList<>();
+    
+    // Construire la réponse
+    FactureVentePaginatedDTO response = new FactureVentePaginatedDTO();
+    response.setPage(page);
+    response.setSize(size);
+    response.setTotalElements(totalElements);
+    response.setTotalPages(totalPages);
+    response.setFirst(page == 0);
+    response.setLast(page >= totalPages - 1);
+    response.setHasNext(page < totalPages - 1);
+    response.setHasPrevious(page > 0);
+    response.setItems(pagedItems);
+    response.setTotalMontantFactures(totalMontantFactures);
+    response.setNombreFactures(totalElements);
+    response.setNombreFacturesRemboursees(nombreFacturesRemboursees);
+    response.setNombreFacturesPartiellementRemboursees(nombreFacturesPartiellementRemboursees);
+    response.setNombreFacturesNormales(nombreFacturesNormales);
+    
+    return response;
 }
 
 public String genererNumeroFactureCompact(Vente vente) {

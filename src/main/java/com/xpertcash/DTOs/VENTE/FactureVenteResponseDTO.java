@@ -21,5 +21,7 @@ public class FactureVenteResponseDTO {
     private String boutiqueNom;
     private List<ProduitFactureResponse> produits;
     private String statutRemboursement;
+    private Long caisseId;
+    private String vendeur;
 
 }
