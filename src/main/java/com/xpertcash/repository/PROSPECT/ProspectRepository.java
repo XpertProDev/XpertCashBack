@@ -20,6 +20,6 @@ public interface ProspectRepository extends JpaRepository<Prospect, Long>{
     Page<Prospect> findByEntrepriseIdAndNomContainingIgnoreCase(Long entrepriseId, String q, Pageable pageable);
     Optional<Prospect> findByIdAndEntrepriseId(Long id, Long entrepriseId);
     Optional<Prospect> findByEmailAndEntrepriseId(String email, Long entrepriseId);
-    
+    Optional<Prospect> findByTelephoneAndEntrepriseId(String telephone, Long entrepriseId);
 
 }

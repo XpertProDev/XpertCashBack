@@ -26,6 +26,11 @@ public class VenteProduit {
     private Double prixUnitaire;
     private Double montantLigne;
     private double remise = 0.0;
+    
+    // Champ pour traquer le remboursement de cette ligne
+    private Integer quantiteRemboursee = 0;
+    private Double montantRembourse = 0.0;
+    private boolean estRemboursee = false;
 
     
     

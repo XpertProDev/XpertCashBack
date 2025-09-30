@@ -168,6 +168,11 @@ public VenteResponse enregistrerVente(VenteRequest request, HttpServletRequest h
             throw new RuntimeException("Produit non trouvé");
         }
 
+        // Validation : si le produit a déjà un prix, ne pas utiliser de prix personnalisé
+        if (produit.getPrixVente() != null && request.getPrixPersonnalises() != null && request.getPrixPersonnalises().containsKey(produitId)) {
+            throw new RuntimeException("Le produit '" + produit.getNom() + "' a déjà un prix de vente défini (" + produit.getPrixVente() + "). Utilisez le prix du produit ou modifiez-le avant la vente.");
+        }
+
         Stock stock = stockMap.get(produitId);
         if (stock == null) {
             throw new RuntimeException("Stock non trouvé pour le produit " + produit.getNom());
@@ -185,7 +190,23 @@ public VenteResponse enregistrerVente(VenteRequest request, HttpServletRequest h
         }
 
         // 💰 Calcul des montants
-        double prixUnitaire = produit.getPrixVente();
+        Double prixVente = produit.getPrixVente();
+        double prixUnitaire;
+        
+        if (prixVente == null) {
+            // Vérifier si un prix personnalisé est fourni pour ce produit
+            if (request.getPrixPersonnalises() != null && request.getPrixPersonnalises().containsKey(produitId)) {
+                Double prixPersonnalise = request.getPrixPersonnalises().get(produitId);
+                if (prixPersonnalise == null || prixPersonnalise <= 0) {
+                    throw new RuntimeException("Le prix personnalisé pour le produit '" + produit.getNom() + "' doit être supérieur à 0.");
+                }
+                prixUnitaire = prixPersonnalise;
+            } else {
+                throw new RuntimeException("Impossible de vendre le produit '" + produit.getNom() + "' car il n'a pas de prix de vente défini et aucun prix personnalisé n'a été fourni.");
+            }
+        } else {
+            prixUnitaire = prixVente;
+        }
         double remisePct = 0.0;
         if (request.getRemises() != null && request.getRemises().containsKey(produitId)
                 && (request.getRemiseGlobale() == null || request.getRemiseGlobale() == 0)) {
@@ -375,7 +396,16 @@ public VenteResponse enregistrerVente(VenteRequest request, HttpServletRequest h
                 produitRepository.save(produit);
             }
 
+            // Mise à jour des quantités et montants de remboursement
             vp.setQuantite(vp.getQuantite() - quantiteARembourser);
+            vp.setQuantiteRemboursee(vp.getQuantiteRemboursee() + quantiteARembourser);
+            vp.setMontantRembourse(vp.getMontantRembourse() + montantProduit);
+            
+            // Marquer comme remboursée si toute la quantité est remboursée
+            if (vp.getQuantite() == 0) {
+                vp.setEstRemboursee(true);
+            }
+            
             venteProduitRepository.save(vp);
 
             lignesRemboursees.add(vp);
@@ -423,6 +453,11 @@ public VenteResponse enregistrerVente(VenteRequest request, HttpServletRequest h
     } else {
         vente.setStatus(VenteStatus.EN_COURS);
     }
+
+        // Mise à jour des champs de suivi des remboursements
+        vente.setMontantTotalRembourse(totalRembourse);
+        vente.setDateDernierRemboursement(LocalDateTime.now());
+        vente.setNombreRemboursements(vente.getNombreRemboursements() + 1);
 
         venteRepository.save(vente);
 
@@ -595,6 +630,9 @@ public List<VenteResponse> getVentesByVendeur(Long vendeurId, HttpServletRequest
                 dto.setPrixUnitaire(ligne.getPrixUnitaire());
                 dto.setMontantLigne(ligne.getMontantLigne());
                 dto.setRemise(ligne.getRemise());
+                dto.setQuantiteRemboursee(ligne.getQuantiteRemboursee());
+                dto.setMontantRembourse(ligne.getMontantRembourse());
+                dto.setEstRemboursee(ligne.isEstRemboursee());
                 lignesDTO.add(dto);
                 
 
@@ -611,6 +649,12 @@ public List<VenteResponse> getVentesByVendeur(Long vendeurId, HttpServletRequest
 
         response.setNomVendeur(vente.getVendeur() != null ? vente.getVendeur().getNomComplet() : null);
         response.setNomBoutique(vente.getBoutique() != null ? vente.getBoutique().getNomBoutique() : null);
+        
+        // Mapper les champs de remboursement
+        response.setMontantTotalRembourse(vente.getMontantTotalRembourse());
+        response.setDateDernierRemboursement(vente.getDateDernierRemboursement());
+        response.setNombreRemboursements(vente.getNombreRemboursements());
+        
         return response;
     }
 
@@ -1017,6 +1061,9 @@ private VenteParClientResponse toVenteParClientResponse(Vente vente) {
             ligne.setPrixUnitaire(vp.getPrixUnitaire());
             ligne.setMontantLigne(vp.getMontantLigne());
             ligne.setRemise(vp.getRemise());
+            ligne.setQuantiteRemboursee(vp.getQuantiteRemboursee());
+            ligne.setMontantRembourse(vp.getMontantRembourse());
+            ligne.setEstRemboursee(vp.isEstRemboursee());
             return ligne;
         }).collect(Collectors.toList());
         dto.setLignes(lignes);

@@ -24,6 +24,11 @@ public class VenteResponse {
     private List<LigneVenteDTO> lignes;
     private Double remiseGlobale;
     private String numeroFacture;
+    
+    // Champs pour le suivi des remboursements
+    private Double montantTotalRembourse;
+    private LocalDateTime dateDernierRemboursement;
+    private Integer nombreRemboursements;
 
 
 
@@ -35,6 +40,11 @@ public class VenteResponse {
         private Double prixUnitaire;
         private Double montantLigne;
         private Double remise;
+        
+        // Champs pour le remboursement
+        private Integer quantiteRemboursee;
+        private Double montantRembourse;
+        private boolean estRemboursee;
 
     }
 

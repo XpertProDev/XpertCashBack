@@ -127,7 +127,12 @@ public class FactureDepenseService {
                                 new FactureDepensePaginatedDTO.FactureDepenseItemDTO.VenteProduitDTO();
                             produitDTO.setProduitId(vp.getProduit().getId());
                             produitDTO.setNomProduit(vp.getProduit().getNom());
-                            produitDTO.setQuantite(vp.getQuantite());
+                            // Pour les remboursements, afficher la quantité remboursée si elle existe
+                            if (vp.isEstRemboursee() && vp.getQuantiteRemboursee() != null && vp.getQuantiteRemboursee() > 0) {
+                                produitDTO.setQuantite(vp.getQuantiteRemboursee());
+                            } else {
+                                produitDTO.setQuantite(vp.getQuantite());
+                            }
                             produitDTO.setPrixUnitaire(vp.getPrixUnitaire());
                             produitDTO.setMontantLigne(vp.getMontantLigne());
                             produitDTO.setRemise(vp.getRemise());
@@ -396,7 +401,12 @@ public class FactureDepenseService {
                                 new FactureDepensePaginatedDTO.FactureDepenseItemDTO.VenteProduitDTO();
                             produitDTO.setProduitId(vp.getProduit().getId());
                             produitDTO.setNomProduit(vp.getProduit().getNom());
-                            produitDTO.setQuantite(vp.getQuantite());
+                            // Pour les remboursements, afficher la quantité remboursée si elle existe
+                            if (vp.isEstRemboursee() && vp.getQuantiteRemboursee() != null && vp.getQuantiteRemboursee() > 0) {
+                                produitDTO.setQuantite(vp.getQuantiteRemboursee());
+                            } else {
+                                produitDTO.setQuantite(vp.getQuantite());
+                            }
                             produitDTO.setPrixUnitaire(vp.getPrixUnitaire());
                             produitDTO.setMontantLigne(vp.getMontantLigne());
                             produitDTO.setRemise(vp.getRemise());
@@ -535,6 +545,28 @@ public class FactureDepenseService {
                 Optional<FactureVente> factureVente = factureVenteRepository.findByVente(vente);
                 if (factureVente.isPresent()) {
                     item.setNumeroFactureVente(factureVente.get().getNumeroFacture());
+                }
+                
+                // Récupérer les produits de la vente
+                if (vente.getProduits() != null) {
+                    List<FactureDepensePaginatedDTO.FactureDepenseItemDTO.VenteProduitDTO> produitsDTO = 
+                        vente.getProduits().stream().map(vp -> {
+                            FactureDepensePaginatedDTO.FactureDepenseItemDTO.VenteProduitDTO produitDTO = 
+                                new FactureDepensePaginatedDTO.FactureDepenseItemDTO.VenteProduitDTO();
+                            produitDTO.setProduitId(vp.getProduit().getId());
+                            produitDTO.setNomProduit(vp.getProduit().getNom());
+                            // Pour les remboursements, afficher la quantité remboursée si elle existe
+                            if (vp.isEstRemboursee() && vp.getQuantiteRemboursee() != null && vp.getQuantiteRemboursee() > 0) {
+                                produitDTO.setQuantite(vp.getQuantiteRemboursee());
+                            } else {
+                                produitDTO.setQuantite(vp.getQuantite());
+                            }
+                            produitDTO.setPrixUnitaire(vp.getPrixUnitaire());
+                            produitDTO.setMontantLigne(vp.getMontantLigne());
+                            produitDTO.setRemise(vp.getRemise());
+                            return produitDTO;
+                        }).collect(Collectors.toList());
+                    item.setProduits(produitsDTO);
                 }
                 
                 allItems.add(item);

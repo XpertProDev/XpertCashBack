@@ -102,11 +102,18 @@ public class ProspectService {
             }
         }
 
-        // --- 4. Vérifier si un prospect avec le même email existe déjà dans l'entreprise ---
+        // --- 4. Vérifier si un prospect avec le même email ou téléphone existe déjà dans l'entreprise ---
         if (request.getEmail() != null && !request.getEmail().trim().isEmpty()) {
             Optional<Prospect> existingProspect = prospectRepository.findByEmailAndEntrepriseId(request.getEmail(), entreprise.getId());
             if (existingProspect.isPresent()) {
                 throw new IllegalArgumentException("Un prospect avec cet email existe déjà dans votre entreprise");
+            }
+        }
+        
+        if (request.getTelephone() != null && !request.getTelephone().trim().isEmpty()) {
+            Optional<Prospect> existingProspect = prospectRepository.findByTelephoneAndEntrepriseId(request.getTelephone(), entreprise.getId());
+            if (existingProspect.isPresent()) {
+                throw new IllegalArgumentException("Un prospect avec ce numéro de téléphone existe déjà dans votre entreprise");
             }
         }
 
@@ -257,11 +264,18 @@ public class ProspectService {
             
         }
 
-        // --- 5. Vérifier si un autre prospect avec le même email existe déjà dans l'entreprise ---
+        // --- 5. Vérifier si un autre prospect avec le même email ou téléphone existe déjà dans l'entreprise ---
         if (request.getEmail() != null && !request.getEmail().trim().isEmpty()) {
             Optional<Prospect> existingProspect = prospectRepository.findByEmailAndEntrepriseId(request.getEmail(), entreprise.getId());
             if (existingProspect.isPresent() && !existingProspect.get().getId().equals(id)) {
                 throw new IllegalArgumentException("Un autre prospect avec cet email existe déjà dans votre entreprise");
+            }
+        }
+        
+        if (request.getTelephone() != null && !request.getTelephone().trim().isEmpty()) {
+            Optional<Prospect> existingProspect = prospectRepository.findByTelephoneAndEntrepriseId(request.getTelephone(), entreprise.getId());
+            if (existingProspect.isPresent() && !existingProspect.get().getId().equals(id)) {
+                throw new IllegalArgumentException("Un autre prospect avec ce numéro de téléphone existe déjà dans votre entreprise");
             }
         }
 
@@ -360,15 +374,15 @@ public class ProspectService {
         if (request.getType() == null) {
             throw new IllegalArgumentException("Le type d'interaction est obligatoire");
         }
-        if (request.getAssignedTo() == null || request.getAssignedTo().trim().isEmpty()) {
-            throw new IllegalArgumentException("L'assigné est obligatoire");
-        }
+        // if (request.getAssignedTo() == null || request.getAssignedTo().trim().isEmpty()) {
+        //     throw new IllegalArgumentException("L'assigné est obligatoire");
+        // }
 
         // --- 5. Créer l'interaction ---
         Interaction interaction = new Interaction();
         interaction.setType(request.getType());
         interaction.setNotes(request.getNotes());
-        interaction.setAssignedTo(request.getAssignedTo().trim());
+        // interaction.setAssignedTo(request.getAssignedTo().trim());
         interaction.setNextFollowUp(request.getNextFollowUp());
         interaction.setProspect(prospect);
 
@@ -511,15 +525,16 @@ public class ProspectService {
             montantFinal = conversionRequest.getMontantAchat();
         } else {
             // Calculer le montant total basé sur le prix unitaire et la quantité
-            montantFinal = produit.getPrixVente() * quantiteAchetee;
+            Double prixVente = produit.getPrixVente();
+            if (prixVente == null) {
+                throw new RuntimeException("Impossible de convertir le prospect car le produit '" + produit.getNom() + "' n'a pas de prix de vente défini.");
+            }
+            montantFinal = prixVente * quantiteAchetee;
         }
 
         // --- 5. Vérifier si le prospect n'est pas déjà converti ---
-        if (prospect.getEmail() != null) {
-            Optional<Client> existingClient = clientRepository.findByEmail(prospect.getEmail());
-            if (existingClient.isPresent()) {
-                throw new IllegalArgumentException("Ce prospect a déjà été converti en client");
-            }
+        if (prospect.getConvertedToClient()) {
+            throw new IllegalArgumentException("Ce prospect a déjà été converti en client");
         }
 
         // --- 6. Conversion selon le type ---
@@ -571,7 +586,7 @@ public class ProspectService {
         response.put("produitId", produit.getId());
         response.put("typeProduit", produit.getTypeProduit().name());
         response.put("descriptionProduit", produit.getDescription());
-        response.put("prixProduit", produit.getPrixVente());
+        response.put("prixProduit", produit.getPrixVente() != null ? produit.getPrixVente() : 0.0);
         response.put("quantiteAchetee", quantiteAchetee);
         response.put("montantAchat", montantFinal);
         response.put("notesAchat", conversionRequest.getNotesAchat());
@@ -679,7 +694,11 @@ public class ProspectService {
         if (conversionRequest.getMontantAchat() != null) {
             montantFinal = conversionRequest.getMontantAchat();
         } else {
-            montantFinal = produit.getPrixVente() * quantiteAchetee;
+            Double prixVente = produit.getPrixVente();
+            if (prixVente == null) {
+                throw new RuntimeException("Impossible de convertir le prospect car le produit '" + produit.getNom() + "' n'a pas de prix de vente défini.");
+            }
+            montantFinal = prixVente * quantiteAchetee;
         }
 
         // --- 7. IMPORTANT: Ne pas décrémenter le stock ici ---
@@ -786,7 +805,7 @@ public class ProspectService {
         dto.produitNom = achat.getProduit().getNom();
         dto.typeProduit = achat.getProduit().getTypeProduit().name();
         dto.descriptionProduit = achat.getProduit().getDescription();
-        dto.prixProduit = achat.getProduit().getPrixVente();
+        dto.prixProduit = achat.getProduit().getPrixVente() != null ? achat.getProduit().getPrixVente() : 0.0;
         dto.quantite = achat.getQuantite();
         dto.montantAchat = achat.getMontantAchat();
         dto.notesAchat = achat.getNotesAchat();

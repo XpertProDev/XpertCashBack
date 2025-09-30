@@ -15,6 +15,7 @@ public class VenteRequest {
     private String clientNumero;
     private String modePaiement;
     private Map<Long, Double> remises = new HashMap<>();
+    private Map<Long, Double> prixPersonnalises = new HashMap<>(); // Prix personnalisés par produit pour les produits sans prix
 
     private Long clientId;
     private Long entrepriseClientId;

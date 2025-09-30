@@ -61,6 +61,11 @@ public class Vente {
 
     @Enumerated(EnumType.STRING)
     private VenteStatus status;
+    
+    // Champs pour le suivi des remboursements
+    private Double montantTotalRembourse = 0.0;
+    private LocalDateTime dateDernierRemboursement;
+    private Integer nombreRemboursements = 0;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "caisse_id")
