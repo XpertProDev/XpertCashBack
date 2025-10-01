@@ -802,10 +802,9 @@ public class FactureProformaService {
             int size, 
             HttpServletRequest request) {
         
-        // --- 1. Validation des paramètres de pagination ---
         if (page < 0) page = 0;
-        if (size <= 0) size = 20; // Taille par défaut
-        if (size > 100) size = 100; // Limite maximale pour éviter la surcharge
+        if (size <= 0) size = 20;
+        if (size > 100) size = 100;
         
         // --- 2. Récupération et validation de l'utilisateur ---
         User currentUser = authHelper.getAuthenticatedUserWithFallback(request);
@@ -879,6 +878,10 @@ public class FactureProformaService {
                     map.put("entreprise", facture.getEntreprise() != null ? facture.getEntreprise().getNomEntreprise() : null);
                     map.put("dateRelance", facture.getDateRelance());
                     map.put("notifie", facture.isNotifie());
+                    
+                    // Ajouter le nom du créateur
+                    map.put("createur", facture.getUtilisateurCreateur() != null ? facture.getUtilisateurCreateur().getNomComplet() : null);
+                    
                     return map;
                 })
                 .collect(Collectors.toList());

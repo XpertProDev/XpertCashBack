@@ -21,6 +21,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.xpertcash.DTOs.AjouterStockRequest;
+import com.xpertcash.DTOs.CompteurBoutiqueDTO;
 import com.xpertcash.DTOs.FactureDTO;
 import com.xpertcash.DTOs.ProduitDTO;
 import com.xpertcash.DTOs.ProduitEntreprisePaginatedResponseDTO;
@@ -604,6 +605,25 @@ public ResponseEntity<?> updateProduit(
         } catch (Exception e) {
             e.printStackTrace();
             throw new RuntimeException("Erreur lors de la récupération des produits paginés: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Endpoint pour récupérer les compteurs de produits par boutique pour l'entreprise de l'utilisateur connecté
+     */
+    @GetMapping("/produits/compteurs-boutiques")
+    public ResponseEntity<?> getCompteursBoutiques(HttpServletRequest request) {
+        try {
+            List<CompteurBoutiqueDTO> compteurs = produitService.getCompteursBoutiques(request);
+            return ResponseEntity.ok(compteurs);
+        } catch (RuntimeException e) {
+            Map<String, String> error = new HashMap<>();
+            error.put("error", e.getMessage());
+            return ResponseEntity.badRequest().body(error);
+        } catch (Exception e) {
+            Map<String, String> error = new HashMap<>();
+            error.put("error", "Erreur interne du serveur : " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(error);
         }
     }
 
