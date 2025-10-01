@@ -103,18 +103,18 @@ public class VenteController {
         }
 
           // Montant total des ventes du jour (avec remboursements)
-    @GetMapping("/vente/montant-total-jour")
-    public ResponseEntity<Double> getMontantTotalVentesDuJour(HttpServletRequest request) {
-        double montantTotal = venteService.getMontantTotalVentesDuJourConnecte(request);
-        return ResponseEntity.ok(montantTotal);
-    }
+    // @GetMapping("/vente/montant-total-jour")
+    // public ResponseEntity<Double> getMontantTotalVentesDuJour(HttpServletRequest request) {
+    //     double montantTotal = venteService.getMontantTotalVentesDuJourConnecte(request);
+    //     return ResponseEntity.ok(montantTotal);
+    // }
 
     // Montant total des ventes du mois (avec remboursements)
-    @GetMapping("/vente/montant-total-mois")
-    public ResponseEntity<Double> getMontantTotalVentesDuMois(HttpServletRequest request) {
-        double montantTotal = venteService.getMontantTotalVentesDuMoisConnecte(request);
-        return ResponseEntity.ok(montantTotal);
-    }
+    // @GetMapping("/vente/montant-total-mois")
+    // public ResponseEntity<Double> getMontantTotalVentesDuMois(HttpServletRequest request) {
+    //     double montantTotal = venteService.getMontantTotalVentesDuMoisConnecte(request);
+    //     return ResponseEntity.ok(montantTotal);
+    // }
 
 
     // Global benefiche
@@ -125,25 +125,25 @@ public class VenteController {
     }
 
     // Bénéfice net du jour
-    @GetMapping("/vente/benefice/jour")
-    public ResponseEntity<Double> getBeneficeNetDuJour(HttpServletRequest request) {
-        double benefice = venteService.calculerBeneficeNetDuJourConnecte(request);
-        return ResponseEntity.ok(benefice);
-    }
+    // @GetMapping("/vente/benefice/jour")
+    // public ResponseEntity<Double> getBeneficeNetDuJour(HttpServletRequest request) {
+    //     double benefice = venteService.calculerBeneficeNetDuJourConnecte(request);
+    //     return ResponseEntity.ok(benefice);
+    // }
 
     // Bénéfice net du mois
-    @GetMapping("/vente/benefice/mois")
-    public ResponseEntity<Double> getBeneficeNetDuMois(HttpServletRequest request) {
-        double benefice = venteService.calculerBeneficeNetDuMoisConnecte(request);
-        return ResponseEntity.ok(benefice);
-    }
+    // @GetMapping("/vente/benefice/mois")
+    // public ResponseEntity<Double> getBeneficeNetDuMois(HttpServletRequest request) {
+    //     double benefice = venteService.calculerBeneficeNetDuMoisConnecte(request);
+    //     return ResponseEntity.ok(benefice);
+    // }
 
     // Benefice annuel
-    @GetMapping("/vente/benefice/annee")
-    public ResponseEntity<Double> getBeneficeNetAnnuel(HttpServletRequest request) {
-        double benefice = venteService.calculerBeneficeNetAnnuelConnecte(request);
-        return ResponseEntity.ok(benefice);
-    }
+    // @GetMapping("/vente/benefice/annee")
+    // public ResponseEntity<Double> getBeneficeNetAnnuel(HttpServletRequest request) {
+    //     double benefice = venteService.calculerBeneficeNetAnnuelConnecte(request);
+    //     return ResponseEntity.ok(benefice);
+    // }
 
     
     // Get achat par client
