@@ -57,10 +57,8 @@ public interface VenteRepository extends JpaRepository<Vente, Long> {
     @Query("SELECT v FROM Vente v WHERE v.boutique.entreprise.id = :entrepriseId")
     List<Vente> findAllByEntrepriseId(@Param("entrepriseId") Long entrepriseId);
 
-
-
-    
-    
-
+    // Récupère les ventes récentes d'une entreprise (triées par date décroissante)
+    @Query("SELECT v FROM Vente v WHERE v.boutique.entreprise.id = :entrepriseId ORDER BY v.dateVente DESC")
+    List<Vente> findRecentVentesByEntrepriseId(@Param("entrepriseId") Long entrepriseId);
 
 }

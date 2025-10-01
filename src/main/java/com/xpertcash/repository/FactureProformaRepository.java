@@ -148,6 +148,12 @@ long countFacturesByEntrepriseIdAndStatut(@Param("entrepriseId") Long entreprise
        "     OR f.utilisateurApprobateur.id = :userId " +
        "     OR :userId IN (SELECT u.id FROM f.approbateurs u))")
 long countFacturesByEntrepriseIdAndUtilisateur(@Param("entrepriseId") Long entrepriseId, @Param("userId") Long userId);
+
+// Récupère les factures proforma en attente (BROUILLON ou EN_ATTENTE_VALIDATION) triées par date
+@Query("SELECT f FROM FactureProForma f WHERE f.entreprise.id = :entrepriseId " +
+       "AND (f.statut = 'BROUILLON' OR f.statut = 'EN_ATTENTE_VALIDATION') " +
+       "ORDER BY f.dateCreation DESC")
+List<FactureProForma> findFacturesProformaEnAttenteByEntrepriseId(@Param("entrepriseId") Long entrepriseId);
     
 }
 

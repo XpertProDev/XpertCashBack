@@ -687,5 +687,36 @@ public List<FactureReelleDTO> getFacturesParPeriode(Long userIdRequete, HttpServ
         .collect(Collectors.toList());
 }
 
+    /**
+     * Récupère les factures réelles récentes de l'entreprise
+     */
+    public List<FactureReelleDTO> getFacturesReellesRecentes(int limit, HttpServletRequest request) {
+        User user = authHelper.getAuthenticatedUserWithFallback(request);
+
+        if (user.getEntreprise() == null) {
+            throw new RuntimeException("Vous n'êtes associé à aucune entreprise.");
+        }
+
+        Long entrepriseId = user.getEntreprise().getId();
+
+        // Vérification des droits
+        RoleType role = user.getRole().getName();
+        boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
+        if (!isAdminOrManager) {
+            throw new RuntimeException("Vous n'avez pas les droits nécessaires pour accéder à cette information.");
+        }
+
+        // Récupérer les factures réelles récentes triées par date
+        List<FactureReelle> factures = factureReelleRepository.findRecentFacturesReellesByEntrepriseId(entrepriseId);
+
+        // Limiter et convertir en DTO
+        return factures.stream()
+                .limit(limit)
+                .map(facture -> {
+                    BigDecimal montantRestant = getMontantRestant(facture.getId());
+                    return new FactureReelleDTO(facture, montantRestant);
+                })
+                .collect(Collectors.toList());
+    }
 
 }

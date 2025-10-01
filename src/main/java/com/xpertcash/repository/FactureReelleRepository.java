@@ -41,6 +41,9 @@ public interface FactureReelleRepository extends JpaRepository<FactureReelle, Lo
     
     List<FactureReelle> findByEntrepriseId(Long entrepriseId);
 
+    // Récupère les factures réelles récentes d'une entreprise (triées par date de création décroissante)
+    @Query("SELECT f FROM FactureReelle f WHERE f.entreprise.id = :entrepriseId ORDER BY f.dateCreationPro DESC")
+    List<FactureReelle> findRecentFacturesReellesByEntrepriseId(@Param("entrepriseId") Long entrepriseId);
 
    Optional<FactureReelle> findByFactureProForma(FactureProForma factureProForma);
 

@@ -1157,4 +1157,53 @@ public List<FactureProFormaDTO> getFacturesParPeriode(Long userIdRequete, HttpSe
             .collect(Collectors.toList());
 }
 
+    /**
+     * Récupère les factures proforma en attente (BROUILLON ou EN_ATTENTE_VALIDATION)
+     */
+    public List<FactureProFormaDTO> getFacturesProformaEnAttente(int limit, HttpServletRequest request) {
+        User user = authHelper.getAuthenticatedUserWithFallback(request);
+
+        if (user.getEntreprise() == null) {
+            throw new RuntimeException("Vous n'êtes associé à aucune entreprise.");
+        }
+
+        Long entrepriseId = user.getEntreprise().getId();
+
+        // Vérification des droits
+        RoleType role = user.getRole().getName();
+        boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
+        if (!isAdminOrManager) {
+            throw new RuntimeException("Vous n'avez pas les droits nécessaires pour accéder à cette information.");
+        }
+
+        // Récupérer les factures proforma en attente
+        List<FactureProForma> factures = factureProformaRepository.findFacturesProformaEnAttenteByEntrepriseId(entrepriseId);
+
+        // Limiter et convertir en DTO
+        return factures.stream()
+                .limit(limit)
+                .map(f -> {
+                    FactureProFormaDTO dto = new FactureProFormaDTO();
+                    dto.setId(f.getId());
+                    dto.setNumeroFacture(f.getNumeroFacture());
+                    dto.setDateCreation(f.getDateCreation());
+                    dto.setDescription(f.getDescription());
+                    dto.setUtilisateurCreateur(f.getUtilisateurCreateur() != null ? f.getUtilisateurCreateur().getNomComplet() : null);
+                    dto.setTotalHT(f.getTotalHT());
+                    dto.setRemise(f.getRemise());
+                    dto.setTauxRemise(f.getTauxRemise());
+                    dto.setTva(f.isTva());
+                    dto.setTotalFacture(f.getTotalFacture());
+                    dto.setStatut(f.getStatut());
+                    dto.setNomEntreprise(f.getEntreprise() != null ? f.getEntreprise().getNomEntreprise() : null);
+                    dto.setEntrepriseId(f.getEntreprise() != null ? f.getEntreprise().getId() : null);
+                    dto.setClient(f.getClient() != null ? new ClientDTO(f.getClient()) : null);
+                    dto.setEntrepriseClient(f.getEntrepriseClient() != null ? new EntrepriseClientDTO(f.getEntrepriseClient()) : null);
+                    dto.setDateRelance(f.getDateRelance());
+                    dto.setNotifie(f.isNotifie());
+                    return dto;
+                })
+                .collect(Collectors.toList());
+    }
+
 }

@@ -1076,5 +1076,39 @@ private VenteParClientResponse toVenteParClientResponse(Vente vente) {
     return dto;
 }   
 
+/**
+ * Récupère les ventes récentes de l'entreprise
+ */
+@Transactional(readOnly = true)
+public List<VenteResponse> getVentesRecentes(int limit, HttpServletRequest request) {
+    String token = request.getHeader("Authorization");
+    if (token == null || !token.startsWith("Bearer ")) {
+        throw new RuntimeException("Token JWT manquant ou mal formaté");
+    }
+
+    User user = authHelper.getAuthenticatedUserWithFallback(request);
+
+    if (user.getEntreprise() == null) {
+        throw new RuntimeException("Vous n'êtes associé à aucune entreprise.");
+    }
+
+    Long entrepriseId = user.getEntreprise().getId();
+
+    // Vérification des droits
+    RoleType role = user.getRole().getName();
+    boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
+    if (!isAdminOrManager) {
+        throw new RuntimeException("Vous n'avez pas les droits nécessaires pour accéder à cette information.");
+    }
+
+    // Récupérer les ventes récentes triées par date
+    List<Vente> ventes = venteRepository.findRecentVentesByEntrepriseId(entrepriseId);
+
+    // Limiter le nombre de résultats
+    return ventes.stream()
+            .limit(limit)
+            .map(this::toVenteResponse)
+            .collect(Collectors.toList());
+}
 
 }

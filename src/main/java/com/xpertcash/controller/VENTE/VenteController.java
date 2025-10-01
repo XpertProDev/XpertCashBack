@@ -167,10 +167,26 @@ public ResponseEntity<List<VenteParClientResponse>> getVentesClientsAffilies(Htt
     return ResponseEntity.ok(ventes);
 }
 
-
-
-
-
-
+    /**
+     * Endpoint pour récupérer les ventes récentes
+     * @param limit Nombre de ventes à retourner (par défaut 10)
+     */
+    @GetMapping("/vente/recentes")
+    public ResponseEntity<?> getVentesRecentes(
+            @RequestParam(defaultValue = "10") int limit,
+            HttpServletRequest request) {
+        try {
+            List<VenteResponse> ventes = venteService.getVentesRecentes(limit, request);
+            return ResponseEntity.ok(ventes);
+        } catch (RuntimeException e) {
+            Map<String, String> error = new HashMap<>();
+            error.put("error", e.getMessage());
+            return ResponseEntity.badRequest().body(error);
+        } catch (Exception e) {
+            Map<String, String> error = new HashMap<>();
+            error.put("error", "Erreur interne du serveur : " + e.getMessage());
+            return ResponseEntity.status(500).body(error);
+        }
+    }
 
 }

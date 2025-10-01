@@ -1,12 +1,17 @@
 package com.xpertcash.service;
 
+import com.xpertcash.DTOs.ActiviteHebdoDTO;
 import com.xpertcash.DTOs.StatistiquesGlobalesDTO;
+import com.xpertcash.entity.FactureProForma;
+import com.xpertcash.entity.FactureReelle;
 import com.xpertcash.entity.User;
 import com.xpertcash.entity.Produit;
 import com.xpertcash.entity.Stock;
 import com.xpertcash.entity.VENTE.Vente;
 import com.xpertcash.entity.VENTE.VenteProduit;
 import com.xpertcash.entity.Enum.RoleType;
+import com.xpertcash.repository.FactureProformaRepository;
+import com.xpertcash.repository.FactureReelleRepository;
 import com.xpertcash.repository.ProduitRepository;
 import com.xpertcash.repository.StockRepository;
 import com.xpertcash.repository.UsersRepository;
@@ -42,6 +47,12 @@ public class StatistiquesGlobalesService {
 
     @Autowired
     private VenteHistoriqueRepository venteHistoriqueRepository;
+
+    @Autowired
+    private FactureReelleRepository factureReelleRepository;
+
+    @Autowired
+    private FactureProformaRepository factureProformaRepository;
 
     @Autowired
     private AuthenticationHelper authHelper;
@@ -268,6 +279,100 @@ public class StatistiquesGlobalesService {
                 .count();
 
         return new StatistiquesGlobalesDTO.UtilisateursStats(total, vendeurs);
+    }
+
+    /**
+     * Récupère les statistiques d'activité hebdomadaire (7 derniers jours)
+     */
+    @Transactional(readOnly = true)
+    public ActiviteHebdoDTO getActiviteHebdomadaire(HttpServletRequest request) {
+        // 🔐 Récupération de l'utilisateur connecté
+        String token = request.getHeader("Authorization");
+        if (token == null || !token.startsWith("Bearer ")) {
+            throw new RuntimeException("Token JWT manquant ou mal formaté");
+        }
+
+        User user = authHelper.getAuthenticatedUserWithFallback(request);
+
+        if (user.getEntreprise() == null) {
+            throw new RuntimeException("Vous n'êtes associé à aucune entreprise.");
+        }
+
+        Long entrepriseId = user.getEntreprise().getId();
+
+        // Vérification des droits (seuls ADMIN et MANAGER peuvent voir les stats)
+        RoleType role = user.getRole().getName();
+        boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
+        if (!isAdminOrManager) {
+            throw new RuntimeException("Vous n'avez pas les droits nécessaires pour accéder à ces statistiques.");
+        }
+
+        // Préparer les listes pour les 7 derniers jours
+        List<String> dates = new java.util.ArrayList<>();
+        List<Double> ventes = new java.util.ArrayList<>();
+        List<Double> facturesReelles = new java.util.ArrayList<>();
+        List<Double> facturesProforma = new java.util.ArrayList<>();
+
+        LocalDate today = LocalDate.now();
+        java.time.format.DateTimeFormatter formatter = java.time.format.DateTimeFormatter.ofPattern("dd/MM");
+
+        // Parcourir les 7 derniers jours (du plus ancien au plus récent)
+        for (int i = 6; i >= 0; i--) {
+            LocalDate date = today.minusDays(i);
+            LocalDateTime startOfDay = date.atStartOfDay();
+            LocalDateTime endOfDay = date.atTime(LocalTime.MAX);
+
+            // Format de la date
+            dates.add(date.format(formatter));
+
+            // 1. Calculer les ventes du jour
+            List<Vente> ventesJour = venteRepository.findByBoutique_Entreprise_IdAndDateVenteBetween(
+                    entrepriseId, startOfDay, endOfDay
+            );
+            
+            double montantVentes = 0.0;
+            if (!ventesJour.isEmpty()) {
+                List<Long> venteIds = ventesJour.stream().map(Vente::getId).collect(Collectors.toList());
+                Map<Long, Double> remboursementsMap = venteHistoriqueRepository.sumRemboursementsByVenteIds(venteIds)
+                        .stream()
+                        .collect(Collectors.toMap(
+                                obj -> (Long) obj[0],
+                                obj -> ((Number) obj[1]).doubleValue()
+                        ));
+
+                for (Vente vente : ventesJour) {
+                    double montantVente = vente.getMontantTotal() != null ? vente.getMontantTotal() : 0.0;
+                    double remboursements = remboursementsMap.getOrDefault(vente.getId(), 0.0);
+                    montantVentes += montantVente - remboursements;
+                }
+            }
+            ventes.add(montantVentes);
+
+            // 2. Calculer les factures réelles du jour
+            List<FactureReelle> facturesReellesJour = factureReelleRepository.findByEntrepriseId(entrepriseId)
+                    .stream()
+                    .filter(f -> f.getDateCreation() != null && f.getDateCreation().equals(date))
+                    .collect(Collectors.toList());
+            
+            double montantFacturesReelles = facturesReellesJour.stream()
+                    .mapToDouble(FactureReelle::getTotalFacture)
+                    .sum();
+            facturesReelles.add(montantFacturesReelles);
+
+            // 3. Calculer les factures proforma du jour
+            List<FactureProForma> facturesProformaJour = factureProformaRepository.findByEntrepriseId(entrepriseId)
+                    .stream()
+                    .filter(f -> f.getDateCreation() != null && 
+                                f.getDateCreation().toLocalDate().equals(date))
+                    .collect(Collectors.toList());
+            
+            double montantFacturesProforma = facturesProformaJour.stream()
+                    .mapToDouble(FactureProForma::getTotalFacture)
+                    .sum();
+            facturesProforma.add(montantFacturesProforma);
+        }
+
+        return new ActiviteHebdoDTO(dates, ventes, facturesReelles, facturesProforma);
     }
 }
 
