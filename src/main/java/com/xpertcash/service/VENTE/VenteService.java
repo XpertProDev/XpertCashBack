@@ -660,29 +660,29 @@ public List<VenteResponse> getVentesByVendeur(Long vendeurId, HttpServletRequest
 
 
     // Methode pour recuperer montant total des vente de mon entreprise et seul admin et manager peuvent y acceder
-    @Transactional(readOnly = true)
-    public double getMontantTotalVentesDuJourConnecte(HttpServletRequest request) {
-        String token = request.getHeader("Authorization");
-        if (token == null || !token.startsWith("Bearer ")) {
-            throw new RuntimeException("Token JWT manquant ou mal formaté");
-        }
+    // @Transactional(readOnly = true)
+    // public double getMontantTotalVentesDuJourConnecte(HttpServletRequest request) {
+    //     String token = request.getHeader("Authorization");
+    //     if (token == null || !token.startsWith("Bearer ")) {
+    //         throw new RuntimeException("Token JWT manquant ou mal formaté");
+    //     }
 
-        User user = authHelper.getAuthenticatedUserWithFallback(request);
+    //     User user = authHelper.getAuthenticatedUserWithFallback(request);
 
-        if (user.getEntreprise() == null) {
-            throw new RuntimeException("Vous n'êtes associé à aucune entreprise.");
-        }
-        Long entrepriseId = user.getEntreprise().getId();
+    //     if (user.getEntreprise() == null) {
+    //         throw new RuntimeException("Vous n'êtes associé à aucune entreprise.");
+    //     }
+    //     Long entrepriseId = user.getEntreprise().getId();
 
-        // Vérification des droits
-        RoleType role = user.getRole().getName();
-        boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
-        if (!isAdminOrManager) {
-            throw new RuntimeException("Vous n'avez pas les droits nécessaires pour accéder à cette information.");
-        }
+    //     // Vérification des droits
+    //     RoleType role = user.getRole().getName();
+    //     boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
+    //     if (!isAdminOrManager) {
+    //         throw new RuntimeException("Vous n'avez pas les droits nécessaires pour accéder à cette information.");
+    //     }
 
-        return getMontantTotalVentesDuJour(entrepriseId);
-    }
+    //     return getMontantTotalVentesDuJour(entrepriseId);
+    // }
 
 @Transactional(readOnly = true)
 public double getMontantTotalVentesDuJour(Long entrepriseId) {
@@ -717,30 +717,30 @@ public double getMontantTotalVentesDuJour(Long entrepriseId) {
 }
 
     // Vente du mois
-    @Transactional(readOnly = true)
-public double getMontantTotalVentesDuMoisConnecte(HttpServletRequest request) {
-    String token = request.getHeader("Authorization");
-    if (token == null || !token.startsWith("Bearer ")) {
-        throw new RuntimeException("Token JWT manquant ou mal formaté");
-    }
+//     @Transactional(readOnly = true)
+// public double getMontantTotalVentesDuMoisConnecte(HttpServletRequest request) {
+//     String token = request.getHeader("Authorization");
+//     if (token == null || !token.startsWith("Bearer ")) {
+//         throw new RuntimeException("Token JWT manquant ou mal formaté");
+//     }
 
-    User user = authHelper.getAuthenticatedUserWithFallback(request);
+//     User user = authHelper.getAuthenticatedUserWithFallback(request);
 
-    if (user.getEntreprise() == null) {
-        throw new RuntimeException("Vous n'êtes associé à aucune entreprise.");
-    }
-    Long entrepriseId = user.getEntreprise().getId();
+//     if (user.getEntreprise() == null) {
+//         throw new RuntimeException("Vous n'êtes associé à aucune entreprise.");
+//     }
+//     Long entrepriseId = user.getEntreprise().getId();
 
 
-        // Vérification des droits
-        RoleType role = user.getRole().getName();
-        boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
-        if (!isAdminOrManager) {
-            throw new RuntimeException("Vous n'avez pas les droits nécessaires pour accéder à cette information.");
-        }
+//         // Vérification des droits
+//         RoleType role = user.getRole().getName();
+//         boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
+//         if (!isAdminOrManager) {
+//             throw new RuntimeException("Vous n'avez pas les droits nécessaires pour accéder à cette information.");
+//         }
 
-    return getMontantTotalVentesDuMois(entrepriseId);
-}
+//     return getMontantTotalVentesDuMois(entrepriseId);
+// }
 
 @Transactional(readOnly = true)
 public double getMontantTotalVentesDuMois(Long entrepriseId) {
@@ -827,115 +827,115 @@ public double getMontantTotalVentesDuMois(Long entrepriseId) {
     }
     
     //  Bénéfice net du jour
-    @Transactional(readOnly = true)
-    public double calculerBeneficeNetDuJourConnecte(HttpServletRequest request) {
-        String token = request.getHeader("Authorization");
-        if (token == null || !token.startsWith("Bearer ")) {
-            throw new RuntimeException("Token JWT manquant ou mal formaté");
-        }
+    // @Transactional(readOnly = true)
+    // public double calculerBeneficeNetDuJourConnecte(HttpServletRequest request) {
+    //     String token = request.getHeader("Authorization");
+    //     if (token == null || !token.startsWith("Bearer ")) {
+    //         throw new RuntimeException("Token JWT manquant ou mal formaté");
+    //     }
 
-        User user = authHelper.getAuthenticatedUserWithFallback(request);
+    //     User user = authHelper.getAuthenticatedUserWithFallback(request);
         
 
-        Long entrepriseId = user.getEntreprise().getId();
+    //     Long entrepriseId = user.getEntreprise().getId();
 
-         // Vérification des droits
-        RoleType role = user.getRole().getName();
-        boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
-        if (!isAdminOrManager) {
-            throw new RuntimeException("Vous n'avez pas les droits nécessaires pour accéder à cette information.");
-        }
+    //      // Vérification des droits
+    //     RoleType role = user.getRole().getName();
+    //     boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
+    //     if (!isAdminOrManager) {
+    //         throw new RuntimeException("Vous n'avez pas les droits nécessaires pour accéder à cette information.");
+    //     }
 
-        LocalDate today = LocalDate.now();
-        LocalDateTime startOfDay = today.atStartOfDay();
-        LocalDateTime endOfDay = today.atTime(LocalTime.MAX);
+    //     LocalDate today = LocalDate.now();
+    //     LocalDateTime startOfDay = today.atStartOfDay();
+    //     LocalDateTime endOfDay = today.atTime(LocalTime.MAX);
 
-        List<Vente> ventes = venteRepository.findByBoutique_Entreprise_IdAndDateVenteBetween(
-                entrepriseId, startOfDay, endOfDay
-        );
+    //     List<Vente> ventes = venteRepository.findByBoutique_Entreprise_IdAndDateVenteBetween(
+    //             entrepriseId, startOfDay, endOfDay
+    //     );
 
-        return calculerBeneficeNetVentes(ventes);
-    }
+    //     return calculerBeneficeNetVentes(ventes);
+    // }
 
     //Bénéfice net du mois
-    @Transactional(readOnly = true)
-    public double calculerBeneficeNetDuMoisConnecte(HttpServletRequest request) {
-        String token = request.getHeader("Authorization");
-        if (token == null || !token.startsWith("Bearer ")) {
-            throw new RuntimeException("Token JWT manquant ou mal formaté");
-        }
+    // @Transactional(readOnly = true)
+    // public double calculerBeneficeNetDuMoisConnecte(HttpServletRequest request) {
+    //     String token = request.getHeader("Authorization");
+    //     if (token == null || !token.startsWith("Bearer ")) {
+    //         throw new RuntimeException("Token JWT manquant ou mal formaté");
+    //     }
 
-        User user = authHelper.getAuthenticatedUserWithFallback(request);
+    //     User user = authHelper.getAuthenticatedUserWithFallback(request);
 
-        Long entrepriseId = user.getEntreprise().getId();
+    //     Long entrepriseId = user.getEntreprise().getId();
 
-        // Vérification des droits
-        RoleType role = user.getRole().getName();
-        boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
-        if (!isAdminOrManager) {
-            throw new RuntimeException("Vous n'avez pas les droits nécessaires pour accéder à cette information.");
-        }
+    //     // Vérification des droits
+    //     RoleType role = user.getRole().getName();
+    //     boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
+    //     if (!isAdminOrManager) {
+    //         throw new RuntimeException("Vous n'avez pas les droits nécessaires pour accéder à cette information.");
+    //     }
 
-        LocalDate today = LocalDate.now();
-        LocalDate firstDayOfMonth = today.withDayOfMonth(1);
-        LocalDate lastDayOfMonth = today.withDayOfMonth(today.lengthOfMonth());
+    //     LocalDate today = LocalDate.now();
+    //     LocalDate firstDayOfMonth = today.withDayOfMonth(1);
+    //     LocalDate lastDayOfMonth = today.withDayOfMonth(today.lengthOfMonth());
 
-        LocalDateTime startOfMonth = firstDayOfMonth.atStartOfDay();
-        LocalDateTime endOfMonth = lastDayOfMonth.atTime(LocalTime.MAX);
+    //     LocalDateTime startOfMonth = firstDayOfMonth.atStartOfDay();
+    //     LocalDateTime endOfMonth = lastDayOfMonth.atTime(LocalTime.MAX);
 
-        List<Vente> ventes = venteRepository.findByBoutique_Entreprise_IdAndDateVenteBetween(
-                entrepriseId, startOfMonth, endOfMonth
-        );
+    //     List<Vente> ventes = venteRepository.findByBoutique_Entreprise_IdAndDateVenteBetween(
+    //             entrepriseId, startOfMonth, endOfMonth
+    //     );
 
-        return calculerBeneficeNetVentes(ventes);
-    }
+    //     return calculerBeneficeNetVentes(ventes);
+    // }
 
-    private double calculerBeneficeNetVentes(List<Vente> ventes) {
-        double beneficeNet = 0.0;
+    // private double calculerBeneficeNetVentes(List<Vente> ventes) {
+    //     double beneficeNet = 0.0;
 
-        for (Vente vente : ventes) {
-            double beneficeVente = 0.0;
+    //     for (Vente vente : ventes) {
+    //         double beneficeVente = 0.0;
 
-            for (VenteProduit vp : vente.getProduits()) {
-                double prixVente = vp.getMontantLigne();
-                double prixAchat = vp.getProduit().getPrixAchat() * vp.getQuantite();
-                beneficeVente += prixVente - prixAchat;
-            }
+    //         for (VenteProduit vp : vente.getProduits()) {
+    //             double prixVente = vp.getMontantLigne();
+    //             double prixAchat = vp.getProduit().getPrixAchat() * vp.getQuantite();
+    //             beneficeVente += prixVente - prixAchat;
+    //         }
 
-            // Déduire les remboursements
-            double remboursements = venteHistoriqueRepository
-                .findByVenteId(vente.getId())
-                .stream()
-                .filter(h -> h.getAction().equals("REMBOURSEMENT_VENTE"))
-                .mapToDouble(VenteHistorique::getMontant)
-                .sum();
+    //         // Déduire les remboursements
+    //         double remboursements = venteHistoriqueRepository
+    //             .findByVenteId(vente.getId())
+    //             .stream()
+    //             .filter(h -> h.getAction().equals("REMBOURSEMENT_VENTE"))
+    //             .mapToDouble(VenteHistorique::getMontant)
+    //             .sum();
 
-            beneficeVente -= remboursements;
-            beneficeNet += beneficeVente;
-        }
+    //         beneficeVente -= remboursements;
+    //         beneficeNet += beneficeVente;
+    //     }
 
-        return beneficeNet;
-    }
+    //     return beneficeNet;
+    // }
 
     //Benefice annuel
-    @Transactional(readOnly = true)
-public double calculerBeneficeNetAnnuelConnecte(HttpServletRequest request) {
-    String token = request.getHeader("Authorization");
-    if (token == null || !token.startsWith("Bearer ")) {
-        throw new RuntimeException("Token JWT manquant ou mal formaté");
-    }
+//     @Transactional(readOnly = true)
+// public double calculerBeneficeNetAnnuelConnecte(HttpServletRequest request) {
+//     String token = request.getHeader("Authorization");
+//     if (token == null || !token.startsWith("Bearer ")) {
+//         throw new RuntimeException("Token JWT manquant ou mal formaté");
+//     }
 
-    User user = authHelper.getAuthenticatedUserWithFallback(request);
+//     User user = authHelper.getAuthenticatedUserWithFallback(request);
 
-    Long entrepriseId = user.getEntreprise().getId();
-    // Vérification des droits
-        RoleType role = user.getRole().getName();
-        boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
-        if (!isAdminOrManager) {
-            throw new RuntimeException("Vous n'avez pas les droits nécessaires pour accéder à cette information.");
-        }
-    return calculerBeneficeNetAnnuel(entrepriseId);
-}
+//     Long entrepriseId = user.getEntreprise().getId();
+//     // Vérification des droits
+//         RoleType role = user.getRole().getName();
+//         boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
+//         if (!isAdminOrManager) {
+//             throw new RuntimeException("Vous n'avez pas les droits nécessaires pour accéder à cette information.");
+//         }
+//     return calculerBeneficeNetAnnuel(entrepriseId);
+// }
 
 @Transactional(readOnly = true)
 public double calculerBeneficeNetAnnuel(Long entrepriseId) {
@@ -1076,5 +1076,39 @@ private VenteParClientResponse toVenteParClientResponse(Vente vente) {
     return dto;
 }   
 
+/**
+ * Récupère les ventes récentes de l'entreprise
+ */
+@Transactional(readOnly = true)
+public List<VenteResponse> getVentesRecentes(int limit, HttpServletRequest request) {
+    String token = request.getHeader("Authorization");
+    if (token == null || !token.startsWith("Bearer ")) {
+        throw new RuntimeException("Token JWT manquant ou mal formaté");
+    }
+
+    User user = authHelper.getAuthenticatedUserWithFallback(request);
+
+    if (user.getEntreprise() == null) {
+        throw new RuntimeException("Vous n'êtes associé à aucune entreprise.");
+    }
+
+    Long entrepriseId = user.getEntreprise().getId();
+
+    // Vérification des droits
+    RoleType role = user.getRole().getName();
+    boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
+    if (!isAdminOrManager) {
+        throw new RuntimeException("Vous n'avez pas les droits nécessaires pour accéder à cette information.");
+    }
+
+    // Récupérer les ventes récentes triées par date
+    List<Vente> ventes = venteRepository.findRecentVentesByEntrepriseId(entrepriseId);
+
+    // Limiter le nombre de résultats
+    return ventes.stream()
+            .limit(limit)
+            .map(this::toVenteResponse)
+            .collect(Collectors.toList());
+}
 
 }

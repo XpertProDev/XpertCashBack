@@ -25,6 +25,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.xpertcash.DTOs.CompteurBoutiqueDTO;
 import com.xpertcash.DTOs.FactureDTO;
 import com.xpertcash.DTOs.ProduitDTO;
 import com.xpertcash.DTOs.ProduitEntreprisePaginatedResponseDTO;
@@ -1725,6 +1726,67 @@ public class ProduitService {
                 .anyMatch(produit -> produit.getBoutique() != null 
                         && produit.getBoutique().getEntreprise() != null
                         && produit.getBoutique().getEntreprise().getId().equals(entrepriseId));
+    }
+
+    /**
+     * Récupère les compteurs de produits par boutique pour l'entreprise de l'utilisateur connecté
+     */
+    public List<CompteurBoutiqueDTO> getCompteursBoutiques(HttpServletRequest request) {
+        // 🔐 Récupération de l'utilisateur connecté
+        String token = request.getHeader("Authorization");
+        if (token == null || !token.startsWith("Bearer ")) {
+            throw new RuntimeException("Token JWT manquant ou mal formaté");
+        }
+
+        User user = authHelper.getAuthenticatedUserWithFallback(request);
+
+        if (user.getEntreprise() == null) {
+            throw new RuntimeException("Vous n'êtes associé à aucune entreprise.");
+        }
+
+        Long entrepriseId = user.getEntreprise().getId();
+
+        // Vérification des droits
+        RoleType role = user.getRole().getName();
+        boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
+        if (!isAdminOrManager) {
+            throw new RuntimeException("Vous n'avez pas les droits nécessaires pour accéder à cette information.");
+        }
+
+        // Récupérer toutes les boutiques de l'entreprise
+        List<Boutique> boutiques = boutiqueRepository.findByEntrepriseId(entrepriseId);
+        
+        List<CompteurBoutiqueDTO> compteurs = new ArrayList<>();
+
+        for (Boutique boutique : boutiques) {
+            // Récupérer tous les produits actifs de cette boutique
+            List<Produit> produitsBoutique = produitRepository.findByBoutiqueIdAndNotDeleted(boutique.getId());
+            
+            long totalProduits = produitsBoutique.size();
+            long totalEnStock = 0;
+
+            // Compter les produits en stock
+            for (Produit produit : produitsBoutique) {
+                Stock stock = stockRepository.findByProduit(produit);
+                
+                if (stock != null && stock.getStockActuel() != null && stock.getStockActuel() > 0) {
+                    totalEnStock++;
+                } else if (produit.getEnStock() != null && produit.getEnStock()) {
+                    // Fallback sur le champ enStock du produit
+                    totalEnStock++;
+                }
+            }
+
+            CompteurBoutiqueDTO compteur = new CompteurBoutiqueDTO();
+            compteur.setBoutiqueId(boutique.getId());
+            compteur.setNomBoutique(boutique.getNomBoutique());
+            compteur.setTotalProduits(totalProduits);
+            compteur.setTotalEnStock(totalEnStock);
+            
+            compteurs.add(compteur);
+        }
+
+        return compteurs;
     }
 
 }

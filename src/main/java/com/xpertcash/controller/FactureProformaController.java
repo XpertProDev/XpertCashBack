@@ -382,6 +382,25 @@ public ResponseEntity<?> getFacturesParPeriode(
         }
     }
 
+    /**
+     * Endpoint pour récupérer les factures proforma en attente
+     * @param limit Nombre de factures à retourner (par défaut 10)
+     */
+    @GetMapping("/factureProforma/en-attente")
+    public ResponseEntity<?> getFacturesProformaEnAttente(
+            @RequestParam(defaultValue = "10") int limit,
+            HttpServletRequest request) {
+        try {
+            List<FactureProFormaDTO> factures = factureProformaService.getFacturesProformaEnAttente(limit, request);
+            return ResponseEntity.ok(factures);
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Erreur interne du serveur : " + e.getMessage()));
+        }
+    }
 
 }
     

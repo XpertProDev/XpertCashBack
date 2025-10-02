@@ -103,18 +103,18 @@ public class VenteController {
         }
 
           // Montant total des ventes du jour (avec remboursements)
-    @GetMapping("/vente/montant-total-jour")
-    public ResponseEntity<Double> getMontantTotalVentesDuJour(HttpServletRequest request) {
-        double montantTotal = venteService.getMontantTotalVentesDuJourConnecte(request);
-        return ResponseEntity.ok(montantTotal);
-    }
+    // @GetMapping("/vente/montant-total-jour")
+    // public ResponseEntity<Double> getMontantTotalVentesDuJour(HttpServletRequest request) {
+    //     double montantTotal = venteService.getMontantTotalVentesDuJourConnecte(request);
+    //     return ResponseEntity.ok(montantTotal);
+    // }
 
     // Montant total des ventes du mois (avec remboursements)
-    @GetMapping("/vente/montant-total-mois")
-    public ResponseEntity<Double> getMontantTotalVentesDuMois(HttpServletRequest request) {
-        double montantTotal = venteService.getMontantTotalVentesDuMoisConnecte(request);
-        return ResponseEntity.ok(montantTotal);
-    }
+    // @GetMapping("/vente/montant-total-mois")
+    // public ResponseEntity<Double> getMontantTotalVentesDuMois(HttpServletRequest request) {
+    //     double montantTotal = venteService.getMontantTotalVentesDuMoisConnecte(request);
+    //     return ResponseEntity.ok(montantTotal);
+    // }
 
 
     // Global benefiche
@@ -125,25 +125,25 @@ public class VenteController {
     }
 
     // Bénéfice net du jour
-    @GetMapping("/vente/benefice/jour")
-    public ResponseEntity<Double> getBeneficeNetDuJour(HttpServletRequest request) {
-        double benefice = venteService.calculerBeneficeNetDuJourConnecte(request);
-        return ResponseEntity.ok(benefice);
-    }
+    // @GetMapping("/vente/benefice/jour")
+    // public ResponseEntity<Double> getBeneficeNetDuJour(HttpServletRequest request) {
+    //     double benefice = venteService.calculerBeneficeNetDuJourConnecte(request);
+    //     return ResponseEntity.ok(benefice);
+    // }
 
     // Bénéfice net du mois
-    @GetMapping("/vente/benefice/mois")
-    public ResponseEntity<Double> getBeneficeNetDuMois(HttpServletRequest request) {
-        double benefice = venteService.calculerBeneficeNetDuMoisConnecte(request);
-        return ResponseEntity.ok(benefice);
-    }
+    // @GetMapping("/vente/benefice/mois")
+    // public ResponseEntity<Double> getBeneficeNetDuMois(HttpServletRequest request) {
+    //     double benefice = venteService.calculerBeneficeNetDuMoisConnecte(request);
+    //     return ResponseEntity.ok(benefice);
+    // }
 
     // Benefice annuel
-    @GetMapping("/vente/benefice/annee")
-    public ResponseEntity<Double> getBeneficeNetAnnuel(HttpServletRequest request) {
-        double benefice = venteService.calculerBeneficeNetAnnuelConnecte(request);
-        return ResponseEntity.ok(benefice);
-    }
+    // @GetMapping("/vente/benefice/annee")
+    // public ResponseEntity<Double> getBeneficeNetAnnuel(HttpServletRequest request) {
+    //     double benefice = venteService.calculerBeneficeNetAnnuelConnecte(request);
+    //     return ResponseEntity.ok(benefice);
+    // }
 
     
     // Get achat par client
@@ -167,10 +167,26 @@ public ResponseEntity<List<VenteParClientResponse>> getVentesClientsAffilies(Htt
     return ResponseEntity.ok(ventes);
 }
 
-
-
-
-
-
+    /**
+     * Endpoint pour récupérer les ventes récentes
+     * @param limit Nombre de ventes à retourner (par défaut 10)
+     */
+    @GetMapping("/vente/recentes")
+    public ResponseEntity<?> getVentesRecentes(
+            @RequestParam(defaultValue = "10") int limit,
+            HttpServletRequest request) {
+        try {
+            List<VenteResponse> ventes = venteService.getVentesRecentes(limit, request);
+            return ResponseEntity.ok(ventes);
+        } catch (RuntimeException e) {
+            Map<String, String> error = new HashMap<>();
+            error.put("error", e.getMessage());
+            return ResponseEntity.badRequest().body(error);
+        } catch (Exception e) {
+            Map<String, String> error = new HashMap<>();
+            error.put("error", "Erreur interne du serveur : " + e.getMessage());
+            return ResponseEntity.status(500).body(error);
+        }
+    }
 
 }
