@@ -4,6 +4,7 @@ import com.xpertcash.DTOs.USER.RegisterResponse;
 import com.xpertcash.DTOs.USER.ResendActivationRequest;
 import com.xpertcash.DTOs.USER.UserDTO;
 import com.xpertcash.DTOs.USER.UserRequest;
+import com.xpertcash.DTOs.UserOptimalDTO;
 import com.xpertcash.configuration.JwtConfig;
 import com.xpertcash.configuration.JwtUtil;
 import com.xpertcash.entity.PermissionType;
@@ -316,6 +317,23 @@ public ResponseEntity<UserDTO> assignPermissionsToUser(
         public ResponseEntity<Long> countUsersInEntreprise(HttpServletRequest request) {
             long count = usersService.countUsersInEntreprise(request);
             return ResponseEntity.ok(count);
+        }
+
+        // Endpoint pour récupérer toutes les données du dashboard
+        @GetMapping("/compte/dashboard")
+        public ResponseEntity<?> getDashboard(HttpServletRequest request) {
+            try {
+                UserOptimalDTO dashboard = usersService.getDashboardData(request);
+                return ResponseEntity.ok(dashboard);
+            } catch (RuntimeException e) {
+                Map<String, String> error = new HashMap<>();
+                error.put("error", e.getMessage());
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error);
+            } catch (Exception e) {
+                Map<String, String> error = new HashMap<>();
+                error.put("error", "Erreur interne du serveur : " + e.getMessage());
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(error);
+            }
         }
  
 }

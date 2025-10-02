@@ -10,6 +10,6 @@ public enum RoleType {
     Fournisseur,
     RH,
     COMPTABLE,
-  
+    GERER_MARKETING,
     
 }
