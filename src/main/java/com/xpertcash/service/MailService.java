@@ -469,12 +469,12 @@ public class MailService {
                         <!-- Logo et Header -->
                         <div style="text-align: center; margin-bottom: 15px;">
                             <img src="cid:logo" alt="Logo" style="width: 60px; height: auto;">
-                            <h2 style="color: #333; margin: 5px 0; font-size: 14px;">Facture de Vente</h2>
+                            <h2 style="color: #333; margin: 5px 0; font-size: 14px;">Facture</h2>
                         </div>
                         
                         <!-- Informations de la facture -->
                         <div style="margin-bottom: 15px; font-size: 10px; color: #333;">
-                            <div style="margin-bottom: 2px;"><strong>Ticket :</strong> %s</div>
+                            <div style="margin-bottom: 2px;"><strong>Numéro fact :</strong> %s</div>
                             <div style="margin-bottom: 2px;">%s</div>
                             <div style="margin-bottom: 2px;"><strong>Vendeur :</strong> %s</div>
                             <div style="margin-bottom: 2px;"><strong>Boutique :</strong> %s</div>
