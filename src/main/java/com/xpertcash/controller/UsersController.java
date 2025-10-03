@@ -15,7 +15,6 @@ import com.xpertcash.DTOs.LoginRequest;
 import com.xpertcash.DTOs.RegistrationRequest;
 import com.xpertcash.service.UsersService;
 import com.xpertcash.service.AuthenticationHelper;
-import com.xpertcash.composant.Utilitaire;
 
 import io.jsonwebtoken.Claims;
 import jakarta.servlet.http.HttpServletRequest;
@@ -43,8 +42,6 @@ public class UsersController {
     private JwtUtil jwtUtil;
     @Autowired 
     JwtConfig jwtConfig;
-    @Autowired
-    private Utilitaire utilitaire;
     @Autowired
     private AuthenticationHelper authHelper;
 

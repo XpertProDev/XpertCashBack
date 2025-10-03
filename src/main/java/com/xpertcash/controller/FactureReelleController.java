@@ -1,7 +1,6 @@
 package com.xpertcash.controller;
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -24,7 +23,6 @@ import com.xpertcash.service.AuthenticationHelper;
 import com.xpertcash.entity.FactureProForma;
 import com.xpertcash.entity.FactureReelle;
 import com.xpertcash.entity.User;
-import com.xpertcash.repository.UsersRepository;
 import com.xpertcash.service.FactureReelleService;
 
 

@@ -7,21 +7,15 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import com.xpertcash.service.AuthenticationHelper;
 import com.xpertcash.entity.FactProHistoriqueAction;
 import com.xpertcash.entity.FactureProForma;
 import com.xpertcash.entity.User;
-import com.xpertcash.repository.ClientRepository;
-import com.xpertcash.repository.EntrepriseClientRepository;
 import com.xpertcash.repository.FactProHistoriqueActionRepository;
 import com.xpertcash.repository.FactureProformaRepository;
-import com.xpertcash.repository.ProduitRepository;
-import com.xpertcash.repository.UsersRepository;
 
 import jakarta.servlet.http.HttpServletRequest;
 
@@ -34,9 +28,6 @@ public class FactProHistoriqueService {
     @Autowired
     private FactProHistoriqueActionRepository factProHistoriqueActionRepository;
 
-
-     @Autowired
-    private UsersRepository usersRepository;
 
     @Autowired
     private AuthenticationHelper authHelper;

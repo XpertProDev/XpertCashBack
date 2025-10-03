@@ -16,7 +16,6 @@ import org.springframework.web.multipart.MultipartFile;
 import com.xpertcash.configuration.CentralAccess;
 
 import com.xpertcash.entity.Client;
-import com.xpertcash.service.AuthenticationHelper;
 import com.xpertcash.entity.Entreprise;
 import com.xpertcash.entity.EntrepriseClient;
 import com.xpertcash.entity.PermissionType;
@@ -26,7 +25,6 @@ import com.xpertcash.repository.ClientRepository;
 import com.xpertcash.repository.EntrepriseClientRepository;
 import com.xpertcash.repository.FactureProformaRepository;
 import com.xpertcash.repository.FactureReelleRepository;
-import com.xpertcash.repository.UsersRepository;
 import com.xpertcash.service.IMAGES.ImageStorageService;
 
 import jakarta.persistence.EntityNotFoundException;
@@ -41,9 +39,6 @@ public class ClientService {
 
     @Autowired
     private EntrepriseClientRepository entrepriseClientRepository;
-
-    @Autowired
-    private UsersRepository usersRepository;
 
     @Autowired
     private AuthenticationHelper authHelper;

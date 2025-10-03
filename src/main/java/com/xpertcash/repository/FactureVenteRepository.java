@@ -15,5 +15,8 @@ public interface FactureVenteRepository extends JpaRepository<FactureVente, Long
     List<FactureVente> findAllByEntrepriseId(@Param("entrepriseId") Long entrepriseId);
 
     Optional<FactureVente> findByVente(Vente vente);
+    
+    @Query("SELECT f FROM FactureVente f WHERE f.vente.id = :venteId")
+    Optional<FactureVente> findByVenteId(@Param("venteId") Long venteId);
 
 }

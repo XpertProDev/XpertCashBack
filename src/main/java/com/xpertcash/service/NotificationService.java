@@ -3,19 +3,15 @@ package com.xpertcash.service;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.Date;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import com.xpertcash.entity.FactureProForma;
 import com.xpertcash.entity.User;
 import com.xpertcash.repository.FactureProformaRepository;
-import com.xpertcash.repository.UsersRepository;
 
 import jakarta.transaction.Transactional;
 
@@ -25,8 +21,6 @@ public class NotificationService {
      @Autowired
     private MailService mailService;
 
-     @Autowired
-    private UsersRepository usersRepository;
      @Autowired
     private FactureProformaRepository factureProformaRepository;
 

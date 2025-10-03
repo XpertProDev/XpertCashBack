@@ -30,7 +30,6 @@ import com.xpertcash.repository.Module.ModuleRepository;
 import com.xpertcash.service.IMAGES.ImageStorageService;
 import com.xpertcash.service.Module.ModuleActivationService;
 
-import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import jakarta.mail.MessagingException;
@@ -60,7 +59,6 @@ import java.util.stream.Collectors;
 
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
-import com.xpertcash.service.AuthenticationHelper;
 
 
 

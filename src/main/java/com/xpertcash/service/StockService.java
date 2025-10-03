@@ -1,25 +1,12 @@
 package com.xpertcash.service;
-
-import java.time.LocalDateTime;
 import java.util.List;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
-import com.xpertcash.configuration.JwtUtil;
-import com.xpertcash.entity.Boutique;
-import com.xpertcash.entity.Produit;
 import com.xpertcash.entity.Stock;
-import com.xpertcash.entity.User;
-import com.xpertcash.entity.Enum.RoleType;
-import com.xpertcash.repository.BoutiqueRepository;
-import com.xpertcash.repository.ProduitRepository;
-import com.xpertcash.repository.RoleRepository;
 import com.xpertcash.repository.StockRepository;
-import com.xpertcash.repository.UsersRepository;
 
-import jakarta.servlet.http.HttpServletRequest;
 
 @Service
 public class StockService {
@@ -27,19 +14,9 @@ public class StockService {
     @Autowired
     private StockRepository stockRepository;
 
-    @Autowired
-    private ProduitRepository produitRepository;
 
-    @Autowired
-    private BoutiqueRepository boutiqueRepository;
 
-    @Autowired
-    private JwtUtil jwtUtil; // Utilitaire pour extraire l'ID de l'utilisateur depuis le token
-
-    @Autowired
-    private UsersRepository usersRepository;
-     @Autowired
-    private  RoleRepository roleRepository;
+   
 
     // Ajouter du stock à une boutique (seul l'admin peut le faire)
     /*@Transactional

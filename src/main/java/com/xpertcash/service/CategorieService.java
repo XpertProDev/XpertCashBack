@@ -33,7 +33,6 @@ import com.xpertcash.repository.EntrepriseRepository;
 import com.xpertcash.repository.ProduitRepository;
 
 import jakarta.servlet.http.HttpServletRequest;
-import com.xpertcash.service.AuthenticationHelper;
 
 @Service
 public class CategorieService {

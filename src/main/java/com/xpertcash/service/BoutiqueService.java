@@ -1,14 +1,11 @@
 package com.xpertcash.service;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -28,17 +25,14 @@ import com.xpertcash.entity.Transfert;
 import com.xpertcash.entity.User;
 import com.xpertcash.entity.Enum.RoleType;
 import com.xpertcash.entity.Enum.TypeBoutique;
-import com.xpertcash.exceptions.BusinessException;
 import com.xpertcash.repository.BoutiqueRepository;
 import com.xpertcash.repository.LigneFactureProformaRepository;
 import com.xpertcash.repository.ProduitRepository;
 import com.xpertcash.repository.StockHistoryRepository;
 import com.xpertcash.repository.StockRepository;
 import com.xpertcash.repository.TransfertRepository;
-import com.xpertcash.repository.UsersRepository;
 
 import jakarta.servlet.http.HttpServletRequest;
-import com.xpertcash.service.AuthenticationHelper;
 
 @Service
 public class BoutiqueService {
@@ -49,10 +43,6 @@ public class BoutiqueService {
     @Autowired
     private BoutiqueRepository boutiqueRepository;
 
- 
-
-    @Autowired
-    private UsersRepository usersRepository;
 
     @Autowired
     private TransfertRepository transfertRepository;

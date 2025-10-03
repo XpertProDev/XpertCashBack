@@ -1,9 +1,11 @@
 package com.xpertcash.service.VENTE;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.Random;
 import java.util.stream.Collectors;
 
@@ -13,6 +15,8 @@ import org.springframework.stereotype.Service;
 import com.xpertcash.DTOs.VENTE.FactureVenteResponseDTO;
 import com.xpertcash.DTOs.VENTE.FactureVentePaginatedDTO;
 import com.xpertcash.DTOs.VENTE.ProduitFactureResponse;
+import com.xpertcash.DTOs.VENTE.ReceiptEmailRequest;
+import com.xpertcash.DTOs.VENTE.VenteLigneResponse;
 import com.xpertcash.configuration.JwtUtil;
 import com.xpertcash.entity.FactureVente;
 import com.xpertcash.entity.User;
@@ -191,6 +195,53 @@ private String calculerStatutRemboursement(Vente vente) {
     }
     
     return "PARTIELLEMENT_REMBOURSEE";
+}
+
+/**
+ * Récupère les données d'une facture pour l'envoi par email
+ */
+public ReceiptEmailRequest getFactureDataForEmail(String venteId, String email) {
+    // Récupérer la facture par l'ID de vente
+    Optional<FactureVente> factureOpt = factureVenteRepository.findByVenteId(Long.parseLong(venteId));
+    
+    if (factureOpt.isEmpty()) {
+        throw new RuntimeException("Facture non trouvée pour l'ID de vente : " + venteId);
+    }
+    
+    FactureVente facture = factureOpt.get();
+    Vente vente = facture.getVente();
+    
+    // Convertir les lignes de vente en VenteLigneResponse
+    List<VenteLigneResponse> lignes = vente.getProduits().stream()
+        .map(ligne -> {
+            VenteLigneResponse ligneResponse = new VenteLigneResponse();
+            ligneResponse.setNomProduit(ligne.getProduit().getNom());
+            ligneResponse.setQuantite(ligne.getQuantite());
+            ligneResponse.setPrixUnitaire(ligne.getPrixUnitaire());
+            ligneResponse.setMontantLigne(ligne.getMontantLigne());
+            return ligneResponse;
+        })
+        .collect(Collectors.toList());
+    
+    // Créer le ReceiptEmailRequest
+    ReceiptEmailRequest request = new ReceiptEmailRequest();
+    request.setEmail(email);
+    request.setVenteId(venteId);
+    request.setNumeroFacture(facture.getNumeroFacture());
+    request.setDateVente(vente.getDateVente());
+    request.setMontantTotal(BigDecimal.valueOf(vente.getMontantTotal()));
+    request.setModePaiement(vente.getModePaiement() != null ? vente.getModePaiement().toString() : "Non spécifié");
+    request.setMontantPaye(BigDecimal.valueOf(vente.getMontantPaye() != null ? vente.getMontantPaye() : vente.getMontantTotal()));
+    
+    // Calculer la monnaie rendue
+    BigDecimal changeDue = request.getMontantPaye().subtract(request.getMontantTotal());
+    request.setChangeDue(changeDue.max(BigDecimal.ZERO));
+    
+    request.setNomVendeur(vente.getVendeur() != null ? vente.getVendeur().getNomComplet() : "Non spécifié");
+    request.setNomBoutique(vente.getBoutique().getNomBoutique());
+    request.setLignes(lignes);
+    
+    return request;
 }
 
 }

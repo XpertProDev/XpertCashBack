@@ -1,6 +1,5 @@
 package com.xpertcash.repository;
 
-import com.xpertcash.entity.Boutique;
 import com.xpertcash.entity.Entreprise;
 import com.xpertcash.entity.User;
 import com.xpertcash.entity.Enum.RoleType;

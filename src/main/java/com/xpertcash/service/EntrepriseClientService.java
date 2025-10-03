@@ -1,10 +1,5 @@
 package com.xpertcash.service;
-
-import java.io.IOException;
 import java.lang.reflect.Field;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -14,8 +9,6 @@ import org.springframework.stereotype.Service;
 
 import com.xpertcash.configuration.CentralAccess;
 
-import com.xpertcash.entity.Client;
-import com.xpertcash.service.AuthenticationHelper;
 import com.xpertcash.entity.Entreprise;
 import com.xpertcash.entity.EntrepriseClient;
 import com.xpertcash.entity.PermissionType;
@@ -23,8 +16,6 @@ import com.xpertcash.entity.User;
 import com.xpertcash.repository.EntrepriseClientRepository;
 import com.xpertcash.repository.FactureProformaRepository;
 import com.xpertcash.repository.FactureReelleRepository;
-import com.xpertcash.repository.UsersRepository;
-
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.transaction.Transactional;
@@ -35,8 +26,6 @@ public class EntrepriseClientService {
     @Autowired
     private EntrepriseClientRepository entrepriseClientRepository;
 
-    @Autowired
-    private UsersRepository usersRepository;
     @Autowired
     private AuthenticationHelper authHelper;
 
