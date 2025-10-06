@@ -28,6 +28,7 @@ public class ProspectAchat {
 
     private Integer quantite;
     private Double montantAchat;
+    @Column(length = 2000)
     private String notesAchat;
     private LocalDateTime dateAchat = LocalDateTime.now();
     

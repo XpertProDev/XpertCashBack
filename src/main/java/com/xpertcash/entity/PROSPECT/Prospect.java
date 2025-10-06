@@ -42,6 +42,7 @@ public class Prospect {
     private String pays;
     private String email;
     private String telephone;
+    @Column(length = 2000)
     private String notes; // notes générales sur le prospect
 
     // Statut de conversion
