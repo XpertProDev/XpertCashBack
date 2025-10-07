@@ -21,7 +21,6 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -59,7 +58,6 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.io.IOException;
 import com.xpertcash.service.IMAGES.ImageStorageService;
-import com.xpertcash.service.AuthenticationHelper;
 
 
 

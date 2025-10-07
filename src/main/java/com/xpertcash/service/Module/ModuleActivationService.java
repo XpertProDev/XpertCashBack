@@ -17,7 +17,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.xpertcash.DTOs.Module.ModuleDTO;
-import com.xpertcash.configuration.JwtUtil;
 import com.xpertcash.entity.Entreprise;
 import com.xpertcash.entity.User;
 import com.xpertcash.entity.Enum.RoleType;
@@ -47,9 +46,6 @@ public class ModuleActivationService {
     private ModuleRepository moduleRepository;
     @Autowired
     private UsersRepository usersRepository;
-
-     @Autowired
-    private JwtUtil jwtUtil; 
 
     @Autowired
     private ModulePaiementService modulePaiementService;

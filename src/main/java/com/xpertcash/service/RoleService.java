@@ -11,7 +11,6 @@ import org.springframework.stereotype.Service;
 
 import com.xpertcash.configuration.JwtUtil;
 import com.xpertcash.entity.Permission;
-import com.xpertcash.service.AuthenticationHelper;
 import com.xpertcash.entity.PermissionType;
 import com.xpertcash.entity.Role;
 import com.xpertcash.entity.User;
@@ -34,7 +33,6 @@ public class RoleService {
     private final PermissionRepository permissionRepository;
     private final JwtUtil jwtUtil;
     private final UsersRepository usersRepository;
-    private final AuthenticationHelper authHelper;
 
     @PostConstruct
     public void initRoles() {

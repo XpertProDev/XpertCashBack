@@ -9,20 +9,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.xpertcash.DTOs.VENTE.VersementComptableDTO;
-import com.xpertcash.composant.Utilitaire;
 import com.xpertcash.entity.Boutique;
 import com.xpertcash.entity.User;
 import com.xpertcash.entity.Enum.RoleType;
 import com.xpertcash.entity.VENTE.StatutVersement;
 import com.xpertcash.entity.VENTE.VersementComptable;
 import com.xpertcash.repository.BoutiqueRepository;
-import com.xpertcash.repository.FactureVenteRepository;
-import com.xpertcash.repository.ProduitRepository;
-import com.xpertcash.repository.StockRepository;
-import com.xpertcash.repository.UsersRepository;
-import com.xpertcash.repository.VENTE.VenteHistoriqueRepository;
-import com.xpertcash.repository.VENTE.VenteProduitRepository;
-import com.xpertcash.repository.VENTE.VenteRepository;
 import com.xpertcash.repository.VENTE.VersementComptableRepository;
 
 import jakarta.servlet.http.HttpServletRequest;
@@ -38,8 +30,6 @@ public class VersementComptableService {
     private VersementComptableRepository versementComptableRepository;
     @Autowired
     private BoutiqueRepository boutiqueRepository;
-    @Autowired
-    private UsersRepository usersRepository;
     
   
 

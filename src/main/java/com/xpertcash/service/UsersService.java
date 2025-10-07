@@ -8,6 +8,7 @@ import com.xpertcash.DTOs.USER.RegisterResponse;
 import com.xpertcash.DTOs.USER.RoleDTO;
 import com.xpertcash.DTOs.USER.UserDTO;
 import com.xpertcash.DTOs.USER.UserRequest;
+import com.xpertcash.DTOs.UserOptimalDTO;
 import com.xpertcash.configuration.CentralAccess;
 import com.xpertcash.configuration.JwtConfig;
 
@@ -16,6 +17,7 @@ import com.xpertcash.configuration.QRCodeGenerator;
 import com.xpertcash.entity.*;
 import com.xpertcash.entity.Enum.RoleType;
 import com.xpertcash.entity.Enum.TypeBoutique;
+import com.xpertcash.entity.PermissionType;
 import com.xpertcash.entity.Module.AppModule;
 import com.xpertcash.exceptions.BusinessException;
 import com.xpertcash.repository.BoutiqueRepository;
@@ -28,7 +30,6 @@ import com.xpertcash.repository.Module.ModuleRepository;
 import com.xpertcash.service.IMAGES.ImageStorageService;
 import com.xpertcash.service.Module.ModuleActivationService;
 
-import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import jakarta.mail.MessagingException;
@@ -44,6 +45,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -57,12 +59,44 @@ import java.util.stream.Collectors;
 
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
-import com.xpertcash.service.AuthenticationHelper;
 
 
 
 @Service
 public class UsersService {
+
+    // Maps statiques pour les descriptions (O(1) lookup)
+    private static final Map<PermissionType, String> PERMISSION_DESCRIPTIONS = new HashMap<>();
+    private static final Map<RoleType, String> ROLE_DESCRIPTIONS = new HashMap<>();
+    
+    static {
+        // Initialisation des descriptions des permissions
+        PERMISSION_DESCRIPTIONS.put(PermissionType.GERER_PRODUITS, "Gérer les produits");
+        PERMISSION_DESCRIPTIONS.put(PermissionType.VENDRE_PRODUITS, "Vendre des produits");
+        PERMISSION_DESCRIPTIONS.put(PermissionType.APPROVISIONNER_STOCK, "Approvisionner le stock");
+        PERMISSION_DESCRIPTIONS.put(PermissionType.GESTION_FACTURATION, "Gestion de la facturation");
+        PERMISSION_DESCRIPTIONS.put(PermissionType.GERER_CLIENTS, "Gérer les clients");
+        PERMISSION_DESCRIPTIONS.put(PermissionType.GERER_FOURNISSEURS, "Gérer les fournisseurs");
+        PERMISSION_DESCRIPTIONS.put(PermissionType.GERER_UTILISATEURS, "Gérer les utilisateurs");
+        PERMISSION_DESCRIPTIONS.put(PermissionType.GERER_BOUTIQUE, "Gérer les boutiques");
+        PERMISSION_DESCRIPTIONS.put(PermissionType.ACTIVER_BOUTIQUE, "Activer les boutiques");
+        PERMISSION_DESCRIPTIONS.put(PermissionType.DESACTIVER_BOUTIQUE, "Désactiver les boutiques");
+        PERMISSION_DESCRIPTIONS.put(PermissionType.COMPTABILITE, "Comptabilité");
+        PERMISSION_DESCRIPTIONS.put(PermissionType.VOIR_FLUX_COMPTABLE, "Voir les flux comptables");
+        PERMISSION_DESCRIPTIONS.put(PermissionType.GERER_MARKETING, "Gérer le marketing");
+        
+        // Initialisation des descriptions des rôles
+        ROLE_DESCRIPTIONS.put(RoleType.SUPER_ADMIN, "Super Administrateur");
+        ROLE_DESCRIPTIONS.put(RoleType.ADMIN, "Administrateur");
+        ROLE_DESCRIPTIONS.put(RoleType.MANAGER, "Gestionnaire");
+        ROLE_DESCRIPTIONS.put(RoleType.VENDEUR, "Vendeur");
+        ROLE_DESCRIPTIONS.put(RoleType.UTILISATEUR, "Utilisateur");
+        ROLE_DESCRIPTIONS.put(RoleType.COMPTABLE, "Comptable");
+        ROLE_DESCRIPTIONS.put(RoleType.RH, "Ressources Humaines");
+        ROLE_DESCRIPTIONS.put(RoleType.Clientel, "Client");
+        ROLE_DESCRIPTIONS.put(RoleType.Fournisseur, "Fournisseur");
+        ROLE_DESCRIPTIONS.put(RoleType.GERER_MARKETING, "Gérer le marketing");
+    }
 
     @Autowired
     private AuthenticationHelper authHelper;
@@ -1100,5 +1134,109 @@ public class UsersService {
     return dto;
 }
 
+    @Transactional(readOnly = true)
+    public UserOptimalDTO getDashboardData(HttpServletRequest request) {
+        // 🔐 Récupération de l'utilisateur connecté
+        User currentUser = authHelper.getAuthenticatedUserWithFallback(request);
+
+        if (currentUser.getEntreprise() == null) {
+            throw new RuntimeException("Vous n'êtes associé à aucune entreprise.");
+        }
+
+        Long entrepriseId = currentUser.getEntreprise().getId();
+
+        // 1. Informations de l'utilisateur connecté
+        UserOptimalDTO.UserInfoDTO userInfo = new UserOptimalDTO.UserInfoDTO();
+        userInfo.setId(currentUser.getId());
+        userInfo.setNomComplet(currentUser.getNomComplet());
+        userInfo.setEmail(currentUser.getEmail());
+        userInfo.setRoleType(currentUser.getRole() != null ? currentUser.getRole().getName().toString() : null);
+        userInfo.setUuid(currentUser.getUuid());
+        userInfo.setPays(currentUser.getPays());
+        userInfo.setPhone(currentUser.getPhone());
+
+        // 2. Tous les rôles disponibles
+        List<UserOptimalDTO.RoleDTO> roles = roleRepository.findAll().stream()
+                .map(role -> {
+                    UserOptimalDTO.RoleDTO roleDTO = new UserOptimalDTO.RoleDTO();
+                    roleDTO.setId(role.getId());
+                    roleDTO.setName(role.getName().toString());
+                    roleDTO.setDescription(getRoleDescription(role.getName()));
+                    return roleDTO;
+                })
+                .collect(Collectors.toList());
+
+        // 3. Toutes les boutiques de l'entreprise
+        List<UserOptimalDTO.BoutiqueDTO> boutiques = boutiqueRepository.findByEntrepriseId(entrepriseId).stream()
+                .map(boutique -> {
+                    UserOptimalDTO.BoutiqueDTO boutiqueDTO = new UserOptimalDTO.BoutiqueDTO();
+                    boutiqueDTO.setId(boutique.getId());
+                    boutiqueDTO.setNom(boutique.getNomBoutique());
+                    boutiqueDTO.setAdresse(boutique.getAdresse());
+                    boutiqueDTO.setTelephone(boutique.getTelephone());
+                    return boutiqueDTO;
+                })
+                .collect(Collectors.toList());
+
+        // 4. Tous les utilisateurs de l'entreprise
+        List<UserOptimalDTO.UserDTO> users = usersRepository.findByEntrepriseId(entrepriseId).stream()
+                .map(user -> {
+                    UserOptimalDTO.UserDTO userDTO = new UserOptimalDTO.UserDTO();
+                    userDTO.setId(user.getId());
+                    userDTO.setNomComplet(user.getNomComplet());
+                    userDTO.setEmail(user.getEmail());
+                    userDTO.setRoleType(user.getRole() != null ? user.getRole().getName().toString() : null);
+                    userDTO.setUuid(user.getUuid());
+                    userDTO.setPays(user.getPays());
+                    userDTO.setPhone(user.getPhone());
+
+                    // Ajouter les détails du rôle
+                    if (user.getRole() != null) {
+                        UserOptimalDTO.RoleDTO roleDTO = new UserOptimalDTO.RoleDTO();
+                        roleDTO.setId(user.getRole().getId());
+                        roleDTO.setName(user.getRole().getName().toString());
+                        roleDTO.setDescription(getRoleDescription(user.getRole().getName()));
+                        userDTO.setRole(roleDTO);
+
+                        // Ajouter les permissions du rôle
+                        List<UserOptimalDTO.PermissionDTO> permissions = user.getRole().getPermissions().stream()
+                                .map(permission -> {
+                                    UserOptimalDTO.PermissionDTO permissionDTO = new UserOptimalDTO.PermissionDTO();
+                                    permissionDTO.setId(permission.getId());
+                                    permissionDTO.setType(permission.getType().toString());
+                                    permissionDTO.setDescription(getPermissionDescription(permission.getType()));
+                                    return permissionDTO;
+                                })
+                                .collect(Collectors.toList());
+                        userDTO.setPermissions(permissions);
+                    } else {
+                        userDTO.setPermissions(new ArrayList<>());
+                    }
+
+                    return userDTO;
+                })
+                .collect(Collectors.toList());
+
+        // 5. Rôle de l'utilisateur connecté
+        String currentUserRole = currentUser.getRole() != null ? currentUser.getRole().getName().toString() : null;
+
+        // Construire et retourner le DTO
+        UserOptimalDTO dashboard = new UserOptimalDTO();
+        dashboard.setUserInfo(userInfo);
+        dashboard.setRoles(roles);
+        dashboard.setBoutiques(boutiques);
+        dashboard.setUsers(users);
+        dashboard.setCurrentUserRole(currentUserRole);
+
+        return dashboard;
+    }
+
+    private String getRoleDescription(RoleType roleType) {
+        return ROLE_DESCRIPTIONS.getOrDefault(roleType, "Rôle non défini");
+    }
+
+    private String getPermissionDescription(PermissionType permissionType) {
+        return PERMISSION_DESCRIPTIONS.getOrDefault(permissionType, "Permission non définie");
+    }
 
 }

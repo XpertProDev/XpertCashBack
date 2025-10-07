@@ -4,7 +4,6 @@ import lombok.Data;
 import java.time.LocalDateTime;
 import java.util.List;
 
-import com.xpertcash.entity.Caisse;
 
 @Data
 public class VenteResponse {

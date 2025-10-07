@@ -18,7 +18,6 @@ import com.xpertcash.DTOs.Boutique.BoutiqueResponseVendeur;
 import com.xpertcash.DTOs.Boutique.VendeurDTO;
 
 import com.xpertcash.entity.Boutique;
-import com.xpertcash.service.AuthenticationHelper;
 import com.xpertcash.entity.Permission;
 import com.xpertcash.entity.PermissionType;
 import com.xpertcash.entity.Role;

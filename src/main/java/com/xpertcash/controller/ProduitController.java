@@ -3,7 +3,6 @@ package com.xpertcash.controller;
 
 import java.io.IOException;
 import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
 import java.util.*;
 
 import jakarta.servlet.http.HttpServletResponse;
@@ -31,7 +30,6 @@ import com.xpertcash.DTOs.StockHistoryDTO;
 import com.xpertcash.DTOs.PRODUIT.ProduitRequest;
 import com.xpertcash.entity.Facture;
 import com.xpertcash.entity.Stock;
-import com.xpertcash.entity.User;
 import com.xpertcash.exceptions.DuplicateProductException;
 import com.xpertcash.service.ProduitService;
 import com.xpertcash.service.IMAGES.ImageStorageService;

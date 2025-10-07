@@ -47,7 +47,6 @@ import com.xpertcash.service.Module.ModuleActivationService;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.transaction.Transactional;
-import com.xpertcash.service.AuthenticationHelper;
 
 @Service
 public class FactureReelleService {

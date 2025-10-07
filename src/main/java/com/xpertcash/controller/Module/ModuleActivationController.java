@@ -5,7 +5,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -19,13 +18,10 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.xpertcash.DTOs.Module.ActivationDemande;
 import com.xpertcash.DTOs.Module.ModuleDTO;
-import com.xpertcash.DTOs.Module.PaiementModuleDTO;
-import com.xpertcash.configuration.JwtUtil;
 import com.xpertcash.entity.Entreprise;
 import com.xpertcash.entity.User;
 import com.xpertcash.entity.Enum.RoleType;
 import com.xpertcash.entity.Module.PaiementModule;
-import com.xpertcash.repository.UsersRepository;
 import com.xpertcash.repository.Module.PaiementModuleRepository;
 import com.xpertcash.service.Module.ModuleActivationService;
 
@@ -40,12 +36,7 @@ public class ModuleActivationController {
     private AuthenticationHelper authHelper;
     @Autowired
     private ModuleActivationService moduleActivationService;
-    
-    @Autowired
-    private JwtUtil jwtUtil; 
-
-    @Autowired
-    private UsersRepository usersRepository;
+ 
 
     @Autowired
     private PaiementModuleRepository paiementModuleRepository;

@@ -10,7 +10,6 @@ import org.springframework.data.repository.query.Param;
 import com.xpertcash.entity.Entreprise;
 import com.xpertcash.entity.User;
 import com.xpertcash.entity.VENTE.Vente;
-import com.xpertcash.entity.VENTE.VenteHistorique;
 
 public interface VenteRepository extends JpaRepository<Vente, Long> {
 

@@ -4,7 +4,6 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -17,7 +16,6 @@ import org.springframework.web.multipart.MultipartFile;
 
 import com.xpertcash.entity.Entreprise;
 import com.xpertcash.entity.Fournisseur;
-import com.xpertcash.entity.PermissionType;
 import com.xpertcash.entity.User;
 import com.xpertcash.entity.Enum.RoleType;
 import com.xpertcash.repository.FactureRepository;
@@ -25,7 +23,6 @@ import com.xpertcash.repository.FournisseurRepository;
 import com.xpertcash.repository.StockProduitFournisseurRepository;
 import com.xpertcash.repository.UsersRepository;
 import com.xpertcash.service.IMAGES.ImageStorageService;
-import com.xpertcash.service.AuthenticationHelper;
 
 import jakarta.servlet.http.HttpServletRequest;
 
@@ -40,8 +37,6 @@ import org.springframework.transaction.annotation.Transactional;
 public class FournisseurService {
     @Autowired
     private FournisseurRepository fournisseurRepository;
-    @Autowired
-    private UsersRepository usersRepository;
 
     @Autowired
     private StockProduitFournisseurRepository stockProduitFournisseurRepository;

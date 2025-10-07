@@ -9,6 +9,8 @@ import java.math.BigDecimal;
 import java.text.DecimalFormat;
 import java.text.NumberFormat;
 import java.text.SimpleDateFormat;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
@@ -16,6 +18,8 @@ import java.util.Objects;
 import java.util.function.Function;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import com.xpertcash.DTOs.VENTE.ReceiptEmailRequest;
+import com.xpertcash.DTOs.VENTE.VenteLigneResponse;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.mail.javamail.JavaMailSender;
@@ -412,5 +416,130 @@ public class MailService {
         referenceTransaction
     );
 }
+
+    // Méthode pour envoyer une facture de vente par email
+    public void sendReceiptEmail(ReceiptEmailRequest request) throws MessagingException {
+        String subject = "Facture de vente - " + request.getNumeroFacture();
+        String htmlContent = generateReceiptEmail(request);
+        sendEmail(request.getEmail(), subject, htmlContent);
+    }
+
+    // Génération du contenu HTML pour l'email de facture
+    private String generateReceiptEmail(ReceiptEmailRequest request) {
+        // Fonction pour formater les montants
+        Function<BigDecimal, String> formatMontant = (montant) -> {
+            DecimalFormat formatter = (DecimalFormat) NumberFormat.getInstance(Locale.FRENCH);
+            formatter.applyPattern("#,##0.##");
+            return formatter.format(montant)
+                         .replace(",", " ")
+                         .replace(".00", "")
+                         .replace(",00", "");
+        };
+
+        String montantTotalFormate = formatMontant.apply(request.getMontantTotal());
+        String montantPayeFormate = formatMontant.apply(request.getMontantPaye());
+        String changeDueFormate = formatMontant.apply(request.getChangeDue());
+
+        // Génération des lignes de produits
+        StringBuilder lignesHtml = new StringBuilder();
+        for (VenteLigneResponse ligne : request.getLignes()) {
+            String prixUnitaireFormate = formatMontant.apply(BigDecimal.valueOf(ligne.getPrixUnitaire()));
+            String montantLigneFormate = formatMontant.apply(BigDecimal.valueOf(ligne.getMontantLigne()));
+            
+            lignesHtml.append(String.format("""
+                <tr>
+                    <td style="border: 1px solid #ddd; padding: 4px; font-size: 9px">%s</td>
+                    <td style="border: 1px solid #ddd; padding: 4px; text-align: center; font-size: 9px">%d</td>
+                    <td style="border: 1px solid #ddd; padding: 4px; text-align: right; font-size: 9px">%s</td>
+                    <td style="border: 1px solid #ddd; padding: 4px; text-align: right; font-size: 9px">%s</td>
+                </tr>
+                """, 
+                ligne.getNomProduit(), 
+                ligne.getQuantite(), 
+                prixUnitaireFormate, 
+                montantLigneFormate
+            ));
+        }
+
+        return String.format("""
+            <html>
+                <body style="font-family: Arial, sans-serif; background-color: #f5f5f5; padding: 20px; margin: 0;">
+                    <div style="max-width: 400px; margin: auto; background: white; padding: 15px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); border-radius: 8px;">
+                        
+                        <!-- Logo et Header -->
+                        <div style="text-align: center; margin-bottom: 15px;">
+                            <img src="cid:logo" alt="Logo" style="width: 60px; height: auto;">
+                            <h2 style="color: #333; margin: 5px 0; font-size: 14px;">Facture</h2>
+                        </div>
+                        
+                        <!-- Informations de la facture -->
+                        <div style="margin-bottom: 15px; font-size: 10px; color: #333;">
+                            <div style="margin-bottom: 2px;"><strong>Numéro fact :</strong> %s</div>
+                            <div style="margin-bottom: 2px;">%s</div>
+                            <div style="margin-bottom: 2px;"><strong>Vendeur :</strong> %s</div>
+                            <div style="margin-bottom: 2px;"><strong>Boutique :</strong> %s</div>
+                        </div>
+
+                        <!-- Ligne de séparation -->
+                        <div style="border-top: 1px dashed #ccc; margin: 10px 0;"></div>
+
+                        <!-- Produits -->
+                        <div style="margin-bottom: 10px;">
+                            <table style="width: 100%%; border-collapse: collapse; font-size: 9px;">
+                                <tr style="background-color: #f8f8f8;">
+                                    <th style="border: 1px solid #ddd; padding: 4px; text-align: left;">Produit</th>
+                                    <th style="border: 1px solid #ddd; padding: 4px; text-align: center;">Qté</th>
+                                    <th style="border: 1px solid #ddd; padding: 4px; text-align: right;">Prix</th>
+                                    <th style="border: 1px solid #ddd; padding: 4px; text-align: right;">Total</th>
+                                </tr>
+                                %s
+                            </table>
+                        </div>
+
+                        <!-- Ligne de séparation -->
+                        <div style="border-top: 1px dashed #ccc; margin: 10px 0;"></div>
+
+                        <!-- Totaux -->
+                        <div style="font-size: 10px; margin-bottom: 10px;">
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 3px;">
+                                <span>Total: </span>
+                                <span><strong> %s FCFA</strong></span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 3px;">
+                                <span>%s: </span>
+                                <span> %s FCFA</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between;">
+                                <span>Monnaie:</span>
+                                <span> %s FCFA</span>
+                            </div>
+                        </div>
+
+                        <!-- Ligne de séparation -->
+                        <div style="border-top: 1px dashed #ccc; margin: 15px 0;"></div>
+
+                        <!-- Footer -->
+                        <div style="text-align: center; font-size: 8px; color: #999; margin-top: 15px;">
+                            Généré par Tchakeda
+                        </div>
+                    </div>
+                </body>
+            </html>
+            """, 
+            request.getNumeroFacture(),
+            formatDateForDisplay(request.getDateVente()),
+            request.getNomVendeur(),
+            request.getNomBoutique(),
+            lignesHtml.toString(),
+            montantTotalFormate,
+            request.getModePaiement().toUpperCase(),
+            montantPayeFormate,
+            changeDueFormate
+        );
+    }
+    private String formatDateForDisplay(LocalDateTime dateTime) {
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
+        return dateTime.format(formatter);
+    }
 
 }
