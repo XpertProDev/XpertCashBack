@@ -28,7 +28,6 @@ import com.xpertcash.entity.User;
 import com.xpertcash.repository.FactureRepository;
 import com.xpertcash.repository.FournisseurRepository;
 import com.xpertcash.repository.StockProduitFournisseurRepository;
-import com.xpertcash.repository.UsersRepository;
 import com.xpertcash.service.FournisseurService;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.MediaType;
@@ -54,8 +53,7 @@ public class FournisseurController {
 
     @Autowired
     private AuthenticationHelper authHelper;
-    @Autowired
-    private UsersRepository usersRepository;
+
 
     // Create fournisseur
   @PostMapping(value = "/save-fournisseurs", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
