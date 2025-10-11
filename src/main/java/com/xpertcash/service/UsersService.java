@@ -278,9 +278,9 @@ public class UsersService {
 
         user.setQrCodeUrl(qrCodeUrl);
 
-    } catch (Exception e) {
-        System.err.println("Erreur génération QR Code: " + e.getMessage());
-    }
+        } catch (Exception e) {
+            System.err.println("Erreur génération QR Code: " + e.getMessage());
+        }
 
 
    
