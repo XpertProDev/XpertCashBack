@@ -36,7 +36,6 @@ import com.xpertcash.entity.User;
 import com.xpertcash.entity.Enum.StatutFactureProForma;
 import com.xpertcash.repository.FactureProformaRepository;
 import com.xpertcash.repository.NoteFactureProFormaRepository;
-import com.xpertcash.repository.UsersRepository;
 import com.xpertcash.service.FactureProformaService;
 import com.xpertcash.service.MailService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -53,9 +52,6 @@ public class FactureProformaController {
     private FactureProformaRepository factureProformaRepository;
     @Autowired
     private NoteFactureProFormaRepository noteFactureProFormaRepository;
-
-    @Autowired
-    private UsersRepository usersRepository;
 
     @Autowired
     private AuthenticationHelper authHelper;
