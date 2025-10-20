@@ -34,6 +34,7 @@ public class Interaction {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "prospect_id")
+    @com.fasterxml.jackson.annotation.JsonBackReference
     private Prospect prospect;
 
 }

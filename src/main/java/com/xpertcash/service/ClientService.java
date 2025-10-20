@@ -21,10 +21,12 @@ import com.xpertcash.entity.EntrepriseClient;
 import com.xpertcash.entity.PermissionType;
 import com.xpertcash.entity.User;
 import com.xpertcash.entity.Enum.RoleType;
+import com.xpertcash.entity.PROSPECT.Interaction;
 import com.xpertcash.repository.ClientRepository;
 import com.xpertcash.repository.EntrepriseClientRepository;
 import com.xpertcash.repository.FactureProformaRepository;
 import com.xpertcash.repository.FactureReelleRepository;
+import com.xpertcash.repository.PROSPECT.InteractionRepository;
 import com.xpertcash.service.IMAGES.ImageStorageService;
 
 import jakarta.persistence.EntityNotFoundException;
@@ -51,6 +53,9 @@ public class ClientService {
 
     @Autowired
     private FactureReelleRepository factureReelleRepository;
+    
+    @Autowired
+    private InteractionRepository interactionRepository;
 
 
     public Client saveClient(Client client,  HttpServletRequest request) {
@@ -170,6 +175,11 @@ public class ClientService {
 
     public Optional<Client> getClientById(Long id) {
         return clientRepository.findById(id);
+    }
+    
+    //Methode pour recuperer les interactions d'un client
+    public List<Interaction> getClientInteractions(Long id) {
+        return interactionRepository.findByProspectClientIdAndProspectClientTypeOrderByOccurredAtDesc(id, "CLIENT");
     }
 
     public List<Client> getClientsByEntreprise(Long entrepriseId) {
