@@ -24,6 +24,8 @@ public interface FactureRepository extends JpaRepository<Facture, Long>{
    List<Facture> findByYear(@Param("year") int year);
 
    boolean existsByFournisseur_Id(Long fournisseurId);
- 
+
+    @Query("SELECT f FROM Facture f WHERE f.boutique.entreprise.id = :entrepriseId")
+    List<Facture> findAllByEntrepriseId(@Param("entrepriseId") Long entrepriseId);
 
 }
