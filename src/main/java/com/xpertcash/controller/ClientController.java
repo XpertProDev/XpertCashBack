@@ -21,9 +21,9 @@ import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
+
 import com.xpertcash.entity.Client;
 import com.xpertcash.entity.EntrepriseClient;
-import com.xpertcash.entity.PROSPECT.Interaction;
 import com.xpertcash.service.ClientService;
 
 import jakarta.persistence.EntityNotFoundException;
@@ -65,7 +65,7 @@ public class ClientController {
     public ResponseEntity<?> getClientInteractions(@PathVariable Long id) {
         Map<String, Object> response = new HashMap<>();
         try {
-            List<Interaction> interactions = clientService.getClientInteractions(id);
+            List<com.xpertcash.DTOs.PROSPECT.InteractionDTO> interactions = clientService.getClientInteractionDTOs(id);
             response.put("clientId", id);
             response.put("interactions", interactions);
             response.put("total", interactions.size());

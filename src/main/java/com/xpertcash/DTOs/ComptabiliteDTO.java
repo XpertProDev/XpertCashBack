@@ -15,6 +15,7 @@ public class ComptabiliteDTO {
     private FacturationDTO facturation;
     private DepensesDTO depenses;
     private List<BoutiqueInfoDTO> boutiques;
+    private List<BoutiqueDisponibleDTO> boutiquesDisponibles;
     private ClientsDTO clients;
     private VendeursDTO vendeurs;
     private ActivitesDTO activites;
@@ -23,14 +24,31 @@ public class ComptabiliteDTO {
     @AllArgsConstructor
     @NoArgsConstructor
     public static class ChiffreAffairesDTO {
-        private Double total; // Total de tous les revenus
+        private Double total;
         private Double duJour;
         private Double duMois;
         private Double deLAnnee;
         private Double totalVentes;
         private Double totalFactures;
         private Double totalPaiementsFactures;
+        private List<VenteCADetail> ventesDetails;
+        private List<FactureDetail> factureDetails;
     }
+
+    @Data
+    @AllArgsConstructor
+    @NoArgsConstructor
+    public static class VenteCADetail {
+        private Long venteId;
+        private String numeroTicket;
+        private java.time.LocalDateTime dateHeure;
+        private String modePaiement;
+        private Double remiseGlobale;
+        private Double montantNet;
+        private String statut;
+    }
+
+    // Note: PaiementCADetail supprimé au profit de FactureDetail plus lisible
 
     @Data
     @AllArgsConstructor
@@ -61,6 +79,24 @@ public class ComptabiliteDTO {
         private Double montantDuMois;
         private Integer deLAnnee;
         private Double montantDeLAnnee;
+        private List<FactureDetail> details;
+    }
+
+    @Data
+    @AllArgsConstructor
+    @NoArgsConstructor
+    public static class FactureDetail {
+        private Long factureId;
+        private String numeroFacture;
+        private java.time.LocalDate dateCreation;
+        private Double totalHT;
+        private Double remise;
+        private Boolean tva;
+        private Double totalFacture;
+        private Double montantPaye;
+        private Double montantRestant;
+        private String statutPaiement;
+        private String encaissePar;
     }
 
     @Data
@@ -75,6 +111,17 @@ public class ComptabiliteDTO {
         private Double montantDuMois;
         private Integer deLAnnee;
         private Double montantDeLAnnee;
+        private List<DepenseDetail> details;
+    }
+
+    @Data
+    @AllArgsConstructor
+    @NoArgsConstructor
+    public static class DepenseDetail {
+        private java.time.LocalDateTime date;
+        private String libelle;
+        private String methode;
+        private Double montant;
     }
 
     @Data
@@ -92,11 +139,26 @@ public class ComptabiliteDTO {
     @Data
     @AllArgsConstructor
     @NoArgsConstructor
+    public static class BoutiqueDisponibleDTO {
+        private Long id;
+        private String nom;
+        private String type;
+        private String email;
+        private String adresse;
+        private String telephone;
+        private java.time.LocalDateTime dateCreation;
+        private String statut;
+    }
+
+    @Data
+    @AllArgsConstructor
+    @NoArgsConstructor
     public static class ClientsDTO {
         private Integer nombreTotal;
         private Integer actifs; // Clients ayant au moins une vente
         private Double montantTotalAchete;
         private List<MeilleurClientDTO> meilleursClients; // Top 3
+        private List<ClientResumeDTO> clients;
     }
 
     @Data
@@ -109,6 +171,17 @@ public class ComptabiliteDTO {
         private String telephone;
         private Double montantAchete;
         private Integer nombreAchats;
+        private String type;
+    }
+
+    @Data
+    @AllArgsConstructor
+    @NoArgsConstructor
+    public static class ClientResumeDTO {
+        private Long id;
+        private String nomComplet;
+        private String email;
+        private String telephone;
         private String type;
     }
 

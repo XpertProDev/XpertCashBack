@@ -16,6 +16,7 @@ import org.springframework.web.multipart.MultipartFile;
 import com.xpertcash.configuration.CentralAccess;
 
 import com.xpertcash.entity.Client;
+import com.xpertcash.DTOs.PROSPECT.InteractionDTO;
 import com.xpertcash.entity.Entreprise;
 import com.xpertcash.entity.EntrepriseClient;
 import com.xpertcash.entity.PermissionType;
@@ -26,6 +27,7 @@ import com.xpertcash.repository.ClientRepository;
 import com.xpertcash.repository.EntrepriseClientRepository;
 import com.xpertcash.repository.FactureProformaRepository;
 import com.xpertcash.repository.FactureReelleRepository;
+import com.xpertcash.repository.VENTE.VenteRepository;
 import com.xpertcash.repository.PROSPECT.InteractionRepository;
 import com.xpertcash.service.IMAGES.ImageStorageService;
 
@@ -56,6 +58,9 @@ public class ClientService {
     
     @Autowired
     private InteractionRepository interactionRepository;
+
+    @Autowired
+    private VenteRepository venteRepository;
 
 
     public Client saveClient(Client client,  HttpServletRequest request) {
@@ -177,9 +182,29 @@ public class ClientService {
         return clientRepository.findById(id);
     }
     
-    //Methode pour recuperer les interactions d'un client
+    //Methode pour recuperer les interactions d'un client (entities)
     public List<Interaction> getClientInteractions(Long id) {
         return interactionRepository.findByProspectClientIdAndProspectClientTypeOrderByOccurredAtDesc(id, "CLIENT");
+    }
+
+    //Methode pour recuperer les interactions d'un client en DTO (inclut produitId)
+    public List<InteractionDTO> getClientInteractionDTOs(Long id) {
+        List<Interaction> interactions = getClientInteractions(id);
+        return interactions.stream().map(this::convertInteractionToDTO).collect(java.util.stream.Collectors.toList());
+    }
+
+    private InteractionDTO convertInteractionToDTO(Interaction interaction) {
+        InteractionDTO dto = new InteractionDTO();
+        dto.id = interaction.getId();
+        dto.type = interaction.getType();
+        dto.occurredAt = interaction.getOccurredAt();
+        dto.notes = interaction.getNotes();
+        dto.assignedTo = interaction.getAssignedTo();
+        dto.nextFollowUp = interaction.getNextFollowUp();
+        if (interaction.getProduit() != null) {
+            dto.produitId = interaction.getProduit().getId();
+        }
+        return dto;
     }
 
     public List<Client> getClientsByEntreprise(Long entrepriseId) {
@@ -403,10 +428,11 @@ public class ClientService {
         // ❌ Vérifier que le client n’a pas de commandes ou de factures
         boolean hasFactures = factureProformaRepository.existsByClientId(clientId);
         boolean hasFacturesReel = factureReelleRepository.existsByClientId(clientId);
+        boolean hasVentes = !venteRepository.findByClientId(clientId).isEmpty();
 
 
-        if ( hasFactures || hasFacturesReel) {
-            throw new RuntimeException("Ce client ne peut pas être supprimé car il a  des factures.");
+        if ( hasFactures || hasFacturesReel || hasVentes) {
+            throw new RuntimeException("Ce client ne peut pas être supprimé car il est lié à des ventes ou des factures.");
         }
 
         // 🗑️ Supprimer l’image si elle existe

@@ -11,5 +11,6 @@ public class InteractionDTO {
     public String notes;
     public String assignedTo;
     public LocalDateTime nextFollowUp;
+    public Long produitId;
 
 }

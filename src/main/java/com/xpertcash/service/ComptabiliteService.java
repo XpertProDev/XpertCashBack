@@ -36,6 +36,9 @@ public class ComptabiliteService {
 
     @Autowired
     private FactureReelleRepository factureReelleRepository;
+    
+    @Autowired
+    private FactureVenteRepository factureVenteRepository;
 
     @Autowired
     private BoutiqueRepository boutiqueRepository;
@@ -76,6 +79,7 @@ public class ComptabiliteService {
         comptabilite.setDepenses(calculerDepenses(entrepriseId));
 
         comptabilite.setBoutiques(calculerBoutiques(entrepriseId));
+        comptabilite.setBoutiquesDisponibles(listerBoutiquesDisponibles(entrepriseId));
 
         comptabilite.setClients(calculerClients(entrepriseId));
 
@@ -128,6 +132,90 @@ public class ComptabiliteService {
                 .mapToDouble(FactureReelle::getTotalFacture)
                 .sum();
 
+        // Construire les détails des ventes
+        List<Vente> ventes = venteRepository.findAllByEntrepriseId(entrepriseId);
+        List<Long> venteIds = ventes.stream().map(Vente::getId).collect(Collectors.toList());
+        Map<Long, Double> remboursementsMap = venteIds.isEmpty() ? java.util.Collections.emptyMap() :
+                venteHistoriqueRepository.sumRemboursementsByVenteIds(venteIds)
+                        .stream()
+                        .collect(Collectors.toMap(
+                                obj -> (Long) obj[0],
+                                obj -> ((Number) obj[1]).doubleValue()
+                        ));
+
+        // Récupérer les numéros de tickets via FactureVente
+        Map<Long, String> venteIdToNumero = new HashMap<>();
+        List<FactureVente> facturesVente = factureVenteRepository.findAllByEntrepriseId(entrepriseId);
+        for (FactureVente fv : facturesVente) {
+            if (fv.getVente() != null) {
+                venteIdToNumero.put(fv.getVente().getId(), fv.getNumeroFacture());
+            }
+        }
+
+        List<ComptabiliteDTO.VenteCADetail> ventesDetails = ventes.stream().map(v -> {
+            double montant = v.getMontantTotal() != null ? v.getMontantTotal() : 0.0;
+            double remb = remboursementsMap.getOrDefault(v.getId(), 0.0);
+            Double net = montant - remb;
+            String numeroTicket = venteIdToNumero.getOrDefault(v.getId(), "VENTE-" + v.getId());
+            String mode = v.getModePaiement() != null ? v.getModePaiement().name() : null;
+            String statut = v.getStatus() != null ? v.getStatus().name() : null;
+            return new ComptabiliteDTO.VenteCADetail(
+                    v.getId(),
+                    numeroTicket,
+                    v.getDateVente(),
+                    mode,
+                    v.getRemiseGlobale(),
+                    net,
+                    statut
+            );
+        }).collect(Collectors.toList());
+
+        // Détails factures (lisibles: remise/TVA et reste à payer)
+        List<Long> factureIds = toutesFacturesReelles.stream().map(FactureReelle::getId).collect(Collectors.toList());
+        Map<Long, Double> paiementsParFacture = new HashMap<>();
+        Map<Long, String> dernierEncaisseurParFacture = new HashMap<>();
+        if (!factureIds.isEmpty()) {
+            List<Object[]> paiementsAgg = paiementRepository.sumMontantsByFactureReelleIds(factureIds);
+            for (Object[] row : paiementsAgg) {
+                Long fid = (Long) row[0];
+                double somme = ((Number) row[1]).doubleValue();
+                paiementsParFacture.put(fid, somme);
+            }
+            // Récupérer tous les paiements pour déterminer le dernier encaisseur
+            List<Paiement> paiementsList = paiementRepository.findByFactureReelle_IdIn(factureIds);
+            java.util.Map<Long, Paiement> dernierPaiement = paiementsList.stream()
+                    .filter(p -> p.getDatePaiement() != null)
+                    .collect(java.util.stream.Collectors.toMap(
+                            p -> p.getFactureReelle() != null ? p.getFactureReelle().getId() : -1L,
+                            p -> p,
+                            (p1, p2) -> p1.getDatePaiement().isAfter(p2.getDatePaiement()) ? p1 : p2
+                    ));
+            for (java.util.Map.Entry<Long, Paiement> e : dernierPaiement.entrySet()) {
+                Paiement p = e.getValue();
+                String nom = p.getEncaissePar() != null ? p.getEncaissePar().getNomComplet() : null;
+                dernierEncaisseurParFacture.put(e.getKey(), nom);
+            }
+        }
+        List<ComptabiliteDTO.FactureDetail> factureDetails = toutesFacturesReelles.stream().map(f -> {
+            double paye = paiementsParFacture.getOrDefault(f.getId(), 0.0);
+            double restant = (f.getTotalFacture() != 0 ? f.getTotalFacture() : 0.0) - paye;
+            String statut = f.getStatutPaiement() != null ? f.getStatutPaiement().name() : null;
+            String encaissePar = dernierEncaisseurParFacture.getOrDefault(f.getId(), null);
+            ComptabiliteDTO.FactureDetail d = new ComptabiliteDTO.FactureDetail();
+            d.setFactureId(f.getId());
+            d.setNumeroFacture(f.getNumeroFacture());
+            d.setDateCreation(f.getDateCreation());
+            d.setTotalHT(f.getTotalHT());
+            d.setRemise(f.getRemise());
+            d.setTva(f.isTva());
+            d.setTotalFacture(f.getTotalFacture());
+            d.setMontantPaye(paye);
+            d.setMontantRestant(restant);
+            d.setStatutPaiement(statut);
+            d.setEncaissePar(encaissePar);
+            return d;
+        }).collect(Collectors.toList());
+
         // Total chiffre d'affaires = ventes + paiements de factures
         double total = totalVentes + totalPaiementsFactures;
 
@@ -138,7 +226,9 @@ public class ComptabiliteService {
                 ventesAnnee,
                 totalVentes,
                 totalFacturesEmises,
-                totalPaiementsFactures
+                totalPaiementsFactures,
+                ventesDetails,
+                factureDetails
         );
     }
 
@@ -273,18 +363,65 @@ public class ComptabiliteService {
                 .mapToDouble(FactureReelle::getTotalFacture)
                 .sum();
 
-        return new ComptabiliteDTO.FacturationDTO(
-                toutesFactures.size(),
-                montantTotalFactures,
-                montantPaye,
-                montantImpaye,
-                facturesJour.size(),
-                montantDuJour,
-                facturesMois.size(),
-                montantDuMois,
-                facturesAnnee.size(),
-                montantDeLAnnee
-        );
+        // Détails factures pour lisibilité (remise/tva et reste à payer)
+        Map<Long, Double> paiementsParFacture = new HashMap<>();
+        Map<Long, String> dernierEncaisseurParFacture = new HashMap<>();
+        if (!factureIds.isEmpty()) {
+            List<Object[]> paiementsAgg = paiementRepository.sumMontantsByFactureReelleIds(factureIds);
+            for (Object[] row : paiementsAgg) {
+                Long fid = (Long) row[0];
+                double somme = ((Number) row[1]).doubleValue();
+                paiementsParFacture.put(fid, somme);
+            }
+
+            // Déterminer le dernier encaisseur par facture à partir des paiements
+            List<Paiement> paiementsList = paiementRepository.findByFactureReelle_IdIn(factureIds);
+            java.util.Map<Long, Paiement> dernierPaiement = paiementsList.stream()
+                    .filter(p -> p.getDatePaiement() != null)
+                    .collect(java.util.stream.Collectors.toMap(
+                            p -> p.getFactureReelle() != null ? p.getFactureReelle().getId() : -1L,
+                            p -> p,
+                            (p1, p2) -> p1.getDatePaiement().isAfter(p2.getDatePaiement()) ? p1 : p2
+                    ));
+            for (java.util.Map.Entry<Long, Paiement> e : dernierPaiement.entrySet()) {
+                Paiement p = e.getValue();
+                String nom = p.getEncaissePar() != null ? p.getEncaissePar().getNomComplet() : null;
+                dernierEncaisseurParFacture.put(e.getKey(), nom);
+            }
+        }
+
+        List<ComptabiliteDTO.FactureDetail> details = toutesFactures.stream().map(f -> {
+            double paye = paiementsParFacture.getOrDefault(f.getId(), 0.0);
+            double restant = (f.getTotalFacture() != 0 ? f.getTotalFacture() : 0.0) - paye;
+            String statut = f.getStatutPaiement() != null ? f.getStatutPaiement().name() : null;
+            ComptabiliteDTO.FactureDetail d = new ComptabiliteDTO.FactureDetail();
+            d.setFactureId(f.getId());
+            d.setNumeroFacture(f.getNumeroFacture());
+            d.setDateCreation(f.getDateCreation());
+            d.setTotalHT(f.getTotalHT());
+            d.setRemise(f.getRemise());
+            d.setTva(f.isTva());
+            d.setTotalFacture(f.getTotalFacture());
+            d.setMontantPaye(paye);
+            d.setMontantRestant(restant);
+            d.setStatutPaiement(statut);
+            d.setEncaissePar(dernierEncaisseurParFacture.getOrDefault(f.getId(), null));
+            return d;
+        }).collect(java.util.stream.Collectors.toList());
+
+        ComptabiliteDTO.FacturationDTO dto = new ComptabiliteDTO.FacturationDTO();
+        dto.setNombreTotalFactures(toutesFactures.size());
+        dto.setMontantTotalFactures(montantTotalFactures);
+        dto.setMontantPaye(montantPaye);
+        dto.setMontantImpaye(montantImpaye);
+        dto.setDuJour(facturesJour.size());
+        dto.setMontantDuJour(montantDuJour);
+        dto.setDuMois(facturesMois.size());
+        dto.setMontantDuMois(montantDuMois);
+        dto.setDeLAnnee(facturesAnnee.size());
+        dto.setMontantDeLAnnee(montantDeLAnnee);
+        dto.setDetails(details);
+        return dto;
     }
 
     /**
@@ -295,7 +432,17 @@ public class ComptabiliteService {
         List<Long> boutiqueIds = boutiques.stream().map(Boutique::getId).collect(Collectors.toList());
 
         if (boutiqueIds.isEmpty()) {
-            return new ComptabiliteDTO.DepensesDTO(0, 0.0, 0, 0.0, 0, 0.0, 0, 0.0);
+            ComptabiliteDTO.DepensesDTO dto = new ComptabiliteDTO.DepensesDTO();
+            dto.setNombreTotal(0);
+            dto.setMontantTotal(0.0);
+            dto.setDuJour(0);
+            dto.setMontantDuJour(0.0);
+            dto.setDuMois(0);
+            dto.setMontantDuMois(0.0);
+            dto.setDeLAnnee(0);
+            dto.setMontantDeLAnnee(0.0);
+            dto.setDetails(java.util.Collections.emptyList());
+            return dto;
         }
 
         // Récupérer les mouvements de type DEPENSE
@@ -340,16 +487,45 @@ public class ComptabiliteService {
                 .mapToDouble(m -> m.getMontant() != null ? m.getMontant() : 0.0)
                 .sum();
 
-        return new ComptabiliteDTO.DepensesDTO(
-                toutesDepenses.size(),
-                montantTotal,
-                depensesJour.size(),
-                montantDuJour,
-                depensesMois.size(),
-                montantDuMois,
-                depensesAnnee.size(),
-                montantDeLAnnee
-        );
+        // Détails des dépenses (Date, Libellé, Méthode, Montant)
+        List<ComptabiliteDTO.DepenseDetail> details = toutesDepenses.stream().map(d -> {
+            ComptabiliteDTO.DepenseDetail dd = new ComptabiliteDTO.DepenseDetail();
+            dd.setDate(d.getDateMouvement());
+            dd.setLibelle(d.getDescription());
+            dd.setMethode(libelleModePaiement(d.getModePaiement()));
+            dd.setMontant(d.getMontant());
+            return dd;
+        }).collect(Collectors.toList());
+
+        ComptabiliteDTO.DepensesDTO dto = new ComptabiliteDTO.DepensesDTO();
+        dto.setNombreTotal(toutesDepenses.size());
+        dto.setMontantTotal(montantTotal);
+        dto.setDuJour(depensesJour.size());
+        dto.setMontantDuJour(montantDuJour);
+        dto.setDuMois(depensesMois.size());
+        dto.setMontantDuMois(montantDuMois);
+        dto.setDeLAnnee(depensesAnnee.size());
+        dto.setMontantDeLAnnee(montantDeLAnnee);
+        dto.setDetails(details);
+        return dto;
+    }
+
+    private String libelleModePaiement(ModePaiement mode) {
+        if (mode == null) return "Espèces";
+        switch (mode.name()) {
+            case "ESPECES":
+                return "Espèces";
+            case "CHEQUE":
+                return "Chèque";
+            case "CARTE":
+                return "Carte";
+            case "MOBILE_MONEY":
+                return "Mobile money";
+            case "VIREMENT":
+                return "Virement";
+            default:
+                return mode.name();
+        }
     }
 
     /**
@@ -384,12 +560,11 @@ public class ComptabiliteService {
             // Calculer les dépenses de cette boutique
             List<Caisse> caisses = getCaissesForBoutique(boutique.getId());
             List<Long> caisseIds = caisses.stream().map(Caisse::getId).collect(Collectors.toList());
-            
+
             List<MouvementCaisse> depenses = new ArrayList<>();
             if (!caisseIds.isEmpty()) {
                 depenses = mouvementCaisseRepository
-                        .findByCaisseIdInAndTypeMouvementAndDateMouvementBetween(
-                                caisseIds, TypeMouvementCaisse.DEPENSE, null, null);
+                        .findByCaisseIdInAndTypeMouvement(caisseIds, TypeMouvementCaisse.DEPENSE);
             }
 
             double totalDepenses = depenses.stream()
@@ -407,6 +582,25 @@ public class ComptabiliteService {
         }
 
         return boutiquesInfo;
+    }
+
+    /**
+     * Liste toutes les boutiques de l'entreprise avec leurs informations de base
+     */
+    private List<ComptabiliteDTO.BoutiqueDisponibleDTO> listerBoutiquesDisponibles(Long entrepriseId) {
+        List<Boutique> boutiques = boutiqueRepository.findByEntrepriseId(entrepriseId);
+        return boutiques.stream().map(b -> {
+            ComptabiliteDTO.BoutiqueDisponibleDTO d = new ComptabiliteDTO.BoutiqueDisponibleDTO();
+            d.setId(b.getId());
+            d.setNom(b.getNomBoutique());
+            d.setType(b.getTypeBoutique() != null ? b.getTypeBoutique().name() : null);
+            d.setEmail(b.getEmail());
+            d.setAdresse(b.getAdresse());
+            d.setTelephone(b.getTelephone());
+            d.setDateCreation(b.getCreatedAt());
+            d.setStatut(b.isActif() ? "Actif" : "Inactif");
+            return d;
+        }).collect(Collectors.toList());
     }
 
     /**
@@ -458,16 +652,81 @@ public class ComptabiliteService {
         // Calculer les top 3 meilleurs clients
         List<ComptabiliteDTO.MeilleurClientDTO> meilleursClients = calculerTop3Clients(entrepriseId, toutesVentes, remboursementsMap);
 
+        // Construire la liste de tous les clients (Client + EntrepriseClient)
+        List<ComptabiliteDTO.ClientResumeDTO> clientsList = new ArrayList<>();
+        for (Client c : tousClients) {
+            ComptabiliteDTO.ClientResumeDTO cr = new ComptabiliteDTO.ClientResumeDTO();
+            cr.setId(c.getId());
+            cr.setNomComplet(c.getNomComplet());
+            cr.setEmail(c.getEmail());
+            cr.setTelephone(c.getTelephone());
+            cr.setType("CLIENT");
+            clientsList.add(cr);
+        }
+        for (EntrepriseClient ec : tousEntreprisesClients) {
+            ComptabiliteDTO.ClientResumeDTO cr = new ComptabiliteDTO.ClientResumeDTO();
+            cr.setId(ec.getId());
+            cr.setNomComplet(ec.getNom());
+            cr.setEmail(ec.getEmail());
+            cr.setTelephone(ec.getTelephone());
+            cr.setType("ENTREPRISE_CLIENT");
+            clientsList.add(cr);
+        }
+
+        // Assurer que tous les meilleurs clients figurent aussi dans la liste complète
+        java.util.Set<String> signatures = clientsList.stream()
+                .map(cl -> (cl.getType() + "|" + (cl.getId() != null ? cl.getId() : -1) + "|" +
+                        (cl.getNomComplet() != null ? cl.getNomComplet() : "") + "|" +
+                        (cl.getTelephone() != null ? cl.getTelephone() : "")))
+                .collect(java.util.stream.Collectors.toSet());
+
+        for (ComptabiliteDTO.MeilleurClientDTO mc : meilleursClients) {
+            String sig = mc.getType() + "|" + (mc.getId() != null ? mc.getId() : -1) + "|" +
+                    (mc.getNomComplet() != null ? mc.getNomComplet() : "") + "|" +
+                    (mc.getTelephone() != null ? mc.getTelephone() : "");
+            if (!signatures.contains(sig)) {
+                ComptabiliteDTO.ClientResumeDTO cr = new ComptabiliteDTO.ClientResumeDTO();
+                cr.setId(mc.getId());
+                cr.setNomComplet(mc.getNomComplet());
+                cr.setEmail(mc.getEmail());
+                cr.setTelephone(mc.getTelephone());
+                cr.setType(mc.getType());
+                clientsList.add(cr);
+                signatures.add(sig);
+            }
+        }
+
+        // Inclure également les clients saisis en caisse (clientNom/clientNumero) absents du référentiel
+        for (Vente v : toutesVentes) {
+            if (v.getClient() != null || v.getEntrepriseClient() != null) continue;
+            String nom = v.getClientNom();
+            String tel = v.getClientNumero();
+            if ((nom != null && !nom.isEmpty()) || (tel != null && !tel.isEmpty())) {
+                String sig = "CLIENT|" + -1 + "|" + (nom != null ? nom : "") + "|" + (tel != null ? tel : "");
+                if (!signatures.contains(sig)) {
+                    ComptabiliteDTO.ClientResumeDTO cr = new ComptabiliteDTO.ClientResumeDTO();
+                    cr.setId(null);
+                    cr.setNomComplet(nom);
+                    cr.setEmail(null);
+                    cr.setTelephone(tel);
+                    cr.setType("CLIENT");
+                    clientsList.add(cr);
+                    signatures.add(sig);
+                }
+            }
+        }
+
         // Total clients = clients normaux + entreprises clients
         int totalClients = tousClients.size() + tousEntreprisesClients.size();
         int clientsActifsTotal = clientsActifsIds.size() + entrepriseClientsActifsIds.size();
 
-        return new ComptabiliteDTO.ClientsDTO(
-                totalClients,
-                clientsActifsTotal,
-                montantTotalAchete,
-                meilleursClients
-        );
+        ComptabiliteDTO.ClientsDTO dto = new ComptabiliteDTO.ClientsDTO();
+        dto.setNombreTotal(totalClients);
+        dto.setActifs(clientsActifsTotal);
+        dto.setMontantTotalAchete(montantTotalAchete);
+        dto.setMeilleursClients(meilleursClients);
+        dto.setClients(clientsList);
+        return dto;
     }
 
     /**
