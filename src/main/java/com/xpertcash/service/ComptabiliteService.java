@@ -38,6 +38,9 @@ public class ComptabiliteService {
     private FactureReelleRepository factureReelleRepository;
     
     @Autowired
+    private FactureProformaRepository factureProformaRepository;
+    
+    @Autowired
     private FactureVenteRepository factureVenteRepository;
 
     @Autowired
@@ -108,8 +111,9 @@ public class ComptabiliteService {
         LocalDateTime startOfYear = firstDayOfYear.atStartOfDay();
         LocalDateTime endOfYear = lastDayOfYear.atTime(LocalTime.MAX);
 
-        // Récupérer tous les paiements de factures
+        // Récupérer factures réelles et proforma
         List<FactureReelle> toutesFacturesReelles = factureReelleRepository.findByEntrepriseId(entrepriseId);
+        List<FactureProForma> toutesFacturesProforma = factureProformaRepository.findByEntrepriseId(entrepriseId);
         
         // Calculer le total des paiements pour toutes les factures (optimisation N+1)
         double totalPaiementsFactures = 0.0;
@@ -127,10 +131,15 @@ public class ComptabiliteService {
         double ventesMois = calculerVentesNet(entrepriseId, startOfMonth, endOfMonth);
         double ventesAnnee = calculerVentesNet(entrepriseId, startOfYear, endOfYear);
 
-        // Calculer les factures émisées
+        // Calculer les montants de factures
         double totalFacturesEmises = toutesFacturesReelles.stream()
                 .mapToDouble(FactureReelle::getTotalFacture)
                 .sum();
+        double totalFacturesProforma = toutesFacturesProforma.stream()
+                .mapToDouble(FactureProForma::getTotalFacture)
+                .sum();
+        int nombreFacturesReelles = toutesFacturesReelles.size();
+        int nombreFacturesProforma = toutesFacturesProforma.size();
 
         // Construire les détails des ventes
         List<Vente> ventes = venteRepository.findAllByEntrepriseId(entrepriseId);
@@ -199,7 +208,7 @@ public class ComptabiliteService {
         List<ComptabiliteDTO.FactureDetail> factureDetails = toutesFacturesReelles.stream().map(f -> {
             double paye = paiementsParFacture.getOrDefault(f.getId(), 0.0);
             double restant = (f.getTotalFacture() != 0 ? f.getTotalFacture() : 0.0) - paye;
-            String statut = f.getStatutPaiement() != null ? f.getStatutPaiement().name() : null;
+            String statutPaiement = f.getStatutPaiement() != null ? f.getStatutPaiement().name() : null;
             String encaissePar = dernierEncaisseurParFacture.getOrDefault(f.getId(), null);
             ComptabiliteDTO.FactureDetail d = new ComptabiliteDTO.FactureDetail();
             d.setFactureId(f.getId());
@@ -211,25 +220,31 @@ public class ComptabiliteService {
             d.setTotalFacture(f.getTotalFacture());
             d.setMontantPaye(paye);
             d.setMontantRestant(restant);
-            d.setStatutPaiement(statut);
+            d.setStatutPaiement(statutPaiement);
             d.setEncaissePar(encaissePar);
+            d.setType("REELLE");
+            try { d.setStatut(f.getStatut() != null ? f.getStatut().name() : null); } catch (Exception ignore) { d.setStatut(null); }
             return d;
         }).collect(Collectors.toList());
 
         // Total chiffre d'affaires = ventes + paiements de factures
         double total = totalVentes + totalPaiementsFactures;
 
-        return new ComptabiliteDTO.ChiffreAffairesDTO(
-                total,
-                ventesJour,
-                ventesMois,
-                ventesAnnee,
-                totalVentes,
-                totalFacturesEmises,
-                totalPaiementsFactures,
-                ventesDetails,
-                factureDetails
-        );
+        ComptabiliteDTO.ChiffreAffairesDTO dto = new ComptabiliteDTO.ChiffreAffairesDTO();
+        dto.setTotal(total);
+        dto.setDuJour(ventesJour);
+        dto.setDuMois(ventesMois);
+        dto.setDeLAnnee(ventesAnnee);
+        dto.setTotalVentes(totalVentes);
+        dto.setTotalFactures(totalFacturesEmises);
+        dto.setTotalPaiementsFactures(totalPaiementsFactures);
+        dto.setVentesDetails(ventesDetails);
+        dto.setFactureDetails(factureDetails);
+        dto.setNombreFacturesReelles(nombreFacturesReelles);
+        dto.setMontantFacturesReelles(totalFacturesEmises);
+        dto.setNombreFacturesProforma(nombreFacturesProforma);
+        dto.setMontantFacturesProforma(totalFacturesProforma);
+        return dto;
     }
 
     /**
@@ -319,6 +334,7 @@ public class ComptabiliteService {
         LocalDate today = LocalDate.now();
 
         List<FactureReelle> toutesFactures = factureReelleRepository.findByEntrepriseId(entrepriseId);
+        List<FactureProForma> toutesProforma = factureProformaRepository.findByEntrepriseId(entrepriseId);
         
         // Filtrer par date pour les stats périodiques
         List<FactureReelle> facturesJour = toutesFactures.stream()
@@ -406,8 +422,31 @@ public class ComptabiliteService {
             d.setMontantRestant(restant);
             d.setStatutPaiement(statut);
             d.setEncaissePar(dernierEncaisseurParFacture.getOrDefault(f.getId(), null));
+            d.setType("REELLE");
+            try { d.setStatut(f.getStatut() != null ? f.getStatut().name() : null); } catch (Exception e) { d.setStatut(null); }
             return d;
         }).collect(java.util.stream.Collectors.toList());
+
+        // Ajouter les PROFORMA aux détails
+        List<ComptabiliteDTO.FactureDetail> proformaDetails = toutesProforma.stream().map(pf -> {
+            ComptabiliteDTO.FactureDetail d = new ComptabiliteDTO.FactureDetail();
+            d.setFactureId(pf.getId());
+            d.setNumeroFacture(pf.getNumeroFacture());
+            d.setDateCreation(pf.getDateCreation() != null ? pf.getDateCreation().toLocalDate() : null);
+            try { d.setTotalHT(pf.getTotalHT()); } catch (Exception ignore) {}
+            try { d.setRemise(pf.getRemise()); } catch (Exception ignore) {}
+            try { d.setTva(pf.isTva()); } catch (Exception ignore) {}
+            d.setTotalFacture(pf.getTotalFacture());
+            d.setMontantPaye(0.0);
+            d.setMontantRestant(pf.getTotalFacture());
+            d.setStatutPaiement(null);
+            d.setEncaissePar(null);
+            d.setType("PROFORMA");
+            try { d.setStatut(pf.getStatut() != null ? pf.getStatut().name() : null); } catch (Exception e) { d.setStatut(null); }
+            return d;
+        }).collect(java.util.stream.Collectors.toList());
+
+        details.addAll(proformaDetails);
 
         ComptabiliteDTO.FacturationDTO dto = new ComptabiliteDTO.FacturationDTO();
         dto.setNombreTotalFactures(toutesFactures.size());

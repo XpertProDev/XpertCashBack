@@ -33,6 +33,11 @@ public class ComptabiliteDTO {
         private Double totalPaiementsFactures;
         private List<VenteCADetail> ventesDetails;
         private List<FactureDetail> factureDetails;
+        private Integer nombreFacturesReelles;
+        private Double montantFacturesReelles;
+        private Integer nombreFacturesProforma;
+        private Double montantFacturesProforma;
+        
     }
 
     @Data
@@ -97,6 +102,8 @@ public class ComptabiliteDTO {
         private Double montantRestant;
         private String statutPaiement;
         private String encaissePar;
+        private String type; // PROFORMA ou REELLE
+        private String statut;
     }
 
     @Data
