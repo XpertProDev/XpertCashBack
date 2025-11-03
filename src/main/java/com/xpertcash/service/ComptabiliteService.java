@@ -652,16 +652,81 @@ public class ComptabiliteService {
         // Calculer les top 3 meilleurs clients
         List<ComptabiliteDTO.MeilleurClientDTO> meilleursClients = calculerTop3Clients(entrepriseId, toutesVentes, remboursementsMap);
 
+        // Construire la liste de tous les clients (Client + EntrepriseClient)
+        List<ComptabiliteDTO.ClientResumeDTO> clientsList = new ArrayList<>();
+        for (Client c : tousClients) {
+            ComptabiliteDTO.ClientResumeDTO cr = new ComptabiliteDTO.ClientResumeDTO();
+            cr.setId(c.getId());
+            cr.setNomComplet(c.getNomComplet());
+            cr.setEmail(c.getEmail());
+            cr.setTelephone(c.getTelephone());
+            cr.setType("CLIENT");
+            clientsList.add(cr);
+        }
+        for (EntrepriseClient ec : tousEntreprisesClients) {
+            ComptabiliteDTO.ClientResumeDTO cr = new ComptabiliteDTO.ClientResumeDTO();
+            cr.setId(ec.getId());
+            cr.setNomComplet(ec.getNom());
+            cr.setEmail(ec.getEmail());
+            cr.setTelephone(ec.getTelephone());
+            cr.setType("ENTREPRISE_CLIENT");
+            clientsList.add(cr);
+        }
+
+        // Assurer que tous les meilleurs clients figurent aussi dans la liste complète
+        java.util.Set<String> signatures = clientsList.stream()
+                .map(cl -> (cl.getType() + "|" + (cl.getId() != null ? cl.getId() : -1) + "|" +
+                        (cl.getNomComplet() != null ? cl.getNomComplet() : "") + "|" +
+                        (cl.getTelephone() != null ? cl.getTelephone() : "")))
+                .collect(java.util.stream.Collectors.toSet());
+
+        for (ComptabiliteDTO.MeilleurClientDTO mc : meilleursClients) {
+            String sig = mc.getType() + "|" + (mc.getId() != null ? mc.getId() : -1) + "|" +
+                    (mc.getNomComplet() != null ? mc.getNomComplet() : "") + "|" +
+                    (mc.getTelephone() != null ? mc.getTelephone() : "");
+            if (!signatures.contains(sig)) {
+                ComptabiliteDTO.ClientResumeDTO cr = new ComptabiliteDTO.ClientResumeDTO();
+                cr.setId(mc.getId());
+                cr.setNomComplet(mc.getNomComplet());
+                cr.setEmail(mc.getEmail());
+                cr.setTelephone(mc.getTelephone());
+                cr.setType(mc.getType());
+                clientsList.add(cr);
+                signatures.add(sig);
+            }
+        }
+
+        // Inclure également les clients saisis en caisse (clientNom/clientNumero) absents du référentiel
+        for (Vente v : toutesVentes) {
+            if (v.getClient() != null || v.getEntrepriseClient() != null) continue;
+            String nom = v.getClientNom();
+            String tel = v.getClientNumero();
+            if ((nom != null && !nom.isEmpty()) || (tel != null && !tel.isEmpty())) {
+                String sig = "CLIENT|" + -1 + "|" + (nom != null ? nom : "") + "|" + (tel != null ? tel : "");
+                if (!signatures.contains(sig)) {
+                    ComptabiliteDTO.ClientResumeDTO cr = new ComptabiliteDTO.ClientResumeDTO();
+                    cr.setId(null);
+                    cr.setNomComplet(nom);
+                    cr.setEmail(null);
+                    cr.setTelephone(tel);
+                    cr.setType("CLIENT");
+                    clientsList.add(cr);
+                    signatures.add(sig);
+                }
+            }
+        }
+
         // Total clients = clients normaux + entreprises clients
         int totalClients = tousClients.size() + tousEntreprisesClients.size();
         int clientsActifsTotal = clientsActifsIds.size() + entrepriseClientsActifsIds.size();
 
-        return new ComptabiliteDTO.ClientsDTO(
-                totalClients,
-                clientsActifsTotal,
-                montantTotalAchete,
-                meilleursClients
-        );
+        ComptabiliteDTO.ClientsDTO dto = new ComptabiliteDTO.ClientsDTO();
+        dto.setNombreTotal(totalClients);
+        dto.setActifs(clientsActifsTotal);
+        dto.setMontantTotalAchete(montantTotalAchete);
+        dto.setMeilleursClients(meilleursClients);
+        dto.setClients(clientsList);
+        return dto;
     }
 
     /**

@@ -16,7 +16,7 @@ public class GlobalNotificationDto {
     private Long id;
     private String message;
     private LocalDateTime createdAt;
-    private String senderName; // optionnel
+    private String senderName;
     
     @Getter
     private boolean read;

@@ -158,6 +158,7 @@ public class ComptabiliteDTO {
         private Integer actifs; // Clients ayant au moins une vente
         private Double montantTotalAchete;
         private List<MeilleurClientDTO> meilleursClients; // Top 3
+        private List<ClientResumeDTO> clients;
     }
 
     @Data
@@ -170,6 +171,17 @@ public class ComptabiliteDTO {
         private String telephone;
         private Double montantAchete;
         private Integer nombreAchats;
+        private String type;
+    }
+
+    @Data
+    @AllArgsConstructor
+    @NoArgsConstructor
+    public static class ClientResumeDTO {
+        private Long id;
+        private String nomComplet;
+        private String email;
+        private String telephone;
         private String type;
     }
 
