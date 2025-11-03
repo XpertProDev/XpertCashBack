@@ -26,6 +26,7 @@ import com.xpertcash.repository.ClientRepository;
 import com.xpertcash.repository.EntrepriseClientRepository;
 import com.xpertcash.repository.FactureProformaRepository;
 import com.xpertcash.repository.FactureReelleRepository;
+import com.xpertcash.repository.VENTE.VenteRepository;
 import com.xpertcash.repository.PROSPECT.InteractionRepository;
 import com.xpertcash.service.IMAGES.ImageStorageService;
 
@@ -56,6 +57,9 @@ public class ClientService {
     
     @Autowired
     private InteractionRepository interactionRepository;
+
+    @Autowired
+    private VenteRepository venteRepository;
 
 
     public Client saveClient(Client client,  HttpServletRequest request) {
@@ -403,10 +407,11 @@ public class ClientService {
         // ❌ Vérifier que le client n’a pas de commandes ou de factures
         boolean hasFactures = factureProformaRepository.existsByClientId(clientId);
         boolean hasFacturesReel = factureReelleRepository.existsByClientId(clientId);
+        boolean hasVentes = !venteRepository.findByClientId(clientId).isEmpty();
 
 
-        if ( hasFactures || hasFacturesReel) {
-            throw new RuntimeException("Ce client ne peut pas être supprimé car il a  des factures.");
+        if ( hasFactures || hasFacturesReel || hasVentes) {
+            throw new RuntimeException("Ce client ne peut pas être supprimé car il est lié à des ventes ou des factures.");
         }
 
         // 🗑️ Supprimer l’image si elle existe
