@@ -79,6 +79,7 @@ public class ComptabiliteService {
         comptabilite.setDepenses(calculerDepenses(entrepriseId));
 
         comptabilite.setBoutiques(calculerBoutiques(entrepriseId));
+        comptabilite.setBoutiquesDisponibles(listerBoutiquesDisponibles(entrepriseId));
 
         comptabilite.setClients(calculerClients(entrepriseId));
 
@@ -431,7 +432,17 @@ public class ComptabiliteService {
         List<Long> boutiqueIds = boutiques.stream().map(Boutique::getId).collect(Collectors.toList());
 
         if (boutiqueIds.isEmpty()) {
-            return new ComptabiliteDTO.DepensesDTO(0, 0.0, 0, 0.0, 0, 0.0, 0, 0.0);
+            ComptabiliteDTO.DepensesDTO dto = new ComptabiliteDTO.DepensesDTO();
+            dto.setNombreTotal(0);
+            dto.setMontantTotal(0.0);
+            dto.setDuJour(0);
+            dto.setMontantDuJour(0.0);
+            dto.setDuMois(0);
+            dto.setMontantDuMois(0.0);
+            dto.setDeLAnnee(0);
+            dto.setMontantDeLAnnee(0.0);
+            dto.setDetails(java.util.Collections.emptyList());
+            return dto;
         }
 
         // Récupérer les mouvements de type DEPENSE
@@ -476,16 +487,45 @@ public class ComptabiliteService {
                 .mapToDouble(m -> m.getMontant() != null ? m.getMontant() : 0.0)
                 .sum();
 
-        return new ComptabiliteDTO.DepensesDTO(
-                toutesDepenses.size(),
-                montantTotal,
-                depensesJour.size(),
-                montantDuJour,
-                depensesMois.size(),
-                montantDuMois,
-                depensesAnnee.size(),
-                montantDeLAnnee
-        );
+        // Détails des dépenses (Date, Libellé, Méthode, Montant)
+        List<ComptabiliteDTO.DepenseDetail> details = toutesDepenses.stream().map(d -> {
+            ComptabiliteDTO.DepenseDetail dd = new ComptabiliteDTO.DepenseDetail();
+            dd.setDate(d.getDateMouvement());
+            dd.setLibelle(d.getDescription());
+            dd.setMethode(libelleModePaiement(d.getModePaiement()));
+            dd.setMontant(d.getMontant());
+            return dd;
+        }).collect(Collectors.toList());
+
+        ComptabiliteDTO.DepensesDTO dto = new ComptabiliteDTO.DepensesDTO();
+        dto.setNombreTotal(toutesDepenses.size());
+        dto.setMontantTotal(montantTotal);
+        dto.setDuJour(depensesJour.size());
+        dto.setMontantDuJour(montantDuJour);
+        dto.setDuMois(depensesMois.size());
+        dto.setMontantDuMois(montantDuMois);
+        dto.setDeLAnnee(depensesAnnee.size());
+        dto.setMontantDeLAnnee(montantDeLAnnee);
+        dto.setDetails(details);
+        return dto;
+    }
+
+    private String libelleModePaiement(ModePaiement mode) {
+        if (mode == null) return "Espèces";
+        switch (mode.name()) {
+            case "ESPECES":
+                return "Espèces";
+            case "CHEQUE":
+                return "Chèque";
+            case "CARTE":
+                return "Carte";
+            case "MOBILE_MONEY":
+                return "Mobile money";
+            case "VIREMENT":
+                return "Virement";
+            default:
+                return mode.name();
+        }
     }
 
     /**
@@ -520,12 +560,11 @@ public class ComptabiliteService {
             // Calculer les dépenses de cette boutique
             List<Caisse> caisses = getCaissesForBoutique(boutique.getId());
             List<Long> caisseIds = caisses.stream().map(Caisse::getId).collect(Collectors.toList());
-            
+
             List<MouvementCaisse> depenses = new ArrayList<>();
             if (!caisseIds.isEmpty()) {
                 depenses = mouvementCaisseRepository
-                        .findByCaisseIdInAndTypeMouvementAndDateMouvementBetween(
-                                caisseIds, TypeMouvementCaisse.DEPENSE, null, null);
+                        .findByCaisseIdInAndTypeMouvement(caisseIds, TypeMouvementCaisse.DEPENSE);
             }
 
             double totalDepenses = depenses.stream()
@@ -543,6 +582,25 @@ public class ComptabiliteService {
         }
 
         return boutiquesInfo;
+    }
+
+    /**
+     * Liste toutes les boutiques de l'entreprise avec leurs informations de base
+     */
+    private List<ComptabiliteDTO.BoutiqueDisponibleDTO> listerBoutiquesDisponibles(Long entrepriseId) {
+        List<Boutique> boutiques = boutiqueRepository.findByEntrepriseId(entrepriseId);
+        return boutiques.stream().map(b -> {
+            ComptabiliteDTO.BoutiqueDisponibleDTO d = new ComptabiliteDTO.BoutiqueDisponibleDTO();
+            d.setId(b.getId());
+            d.setNom(b.getNomBoutique());
+            d.setType(b.getTypeBoutique() != null ? b.getTypeBoutique().name() : null);
+            d.setEmail(b.getEmail());
+            d.setAdresse(b.getAdresse());
+            d.setTelephone(b.getTelephone());
+            d.setDateCreation(b.getCreatedAt());
+            d.setStatut(b.isActif() ? "Actif" : "Inactif");
+            return d;
+        }).collect(Collectors.toList());
     }
 
     /**

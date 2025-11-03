@@ -15,6 +15,7 @@ public class ComptabiliteDTO {
     private FacturationDTO facturation;
     private DepensesDTO depenses;
     private List<BoutiqueInfoDTO> boutiques;
+    private List<BoutiqueDisponibleDTO> boutiquesDisponibles;
     private ClientsDTO clients;
     private VendeursDTO vendeurs;
     private ActivitesDTO activites;
@@ -110,6 +111,17 @@ public class ComptabiliteDTO {
         private Double montantDuMois;
         private Integer deLAnnee;
         private Double montantDeLAnnee;
+        private List<DepenseDetail> details;
+    }
+
+    @Data
+    @AllArgsConstructor
+    @NoArgsConstructor
+    public static class DepenseDetail {
+        private java.time.LocalDateTime date;
+        private String libelle;
+        private String methode;
+        private Double montant;
     }
 
     @Data
@@ -122,6 +134,20 @@ public class ComptabiliteDTO {
         private Integer nombreVentes;
         private Double totalDepenses;
         private Integer nombreDepenses;
+    }
+
+    @Data
+    @AllArgsConstructor
+    @NoArgsConstructor
+    public static class BoutiqueDisponibleDTO {
+        private Long id;
+        private String nom;
+        private String type;
+        private String email;
+        private String adresse;
+        private String telephone;
+        private java.time.LocalDateTime dateCreation;
+        private String statut;
     }
 
     @Data
