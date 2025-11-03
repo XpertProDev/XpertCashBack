@@ -23,6 +23,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import com.xpertcash.entity.Client;
 import com.xpertcash.entity.EntrepriseClient;
+import com.xpertcash.entity.PROSPECT.Interaction;
 import com.xpertcash.service.ClientService;
 
 import jakarta.persistence.EntityNotFoundException;
@@ -58,6 +59,21 @@ public class ClientController {
     @GetMapping("/clients/{id}")
     public Optional<Client> getClientById(@PathVariable Long id) {
         return clientService.getClientById(id);
+    }
+    
+    @GetMapping("/clients/{id}/interactions")
+    public ResponseEntity<?> getClientInteractions(@PathVariable Long id) {
+        Map<String, Object> response = new HashMap<>();
+        try {
+            List<Interaction> interactions = clientService.getClientInteractions(id);
+            response.put("clientId", id);
+            response.put("interactions", interactions);
+            response.put("total", interactions.size());
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            response.put("error", "Erreur lors de la récupération des interactions: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+        }
     }
 
     @GetMapping("/clients")

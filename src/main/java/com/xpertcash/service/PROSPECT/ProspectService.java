@@ -106,14 +106,22 @@ public class ProspectService {
         if (request.getEmail() != null && !request.getEmail().trim().isEmpty()) {
             Optional<Prospect> existingProspect = prospectRepository.findByEmailAndEntrepriseId(request.getEmail(), entreprise.getId());
             if (existingProspect.isPresent()) {
-                throw new IllegalArgumentException("Un prospect avec cet email existe déjà dans votre entreprise");
+                Prospect prospect = existingProspect.get();
+                String prospectName = prospect.getType() == ProspectType.ENTREPRISE 
+                    ? prospect.getNom() 
+                    : prospect.getNomComplet();
+                throw new IllegalArgumentException("Un prospect avec cet email existe déjà dans votre entreprise : " + prospectName + " (ID: " + prospect.getId() + ")");
             }
         }
         
         if (request.getTelephone() != null && !request.getTelephone().trim().isEmpty()) {
             Optional<Prospect> existingProspect = prospectRepository.findByTelephoneAndEntrepriseId(request.getTelephone(), entreprise.getId());
             if (existingProspect.isPresent()) {
-                throw new IllegalArgumentException("Un prospect avec ce numéro de téléphone existe déjà dans votre entreprise");
+                Prospect prospect = existingProspect.get();
+                String prospectName = prospect.getType() == ProspectType.ENTREPRISE 
+                    ? prospect.getNom() 
+                    : prospect.getNomComplet();
+                throw new IllegalArgumentException("Un prospect avec ce numéro de téléphone existe déjà dans votre entreprise : " + prospectName + " (ID: " + prospect.getId() + ")");
             }
         }
 

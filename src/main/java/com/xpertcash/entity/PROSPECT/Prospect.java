@@ -52,6 +52,7 @@ public class Prospect {
     private String clientType; // "CLIENT" ou "ENTREPRISE_CLIENT"
 
     @OneToMany(mappedBy = "prospect", cascade = CascadeType.ALL, orphanRemoval = true)
+    @com.fasterxml.jackson.annotation.JsonManagedReference
     private List<Interaction> interactions = new ArrayList<>();
 
     @OneToMany(mappedBy = "prospect", cascade = CascadeType.ALL, orphanRemoval = true)

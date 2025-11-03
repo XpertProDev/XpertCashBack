@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.xpertcash.entity.EntrepriseClient;
+import com.xpertcash.entity.PROSPECT.Interaction;
 import com.xpertcash.service.EntrepriseClientService;
 
 import jakarta.persistence.EntityNotFoundException;
@@ -52,8 +53,21 @@ public class EntrepriseClientController {
                     .body("Aucune entreprise cliente trouvée avec l'ID : " + id);
         }
     }
-
- 
+    
+    @GetMapping("/entreprises/{id}/interactions")
+    public ResponseEntity<?> getEntrepriseClientInteractions(@PathVariable Long id) {
+        java.util.Map<String, Object> response = new java.util.HashMap<>();
+        try {
+            List<Interaction> interactions = entrepriseClientService.getEntrepriseClientInteractions(id);
+            response.put("entrepriseClientId", id);
+            response.put("interactions", interactions);
+            response.put("total", interactions.size());
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            response.put("error", "Erreur lors de la récupération des interactions: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+        }
+    }
 
    @GetMapping("/entreprises")
     public ResponseEntity<?> getAllEntreprises(HttpServletRequest request) {

@@ -13,9 +13,11 @@ import com.xpertcash.entity.Entreprise;
 import com.xpertcash.entity.EntrepriseClient;
 import com.xpertcash.entity.PermissionType;
 import com.xpertcash.entity.User;
+import com.xpertcash.entity.PROSPECT.Interaction;
 import com.xpertcash.repository.EntrepriseClientRepository;
 import com.xpertcash.repository.FactureProformaRepository;
 import com.xpertcash.repository.FactureReelleRepository;
+import com.xpertcash.repository.PROSPECT.InteractionRepository;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.transaction.Transactional;
@@ -33,9 +35,10 @@ public class EntrepriseClientService {
     private FactureProformaRepository factureProformaRepository;
     @Autowired
     private FactureReelleRepository factureReelleRepository;
+    @Autowired
+    private InteractionRepository interactionRepository;
 
   
-
    @Transactional
     public EntrepriseClient saveEntreprise(EntrepriseClient entrepriseClient, HttpServletRequest request) {
         User user = authHelper.getAuthenticatedUserWithFallback(request);
@@ -121,6 +124,10 @@ public class EntrepriseClientService {
     return Optional.of(entrepriseClient);
 }
 
+   //Methode pour recuperer les interactions d'une entreprise cliente
+   public List<Interaction> getEntrepriseClientInteractions(Long id) {
+       return interactionRepository.findByProspectClientIdAndProspectClientTypeOrderByOccurredAtDesc(id, "ENTREPRISE_CLIENT");
+   }
 
    public List<EntrepriseClient> getAllEntreprises(HttpServletRequest request) {
     User user = authHelper.getAuthenticatedUserWithFallback(request);

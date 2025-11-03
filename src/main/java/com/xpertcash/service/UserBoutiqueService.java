@@ -56,9 +56,9 @@ public class UserBoutiqueService {
     @Autowired
     private PermissionRepository permissionRepository;
 
-@Transactional
-public List<String> assignerVendeurAuxBoutiques(HttpServletRequest request, Long userId, List<Long> boutiqueIds) {
-    List<String> resultMessages = new ArrayList<>();
+    @Transactional
+    public List<String> assignerVendeurAuxBoutiques(HttpServletRequest request, Long userId, List<Long> boutiqueIds) {
+        List<String> resultMessages = new ArrayList<>();
 
     User admin = authHelper.getAuthenticatedUserWithFallback(request);
 
