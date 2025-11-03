@@ -390,9 +390,23 @@ public class ProspectService {
         Interaction interaction = new Interaction();
         interaction.setType(request.getType());
         interaction.setNotes(request.getNotes());
-        // interaction.setAssignedTo(request.getAssignedTo().trim());
+        if (request.getAssignedTo() != null && !request.getAssignedTo().trim().isEmpty()) {
+            interaction.setAssignedTo(request.getAssignedTo().trim());
+        }
         interaction.setNextFollowUp(request.getNextFollowUp());
         interaction.setProspect(prospect);
+
+        // Lier un produit si fourni (optionnel), avec vérification d'appartenance à l'entreprise
+        if (request.getProduitId() != null) {
+            Produit produit = produitRepository.findById(request.getProduitId())
+                .orElseThrow(() -> new IllegalArgumentException("Produit/service non trouvé avec l'ID: " + request.getProduitId()));
+
+            if (!produit.getBoutique().getEntreprise().getId().equals(entreprise.getId())) {
+                throw new IllegalArgumentException("Ce produit/service n'appartient pas à votre entreprise");
+            }
+
+            interaction.setProduit(produit);
+        }
 
         Interaction savedInteraction = interactionRepository.save(interaction);
         return convertInteractionToDTO(savedInteraction);
@@ -800,6 +814,9 @@ public class ProspectService {
         dto.notes = interaction.getNotes();
         dto.assignedTo = interaction.getAssignedTo();
         dto.nextFollowUp = interaction.getNextFollowUp();
+        if (interaction.getProduit() != null) {
+            dto.produitId = interaction.getProduit().getId();
+        }
         return dto;
     }
 

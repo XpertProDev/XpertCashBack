@@ -16,6 +16,7 @@ import org.springframework.web.multipart.MultipartFile;
 import com.xpertcash.configuration.CentralAccess;
 
 import com.xpertcash.entity.Client;
+import com.xpertcash.DTOs.PROSPECT.InteractionDTO;
 import com.xpertcash.entity.Entreprise;
 import com.xpertcash.entity.EntrepriseClient;
 import com.xpertcash.entity.PermissionType;
@@ -181,9 +182,29 @@ public class ClientService {
         return clientRepository.findById(id);
     }
     
-    //Methode pour recuperer les interactions d'un client
+    //Methode pour recuperer les interactions d'un client (entities)
     public List<Interaction> getClientInteractions(Long id) {
         return interactionRepository.findByProspectClientIdAndProspectClientTypeOrderByOccurredAtDesc(id, "CLIENT");
+    }
+
+    //Methode pour recuperer les interactions d'un client en DTO (inclut produitId)
+    public List<InteractionDTO> getClientInteractionDTOs(Long id) {
+        List<Interaction> interactions = getClientInteractions(id);
+        return interactions.stream().map(this::convertInteractionToDTO).collect(java.util.stream.Collectors.toList());
+    }
+
+    private InteractionDTO convertInteractionToDTO(Interaction interaction) {
+        InteractionDTO dto = new InteractionDTO();
+        dto.id = interaction.getId();
+        dto.type = interaction.getType();
+        dto.occurredAt = interaction.getOccurredAt();
+        dto.notes = interaction.getNotes();
+        dto.assignedTo = interaction.getAssignedTo();
+        dto.nextFollowUp = interaction.getNextFollowUp();
+        if (interaction.getProduit() != null) {
+            dto.produitId = interaction.getProduit().getId();
+        }
+        return dto;
     }
 
     public List<Client> getClientsByEntreprise(Long entrepriseId) {

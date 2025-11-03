@@ -18,6 +18,9 @@ public interface PaiementRepository extends JpaRepository<Paiement, Long>{
 
     List<Paiement> findByFactureReelle(FactureReelle factureReelle);
 
+    // Récupérer tous les paiements pour un ensemble de factures
+    List<Paiement> findByFactureReelle_IdIn(List<Long> factureIds);
+
     // Optimisation N+1 : Récupérer tous les paiements pour plusieurs factures
     @Query("SELECT p.factureReelle.id, COALESCE(SUM(p.montant), 0) FROM Paiement p " +
            "WHERE p.factureReelle.id IN :factureIds " +

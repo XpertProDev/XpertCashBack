@@ -36,6 +36,9 @@ public class ComptabiliteService {
 
     @Autowired
     private FactureReelleRepository factureReelleRepository;
+    
+    @Autowired
+    private FactureVenteRepository factureVenteRepository;
 
     @Autowired
     private BoutiqueRepository boutiqueRepository;
@@ -128,6 +131,90 @@ public class ComptabiliteService {
                 .mapToDouble(FactureReelle::getTotalFacture)
                 .sum();
 
+        // Construire les détails des ventes
+        List<Vente> ventes = venteRepository.findAllByEntrepriseId(entrepriseId);
+        List<Long> venteIds = ventes.stream().map(Vente::getId).collect(Collectors.toList());
+        Map<Long, Double> remboursementsMap = venteIds.isEmpty() ? java.util.Collections.emptyMap() :
+                venteHistoriqueRepository.sumRemboursementsByVenteIds(venteIds)
+                        .stream()
+                        .collect(Collectors.toMap(
+                                obj -> (Long) obj[0],
+                                obj -> ((Number) obj[1]).doubleValue()
+                        ));
+
+        // Récupérer les numéros de tickets via FactureVente
+        Map<Long, String> venteIdToNumero = new HashMap<>();
+        List<FactureVente> facturesVente = factureVenteRepository.findAllByEntrepriseId(entrepriseId);
+        for (FactureVente fv : facturesVente) {
+            if (fv.getVente() != null) {
+                venteIdToNumero.put(fv.getVente().getId(), fv.getNumeroFacture());
+            }
+        }
+
+        List<ComptabiliteDTO.VenteCADetail> ventesDetails = ventes.stream().map(v -> {
+            double montant = v.getMontantTotal() != null ? v.getMontantTotal() : 0.0;
+            double remb = remboursementsMap.getOrDefault(v.getId(), 0.0);
+            Double net = montant - remb;
+            String numeroTicket = venteIdToNumero.getOrDefault(v.getId(), "VENTE-" + v.getId());
+            String mode = v.getModePaiement() != null ? v.getModePaiement().name() : null;
+            String statut = v.getStatus() != null ? v.getStatus().name() : null;
+            return new ComptabiliteDTO.VenteCADetail(
+                    v.getId(),
+                    numeroTicket,
+                    v.getDateVente(),
+                    mode,
+                    v.getRemiseGlobale(),
+                    net,
+                    statut
+            );
+        }).collect(Collectors.toList());
+
+        // Détails factures (lisibles: remise/TVA et reste à payer)
+        List<Long> factureIds = toutesFacturesReelles.stream().map(FactureReelle::getId).collect(Collectors.toList());
+        Map<Long, Double> paiementsParFacture = new HashMap<>();
+        Map<Long, String> dernierEncaisseurParFacture = new HashMap<>();
+        if (!factureIds.isEmpty()) {
+            List<Object[]> paiementsAgg = paiementRepository.sumMontantsByFactureReelleIds(factureIds);
+            for (Object[] row : paiementsAgg) {
+                Long fid = (Long) row[0];
+                double somme = ((Number) row[1]).doubleValue();
+                paiementsParFacture.put(fid, somme);
+            }
+            // Récupérer tous les paiements pour déterminer le dernier encaisseur
+            List<Paiement> paiementsList = paiementRepository.findByFactureReelle_IdIn(factureIds);
+            java.util.Map<Long, Paiement> dernierPaiement = paiementsList.stream()
+                    .filter(p -> p.getDatePaiement() != null)
+                    .collect(java.util.stream.Collectors.toMap(
+                            p -> p.getFactureReelle() != null ? p.getFactureReelle().getId() : -1L,
+                            p -> p,
+                            (p1, p2) -> p1.getDatePaiement().isAfter(p2.getDatePaiement()) ? p1 : p2
+                    ));
+            for (java.util.Map.Entry<Long, Paiement> e : dernierPaiement.entrySet()) {
+                Paiement p = e.getValue();
+                String nom = p.getEncaissePar() != null ? p.getEncaissePar().getNomComplet() : null;
+                dernierEncaisseurParFacture.put(e.getKey(), nom);
+            }
+        }
+        List<ComptabiliteDTO.FactureDetail> factureDetails = toutesFacturesReelles.stream().map(f -> {
+            double paye = paiementsParFacture.getOrDefault(f.getId(), 0.0);
+            double restant = (f.getTotalFacture() != 0 ? f.getTotalFacture() : 0.0) - paye;
+            String statut = f.getStatutPaiement() != null ? f.getStatutPaiement().name() : null;
+            String encaissePar = dernierEncaisseurParFacture.getOrDefault(f.getId(), null);
+            ComptabiliteDTO.FactureDetail d = new ComptabiliteDTO.FactureDetail();
+            d.setFactureId(f.getId());
+            d.setNumeroFacture(f.getNumeroFacture());
+            d.setDateCreation(f.getDateCreation());
+            d.setTotalHT(f.getTotalHT());
+            d.setRemise(f.getRemise());
+            d.setTva(f.isTva());
+            d.setTotalFacture(f.getTotalFacture());
+            d.setMontantPaye(paye);
+            d.setMontantRestant(restant);
+            d.setStatutPaiement(statut);
+            d.setEncaissePar(encaissePar);
+            return d;
+        }).collect(Collectors.toList());
+
         // Total chiffre d'affaires = ventes + paiements de factures
         double total = totalVentes + totalPaiementsFactures;
 
@@ -138,7 +225,9 @@ public class ComptabiliteService {
                 ventesAnnee,
                 totalVentes,
                 totalFacturesEmises,
-                totalPaiementsFactures
+                totalPaiementsFactures,
+                ventesDetails,
+                factureDetails
         );
     }
 
@@ -273,18 +362,65 @@ public class ComptabiliteService {
                 .mapToDouble(FactureReelle::getTotalFacture)
                 .sum();
 
-        return new ComptabiliteDTO.FacturationDTO(
-                toutesFactures.size(),
-                montantTotalFactures,
-                montantPaye,
-                montantImpaye,
-                facturesJour.size(),
-                montantDuJour,
-                facturesMois.size(),
-                montantDuMois,
-                facturesAnnee.size(),
-                montantDeLAnnee
-        );
+        // Détails factures pour lisibilité (remise/tva et reste à payer)
+        Map<Long, Double> paiementsParFacture = new HashMap<>();
+        Map<Long, String> dernierEncaisseurParFacture = new HashMap<>();
+        if (!factureIds.isEmpty()) {
+            List<Object[]> paiementsAgg = paiementRepository.sumMontantsByFactureReelleIds(factureIds);
+            for (Object[] row : paiementsAgg) {
+                Long fid = (Long) row[0];
+                double somme = ((Number) row[1]).doubleValue();
+                paiementsParFacture.put(fid, somme);
+            }
+
+            // Déterminer le dernier encaisseur par facture à partir des paiements
+            List<Paiement> paiementsList = paiementRepository.findByFactureReelle_IdIn(factureIds);
+            java.util.Map<Long, Paiement> dernierPaiement = paiementsList.stream()
+                    .filter(p -> p.getDatePaiement() != null)
+                    .collect(java.util.stream.Collectors.toMap(
+                            p -> p.getFactureReelle() != null ? p.getFactureReelle().getId() : -1L,
+                            p -> p,
+                            (p1, p2) -> p1.getDatePaiement().isAfter(p2.getDatePaiement()) ? p1 : p2
+                    ));
+            for (java.util.Map.Entry<Long, Paiement> e : dernierPaiement.entrySet()) {
+                Paiement p = e.getValue();
+                String nom = p.getEncaissePar() != null ? p.getEncaissePar().getNomComplet() : null;
+                dernierEncaisseurParFacture.put(e.getKey(), nom);
+            }
+        }
+
+        List<ComptabiliteDTO.FactureDetail> details = toutesFactures.stream().map(f -> {
+            double paye = paiementsParFacture.getOrDefault(f.getId(), 0.0);
+            double restant = (f.getTotalFacture() != 0 ? f.getTotalFacture() : 0.0) - paye;
+            String statut = f.getStatutPaiement() != null ? f.getStatutPaiement().name() : null;
+            ComptabiliteDTO.FactureDetail d = new ComptabiliteDTO.FactureDetail();
+            d.setFactureId(f.getId());
+            d.setNumeroFacture(f.getNumeroFacture());
+            d.setDateCreation(f.getDateCreation());
+            d.setTotalHT(f.getTotalHT());
+            d.setRemise(f.getRemise());
+            d.setTva(f.isTva());
+            d.setTotalFacture(f.getTotalFacture());
+            d.setMontantPaye(paye);
+            d.setMontantRestant(restant);
+            d.setStatutPaiement(statut);
+            d.setEncaissePar(dernierEncaisseurParFacture.getOrDefault(f.getId(), null));
+            return d;
+        }).collect(java.util.stream.Collectors.toList());
+
+        ComptabiliteDTO.FacturationDTO dto = new ComptabiliteDTO.FacturationDTO();
+        dto.setNombreTotalFactures(toutesFactures.size());
+        dto.setMontantTotalFactures(montantTotalFactures);
+        dto.setMontantPaye(montantPaye);
+        dto.setMontantImpaye(montantImpaye);
+        dto.setDuJour(facturesJour.size());
+        dto.setMontantDuJour(montantDuJour);
+        dto.setDuMois(facturesMois.size());
+        dto.setMontantDuMois(montantDuMois);
+        dto.setDeLAnnee(facturesAnnee.size());
+        dto.setMontantDeLAnnee(montantDeLAnnee);
+        dto.setDetails(details);
+        return dto;
     }
 
     /**

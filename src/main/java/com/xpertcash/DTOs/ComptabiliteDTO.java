@@ -23,14 +23,31 @@ public class ComptabiliteDTO {
     @AllArgsConstructor
     @NoArgsConstructor
     public static class ChiffreAffairesDTO {
-        private Double total; // Total de tous les revenus
+        private Double total;
         private Double duJour;
         private Double duMois;
         private Double deLAnnee;
         private Double totalVentes;
         private Double totalFactures;
         private Double totalPaiementsFactures;
+        private List<VenteCADetail> ventesDetails;
+        private List<FactureDetail> factureDetails;
     }
+
+    @Data
+    @AllArgsConstructor
+    @NoArgsConstructor
+    public static class VenteCADetail {
+        private Long venteId;
+        private String numeroTicket;
+        private java.time.LocalDateTime dateHeure;
+        private String modePaiement;
+        private Double remiseGlobale;
+        private Double montantNet;
+        private String statut;
+    }
+
+    // Note: PaiementCADetail supprimé au profit de FactureDetail plus lisible
 
     @Data
     @AllArgsConstructor
@@ -61,6 +78,24 @@ public class ComptabiliteDTO {
         private Double montantDuMois;
         private Integer deLAnnee;
         private Double montantDeLAnnee;
+        private List<FactureDetail> details;
+    }
+
+    @Data
+    @AllArgsConstructor
+    @NoArgsConstructor
+    public static class FactureDetail {
+        private Long factureId;
+        private String numeroFacture;
+        private java.time.LocalDate dateCreation;
+        private Double totalHT;
+        private Double remise;
+        private Boolean tva;
+        private Double totalFacture;
+        private Double montantPaye;
+        private Double montantRestant;
+        private String statutPaiement;
+        private String encaissePar;
     }
 
     @Data
