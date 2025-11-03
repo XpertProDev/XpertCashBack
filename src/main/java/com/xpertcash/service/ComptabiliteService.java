@@ -204,6 +204,11 @@ public class ComptabiliteService {
         double montantDuMois = calculerVentesNet(entrepriseId, startOfMonth, endOfMonth);
         double montantDeLAnnee = calculerVentesNet(entrepriseId, startOfYear, endOfYear);
 
+        // Nombre de ventes annulées (considérées comme totalement remboursées)
+        int annulees = (int) toutesVentes.stream()
+                .filter(v -> v.getStatus() != null && v.getStatus() == VenteStatus.REMBOURSEE)
+                .count();
+
         return new ComptabiliteDTO.VentesDTO(
                 toutesVentes.size(),
                 montantTotal,
@@ -212,7 +217,8 @@ public class ComptabiliteService {
                 ventesMois.size(),
                 montantDuMois,
                 ventesAnnee.size(),
-                montantDeLAnnee
+                montantDeLAnnee,
+                annulees
         );
     }
 

@@ -44,6 +44,7 @@ public class ComptabiliteDTO {
         private Double montantDuMois;
         private Integer deLAnnee;
         private Double montantDeLAnnee;
+        private Integer annulees; // ventes totalement remboursées
     }
 
     @Data
