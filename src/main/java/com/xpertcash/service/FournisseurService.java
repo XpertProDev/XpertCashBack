@@ -21,7 +21,6 @@ import com.xpertcash.entity.Enum.RoleType;
 import com.xpertcash.repository.FactureRepository;
 import com.xpertcash.repository.FournisseurRepository;
 import com.xpertcash.repository.StockProduitFournisseurRepository;
-import com.xpertcash.repository.UsersRepository;
 import com.xpertcash.service.IMAGES.ImageStorageService;
 
 import jakarta.servlet.http.HttpServletRequest;

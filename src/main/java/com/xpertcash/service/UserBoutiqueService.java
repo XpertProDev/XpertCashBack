@@ -90,7 +90,7 @@ public List<String> assignerVendeurAuxBoutiques(HttpServletRequest request, Long
         }
     }
 
-    // ✅ Vérification et modification du rôle en fonction des permissions existantes
+    // Vérification et modification du rôle en fonction des permissions existantes
     Role currentRole = user.getRole();
 
     if (currentRole != null && currentRole.getName() == RoleType.UTILISATEUR) {
