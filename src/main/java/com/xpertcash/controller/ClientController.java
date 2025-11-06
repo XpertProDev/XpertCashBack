@@ -21,7 +21,6 @@ import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
-
 import com.xpertcash.entity.Client;
 import com.xpertcash.entity.EntrepriseClient;
 import com.xpertcash.service.ClientService;

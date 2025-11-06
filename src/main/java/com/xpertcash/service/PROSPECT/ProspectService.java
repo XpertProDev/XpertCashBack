@@ -554,53 +554,59 @@ public class ProspectService {
             montantFinal = prixVente * quantiteAchetee;
         }
 
-        // --- 5. Vérifier si le prospect n'est pas déjà converti ---
-        if (prospect.getConvertedToClient()) {
-            throw new IllegalArgumentException("Ce prospect a déjà été converti en client");
-        }
+        // --- 5. Gérer le cas où le prospect est déjà converti ---
+        boolean alreadyConverted = prospect.getConvertedToClient() != null && prospect.getConvertedToClient();
 
-        // --- 6. Conversion selon le type ---
+        // --- 6. Conversion selon le type (ou réutilisation si déjà converti) ---
         Long clientId = null;
         String clientType = null;
-        
-        if (prospect.getType() == ProspectType.ENTREPRISE) {
-            // Convertir directement en EntrepriseClient (pas de Client associé)
-            EntrepriseClient entrepriseClient = new EntrepriseClient();
-            entrepriseClient.setNom(prospect.getNom());
-            entrepriseClient.setEmail(prospect.getEmail());
-            entrepriseClient.setTelephone(prospect.getTelephone());
-            entrepriseClient.setAdresse(prospect.getAdresse());
-            entrepriseClient.setPays(prospect.getPays());
-            entrepriseClient.setSecteur(prospect.getSecteur());
-            entrepriseClient.setEntreprise(entreprise);
-            entrepriseClient.setCreatedAt(LocalDateTime.now());
 
-            EntrepriseClient savedEntrepriseClient = entrepriseClientRepository.save(entrepriseClient);
-            clientId = savedEntrepriseClient.getId();
-            clientType = "ENTREPRISE_CLIENT";
-            
-            response.put("message", "Prospect ENTREPRISE converti en EntrepriseClient avec succès");
-            response.put("entrepriseClientId", savedEntrepriseClient.getId());
-            response.put("type", "ENTREPRISE");
-            
-        } else if (prospect.getType() == ProspectType.PARTICULIER) {
-            // Convertir en Client particulier
-            Client client = new Client();
-            client.setNomComplet(prospect.getNomComplet());
-            client.setEmail(prospect.getEmail());
-            client.setTelephone(prospect.getTelephone());
-            client.setAdresse(prospect.getAdresse());
-            client.setPays(prospect.getPays());
-            client.setEntreprise(entreprise);
-            client.setCreatedAt(LocalDateTime.now());
+        if (alreadyConverted) {
+            // Réutiliser le client existant
+            clientId = prospect.getClientId();
+            clientType = prospect.getClientType();
+            response.put("message", "Prospect déjà converti : ajout d'un nouvel achat");
+            response.put("type", prospect.getType() == ProspectType.ENTREPRISE ? "ENTREPRISE" : "PARTICULIER");
+        } else {
+            if (prospect.getType() == ProspectType.ENTREPRISE) {
+                // Convertir directement en EntrepriseClient (pas de Client associé)
+                EntrepriseClient entrepriseClient = new EntrepriseClient();
+                entrepriseClient.setNom(prospect.getNom());
+                entrepriseClient.setEmail(prospect.getEmail());
+                entrepriseClient.setTelephone(prospect.getTelephone());
+                entrepriseClient.setAdresse(prospect.getAdresse());
+                entrepriseClient.setPays(prospect.getPays());
+                entrepriseClient.setSecteur(prospect.getSecteur());
+                entrepriseClient.setEntreprise(entreprise);
+                entrepriseClient.setCreatedAt(LocalDateTime.now());
 
-            Client savedClient = clientRepository.save(client);
-            clientId = savedClient.getId();
-            clientType = "CLIENT";
-            
-            response.put("message", "Prospect PARTICULIER converti en Client avec succès");
-            response.put("clientId", savedClient.getId());
-            response.put("type", "PARTICULIER");
+                EntrepriseClient savedEntrepriseClient = entrepriseClientRepository.save(entrepriseClient);
+                clientId = savedEntrepriseClient.getId();
+                clientType = "ENTREPRISE_CLIENT";
+
+                response.put("message", "Prospect ENTREPRISE converti en EntrepriseClient avec succès");
+                response.put("entrepriseClientId", savedEntrepriseClient.getId());
+                response.put("type", "ENTREPRISE");
+
+            } else if (prospect.getType() == ProspectType.PARTICULIER) {
+                // Convertir en Client particulier
+                Client client = new Client();
+                client.setNomComplet(prospect.getNomComplet());
+                client.setEmail(prospect.getEmail());
+                client.setTelephone(prospect.getTelephone());
+                client.setAdresse(prospect.getAdresse());
+                client.setPays(prospect.getPays());
+                client.setEntreprise(entreprise);
+                client.setCreatedAt(LocalDateTime.now());
+
+                Client savedClient = clientRepository.save(client);
+                clientId = savedClient.getId();
+                clientType = "CLIENT";
+
+                response.put("message", "Prospect PARTICULIER converti en Client avec succès");
+                response.put("clientId", savedClient.getId());
+                response.put("type", "PARTICULIER");
+            }
         }
         
         // Informations complètes sur le produit/service acheté
@@ -632,14 +638,14 @@ public class ProspectService {
         
         prospectAchatRepository.save(achat);
 
-        // --- 9. Marquer le prospect comme converti (garder l'historique) ---
-        prospect.setConvertedToClient(true);
-        prospect.setConvertedAt(LocalDateTime.now());
-        
-        prospect.setClientId(clientId);
-        prospect.setClientType(clientType);
-        
-        prospectRepository.save(prospect);
+        // --- 9. Marquer le prospect comme converti (si ce n'est pas déjà fait) ---
+        if (!alreadyConverted) {
+            prospect.setConvertedToClient(true);
+            prospect.setConvertedAt(LocalDateTime.now());
+            prospect.setClientId(clientId);
+            prospect.setClientType(clientType);
+            prospectRepository.save(prospect);
+        }
 
         return response;
     }
