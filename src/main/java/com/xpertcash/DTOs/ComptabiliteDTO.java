@@ -141,6 +141,7 @@ public class ComptabiliteDTO {
         private Integer nombreVentes;
         private Double totalDepenses;
         private Integer nombreDepenses;
+        private Integer stockTotal;
     }
 
     @Data
@@ -155,6 +156,7 @@ public class ComptabiliteDTO {
         private String telephone;
         private java.time.LocalDateTime dateCreation;
         private String statut;
+        private Integer stockTotal;
     }
 
     @Data

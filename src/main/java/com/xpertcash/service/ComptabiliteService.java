@@ -58,6 +58,9 @@ public class ComptabiliteService {
     @Autowired
     private CaisseRepository caisseRepository;
 
+    @Autowired
+    private StockRepository stockRepository;
+
     /**
      * Récupère toutes les données comptables de l'entreprise
      */
@@ -610,14 +613,21 @@ public class ComptabiliteService {
                     .mapToDouble(m -> m.getMontant() != null ? m.getMontant() : 0.0)
                     .sum();
 
-            boutiquesInfo.add(new ComptabiliteDTO.BoutiqueInfoDTO(
-                    boutique.getId(),
-                    boutique.getNomBoutique(),
-                    chiffreAffaires,
-                    ventes.size(),
-                    totalDepenses,
-                    depenses.size()
-            ));
+            // Calculer le stock total de la boutique
+            List<Stock> stocks = stockRepository.findByBoutiqueId(boutique.getId());
+            int stockTotal = stocks.stream()
+                    .mapToInt(s -> s.getStockActuel() != null ? s.getStockActuel() : 0)
+                    .sum();
+
+            ComptabiliteDTO.BoutiqueInfoDTO info = new ComptabiliteDTO.BoutiqueInfoDTO();
+            info.setId(boutique.getId());
+            info.setNom(boutique.getNomBoutique());
+            info.setChiffreAffaires(chiffreAffaires);
+            info.setNombreVentes(ventes.size());
+            info.setTotalDepenses(totalDepenses);
+            info.setNombreDepenses(depenses.size());
+            info.setStockTotal(stockTotal);
+            boutiquesInfo.add(info);
         }
 
         return boutiquesInfo;
@@ -629,6 +639,12 @@ public class ComptabiliteService {
     private List<ComptabiliteDTO.BoutiqueDisponibleDTO> listerBoutiquesDisponibles(Long entrepriseId) {
         List<Boutique> boutiques = boutiqueRepository.findByEntrepriseId(entrepriseId);
         return boutiques.stream().map(b -> {
+            // Calculer le stock total de la boutique
+            List<Stock> stocks = stockRepository.findByBoutiqueId(b.getId());
+            int stockTotal = stocks.stream()
+                    .mapToInt(s -> s.getStockActuel() != null ? s.getStockActuel() : 0)
+                    .sum();
+            
             ComptabiliteDTO.BoutiqueDisponibleDTO d = new ComptabiliteDTO.BoutiqueDisponibleDTO();
             d.setId(b.getId());
             d.setNom(b.getNomBoutique());
@@ -638,6 +654,7 @@ public class ComptabiliteService {
             d.setTelephone(b.getTelephone());
             d.setDateCreation(b.getCreatedAt());
             d.setStatut(b.isActif() ? "Actif" : "Inactif");
+            d.setStockTotal(stockTotal);
             return d;
         }).collect(Collectors.toList());
     }
