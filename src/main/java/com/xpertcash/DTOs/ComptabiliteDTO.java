@@ -33,6 +33,11 @@ public class ComptabiliteDTO {
         private Double totalPaiementsFactures;
         private List<VenteCADetail> ventesDetails;
         private List<FactureDetail> factureDetails;
+        private Integer nombreFacturesReelles;
+        private Double montantFacturesReelles;
+        private Integer nombreFacturesProforma;
+        private Double montantFacturesProforma;
+        
     }
 
     @Data
@@ -97,6 +102,8 @@ public class ComptabiliteDTO {
         private Double montantRestant;
         private String statutPaiement;
         private String encaissePar;
+        private String type; // PROFORMA ou REELLE
+        private String statut;
     }
 
     @Data
@@ -172,6 +179,8 @@ public class ComptabiliteDTO {
         private Double montantAchete;
         private Integer nombreAchats;
         private String type;
+        private String photo;
+        private String adresse;
     }
 
     @Data
@@ -182,6 +191,8 @@ public class ComptabiliteDTO {
         private String nomComplet;
         private String email;
         private String telephone;
+        private String photo;
+        private String adresse;
         private String type;
     }
 
@@ -193,6 +204,19 @@ public class ComptabiliteDTO {
         private Integer actifs; // Vendeurs ayant au moins une vente
         private Double chiffreAffairesTotal;
         private List<MeilleurVendeurDTO> meilleursVendeurs; // Top 3
+        private List<VendeurResumeDTO> vendeurs; // Tous les vendeurs
+    }
+    
+    @Data
+    @AllArgsConstructor
+    @NoArgsConstructor
+    public static class VendeurResumeDTO {
+        private Long id;
+        private String nomComplet;
+        private String email;
+        private String telephone;
+        private String photo;
+        private String adresse;
     }
 
     @Data
@@ -202,6 +226,8 @@ public class ComptabiliteDTO {
         private Long id;
         private String nomComplet;
         private String email;
+        private String photo;
+        private String adresse;
         private Double chiffreAffaires;
         private Integer nombreVentes;
     }

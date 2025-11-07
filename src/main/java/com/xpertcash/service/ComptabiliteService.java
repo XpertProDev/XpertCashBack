@@ -38,6 +38,9 @@ public class ComptabiliteService {
     private FactureReelleRepository factureReelleRepository;
     
     @Autowired
+    private FactureProformaRepository factureProformaRepository;
+    
+    @Autowired
     private FactureVenteRepository factureVenteRepository;
 
     @Autowired
@@ -108,8 +111,9 @@ public class ComptabiliteService {
         LocalDateTime startOfYear = firstDayOfYear.atStartOfDay();
         LocalDateTime endOfYear = lastDayOfYear.atTime(LocalTime.MAX);
 
-        // Récupérer tous les paiements de factures
+        // Récupérer factures réelles et proforma
         List<FactureReelle> toutesFacturesReelles = factureReelleRepository.findByEntrepriseId(entrepriseId);
+        List<FactureProForma> toutesFacturesProforma = factureProformaRepository.findByEntrepriseId(entrepriseId);
         
         // Calculer le total des paiements pour toutes les factures (optimisation N+1)
         double totalPaiementsFactures = 0.0;
@@ -127,10 +131,15 @@ public class ComptabiliteService {
         double ventesMois = calculerVentesNet(entrepriseId, startOfMonth, endOfMonth);
         double ventesAnnee = calculerVentesNet(entrepriseId, startOfYear, endOfYear);
 
-        // Calculer les factures émisées
+        // Calculer les montants de factures
         double totalFacturesEmises = toutesFacturesReelles.stream()
                 .mapToDouble(FactureReelle::getTotalFacture)
                 .sum();
+        double totalFacturesProforma = toutesFacturesProforma.stream()
+                .mapToDouble(FactureProForma::getTotalFacture)
+                .sum();
+        int nombreFacturesReelles = toutesFacturesReelles.size();
+        int nombreFacturesProforma = toutesFacturesProforma.size();
 
         // Construire les détails des ventes
         List<Vente> ventes = venteRepository.findAllByEntrepriseId(entrepriseId);
@@ -199,7 +208,7 @@ public class ComptabiliteService {
         List<ComptabiliteDTO.FactureDetail> factureDetails = toutesFacturesReelles.stream().map(f -> {
             double paye = paiementsParFacture.getOrDefault(f.getId(), 0.0);
             double restant = (f.getTotalFacture() != 0 ? f.getTotalFacture() : 0.0) - paye;
-            String statut = f.getStatutPaiement() != null ? f.getStatutPaiement().name() : null;
+            String statutPaiement = f.getStatutPaiement() != null ? f.getStatutPaiement().name() : null;
             String encaissePar = dernierEncaisseurParFacture.getOrDefault(f.getId(), null);
             ComptabiliteDTO.FactureDetail d = new ComptabiliteDTO.FactureDetail();
             d.setFactureId(f.getId());
@@ -211,25 +220,31 @@ public class ComptabiliteService {
             d.setTotalFacture(f.getTotalFacture());
             d.setMontantPaye(paye);
             d.setMontantRestant(restant);
-            d.setStatutPaiement(statut);
+            d.setStatutPaiement(statutPaiement);
             d.setEncaissePar(encaissePar);
+            d.setType("REELLE");
+            try { d.setStatut(f.getStatut() != null ? f.getStatut().name() : null); } catch (Exception ignore) { d.setStatut(null); }
             return d;
         }).collect(Collectors.toList());
 
         // Total chiffre d'affaires = ventes + paiements de factures
         double total = totalVentes + totalPaiementsFactures;
 
-        return new ComptabiliteDTO.ChiffreAffairesDTO(
-                total,
-                ventesJour,
-                ventesMois,
-                ventesAnnee,
-                totalVentes,
-                totalFacturesEmises,
-                totalPaiementsFactures,
-                ventesDetails,
-                factureDetails
-        );
+        ComptabiliteDTO.ChiffreAffairesDTO dto = new ComptabiliteDTO.ChiffreAffairesDTO();
+        dto.setTotal(total);
+        dto.setDuJour(ventesJour);
+        dto.setDuMois(ventesMois);
+        dto.setDeLAnnee(ventesAnnee);
+        dto.setTotalVentes(totalVentes);
+        dto.setTotalFactures(totalFacturesEmises);
+        dto.setTotalPaiementsFactures(totalPaiementsFactures);
+        dto.setVentesDetails(ventesDetails);
+        dto.setFactureDetails(factureDetails);
+        dto.setNombreFacturesReelles(nombreFacturesReelles);
+        dto.setMontantFacturesReelles(totalFacturesEmises);
+        dto.setNombreFacturesProforma(nombreFacturesProforma);
+        dto.setMontantFacturesProforma(totalFacturesProforma);
+        return dto;
     }
 
     /**
@@ -319,6 +334,7 @@ public class ComptabiliteService {
         LocalDate today = LocalDate.now();
 
         List<FactureReelle> toutesFactures = factureReelleRepository.findByEntrepriseId(entrepriseId);
+        List<FactureProForma> toutesProforma = factureProformaRepository.findByEntrepriseId(entrepriseId);
         
         // Filtrer par date pour les stats périodiques
         List<FactureReelle> facturesJour = toutesFactures.stream()
@@ -406,8 +422,31 @@ public class ComptabiliteService {
             d.setMontantRestant(restant);
             d.setStatutPaiement(statut);
             d.setEncaissePar(dernierEncaisseurParFacture.getOrDefault(f.getId(), null));
+            d.setType("REELLE");
+            try { d.setStatut(f.getStatut() != null ? f.getStatut().name() : null); } catch (Exception e) { d.setStatut(null); }
             return d;
         }).collect(java.util.stream.Collectors.toList());
+
+        // Ajouter les PROFORMA aux détails
+        List<ComptabiliteDTO.FactureDetail> proformaDetails = toutesProforma.stream().map(pf -> {
+            ComptabiliteDTO.FactureDetail d = new ComptabiliteDTO.FactureDetail();
+            d.setFactureId(pf.getId());
+            d.setNumeroFacture(pf.getNumeroFacture());
+            d.setDateCreation(pf.getDateCreation() != null ? pf.getDateCreation().toLocalDate() : null);
+            try { d.setTotalHT(pf.getTotalHT()); } catch (Exception ignore) {}
+            try { d.setRemise(pf.getRemise()); } catch (Exception ignore) {}
+            try { d.setTva(pf.isTva()); } catch (Exception ignore) {}
+            d.setTotalFacture(pf.getTotalFacture());
+            d.setMontantPaye(0.0);
+            d.setMontantRestant(pf.getTotalFacture());
+            d.setStatutPaiement(null);
+            d.setEncaissePar(null);
+            d.setType("PROFORMA");
+            try { d.setStatut(pf.getStatut() != null ? pf.getStatut().name() : null); } catch (Exception e) { d.setStatut(null); }
+            return d;
+        }).collect(java.util.stream.Collectors.toList());
+
+        details.addAll(proformaDetails);
 
         ComptabiliteDTO.FacturationDTO dto = new ComptabiliteDTO.FacturationDTO();
         dto.setNombreTotalFactures(toutesFactures.size());
@@ -660,6 +699,8 @@ public class ComptabiliteService {
             cr.setNomComplet(c.getNomComplet());
             cr.setEmail(c.getEmail());
             cr.setTelephone(c.getTelephone());
+            cr.setPhoto(c.getPhoto());
+            cr.setAdresse(c.getAdresse());
             cr.setType("CLIENT");
             clientsList.add(cr);
         }
@@ -669,6 +710,7 @@ public class ComptabiliteService {
             cr.setNomComplet(ec.getNom());
             cr.setEmail(ec.getEmail());
             cr.setTelephone(ec.getTelephone());
+            cr.setPhoto(null);
             cr.setType("ENTREPRISE_CLIENT");
             clientsList.add(cr);
         }
@@ -690,6 +732,8 @@ public class ComptabiliteService {
                 cr.setNomComplet(mc.getNomComplet());
                 cr.setEmail(mc.getEmail());
                 cr.setTelephone(mc.getTelephone());
+                cr.setPhoto(mc.getPhoto());
+                cr.setAdresse(mc.getAdresse());
                 cr.setType(mc.getType());
                 clientsList.add(cr);
                 signatures.add(sig);
@@ -709,6 +753,7 @@ public class ComptabiliteService {
                     cr.setNomComplet(nom);
                     cr.setEmail(null);
                     cr.setTelephone(tel);
+                    cr.setPhoto(null);
                     cr.setType("CLIENT");
                     clientsList.add(cr);
                     signatures.add(sig);
@@ -749,7 +794,9 @@ public class ComptabiliteService {
                         vente.getClient().getNomComplet(),
                         vente.getClient().getEmail(),
                         vente.getClient().getTelephone(),
-                        "CLIENT"
+                        "CLIENT",
+                        vente.getClient().getPhoto(),
+                        vente.getClient().getAdresse()
                 )).ajouterAchat(montantNet);
             } else if (vente.getEntrepriseClient() != null) {
                 Long entrepriseClientId = vente.getEntrepriseClient().getId();
@@ -759,7 +806,9 @@ public class ComptabiliteService {
                         vente.getEntrepriseClient().getNom(),
                         vente.getEntrepriseClient().getEmail(),
                         vente.getEntrepriseClient().getTelephone(),
-                        "ENTREPRISE_CLIENT"
+                        "ENTREPRISE_CLIENT",
+                        null,
+                        vente.getEntrepriseClient().getAdresse()
                 )).ajouterAchat(montantNet);
             }
         }
@@ -768,15 +817,19 @@ public class ComptabiliteService {
         List<ComptabiliteDTO.MeilleurClientDTO> top3 = statsParClient.values().stream()
                 .sorted((a, b) -> Double.compare(b.montantAchete, a.montantAchete))
                 .limit(3)
-                .map(cs -> new ComptabiliteDTO.MeilleurClientDTO(
-                        cs.id,
-                        cs.nomComplet,
-                        cs.email,
-                        cs.telephone,
-                        cs.montantAchete,
-                        cs.nombreAchats,
-                        cs.type
-                ))
+                .map(cs -> {
+                    ComptabiliteDTO.MeilleurClientDTO d = new ComptabiliteDTO.MeilleurClientDTO();
+                    d.setId(cs.id);
+                    d.setNomComplet(cs.nomComplet);
+                    d.setEmail(cs.email);
+                    d.setTelephone(cs.telephone);
+                    d.setPhoto(cs.photo);
+                    d.setAdresse(cs.adresse);
+                    d.setMontantAchete(cs.montantAchete);
+                    d.setNombreAchats(cs.nombreAchats);
+                    d.setType(cs.type);
+                    return d;
+                })
                 .collect(Collectors.toList());
 
         return top3;
@@ -791,15 +844,19 @@ public class ComptabiliteService {
         String email;
         String telephone;
         String type;
+        String photo;
+        String adresse;
         double montantAchete = 0.0;
         int nombreAchats = 0;
 
-        ClientStats(Long id, String nomComplet, String email, String telephone, String type) {
+        ClientStats(Long id, String nomComplet, String email, String telephone, String type, String photo, String adresse) {
             this.id = id;
             this.nomComplet = nomComplet;
             this.email = email;
             this.telephone = telephone;
             this.type = type;
+            this.photo = photo;
+            this.adresse = adresse;
         }
 
         void ajouterAchat(double montant) {
@@ -829,12 +886,25 @@ public class ComptabiliteService {
         // Calculer les top 3 meilleurs vendeurs
         List<ComptabiliteDTO.MeilleurVendeurDTO> meilleursVendeurs = calculerTop3Vendeurs(entrepriseId, toutesVentes);
 
-        return new ComptabiliteDTO.VendeursDTO(
-                tousVendeurs.size(),
-                vendeursActifsIds.size(),
-                chiffreAffairesTotal,
-                meilleursVendeurs
-        );
+        // Construire la liste de tous les vendeurs
+        List<ComptabiliteDTO.VendeurResumeDTO> vendeursList = tousVendeurs.stream().map(u -> {
+            ComptabiliteDTO.VendeurResumeDTO vr = new ComptabiliteDTO.VendeurResumeDTO();
+            vr.setId(u.getId());
+            vr.setNomComplet(u.getNomComplet());
+            vr.setEmail(u.getEmail());
+            vr.setTelephone(u.getPhone());
+            vr.setPhoto(u.getPhoto());
+            vr.setAdresse(null);
+            return vr;
+        }).collect(java.util.stream.Collectors.toList());
+
+        ComptabiliteDTO.VendeursDTO dto = new ComptabiliteDTO.VendeursDTO();
+        dto.setNombreTotal(tousVendeurs.size());
+        dto.setActifs(vendeursActifsIds.size());
+        dto.setChiffreAffairesTotal(chiffreAffairesTotal);
+        dto.setMeilleursVendeurs(meilleursVendeurs);
+        dto.setVendeurs(vendeursList);
+        return dto;
     }
 
     /**
@@ -865,7 +935,9 @@ public class ComptabiliteService {
                 statsParVendeur.computeIfAbsent(vendeurId, k -> new VendeurStats(
                         vente.getVendeur().getId(),
                         vente.getVendeur().getNomComplet(),
-                        vente.getVendeur().getEmail()
+                        vente.getVendeur().getEmail(),
+                        vente.getVendeur().getPhoto(),
+                        null
                 )).ajouterVente(montantNet);
             }
         }
@@ -874,13 +946,17 @@ public class ComptabiliteService {
         List<ComptabiliteDTO.MeilleurVendeurDTO> top3 = statsParVendeur.values().stream()
                 .sorted((a, b) -> Double.compare(b.chiffreAffaires, a.chiffreAffaires))
                 .limit(3)
-                .map(vs -> new ComptabiliteDTO.MeilleurVendeurDTO(
-                        vs.id,
-                        vs.nomComplet,
-                        vs.email,
-                        vs.chiffreAffaires,
-                        vs.nombreVentes
-                ))
+                .map(vs -> {
+                    ComptabiliteDTO.MeilleurVendeurDTO d = new ComptabiliteDTO.MeilleurVendeurDTO();
+                    d.setId(vs.id);
+                    d.setNomComplet(vs.nomComplet);
+                    d.setEmail(vs.email);
+                    d.setPhoto(vs.photo);
+                    d.setAdresse(vs.adresse);
+                    d.setChiffreAffaires(vs.chiffreAffaires);
+                    d.setNombreVentes(vs.nombreVentes);
+                    return d;
+                })
                 .collect(Collectors.toList());
 
         return top3;
@@ -893,13 +969,17 @@ public class ComptabiliteService {
         Long id;
         String nomComplet;
         String email;
+        String photo;
+        String adresse;
         double chiffreAffaires = 0.0;
         int nombreVentes = 0;
 
-        VendeurStats(Long id, String nomComplet, String email) {
+        VendeurStats(Long id, String nomComplet, String email, String photo, String adresse) {
             this.id = id;
             this.nomComplet = nomComplet;
             this.email = email;
+            this.photo = photo;
+            this.adresse = adresse;
         }
 
         void ajouterVente(double montant) {
