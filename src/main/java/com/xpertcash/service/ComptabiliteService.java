@@ -16,6 +16,14 @@ import java.time.LocalTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import com.xpertcash.DTOs.DepenseGeneraleRequest;
+import com.xpertcash.DTOs.DepenseGeneraleResponse;
+import com.xpertcash.DTOs.VENTE.TransactionSummaryDTO;
+import com.xpertcash.entity.DepenseEntreprise;
+import com.xpertcash.entity.Enum.RoleType;
+import com.xpertcash.entity.PermissionType;
+import com.xpertcash.service.VENTE.TransactionSummaryService;
+
 @Service
 public class ComptabiliteService {
 
@@ -57,6 +65,12 @@ public class ComptabiliteService {
 
     @Autowired
     private CaisseRepository caisseRepository;
+
+    @Autowired
+    private DepenseEntrepriseRepository depenseEntrepriseRepository;
+
+    @Autowired
+    private TransactionSummaryService transactionSummaryService;
 
     @Autowired
     private StockRepository stockRepository;
@@ -143,6 +157,7 @@ public class ComptabiliteService {
                 .sum();
         int nombreFacturesReelles = toutesFacturesReelles.size();
         int nombreFacturesProforma = toutesFacturesProforma.size();
+        double soldeDisponible = calculerSoldeDisponibleEntreprise(entrepriseId);
 
         // Construire les détails des ventes
         List<Vente> ventes = venteRepository.findAllByEntrepriseId(entrepriseId);
@@ -241,6 +256,7 @@ public class ComptabiliteService {
         dto.setTotalVentes(totalVentes);
         dto.setTotalFactures(totalFacturesEmises);
         dto.setTotalPaiementsFactures(totalPaiementsFactures);
+        dto.setSoldeDisponible(soldeDisponible);
         dto.setVentesDetails(ventesDetails);
         dto.setFactureDetails(factureDetails);
         dto.setNombreFacturesReelles(nombreFacturesReelles);
@@ -473,83 +489,232 @@ public class ComptabiliteService {
         List<Boutique> boutiques = boutiqueRepository.findByEntrepriseId(entrepriseId);
         List<Long> boutiqueIds = boutiques.stream().map(Boutique::getId).collect(Collectors.toList());
 
-        if (boutiqueIds.isEmpty()) {
-            ComptabiliteDTO.DepensesDTO dto = new ComptabiliteDTO.DepensesDTO();
-            dto.setNombreTotal(0);
-            dto.setMontantTotal(0.0);
-            dto.setDuJour(0);
-            dto.setMontantDuJour(0.0);
-            dto.setDuMois(0);
-            dto.setMontantDuMois(0.0);
-            dto.setDeLAnnee(0);
-            dto.setMontantDeLAnnee(0.0);
-            dto.setDetails(java.util.Collections.emptyList());
-            return dto;
-        }
-
         // Récupérer les mouvements de type DEPENSE
-        List<MouvementCaisse> toutesDepenses = mouvementCaisseRepository
-                .findByCaisse_Boutique_Entreprise_IdAndTypeMouvement(
+        List<MouvementCaisse> depensesCaisses = boutiqueIds.isEmpty()
+                ? java.util.Collections.emptyList()
+                : mouvementCaisseRepository.findByCaisse_Boutique_Entreprise_IdAndTypeMouvement(
                         entrepriseId, TypeMouvementCaisse.DEPENSE);
+
+        // Récupérer les dépenses générales enregistrées par le comptable
+        List<DepenseEntreprise> depensesGenerales = depenseEntrepriseRepository.findByEntreprise_Id(entrepriseId);
 
         // Dépenses d'aujourd'hui
         LocalDate today = LocalDate.now();
         LocalDateTime startOfDay = today.atStartOfDay();
         LocalDateTime endOfDay = today.atTime(LocalTime.MAX);
-        List<MouvementCaisse> depensesJour = mouvementCaisseRepository
-                .findByCaisse_Boutique_Entreprise_IdAndTypeMouvementAndDateMouvementBetween(
+        List<MouvementCaisse> depensesJour = boutiqueIds.isEmpty()
+                ? java.util.Collections.emptyList()
+                : mouvementCaisseRepository.findByCaisse_Boutique_Entreprise_IdAndTypeMouvementAndDateMouvementBetween(
                         entrepriseId, TypeMouvementCaisse.DEPENSE, startOfDay, endOfDay);
+        List<DepenseEntreprise> depensesGeneralesJour = depensesGenerales.stream()
+                .filter(d -> d.getDateDepense() != null && !d.getDateDepense().isBefore(startOfDay)
+                        && !d.getDateDepense().isAfter(endOfDay))
+                .collect(Collectors.toList());
 
         // Dépenses du mois
         LocalDateTime startOfMonth = today.withDayOfMonth(1).atStartOfDay();
         LocalDateTime endOfMonth = today.withDayOfMonth(today.lengthOfMonth()).atTime(LocalTime.MAX);
-        List<MouvementCaisse> depensesMois = mouvementCaisseRepository
-                .findByCaisse_Boutique_Entreprise_IdAndTypeMouvementAndDateMouvementBetween(
+        List<MouvementCaisse> depensesMois = boutiqueIds.isEmpty()
+                ? java.util.Collections.emptyList()
+                : mouvementCaisseRepository.findByCaisse_Boutique_Entreprise_IdAndTypeMouvementAndDateMouvementBetween(
                         entrepriseId, TypeMouvementCaisse.DEPENSE, startOfMonth, endOfMonth);
+        List<DepenseEntreprise> depensesGeneralesMois = depensesGenerales.stream()
+                .filter(d -> d.getDateDepense() != null && !d.getDateDepense().isBefore(startOfMonth)
+                        && !d.getDateDepense().isAfter(endOfMonth))
+                .collect(Collectors.toList());
 
         // Dépenses de l'année
         LocalDate firstDayOfYear = today.withDayOfYear(1);
         LocalDate lastDayOfYear = today.withDayOfYear(today.lengthOfYear());
         LocalDateTime startOfYear = firstDayOfYear.atStartOfDay();
         LocalDateTime endOfYear = lastDayOfYear.atTime(LocalTime.MAX);
-        List<MouvementCaisse> depensesAnnee = mouvementCaisseRepository
-                .findByCaisse_Boutique_Entreprise_IdAndTypeMouvementAndDateMouvementBetween(
+        List<MouvementCaisse> depensesAnnee = boutiqueIds.isEmpty()
+                ? java.util.Collections.emptyList()
+                : mouvementCaisseRepository.findByCaisse_Boutique_Entreprise_IdAndTypeMouvementAndDateMouvementBetween(
                         entrepriseId, TypeMouvementCaisse.DEPENSE, startOfYear, endOfYear);
+        List<DepenseEntreprise> depensesGeneralesAnnee = depensesGenerales.stream()
+                .filter(d -> d.getDateDepense() != null && !d.getDateDepense().isBefore(startOfYear)
+                        && !d.getDateDepense().isAfter(endOfYear))
+                .collect(Collectors.toList());
 
-        double montantTotal = toutesDepenses.stream()
+        double montantTotalCaisses = depensesCaisses.stream()
                 .mapToDouble(m -> m.getMontant() != null ? m.getMontant() : 0.0)
                 .sum();
-        double montantDuJour = depensesJour.stream()
+        double montantTotalGenerales = depensesGenerales.stream()
+                .mapToDouble(d -> d.getMontant() != null ? d.getMontant() : 0.0)
+                .sum();
+        double montantTotal = montantTotalCaisses + montantTotalGenerales;
+
+        double montantDuJourCaisses = depensesJour.stream()
                 .mapToDouble(m -> m.getMontant() != null ? m.getMontant() : 0.0)
                 .sum();
-        double montantDuMois = depensesMois.stream()
+        double montantDuJourGenerales = depensesGeneralesJour.stream()
+                .mapToDouble(d -> d.getMontant() != null ? d.getMontant() : 0.0)
+                .sum();
+        double montantDuJour = montantDuJourCaisses + montantDuJourGenerales;
+
+        double montantDuMoisCaisses = depensesMois.stream()
                 .mapToDouble(m -> m.getMontant() != null ? m.getMontant() : 0.0)
                 .sum();
-        double montantDeLAnnee = depensesAnnee.stream()
+        double montantDuMoisGenerales = depensesGeneralesMois.stream()
+                .mapToDouble(d -> d.getMontant() != null ? d.getMontant() : 0.0)
+                .sum();
+        double montantDuMois = montantDuMoisCaisses + montantDuMoisGenerales;
+
+        double montantDeLAnneeCaisses = depensesAnnee.stream()
                 .mapToDouble(m -> m.getMontant() != null ? m.getMontant() : 0.0)
                 .sum();
+        double montantDeLAnneeGenerales = depensesGeneralesAnnee.stream()
+                .mapToDouble(d -> d.getMontant() != null ? d.getMontant() : 0.0)
+                .sum();
+        double montantDeLAnnee = montantDeLAnneeCaisses + montantDeLAnneeGenerales;
 
         // Détails des dépenses (Date, Libellé, Méthode, Montant)
-        List<ComptabiliteDTO.DepenseDetail> details = toutesDepenses.stream().map(d -> {
+        List<ComptabiliteDTO.DepenseDetail> details = new ArrayList<>();
+
+        details.addAll(depensesCaisses.stream().map(d -> {
             ComptabiliteDTO.DepenseDetail dd = new ComptabiliteDTO.DepenseDetail();
             dd.setDate(d.getDateMouvement());
             dd.setLibelle(d.getDescription());
             dd.setMethode(libelleModePaiement(d.getModePaiement()));
             dd.setMontant(d.getMontant());
+            dd.setType("CAISSE");
             return dd;
-        }).collect(Collectors.toList());
+        }).collect(Collectors.toList()));
+
+        details.addAll(depensesGenerales.stream().map(d -> {
+            ComptabiliteDTO.DepenseDetail dd = new ComptabiliteDTO.DepenseDetail();
+            dd.setDate(d.getDateDepense());
+            dd.setLibelle(d.getMotif());
+            dd.setMethode(libelleModePaiement(d.getModePaiement()));
+            dd.setMontant(d.getMontant());
+            dd.setType("ENTREPRISE");
+            return dd;
+        }).collect(Collectors.toList()));
 
         ComptabiliteDTO.DepensesDTO dto = new ComptabiliteDTO.DepensesDTO();
-        dto.setNombreTotal(toutesDepenses.size());
+        dto.setNombreTotal(depensesCaisses.size() + depensesGenerales.size());
         dto.setMontantTotal(montantTotal);
-        dto.setDuJour(depensesJour.size());
+        dto.setNombreDepensesCaisses(depensesCaisses.size());
+        dto.setMontantDepensesCaisses(montantTotalCaisses);
+        dto.setNombreDepensesGenerales(depensesGenerales.size());
+        dto.setMontantDepensesGenerales(montantTotalGenerales);
+        dto.setDuJour(depensesJour.size() + depensesGeneralesJour.size());
         dto.setMontantDuJour(montantDuJour);
-        dto.setDuMois(depensesMois.size());
+        dto.setDuMois(depensesMois.size() + depensesGeneralesMois.size());
         dto.setMontantDuMois(montantDuMois);
-        dto.setDeLAnnee(depensesAnnee.size());
+        dto.setDeLAnnee(depensesAnnee.size() + depensesGeneralesAnnee.size());
         dto.setMontantDeLAnnee(montantDeLAnnee);
         dto.setDetails(details);
         return dto;
+    }
+
+    /**
+     * Enregistre une dépense générale pour l'entreprise.
+     * Seuls les utilisateurs ayant le rôle COMPTABLE peuvent effectuer cette opération.
+     */
+    @Transactional
+    public DepenseGeneraleResponse enregistrerDepenseGenerale(DepenseGeneraleRequest request, HttpServletRequest httpRequest) {
+        User user = authHelper.getAuthenticatedUserWithFallback(httpRequest);
+
+        if (user.getEntreprise() == null) {
+            throw new RuntimeException("Vous n'êtes associé à aucune entreprise.");
+        }
+
+        boolean hasRoleComptable = user.getRole() != null && user.getRole().getName() == RoleType.COMPTABLE;
+        boolean hasRoleAdmin = user.getRole() != null && user.getRole().getName() == RoleType.ADMIN;
+        boolean hasPermissionComptabilite = user.getRole() != null && user.getRole().hasPermission(PermissionType.COMPTABILITE);
+
+        if (!(hasRoleComptable || hasRoleAdmin || hasPermissionComptabilite)) {
+            throw new RuntimeException("Seul un comptable, un administrateur ou un utilisateur disposant de la permission COMPTABILITE peut enregistrer une dépense générale.");
+        }
+
+        if (request.getMontant() == null || request.getMontant() <= 0) {
+            throw new RuntimeException("Le montant de la dépense doit être supérieur à zéro.");
+        }
+
+        double soldeDisponible = calculerSoldeDisponibleEntreprise(user.getEntreprise().getId());
+        if (request.getMontant() > soldeDisponible) {
+            throw new RuntimeException(String.format(
+                    "Montant insuffisant. Solde disponible: %.2f, montant demandé: %.2f",
+                    soldeDisponible, request.getMontant()));
+        }
+
+        ModePaiement modePaiement = ModePaiement.ESPECES;
+        if (request.getModePaiement() != null && !request.getModePaiement().isBlank()) {
+            try {
+                modePaiement = ModePaiement.valueOf(request.getModePaiement().trim().toUpperCase());
+            } catch (IllegalArgumentException e) {
+                throw new RuntimeException("Mode de paiement invalide : " + request.getModePaiement());
+            }
+        }
+
+        DepenseEntreprise depense = new DepenseEntreprise();
+        depense.setEntreprise(user.getEntreprise());
+        depense.setCreePar(user);
+        depense.setMontant(request.getMontant());
+        depense.setMotif(request.getMotif());
+        depense.setModePaiement(modePaiement);
+        depense.setDateDepense(LocalDateTime.now());
+
+        DepenseEntreprise saved = depenseEntrepriseRepository.save(depense);
+        return mapDepenseGenerale(saved);
+    }
+
+    @Transactional(readOnly = true)
+    public List<DepenseGeneraleResponse> listerDepensesGenerales(HttpServletRequest httpRequest) {
+        User user = authHelper.getAuthenticatedUserWithFallback(httpRequest);
+
+        if (user.getEntreprise() == null) {
+            throw new RuntimeException("Vous n'êtes associé à aucune entreprise.");
+        }
+
+        boolean hasRoleComptable = user.getRole() != null && user.getRole().getName() == RoleType.COMPTABLE;
+        boolean hasRoleAdmin = user.getRole() != null && user.getRole().getName() == RoleType.ADMIN;
+        boolean hasPermissionComptabilite = user.getRole() != null && user.getRole().hasPermission(PermissionType.COMPTABILITE);
+
+        if (!(hasRoleComptable || hasRoleAdmin || hasPermissionComptabilite)) {
+            throw new RuntimeException("Seul un comptable, un administrateur ou un utilisateur disposant de la permission COMPTABILITE peut consulter les dépenses générales.");
+        }
+
+        return depenseEntrepriseRepository.findByEntreprise_Id(user.getEntreprise().getId())
+                .stream()
+                .map(this::mapDepenseGenerale)
+                .collect(Collectors.toList());
+    }
+
+    private DepenseGeneraleResponse mapDepenseGenerale(DepenseEntreprise depense) {
+        DepenseGeneraleResponse dto = new DepenseGeneraleResponse();
+        dto.setId(depense.getId());
+        dto.setMontant(depense.getMontant());
+        dto.setMotif(depense.getMotif());
+        dto.setModePaiement(depense.getModePaiement() != null ? depense.getModePaiement().name() : "ESPECES");
+        dto.setDateDepense(depense.getDateDepense());
+        if (depense.getCreePar() != null) {
+            dto.setCreeParId(depense.getCreePar().getId());
+            dto.setCreeParNom(depense.getCreePar().getNomComplet());
+            dto.setCreeParEmail(depense.getCreePar().getEmail());
+        }
+        if (depense.getEntreprise() != null) {
+            dto.setEntrepriseId(depense.getEntreprise().getId());
+            dto.setEntrepriseNom(depense.getEntreprise().getNomEntreprise());
+        }
+        return dto;
+    }
+
+    private double calculerSoldeDisponibleEntreprise(Long entrepriseId) {
+        LocalDateTime start = LocalDate.of(2000, 1, 1).atStartOfDay();
+        LocalDateTime end = LocalDateTime.now();
+        TransactionSummaryDTO summary = transactionSummaryService.getTransactionSummary(entrepriseId, start, end);
+        double soldeTransactions = summary.getSoldeNet() != null ? summary.getSoldeNet() : 0.0;
+        double depensesGenerales = calculerTotalDepensesGenerales(entrepriseId);
+        return soldeTransactions - depensesGenerales;
+    }
+
+    private double calculerTotalDepensesGenerales(Long entrepriseId) {
+        return depenseEntrepriseRepository.findByEntreprise_Id(entrepriseId).stream()
+                .mapToDouble(d -> d.getMontant() != null ? d.getMontant() : 0.0)
+                .sum();
     }
 
     private String libelleModePaiement(ModePaiement mode) {
@@ -565,6 +730,8 @@ public class ComptabiliteService {
                 return "Mobile money";
             case "VIREMENT":
                 return "Virement";
+            case "AUTRE":
+                return "Autre";
             default:
                 return mode.name();
         }

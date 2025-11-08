@@ -1,15 +1,16 @@
 package com.xpertcash.controller;
 
 import com.xpertcash.DTOs.ComptabiliteDTO;
+import com.xpertcash.DTOs.DepenseGeneraleRequest;
+import com.xpertcash.DTOs.DepenseGeneraleResponse;
 import com.xpertcash.service.ComptabiliteService;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -39,6 +40,45 @@ public class ComptabiliteController {
         try {
             ComptabiliteDTO comptabilite = comptabiliteService.getComptabilite(request);
             return ResponseEntity.ok(comptabilite);
+        } catch (RuntimeException e) {
+            Map<String, String> error = new HashMap<>();
+            error.put("error", e.getMessage());
+            return ResponseEntity.badRequest().body(error);
+        } catch (Exception e) {
+            Map<String, String> error = new HashMap<>();
+            error.put("error", "Erreur interne du serveur : " + e.getMessage());
+            return ResponseEntity.status(500).body(error);
+        }
+    }
+
+    /**
+     * Endpoint pour enregistrer une dépense générale (réservé au rôle COMPTABLE)
+     */
+    @PostMapping("/comptabilite/depenses-generales")
+    public ResponseEntity<?> enregistrerDepenseGenerale(@RequestBody DepenseGeneraleRequest request,
+                                                        HttpServletRequest httpRequest) {
+        try {
+            DepenseGeneraleResponse depense = comptabiliteService.enregistrerDepenseGenerale(request, httpRequest);
+            return ResponseEntity.ok(depense);
+        } catch (RuntimeException e) {
+            Map<String, String> error = new HashMap<>();
+            error.put("error", e.getMessage());
+            return ResponseEntity.badRequest().body(error);
+        } catch (Exception e) {
+            Map<String, String> error = new HashMap<>();
+            error.put("error", "Erreur interne du serveur : " + e.getMessage());
+            return ResponseEntity.status(500).body(error);
+        }
+    }
+
+    /**
+     * Endpoint pour lister les dépenses générales (réservé au rôle COMPTABLE)
+     */
+    @GetMapping("/comptabilite/depenses-generales")
+    public ResponseEntity<?> listerDepensesGenerales(HttpServletRequest httpRequest) {
+        try {
+            List<DepenseGeneraleResponse> depenses = comptabiliteService.listerDepensesGenerales(httpRequest);
+            return ResponseEntity.ok(depenses);
         } catch (RuntimeException e) {
             Map<String, String> error = new HashMap<>();
             error.put("error", e.getMessage());
