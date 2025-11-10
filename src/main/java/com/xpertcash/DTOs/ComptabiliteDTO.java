@@ -31,6 +31,7 @@ public class ComptabiliteDTO {
         private Double totalVentes;
         private Double totalFactures;
         private Double totalPaiementsFactures;
+        private Double soldeDisponible;
         private List<VenteCADetail> ventesDetails;
         private List<FactureDetail> factureDetails;
         private Integer nombreFacturesReelles;
@@ -112,6 +113,10 @@ public class ComptabiliteDTO {
     public static class DepensesDTO {
         private Integer nombreTotal;
         private Double montantTotal;
+        private Integer nombreDepensesCaisses;
+        private Double montantDepensesCaisses;
+        private Integer nombreDepensesGenerales;
+        private Double montantDepensesGenerales;
         private Integer duJour;
         private Double montantDuJour;
         private Integer duMois;
@@ -129,6 +134,7 @@ public class ComptabiliteDTO {
         private String libelle;
         private String methode;
         private Double montant;
+        private String type;
     }
 
     @Data
