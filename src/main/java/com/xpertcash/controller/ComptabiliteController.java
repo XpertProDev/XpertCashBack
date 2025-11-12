@@ -1,16 +1,17 @@
 package com.xpertcash.controller;
 
-import com.xpertcash.DTOs.ComptabiliteDTO;
-import com.xpertcash.DTOs.DepenseGeneraleRequest;
-import com.xpertcash.DTOs.DepenseGeneraleResponse;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.xpertcash.DTOs.DepenseGeneraleRequestDTO;
 import com.xpertcash.service.ComptabiliteService;
+import com.xpertcash.service.IMAGES.ImageStorageService;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -19,6 +20,12 @@ public class ComptabiliteController {
 
     @Autowired
     private ComptabiliteService comptabiliteService;
+
+    @Autowired
+    private ImageStorageService imageStorageService;
+
+    @Autowired
+    private ObjectMapper objectMapper;
 
     /**
      * Endpoint qui retourne toutes les données comptables de l'entreprise
@@ -37,57 +44,112 @@ public class ComptabiliteController {
      */
     @GetMapping("/comptabilite")
     public ResponseEntity<?> getComptabilite(HttpServletRequest request) {
+        return handleRequest(() -> comptabiliteService.getComptabilite(request));
+    }
+
+    /**
+     * Crée une dépense générale pour l'entreprise.
+     * Accepte multipart/form-data pour permettre l'upload de pièces jointes.
+     */
+    @PostMapping(value = "/create/depenses-generales", consumes = { MediaType.MULTIPART_FORM_DATA_VALUE })
+    public ResponseEntity<?> creerDepenseGenerale(
+            @RequestParam("depense") String depenseJson,
+            @RequestParam(value = "pieceJointe", required = false) MultipartFile pieceJointeFile,
+            HttpServletRequest httpRequest) {
+        return handleRequest(() -> {
+            DepenseGeneraleRequestDTO request = parseDepenseJson(depenseJson);
+            String pieceJointeUrl = savePieceJointe(pieceJointeFile);
+            request.setPieceJointe(pieceJointeUrl);
+            return comptabiliteService.creerDepenseGenerale(request, httpRequest);
+        });
+    }
+
+    @GetMapping("/list/depenses-generales")
+    public ResponseEntity<?> listerDepensesGenerales(HttpServletRequest request) {
+        return handleRequest(() -> comptabiliteService.listerDepensesGenerales(request));
+    }
+
+    @PostMapping("/create/categories-depense")
+    public ResponseEntity<?> creerCategorieDepense(@RequestBody Map<String, String> request, HttpServletRequest httpRequest) {
+        return handleRequest(() -> {
+            String nom = request.get("nom");
+            String description = request.get("description");
+            return comptabiliteService.creerCategorieDepense(nom, description, httpRequest);
+        });
+    }
+
+    @GetMapping("/list/categories-depense")
+    public ResponseEntity<?> listerCategoriesDepense(HttpServletRequest request) {
+        return handleRequest(() -> comptabiliteService.listerCategoriesDepense(request));
+    }
+
+    // ========== Méthodes utilitaires privées ==========
+
+    /**
+     * Gère les requêtes avec gestion d'erreur centralisée
+     */
+    private ResponseEntity<?> handleRequest(java.util.function.Supplier<Object> supplier) {
         try {
-            ComptabiliteDTO comptabilite = comptabiliteService.getComptabilite(request);
-            return ResponseEntity.ok(comptabilite);
+            return ResponseEntity.ok(supplier.get());
         } catch (RuntimeException e) {
-            Map<String, String> error = new HashMap<>();
-            error.put("error", e.getMessage());
-            return ResponseEntity.badRequest().body(error);
+            return ResponseEntity.badRequest().body(createErrorResponse(e.getMessage()));
         } catch (Exception e) {
-            Map<String, String> error = new HashMap<>();
-            error.put("error", "Erreur interne du serveur : " + e.getMessage());
-            return ResponseEntity.status(500).body(error);
+            return ResponseEntity.status(500).body(createErrorResponse("Erreur interne du serveur : " + e.getMessage()));
         }
     }
 
     /**
-     * Endpoint pour enregistrer une dépense générale (réservé au rôle COMPTABLE)
+     * Crée une réponse d'erreur
      */
-    @PostMapping("/comptabilite/depenses-generales")
-    public ResponseEntity<?> enregistrerDepenseGenerale(@RequestBody DepenseGeneraleRequest request,
-                                                        HttpServletRequest httpRequest) {
+    private Map<String, String> createErrorResponse(String message) {
+        Map<String, String> error = new HashMap<>();
+        error.put("error", message);
+        return error;
+    }
+
+    /**
+     * Parse le JSON de dépense et corrige les problèmes de format
+     */
+    private DepenseGeneraleRequestDTO parseDepenseJson(String depenseJson) {
         try {
-            DepenseGeneraleResponse depense = comptabiliteService.enregistrerDepenseGenerale(request, httpRequest);
-            return ResponseEntity.ok(depense);
-        } catch (RuntimeException e) {
-            Map<String, String> error = new HashMap<>();
-            error.put("error", e.getMessage());
-            return ResponseEntity.badRequest().body(error);
+            String cleanedJson = cleanJson(depenseJson);
+            return objectMapper.readValue(cleanedJson, DepenseGeneraleRequestDTO.class);
         } catch (Exception e) {
-            Map<String, String> error = new HashMap<>();
-            error.put("error", "Erreur interne du serveur : " + e.getMessage());
-            return ResponseEntity.status(500).body(error);
+            throw new RuntimeException("Format JSON invalide : " + e.getMessage(), e);
         }
     }
 
     /**
-     * Endpoint pour lister les dépenses générales (réservé au rôle COMPTABLE)
+     * Nettoie et corrige le JSON si nécessaire (ajoute les accolades manquantes)
      */
-    @GetMapping("/comptabilite/depenses-generales")
-    public ResponseEntity<?> listerDepensesGenerales(HttpServletRequest httpRequest) {
-        try {
-            List<DepenseGeneraleResponse> depenses = comptabiliteService.listerDepensesGenerales(httpRequest);
-            return ResponseEntity.ok(depenses);
-        } catch (RuntimeException e) {
-            Map<String, String> error = new HashMap<>();
-            error.put("error", e.getMessage());
-            return ResponseEntity.badRequest().body(error);
-        } catch (Exception e) {
-            Map<String, String> error = new HashMap<>();
-            error.put("error", "Erreur interne du serveur : " + e.getMessage());
-            return ResponseEntity.status(500).body(error);
+    private String cleanJson(String json) {
+        if (json == null || json.trim().isEmpty()) {
+            throw new RuntimeException("Le JSON de dépense est vide");
         }
+        
+        String cleaned = json.trim();
+        
+        // Si le JSON ne commence pas par {, l'ajouter
+        if (!cleaned.startsWith("{")) {
+            cleaned = "{" + cleaned;
+        }
+        
+        // Si le JSON ne se termine pas par }, l'ajouter
+        if (!cleaned.endsWith("}")) {
+            cleaned = cleaned + "}";
+        }
+        
+        return cleaned;
+    }
+
+    /**
+     * Sauvegarde la pièce jointe si elle est présente
+     */
+    private String savePieceJointe(MultipartFile pieceJointeFile) {
+        if (pieceJointeFile != null && !pieceJointeFile.isEmpty()) {
+            return imageStorageService.saveDepensePieceJointe(pieceJointeFile);
+        }
+        return null;
     }
 }
 

@@ -1,0 +1,344 @@
+{
+	"info": {
+		"_postman_id": "xpertcash-depenses-generales-001",
+		"name": "XpertCashBack - Dépenses Générales",
+		"description": "Collection Postman pour la gestion des dépenses générales et catégories de dépense",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Catégories de Dépense",
+			"item": [
+				{
+					"name": "Créer une Catégorie de Dépense",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}",
+								"description": "Token JWT d'authentification"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"nom\": \"Fournitures de bureau\",\n  \"description\": \"Catégorie pour les dépenses liées aux fournitures de bureau\"\n}"
+						},
+						"url": {
+							"raw": "{{base_url}}/api/auth/comptabilite/categories-depense",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"auth",
+								"comptabilite",
+								"categories-depense"
+							]
+						},
+						"description": "Créer une nouvelle catégorie de dépense. Seuls les comptables ou utilisateurs avec la permission COMPTABILITE peuvent effectuer cette opération."
+					},
+					"response": []
+				},
+				{
+					"name": "Lister toutes les Catégories de Dépense",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}",
+								"description": "Token JWT d'authentification"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/auth/comptabilite/categories-depense",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"auth",
+								"comptabilite",
+								"categories-depense"
+							]
+						},
+						"description": "Récupère toutes les catégories de dépense de l'entreprise."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Dépenses Générales",
+			"item": [
+				{
+					"name": "Créer une Dépense Générale (avec catégorie existante)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}",
+								"description": "Token JWT d'authentification"
+							}
+						],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "depense",
+									"value": "{\"designation\":\"Achat de papeterie\",\"categorieId\":1,\"prixUnitaire\":5000.0,\"quantite\":10,\"source\":\"CAISSE\",\"ordonnateur\":\"COMPTABLE\",\"numeroCheque\":null,\"typeCharge\":\"CHARGE_VARIABLE\",\"produitId\":null,\"fournisseurId\":1,\"pieceJointe\":null}",
+									"type": "text"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{base_url}}/api/auth/comptabilite/depenses-generales",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"auth",
+								"comptabilite",
+								"depenses-generales"
+							]
+						},
+						"description": "Créer une dépense générale en utilisant une catégorie existante. Le montant est calculé automatiquement (prixUnitaire × quantite). Utilise multipart/form-data."
+					},
+					"response": []
+				},
+				{
+					"name": "Créer une Dépense Générale (avec nouvelle catégorie)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}",
+								"description": "Token JWT d'authentification"
+							}
+						],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "depense",
+									"value": "{\"designation\":\"Frais de transport\",\"categorieId\":null,\"nouvelleCategorieNom\":\"Transport\",\"prixUnitaire\":2500.0,\"quantite\":5,\"source\":\"MOBILE_MONEY\",\"ordonnateur\":\"MANAGER\",\"numeroCheque\":null,\"typeCharge\":\"CHARGE_VARIABLE\",\"produitId\":null,\"fournisseurId\":null,\"pieceJointe\":null}",
+									"type": "text"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{base_url}}/api/auth/comptabilite/depenses-generales",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"auth",
+								"comptabilite",
+								"depenses-generales"
+							]
+						},
+						"description": "Créer une dépense générale et créer une nouvelle catégorie en même temps."
+					},
+					"response": []
+				},
+				{
+					"name": "Créer une Dépense Générale (complète)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}",
+								"description": "Token JWT d'authentification"
+							}
+						],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "depense",
+									"value": "{\"designation\":\"Achat de matériel informatique\",\"categorieId\":1,\"prixUnitaire\":150000.0,\"quantite\":2,\"source\":\"BANQUE\",\"ordonnateur\":\"COMPTABLE\",\"numeroCheque\":\"CHQ-001234\",\"typeCharge\":\"CHARGE_FIXE\",\"produitId\":5,\"fournisseurId\":3,\"pieceJointe\":null}",
+									"type": "text"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{base_url}}/api/auth/comptabilite/depenses-generales",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"auth",
+								"comptabilite",
+								"depenses-generales"
+							]
+						},
+						"description": "Créer une dépense générale complète avec tous les champs remplis."
+					},
+					"response": []
+				},
+				{
+					"name": "Créer une Dépense Générale (avec pièce jointe)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}",
+								"description": "Token JWT d'authentification"
+							}
+						],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "depense",
+									"value": "{\"designation\":\"Achat de matériel informatique\",\"categorieId\":1,\"prixUnitaire\":150000.0,\"quantite\":2,\"source\":\"BANQUE\",\"ordonnateur\":\"COMPTABLE\",\"numeroCheque\":\"CHQ-001234\",\"typeCharge\":\"CHARGE_FIXE\",\"produitId\":5,\"fournisseurId\":3,\"pieceJointe\":null}",
+									"type": "text"
+								},
+								{
+									"key": "pieceJointe",
+									"type": "file",
+									"src": [],
+									"description": "Sélectionner un fichier (image ou PDF)"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{base_url}}/api/auth/comptabilite/depenses-generales",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"auth",
+								"comptabilite",
+								"depenses-generales"
+							]
+						},
+						"description": "Créer une dépense générale avec une pièce jointe (image ou PDF). Le fichier sera sauvegardé dans /static/depenseUpload/."
+					},
+					"response": []
+				},
+				{
+					"name": "Créer une Dépense Générale (avec dette)",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}",
+								"description": "Token JWT d'authentification"
+							}
+						],
+						"body": {
+							"mode": "formdata",
+							"formdata": [
+								{
+									"key": "depense",
+									"value": "{\"designation\":\"Facture d'électricité\",\"categorieId\":2,\"prixUnitaire\":75000.0,\"quantite\":1,\"source\":\"DETTE\",\"ordonnateur\":\"MANAGER\",\"numeroCheque\":null,\"typeCharge\":\"CHARGE_FIXE\",\"produitId\":null,\"fournisseurId\":2,\"pieceJointe\":null}",
+									"type": "text"
+								}
+							]
+						},
+						"url": {
+							"raw": "{{base_url}}/api/auth/comptabilite/depenses-generales",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"auth",
+								"comptabilite",
+								"depenses-generales"
+							]
+						},
+						"description": "Créer une dépense générale avec source DETTE."
+					},
+					"response": []
+				},
+				{
+					"name": "Lister toutes les Dépenses Générales",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}",
+								"description": "Token JWT d'authentification"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/auth/comptabilite/depenses-generales",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"auth",
+								"comptabilite",
+								"depenses-generales"
+							]
+						},
+						"description": "Récupère toutes les dépenses générales de l'entreprise, triées par date de création décroissante."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Comptabilité",
+			"item": [
+				{
+					"name": "Récupérer la Comptabilité",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "Bearer {{token}}",
+								"description": "Token JWT d'authentification"
+							}
+						],
+						"url": {
+							"raw": "{{base_url}}/api/auth/comptabilite",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"api",
+								"auth",
+								"comptabilite"
+							]
+						},
+						"description": "Récupère toutes les données comptables de l'entreprise (chiffre d'affaires, ventes, facturation, dépenses, boutiques, clients, vendeurs, activités)."
+					},
+					"response": []
+				}
+			]
+		}
+	],
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://localhost:8080",
+			"type": "string"
+		},
+		{
+			"key": "token",
+			"value": "votre_token_jwt_ici",
+			"type": "string"
+		}
+	]
+}
+
