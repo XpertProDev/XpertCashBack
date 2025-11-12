@@ -156,6 +156,7 @@ public class ComptabiliteDTO {
     @NoArgsConstructor
     public static class DepenseGeneraleDetail {
         private Long id;
+        private String numero;
         private String designation;
         private String categorieNom;
         private Double prixUnitaire;

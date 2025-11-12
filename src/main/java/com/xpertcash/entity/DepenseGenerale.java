@@ -22,6 +22,9 @@ public class DepenseGenerale {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(nullable = true, unique = false)
+    private String numero;
+
     @Column(nullable = false)
     private String designation;
 

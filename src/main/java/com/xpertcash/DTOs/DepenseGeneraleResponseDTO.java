@@ -11,6 +11,7 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 public class DepenseGeneraleResponseDTO {
     private Long id;
+    private String numero;
     private String designation;
     private Long categorieId;
     private String categorieNom;
