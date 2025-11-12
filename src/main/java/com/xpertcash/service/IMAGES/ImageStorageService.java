@@ -253,5 +253,30 @@ public class ImageStorageService {
     }
 }
 
+    // Gestion pièce jointe pour les dépenses générales
+    public String saveDepensePieceJointe(MultipartFile pieceJointeFile) {
+        if (pieceJointeFile == null || pieceJointeFile.isEmpty()) {
+            throw new NotFoundException("Le fichier pièce jointe est vide ou invalide.");
+        }
+        try {
+            Path depenseRootLocation = Paths.get("src/main/resources/static/depenseUpload");
+            // Vérifie si le dossier existe, sinon le crée
+            if (!Files.exists(depenseRootLocation)) {
+                Files.createDirectories(depenseRootLocation);
+            }
+
+            String fileName = UUID.randomUUID().toString() + "_" + pieceJointeFile.getOriginalFilename();
+            Path filePath = depenseRootLocation.resolve(fileName);
+            Files.copy(pieceJointeFile.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
+
+            String fileUrl = "/depenseUpload/" + fileName;
+            System.out.println("✅ Pièce jointe dépense sauvegardée : " + fileUrl);
+            return fileUrl;
+        } catch (IOException e) {
+            System.out.println("❌ ERREUR lors de l'enregistrement de la pièce jointe : " + e.getMessage());
+            throw new NotFoundException("Erreur lors de l'enregistrement de la pièce jointe : " + e.getMessage());
+        }
+    }
+
 }
 

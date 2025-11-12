@@ -14,6 +14,7 @@ public class ComptabiliteDTO {
     private VentesDTO ventes;
     private FacturationDTO facturation;
     private DepensesDTO depenses;
+    private DepensesGeneralesDTO depensesGenerales;
     private List<BoutiqueInfoDTO> boutiques;
     private List<BoutiqueDisponibleDTO> boutiquesDisponibles;
     private ClientsDTO clients;
@@ -31,7 +32,10 @@ public class ComptabiliteDTO {
         private Double totalVentes;
         private Double totalFactures;
         private Double totalPaiementsFactures;
-        private Double soldeDisponible;
+        private Double totalDepensesGenerales;
+        private Double depensesGeneralesDuJour;
+        private Double depensesGeneralesDuMois;
+        private Double depensesGeneralesDeLAnnee;
         private List<VenteCADetail> ventesDetails;
         private List<FactureDetail> factureDetails;
         private Integer nombreFacturesReelles;
@@ -113,10 +117,6 @@ public class ComptabiliteDTO {
     public static class DepensesDTO {
         private Integer nombreTotal;
         private Double montantTotal;
-        private Integer nombreDepensesCaisses;
-        private Double montantDepensesCaisses;
-        private Integer nombreDepensesGenerales;
-        private Double montantDepensesGenerales;
         private Integer duJour;
         private Double montantDuJour;
         private Integer duMois;
@@ -134,7 +134,42 @@ public class ComptabiliteDTO {
         private String libelle;
         private String methode;
         private Double montant;
-        private String type;
+    }
+
+    @Data
+    @AllArgsConstructor
+    @NoArgsConstructor
+    public static class DepensesGeneralesDTO {
+        private Integer nombreTotal;
+        private Double montantTotal;
+        private Integer duJour;
+        private Double montantDuJour;
+        private Integer duMois;
+        private Double montantDuMois;
+        private Integer deLAnnee;
+        private Double montantDeLAnnee;
+        private List<DepenseGeneraleDetail> details;
+    }
+
+    @Data
+    @AllArgsConstructor
+    @NoArgsConstructor
+    public static class DepenseGeneraleDetail {
+        private Long id;
+        private String designation;
+        private String categorieNom;
+        private Double prixUnitaire;
+        private Integer quantite;
+        private Double montant;
+        private String source;
+        private String ordonnateur;
+        private String numeroCheque;
+        private String typeCharge;
+        private String produitNom;
+        private String fournisseurNom;
+        private String pieceJointe;
+        private java.time.LocalDateTime dateCreation;
+        private String creeParNom;
     }
 
     @Data
