@@ -454,6 +454,9 @@ public class FactureProformaService {
         if (modifications.getStatut() == StatutFactureProForma.VALIDE && facture.getStatut() != StatutFactureProForma.VALIDE) {
             // On récupère et enregistre le validateur
             facture.setUtilisateurValidateur(user);
+            
+            // Mettre à jour le statut à VALIDE
+            facture.setStatut(StatutFactureProForma.VALIDE);
 
             FactureReelle factureReelle = factureReelleService.genererFactureReelle(facture);
             System.out.println("✅ Facture Réelle générée avec succès : " + factureReelle.getNumeroFacture());
@@ -503,6 +506,9 @@ public class FactureProformaService {
             } else {
                 System.out.println("ℹ Facture déjà approuvée une fois. Appropriation directe autorisée.");
             }
+
+            // Mettre à jour le statut à APPROUVE
+            facture.setStatut(StatutFactureProForma.APPROUVE);
 
             factProHistoriqueService.enregistrerActionHistorique(
                     facture,
@@ -587,6 +593,9 @@ public class FactureProformaService {
             // Notifications
             globalNotificationService.notifyRecipients(approbateurs, msgAppro);
             globalNotificationService.notifySingle(user, msgSender);
+
+            // Mettre à jour le statut à APPROBATION
+            facture.setStatut(StatutFactureProForma.APPROBATION);
 
             // Historique
             factProHistoriqueService.enregistrerActionHistorique(
@@ -702,16 +711,18 @@ public class FactureProformaService {
         facture.setTva(tvaActive);
         facture.setTotalFacture(montantTotalAPayer);
 
-        // ✅ Mise à jour du statut (hors VALIDÉ déjà traité)
-//        if (modifications.getStatut() != null && facture.getStatut() != StatutFactureProForma.VALIDE) {
-//            facture.setStatut(modifications.getStatut());
-//        }
-
-        if (modifications.getStatut() != null && facture.getStatut() != StatutFactureProForma.VALIDE) {
-            // Ne change le statut que si ce n'est pas une facture APPROUVE, ou si le changement est explicite
-            if (facture.getStatut() != StatutFactureProForma.APPROUVE || modifications.getStatut() == StatutFactureProForma.ANNULE) {
-                facture.setStatut(modifications.getStatut());
-            }
+        // ✅ Mise à jour du statut (hors VALIDÉ et autres statuts déjà traités ci-dessus)
+     
+        if (modifications.getStatut() != null 
+                && facture.getStatut() != StatutFactureProForma.VALIDE
+                && modifications.getStatut() != StatutFactureProForma.VALIDE
+                && modifications.getStatut() != StatutFactureProForma.APPROUVE
+                && modifications.getStatut() != StatutFactureProForma.APPROBATION
+                && modifications.getStatut() != StatutFactureProForma.ENVOYE
+                && modifications.getStatut() != StatutFactureProForma.BROUILLON
+                && modifications.getStatut() != StatutFactureProForma.ANNULE) {
+            // Pour les autres statuts non gérés ci-dessus, on change le statut normalement
+            facture.setStatut(modifications.getStatut());
         }
 
         // 📝 Enregistrement de l'action "Modification" uniquement si le montant a changé
