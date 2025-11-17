@@ -4,8 +4,11 @@ import com.xpertcash.DTOs.TresorerieDTO;
 import com.xpertcash.entity.*;
 import com.xpertcash.entity.Enum.SourceDepense;
 import com.xpertcash.entity.VENTE.*;
+import com.xpertcash.exceptions.BusinessException;
 import com.xpertcash.repository.*;
 import com.xpertcash.repository.VENTE.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -17,6 +20,8 @@ import java.util.stream.Collectors;
 
 @Service
 public class TresorerieService {
+
+    private static final Logger logger = LoggerFactory.getLogger(TresorerieService.class);
 
     @Autowired
     private AuthenticationHelper authHelper;
@@ -48,45 +53,57 @@ public class TresorerieService {
     @Transactional(readOnly = true)
     public TresorerieDTO calculerTresorerie(HttpServletRequest request) {
         Long entrepriseId = validerEntreprise(request);
-        TresorerieData data = chargerDonnees(entrepriseId);
-        TresorerieDTO tresorerie = new TresorerieDTO();
+        return calculerTresorerieParEntrepriseId(entrepriseId);
+    }
 
-        TresorerieDTO.CaisseDetail caisseDetail = calculerCaisse(data);
-        tresorerie.setCaisseDetail(caisseDetail);
-        tresorerie.setMontantCaisse(caisseDetail.getMontantTotal());
+    @Transactional(readOnly = true)
+    public TresorerieDTO calculerTresorerieParEntrepriseId(Long entrepriseId) {
+        try {
+            TresorerieData data = chargerDonnees(entrepriseId);
+            TresorerieDTO tresorerie = new TresorerieDTO();
 
-        TresorerieDTO.BanqueDetail banqueDetail = calculerBanque(data);
-        tresorerie.setBanqueDetail(banqueDetail);
-        tresorerie.setMontantBanque(banqueDetail.getSolde());
+            TresorerieDTO.CaisseDetail caisseDetail = calculerCaisse(data);
+            tresorerie.setCaisseDetail(caisseDetail);
+            tresorerie.setMontantCaisse(caisseDetail.getMontantTotal());
 
-        TresorerieDTO.MobileMoneyDetail mobileMoneyDetail = calculerMobileMoney(data);
-        tresorerie.setMobileMoneyDetail(mobileMoneyDetail);
-        tresorerie.setMontantMobileMoney(mobileMoneyDetail.getSolde());
+            TresorerieDTO.BanqueDetail banqueDetail = calculerBanque(data);
+            tresorerie.setBanqueDetail(banqueDetail);
+            tresorerie.setMontantBanque(banqueDetail.getSolde());
 
-        TresorerieDTO.DetteDetail detteDetail = calculerDette(data);
-        tresorerie.setDetteDetail(detteDetail);
-        tresorerie.setMontantDette(detteDetail.getTotal());
+            TresorerieDTO.MobileMoneyDetail mobileMoneyDetail = calculerMobileMoney(data);
+            tresorerie.setMobileMoneyDetail(mobileMoneyDetail);
+            tresorerie.setMontantMobileMoney(mobileMoneyDetail.getSolde());
 
-        tresorerie.setTotalTresorerie(
-            tresorerie.getMontantCaisse() + 
-            tresorerie.getMontantBanque() + 
-            tresorerie.getMontantMobileMoney()
-        );
+            TresorerieDTO.DetteDetail detteDetail = calculerDette(data);
+            tresorerie.setDetteDetail(detteDetail);
+            tresorerie.setMontantDette(detteDetail.getTotal());
 
-        return tresorerie;
+            tresorerie.setTotalTresorerie(
+                tresorerie.getMontantCaisse() + 
+                tresorerie.getMontantBanque() + 
+                tresorerie.getMontantMobileMoney()
+            );
+
+            return tresorerie;
+        } catch (BusinessException e) {
+            throw e;
+        } catch (Exception e) {
+            logger.error("Erreur lors du calcul de la trésorerie pour l'entreprise {}", entrepriseId, e);
+            throw new BusinessException("Erreur lors du calcul de la trésorerie : " + e.getMessage());
+        }
     }
 
     private Long validerEntreprise(HttpServletRequest request) {
         User user = authHelper.getAuthenticatedUserWithFallback(request);
         if (user.getEntreprise() == null) {
-            throw new RuntimeException("Vous n'êtes associé à aucune entreprise.");
+            throw new BusinessException("Vous n'êtes associé à aucune entreprise.");
         }
         return user.getEntreprise().getId();
     }
 
     private static class TresorerieData {
         final List<Long> boutiqueIds;
-        final List<Caisse> caissesOuvertes;
+        final List<Caisse> caissesFermees;
         final List<Vente> toutesVentes;
         final Map<Long, Double> remboursementsParVente;
         final List<FactureReelle> factures;
@@ -95,13 +112,13 @@ public class TresorerieService {
         final List<MouvementCaisse> mouvementsDepense;
         final List<MouvementCaisse> mouvementsRetrait;
 
-        TresorerieData(List<Long> boutiqueIds, List<Caisse> caissesOuvertes,
+        TresorerieData(List<Long> boutiqueIds, List<Caisse> caissesFermees,
                       List<Vente> toutesVentes, Map<Long, Double> remboursementsParVente,
                       List<FactureReelle> factures, Map<Long, BigDecimal> paiementsParFacture,
                       List<DepenseGenerale> depensesGenerales, List<MouvementCaisse> mouvementsDepense,
                       List<MouvementCaisse> mouvementsRetrait) {
             this.boutiqueIds = boutiqueIds;
-            this.caissesOuvertes = caissesOuvertes;
+            this.caissesFermees = caissesFermees;
             this.toutesVentes = toutesVentes;
             this.remboursementsParVente = remboursementsParVente;
             this.factures = factures;
@@ -118,7 +135,7 @@ public class TresorerieService {
                 .map(Boutique::getId)
                 .collect(Collectors.toList());
 
-        List<Caisse> caissesOuvertes = chargerCaissesOuvertes(boutiqueIds);
+        List<Caisse> caissesFermees = chargerCaissesFermees(entrepriseId);
         List<Vente> toutesVentes = venteRepository.findAllByEntrepriseId(entrepriseId);
         Map<Long, Double> remboursementsParVente = calculerRemboursementsParVente(toutesVentes);
         List<FactureReelle> factures = factureReelleRepository.findByEntrepriseId(entrepriseId);
@@ -129,20 +146,13 @@ public class TresorerieService {
         List<MouvementCaisse> mouvementsRetrait = mouvementCaisseRepository
                 .findByCaisse_Boutique_Entreprise_IdAndTypeMouvement(entrepriseId, TypeMouvementCaisse.RETRAIT);
 
-        return new TresorerieData(boutiqueIds, caissesOuvertes, toutesVentes,
+        return new TresorerieData(boutiqueIds, caissesFermees, toutesVentes,
                 remboursementsParVente, factures, paiementsParFacture, depensesGenerales,
                 mouvementsDepense, mouvementsRetrait);
     }
 
-    private List<Caisse> chargerCaissesOuvertes(List<Long> boutiqueIds) {
-        if (boutiqueIds.isEmpty()) {
-            return Collections.emptyList();
-        }
-        return caisseRepository.findAll().stream()
-                .filter(c -> c.getStatut() == StatutCaisse.OUVERTE
-                        && c.getBoutique() != null
-                        && boutiqueIds.contains(c.getBoutique().getId()))
-                .collect(Collectors.toList());
+    private List<Caisse> chargerCaissesFermees(Long entrepriseId) {
+        return caisseRepository.findByEntrepriseIdAndStatut(entrepriseId, StatutCaisse.FERMEE);
     }
 
     private Map<Long, Double> calculerRemboursementsParVente(List<Vente> ventes) {
@@ -185,13 +195,13 @@ public class TresorerieService {
             return creerCaisseDetailVide();
         }
 
-        double montantTotalCaisse = calculerMontantTotalCaisses(data.caissesOuvertes);
+        double montantTotalCaisse = calculerMontantTotalCaisses(data.caissesFermees);
         double entrees = calculerEntreesVentes(data.toutesVentes, data.remboursementsParVente,
                 ModePaiement.ESPECES);
         double sorties = calculerSortiesCaisse(data);
 
         TresorerieDTO.CaisseDetail detail = new TresorerieDTO.CaisseDetail();
-        detail.setNombreCaissesOuvertes(data.caissesOuvertes.size());
+        detail.setNombreCaissesOuvertes(data.caissesFermees.size());
         detail.setMontantTotal(montantTotalCaisse);
         detail.setEntrees(entrees);
         detail.setSorties(sorties);

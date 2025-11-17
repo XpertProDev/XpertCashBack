@@ -2,11 +2,12 @@ package com.xpertcash.repository.VENTE;
 
 import com.xpertcash.entity.Caisse;
 import com.xpertcash.entity.VENTE.StatutCaisse;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 import java.util.Optional;
-
-import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface CaisseRepository extends JpaRepository<Caisse, Long> {
 
@@ -32,5 +33,11 @@ public interface CaisseRepository extends JpaRepository<Caisse, Long> {
     List<Caisse> findByVendeurIdAndBoutiqueId(Long vendeurId, Long boutiqueId);
     
     List<Caisse> findByVendeur_Id(Long vendeurId);
+
+    @Query("SELECT c FROM Caisse c WHERE c.boutique.entreprise.id = :entrepriseId AND c.statut = :statut")
+    List<Caisse> findByEntrepriseIdAndStatut(@Param("entrepriseId") Long entrepriseId, @Param("statut") StatutCaisse statut);
+
+    @Query("SELECT c FROM Caisse c WHERE c.boutique.entreprise.id = :entrepriseId AND c.statut = :statut ORDER BY c.dateFermeture DESC")
+    List<Caisse> findByEntrepriseIdAndStatutOrderByDateFermetureDesc(@Param("entrepriseId") Long entrepriseId, @Param("statut") StatutCaisse statut);
 
 }

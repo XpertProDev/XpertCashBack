@@ -62,7 +62,7 @@ public class TresorerieDTO {
     @NoArgsConstructor
     public static class CaisseDetail {
         /**
-         * Nombre de caisses ouvertes
+         * Nombre de caisses fermées (seules les caisses fermées sont comptabilisées dans la trésorerie)
          */
         private Integer nombreCaissesOuvertes;
         
