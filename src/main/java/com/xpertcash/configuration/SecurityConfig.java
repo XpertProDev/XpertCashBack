@@ -27,8 +27,9 @@ public class SecurityConfig {
                         // on stocke le token dans un cookie lisible par JS
                         .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
                         // on ignore CSRF pour WS et pour toute l'API d'auth
+                        // WebSocket désactivé - /ws/** retiré
                         .ignoringRequestMatchers(
-                                new AntPathRequestMatcher("/ws/**"),
+                                // new AntPathRequestMatcher("/ws/**"),
                                 new AntPathRequestMatcher("/api/auth/**")
                         )
                 )

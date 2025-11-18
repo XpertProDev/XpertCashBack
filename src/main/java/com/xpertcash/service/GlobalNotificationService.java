@@ -1,12 +1,12 @@
 package com.xpertcash.service;
 
-import com.xpertcash.DTOs.GlobalNotificationDto;
+// WebSocket désactivé - import commenté
+// import com.xpertcash.DTOs.GlobalNotificationDto;
 import com.xpertcash.entity.GlobalNotification;
 import com.xpertcash.entity.User;
 import com.xpertcash.repository.GlobalNotificationRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -16,13 +16,10 @@ import java.util.List;
 public class GlobalNotificationService {
 
     private final GlobalNotificationRepository notificationRepo;
-    private final SimpMessagingTemplate messagingTemplate;
     private static final Logger log = LoggerFactory.getLogger(GlobalNotificationService.class);
 
-    public GlobalNotificationService(GlobalNotificationRepository notificationRepo,
-                                     SimpMessagingTemplate messagingTemplate) {
+    public GlobalNotificationService(GlobalNotificationRepository notificationRepo) {
         this.notificationRepo = notificationRepo;
-        this.messagingTemplate = messagingTemplate;
     }
 
     @Transactional
@@ -31,11 +28,12 @@ public class GlobalNotificationService {
             log.info("Envoi notification à: {} | Message: {}", user.getEmail(), message);
             GlobalNotification notif = new GlobalNotification(user, message);
             notificationRepo.save(notif);
-            messagingTemplate.convertAndSendToUser(
-                    user.getId().toString(),
-                    "/queue/notifications",
-                    new GlobalNotificationDto(notif)
-            );
+            // WebSocket désactivé - notification sauvegardée en base uniquement
+            // messagingTemplate.convertAndSendToUser(
+            //         user.getId().toString(),
+            //         "/queue/notifications",
+            //         new GlobalNotificationDto(notif)
+            // );
         });
     }
 
@@ -43,11 +41,12 @@ public class GlobalNotificationService {
     public void notifySingle(User recipient, String message) {
         GlobalNotification notif = new GlobalNotification(recipient, message);
         notificationRepo.save(notif);
-        messagingTemplate.convertAndSendToUser(
-                recipient.getId().toString(),
-                "/queue/notifications",
-                new GlobalNotificationDto(notif)
-        );
+        // WebSocket désactivé - notification sauvegardée en base uniquement
+        // messagingTemplate.convertAndSendToUser(
+        //         recipient.getId().toString(),
+        //         "/queue/notifications",
+        //         new GlobalNotificationDto(notif)
+        // );
     }
 
 
