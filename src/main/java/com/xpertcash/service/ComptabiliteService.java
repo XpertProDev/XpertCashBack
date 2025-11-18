@@ -16,6 +16,9 @@ import org.springframework.transaction.annotation.Transactional;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.time.LocalTime;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -678,6 +681,7 @@ public class ComptabiliteService {
     private ComptabiliteDTO.DepenseGeneraleDetail mapToDepenseGeneraleDetail(DepenseGenerale depense) {
         ComptabiliteDTO.DepenseGeneraleDetail detail = new ComptabiliteDTO.DepenseGeneraleDetail();
         detail.setId(depense.getId());
+        detail.setNumero(depense.getNumero());
         detail.setDesignation(depense.getDesignation());
         detail.setCategorieNom(depense.getCategorie() != null ? depense.getCategorie().getNom() : null);
         detail.setPrixUnitaire(depense.getPrixUnitaire());
@@ -1386,6 +1390,55 @@ public class ComptabiliteService {
     }
 
     /**
+     * Génère un numéro unique pour une dépense générale au format "DP: 001-11-2025"
+     * Le compteur est réinitialisé chaque mois
+     */
+    private String genererNumeroDepense(Long entrepriseId) {
+        LocalDate currentDate = LocalDate.now();
+        int month = currentDate.getMonthValue();
+        int year = currentDate.getYear();
+        
+        // Récupérer les dépenses du mois en cours
+        List<DepenseGenerale> depensesDuMois = depenseGeneraleRepository
+                .findByEntrepriseIdAndMonthAndYear(entrepriseId, month, year);
+        
+        long newIndex = 1;
+        
+        if (!depensesDuMois.isEmpty()) {
+            String lastNumero = depensesDuMois.get(0).getNumero();
+            
+            if (lastNumero != null && !lastNumero.isEmpty()) {
+                Pattern pattern = Pattern.compile("DP:\\s*(\\d+)-");
+                Matcher matcher = pattern.matcher(lastNumero);
+                
+                if (matcher.find()) {
+                    try {
+                        newIndex = Long.parseLong(matcher.group(1)) + 1;
+                    } catch (NumberFormatException e) {
+                        throw new RuntimeException("Impossible de parser l'index numérique dans le numéro : " + lastNumero, e);
+                    }
+                } else {
+                    Pattern fallbackPattern = Pattern.compile("(\\d+)");
+                    Matcher fallbackMatcher = fallbackPattern.matcher(lastNumero);
+                    if (fallbackMatcher.find()) {
+                        try {
+                            newIndex = Long.parseLong(fallbackMatcher.group(1)) + 1;
+                        } catch (NumberFormatException e) {
+                            newIndex = 1;
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Formater le numéro : "DP: 001-11-2025"
+        String indexFormate = String.format("%03d", newIndex);
+        String formattedDate = currentDate.format(DateTimeFormatter.ofPattern("MM-yyyy"));
+        
+        return "DP: " + indexFormate + "-" + formattedDate;
+    }
+
+    /**
      * Crée une entité DepenseGenerale à partir du DTO
      */
     private DepenseGenerale createDepenseGenerale(
@@ -1399,6 +1452,11 @@ public class ComptabiliteService {
             Fournisseur fournisseur) {
         
         DepenseGenerale depense = new DepenseGenerale();
+        
+        // Générer le numéro unique avant de sauvegarder
+        String numero = genererNumeroDepense(user.getEntreprise().getId());
+        depense.setNumero(numero);
+        
         depense.setDesignation(request.getDesignation().trim());
         depense.setCategorie(categorie);
         depense.setPrixUnitaire(request.getPrixUnitaire());
@@ -1423,6 +1481,7 @@ public class ComptabiliteService {
     private DepenseGeneraleResponseDTO mapDepenseGeneraleToResponse(DepenseGenerale depense) {
         DepenseGeneraleResponseDTO dto = new DepenseGeneraleResponseDTO();
         dto.setId(depense.getId());
+        dto.setNumero(depense.getNumero());
         dto.setDesignation(depense.getDesignation());
         if (depense.getCategorie() != null) {
             dto.setCategorieId(depense.getCategorie().getId());

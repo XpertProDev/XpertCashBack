@@ -29,9 +29,8 @@ public class Interaction {
 
     @Column(length = 2000)
     private String notes;
-    private String assignedTo; // commercial qui a fait l'action
-
-    private LocalDateTime nextFollowUp; // nullable
+    private String assignedTo;
+    private LocalDateTime nextFollowUp;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "prospect_id")

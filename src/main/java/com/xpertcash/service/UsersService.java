@@ -582,7 +582,6 @@ public class UsersService {
                 User savedUser = usersRepository.save(newUser);
 
                 // Envoi de l'email avec les identifiants
-                // Essayer d'envoyer l'email, mais ne pas faire échouer la création si ça échoue
                 try {
                     mailService.sendEmployeEmail(
                         savedUser.getEmail(),
@@ -594,11 +593,10 @@ public class UsersService {
                         savedUser.getPersonalCode()
 
                     );
-                } catch (Exception e) {
-                    System.err.println("⚠️ Erreur lors de l'envoi de l'email à " + savedUser.getEmail() + " : " + e.getMessage());
+                } catch (MessagingException e) {
+                    System.err.println("Erreur lors de l'envoi de l'email à " + savedUser.getEmail() + " : " + e.getMessage());
                     e.printStackTrace();
-                    // Ne pas faire échouer la création de l'utilisateur si l'email échoue
-                    // L'utilisateur a été créé avec succès, seul l'envoi de l'email a échoué
+                    throw new RuntimeException("Utilisateur créé mais une erreur est survenue lors de l'envoi de l'email.", e);
                 }
                 return savedUser;
             }
