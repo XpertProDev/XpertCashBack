@@ -118,6 +118,12 @@ public class TransfertFondsService {
         if (request.getMotif().length() > 500) {
             throw new BusinessException("Le motif ne peut pas dépasser 500 caractères.");
         }
+        if (request.getPersonneALivrer() == null || request.getPersonneALivrer().trim().isEmpty()) {
+            throw new BusinessException("La personne à livrer est obligatoire.");
+        }
+        if (request.getPersonneALivrer().length() > 500) {
+            throw new BusinessException("La personne à livrer ne peut pas dépasser 500 caractères.");
+        }
     }
 
     private SourceTresorerie parseSourceTresorerie(String source) {
@@ -167,6 +173,7 @@ public class TransfertFondsService {
         transfert.setSource(source);
         transfert.setDestination(destination);
         transfert.setMotif(request.getMotif().trim());
+        transfert.setPersonneALivrer(request.getPersonneALivrer().trim());
         transfert.setEntreprise(user.getEntreprise());
         transfert.setCreePar(user);
         return transfert;
@@ -257,6 +264,7 @@ public class TransfertFondsService {
         dto.setDe(transfert.getSource().name());
         dto.setVers(transfert.getDestination().name());
         dto.setMontant(transfert.getMontant());
+        dto.setPersonneALivrer(transfert.getPersonneALivrer());
         return dto;
     }
 }

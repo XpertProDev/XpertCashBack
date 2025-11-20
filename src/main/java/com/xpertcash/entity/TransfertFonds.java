@@ -29,6 +29,9 @@ public class TransfertFonds {
     @Column(nullable = false, length = 500)
     private String motif;
 
+    @Column(nullable = false, length = 500)
+    private String personneALivrer;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "entreprise_id", nullable = false)
     private Entreprise entreprise;

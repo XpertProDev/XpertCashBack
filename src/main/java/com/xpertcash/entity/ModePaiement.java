@@ -6,5 +6,6 @@ public enum ModePaiement {
     MOBILE_MONEY,
     CHEQUE,
     VIREMENT,
+    RETRAIT,
     AUTRE
 }

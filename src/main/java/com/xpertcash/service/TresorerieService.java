@@ -45,6 +45,9 @@ public class TresorerieService {
     private DepenseGeneraleRepository depenseGeneraleRepository;
 
     @Autowired
+    private EntreeGeneraleRepository entreeGeneraleRepository;
+
+    @Autowired
     private MouvementCaisseRepository mouvementCaisseRepository;
 
     @Autowired
@@ -109,14 +112,15 @@ public class TresorerieService {
         final List<FactureReelle> factures;
         final Map<Long, BigDecimal> paiementsParFacture;
         final List<DepenseGenerale> depensesGenerales;
+        final List<EntreeGenerale> entreesGenerales;
         final List<MouvementCaisse> mouvementsDepense;
         final List<MouvementCaisse> mouvementsRetrait;
 
         TresorerieData(List<Long> boutiqueIds, List<Caisse> caissesFermees,
                       List<Vente> toutesVentes, Map<Long, Double> remboursementsParVente,
                       List<FactureReelle> factures, Map<Long, BigDecimal> paiementsParFacture,
-                      List<DepenseGenerale> depensesGenerales, List<MouvementCaisse> mouvementsDepense,
-                      List<MouvementCaisse> mouvementsRetrait) {
+                      List<DepenseGenerale> depensesGenerales, List<EntreeGenerale> entreesGenerales,
+                      List<MouvementCaisse> mouvementsDepense, List<MouvementCaisse> mouvementsRetrait) {
             this.boutiqueIds = boutiqueIds;
             this.caissesFermees = caissesFermees;
             this.toutesVentes = toutesVentes;
@@ -124,6 +128,7 @@ public class TresorerieService {
             this.factures = factures;
             this.paiementsParFacture = paiementsParFacture;
             this.depensesGenerales = depensesGenerales;
+            this.entreesGenerales = entreesGenerales;
             this.mouvementsDepense = mouvementsDepense;
             this.mouvementsRetrait = mouvementsRetrait;
         }
@@ -141,13 +146,14 @@ public class TresorerieService {
         List<FactureReelle> factures = factureReelleRepository.findByEntrepriseId(entrepriseId);
         Map<Long, BigDecimal> paiementsParFacture = chargerPaiementsParFacture(factures);
         List<DepenseGenerale> depensesGenerales = depenseGeneraleRepository.findByEntrepriseId(entrepriseId);
+        List<EntreeGenerale> entreesGenerales = entreeGeneraleRepository.findByEntrepriseId(entrepriseId);
         List<MouvementCaisse> mouvementsDepense = mouvementCaisseRepository
                 .findByCaisse_Boutique_Entreprise_IdAndTypeMouvement(entrepriseId, TypeMouvementCaisse.DEPENSE);
         List<MouvementCaisse> mouvementsRetrait = mouvementCaisseRepository
                 .findByCaisse_Boutique_Entreprise_IdAndTypeMouvement(entrepriseId, TypeMouvementCaisse.RETRAIT);
 
         return new TresorerieData(boutiqueIds, caissesFermees, toutesVentes,
-                remboursementsParVente, factures, paiementsParFacture, depensesGenerales,
+                remboursementsParVente, factures, paiementsParFacture, depensesGenerales, entreesGenerales,
                 mouvementsDepense, mouvementsRetrait);
     }
 
@@ -196,8 +202,10 @@ public class TresorerieService {
         }
 
         double montantTotalCaisse = calculerMontantTotalCaisses(data.caissesFermees);
-        double entrees = calculerEntreesVentes(data.toutesVentes, data.remboursementsParVente,
+        double entreesVentes = calculerEntreesVentes(data.toutesVentes, data.remboursementsParVente,
                 ModePaiement.ESPECES);
+        double entreesGeneralesCaisse = calculerEntreesGeneralesCaisse(data);
+        double entrees = entreesVentes + entreesGeneralesCaisse;
         double sorties = calculerSortiesCaisse(data);
 
         TresorerieDTO.CaisseDetail detail = new TresorerieDTO.CaisseDetail();
@@ -272,7 +280,8 @@ public class TresorerieService {
                                                                           ModePaiement modePaiement2) {
         double entreesVentes = calculerEntreesVentesBanqueOuMobileMoney(data, modePaiement1, modePaiement2);
         double entreesPaiements = calculerEntreesPaiementsFactures(data, modePaiement1, modePaiement2);
-        double entrees = entreesVentes + entreesPaiements;
+        double entreesGenerales = calculerEntreesGeneralesParSource(data, sourceDepense);
+        double entrees = entreesVentes + entreesPaiements + entreesGenerales;
 
         double sortiesDepenses = data.depensesGenerales.stream()
                 .filter(d -> d.getSource() == sourceDepense)
@@ -384,6 +393,20 @@ public class TresorerieService {
         detail.setEntrees(0.0);
         detail.setSorties(0.0);
         return detail;
+    }
+
+    private double calculerEntreesGeneralesCaisse(TresorerieData data) {
+        return data.entreesGenerales.stream()
+                .filter(e -> e.getSource() == SourceDepense.CAISSE)
+                .mapToDouble(e -> getValeurDouble(e.getMontant()))
+                .sum();
+    }
+
+    private double calculerEntreesGeneralesParSource(TresorerieData data, SourceDepense sourceDepense) {
+        return data.entreesGenerales.stream()
+                .filter(e -> e.getSource() == sourceDepense)
+                .mapToDouble(e -> getValeurDouble(e.getMontant()))
+                .sum();
     }
 
     private double getValeurDouble(Double value) {

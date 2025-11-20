@@ -8,5 +8,6 @@ public class TransfertFondsRequestDTO {
     private String source;
     private String destination;
     private String motif;
+    private String personneALivrer;
 }
 
