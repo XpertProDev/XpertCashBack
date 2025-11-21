@@ -16,5 +16,6 @@ public class TransfertFondsResponseDTO {
     private String de;
     private String vers;
     private Double montant;
+    private String personneALivrer;
 }
 

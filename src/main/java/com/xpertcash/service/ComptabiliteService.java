@@ -2,8 +2,11 @@ package com.xpertcash.service;
 
 import com.xpertcash.DTOs.ComptabiliteDTO;
 import com.xpertcash.DTOs.CategorieDepenseDTO;
+import com.xpertcash.DTOs.CategorieEntreeDTO;
 import com.xpertcash.DTOs.DepenseGeneraleRequestDTO;
 import com.xpertcash.DTOs.DepenseGeneraleResponseDTO;
+import com.xpertcash.DTOs.EntreeGeneraleRequestDTO;
+import com.xpertcash.DTOs.EntreeGeneraleResponseDTO;
 import com.xpertcash.entity.*;
 import com.xpertcash.entity.Enum.*;
 import com.xpertcash.entity.VENTE.*;
@@ -75,10 +78,16 @@ public class ComptabiliteService {
     private CategorieDepenseRepository categorieDepenseRepository;
 
     @Autowired
+    private CategorieEntreeRepository categorieEntreeRepository;
+
+    @Autowired
     private ProduitRepository produitRepository;
 
     @Autowired
     private FournisseurRepository fournisseurRepository;
+
+    @Autowired
+    private EntreeGeneraleRepository entreeGeneraleRepository;
 
     /**
      * Récupère toutes les données comptables de l'entreprise
@@ -1261,6 +1270,42 @@ public class ComptabiliteService {
                 .collect(Collectors.toList());
     }
 
+    @Transactional
+    public CategorieEntreeDTO creerCategorieEntree(String nom, String description, HttpServletRequest httpRequest) {
+        User user = validateComptabilitePermission(httpRequest);
+        
+        if (nom == null || nom.trim().isEmpty()) {
+            throw new RuntimeException("Le nom de la catégorie est obligatoire.");
+        }
+        
+        String nomTrim = nom.trim();
+        if (categorieEntreeRepository.existsByNomAndEntrepriseId(nomTrim, user.getEntreprise().getId())) {
+            throw new RuntimeException("Une catégorie avec ce nom existe déjà.");
+        }
+
+        CategorieEntree categorie = new CategorieEntree();
+        categorie.setNom(nomTrim);
+        categorie.setDescription(description != null ? description.trim() : null);
+        categorie.setEntreprise(user.getEntreprise());
+        
+        categorie = categorieEntreeRepository.save(categorie);
+        return mapCategorieEntreeToDTO(categorie);
+    }
+
+    @Transactional(readOnly = true)
+    public List<CategorieEntreeDTO> listerCategoriesEntree(HttpServletRequest httpRequest) {
+        User user = authHelper.getAuthenticatedUserWithFallback(httpRequest);
+        
+        if (user.getEntreprise() == null) {
+            throw new RuntimeException("Vous n'êtes associé à aucune entreprise.");
+        }
+
+        List<CategorieEntree> categories = categorieEntreeRepository.findByEntrepriseId(user.getEntreprise().getId());
+        return categories.stream()
+                .map(this::mapCategorieEntreeToDTO)
+                .collect(Collectors.toList());
+    }
+
     // ========== Méthodes utilitaires privées pour les dépenses générales ==========
 
     /**
@@ -1387,6 +1432,24 @@ public class ComptabiliteService {
         }
         
         return fournisseur;
+    }
+
+    /**
+     * Valide et récupère un responsable
+     */
+    private User validateResponsable(Long responsableId, User user) {
+        if (responsableId == null) {
+            throw new RuntimeException("Le responsable est obligatoire.");
+        }
+        
+        User responsable = usersRepository.findById(responsableId)
+                .orElseThrow(() -> new RuntimeException("Responsable non trouvé."));
+        
+        if (responsable.getEntreprise() == null || !responsable.getEntreprise().getId().equals(user.getEntreprise().getId())) {
+            throw new RuntimeException("Le responsable n'appartient pas à votre entreprise.");
+        }
+        
+        return responsable;
     }
 
     /**
@@ -1522,6 +1585,242 @@ public class ComptabiliteService {
      */
     private CategorieDepenseDTO mapCategorieDepenseToDTO(CategorieDepense categorie) {
         CategorieDepenseDTO dto = new CategorieDepenseDTO();
+        dto.setId(categorie.getId());
+        dto.setNom(categorie.getNom());
+        dto.setDescription(categorie.getDescription());
+        if (categorie.getEntreprise() != null) {
+            dto.setEntrepriseId(categorie.getEntreprise().getId());
+        }
+        dto.setCreatedAt(categorie.getCreatedAt());
+        return dto;
+    }
+
+    /**
+     * Crée une entrée générale pour l'entreprise.
+     */
+    @Transactional
+    public EntreeGeneraleResponseDTO creerEntreeGenerale(EntreeGeneraleRequestDTO request, HttpServletRequest httpRequest) {
+        User user = validateComptabilitePermission(httpRequest);
+        validateEntreeRequest(request);
+        
+        CategorieEntree categorie = getOrCreateCategorieEntree(request, user);
+        SourceDepense source = parseEnum(SourceDepense.class, request.getSource(), "Source");
+        
+        ModePaiement modeEntree = null;
+        String numeroModeEntree = null;
+        
+        if (source == SourceDepense.BANQUE) {
+            if (request.getModeEntree() == null || request.getModeEntree().trim().isEmpty()) {
+                throw new RuntimeException("Le mode d'entrée est obligatoire lorsque la source est BANQUE.");
+            }
+            if (request.getNumeroModeEntree() == null || request.getNumeroModeEntree().trim().isEmpty()) {
+                throw new RuntimeException("Le numéro du mode d'entrée est obligatoire lorsque la source est BANQUE.");
+            }
+            
+            try {
+                modeEntree = ModePaiement.valueOf(request.getModeEntree().trim().toUpperCase());
+                if (modeEntree != ModePaiement.CHEQUE && modeEntree != ModePaiement.VIREMENT && modeEntree != ModePaiement.RETRAIT) {
+                    throw new RuntimeException("Mode d'entrée invalide pour BANQUE : " + request.getModeEntree() + ". Valeurs acceptées : CHEQUE, VIREMENT, RETRAIT");
+                }
+            } catch (IllegalArgumentException e) {
+                throw new RuntimeException("Mode d'entrée invalide : " + request.getModeEntree() + ". Valeurs acceptées : CHEQUE, VIREMENT, RETRAIT");
+            }
+            
+            numeroModeEntree = request.getNumeroModeEntree().trim();
+        } else {
+            if (request.getModeEntree() != null && !request.getModeEntree().trim().isEmpty()) {
+                throw new RuntimeException("Le mode d'entrée ne doit être fourni que lorsque la source est BANQUE.");
+            }
+            if (request.getNumeroModeEntree() != null && !request.getNumeroModeEntree().trim().isEmpty()) {
+                throw new RuntimeException("Le numéro du mode d'entrée ne doit être fourni que lorsque la source est BANQUE.");
+            }
+        }
+        
+        User responsable = validateResponsable(request.getResponsableId(), user);
+        
+        EntreeGenerale entree = createEntreeGenerale(request, user, responsable, categorie, source, modeEntree, numeroModeEntree);
+        entree = entreeGeneraleRepository.save(entree);
+        
+        return mapEntreeGeneraleToResponse(entree);
+    }
+
+    @Transactional(readOnly = true)
+    public List<EntreeGeneraleResponseDTO> listerEntreesGenerales(HttpServletRequest httpRequest) {
+        User user = validateComptabilitePermission(httpRequest);
+        List<EntreeGenerale> entrees = entreeGeneraleRepository.findByEntrepriseIdOrderByDateCreationDesc(user.getEntreprise().getId());
+        return entrees.stream()
+                .map(this::mapEntreeGeneraleToResponse)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Valide les champs obligatoires d'une entrée
+     */
+    private void validateEntreeRequest(EntreeGeneraleRequestDTO request) {
+        if (request.getDesignation() == null || request.getDesignation().trim().isEmpty()) {
+            throw new RuntimeException("La désignation est obligatoire.");
+        }
+        if (request.getPrixUnitaire() == null || request.getPrixUnitaire() <= 0) {
+            throw new RuntimeException("Le prix unitaire doit être supérieur à zéro.");
+        }
+        if (request.getQuantite() == null || request.getQuantite() <= 0) {
+            throw new RuntimeException("La quantité doit être supérieure à zéro.");
+        }
+        if (request.getSource() == null || request.getSource().trim().isEmpty()) {
+            throw new RuntimeException("La source est obligatoire.");
+        }
+        if (request.getResponsableId() == null) {
+            throw new RuntimeException("Le responsable est obligatoire.");
+        }
+    }
+
+    /**
+     * Récupère ou crée une catégorie d'entrée
+     */
+    private CategorieEntree getOrCreateCategorieEntree(EntreeGeneraleRequestDTO request, User user) {
+        if (request.getCategorieId() != null) {
+            return categorieEntreeRepository.findByIdAndEntrepriseId(request.getCategorieId(), user.getEntreprise().getId())
+                    .orElseThrow(() -> new RuntimeException("Catégorie d'entrée non trouvée."));
+        }
+        
+        if (request.getNouvelleCategorieNom() != null && !request.getNouvelleCategorieNom().trim().isEmpty()) {
+            String nomCategorie = request.getNouvelleCategorieNom().trim();
+            CategorieEntree categorie = categorieEntreeRepository.findByNomAndEntrepriseId(nomCategorie, user.getEntreprise().getId())
+                    .orElse(null);
+            
+            if (categorie == null) {
+                categorie = new CategorieEntree();
+                categorie.setNom(nomCategorie);
+                categorie.setEntreprise(user.getEntreprise());
+                categorie = categorieEntreeRepository.save(categorie);
+            }
+            return categorie;
+        }
+        
+        return null;
+    }
+
+    /**
+     * Génère un numéro unique pour une entrée générale au format "EN: 001-11-2025"
+     */
+    private String genererNumeroEntree(Long entrepriseId) {
+        LocalDate currentDate = LocalDate.now();
+        int month = currentDate.getMonthValue();
+        int year = currentDate.getYear();
+        
+        List<EntreeGenerale> entreesDuMois = entreeGeneraleRepository
+                .findByEntrepriseIdAndMonthAndYear(entrepriseId, month, year);
+        
+        long newIndex = 1;
+        
+        if (!entreesDuMois.isEmpty()) {
+            String lastNumero = entreesDuMois.get(0).getNumero();
+            
+            if (lastNumero != null && !lastNumero.isEmpty()) {
+                Pattern pattern = Pattern.compile("EN:\\s*(\\d+)-");
+                Matcher matcher = pattern.matcher(lastNumero);
+                
+                if (matcher.find()) {
+                    try {
+                        newIndex = Long.parseLong(matcher.group(1)) + 1;
+                    } catch (NumberFormatException e) {
+                        throw new RuntimeException("Impossible de parser l'index numérique dans le numéro : " + lastNumero, e);
+                    }
+                } else {
+                    Pattern fallbackPattern = Pattern.compile("(\\d+)");
+                    Matcher fallbackMatcher = fallbackPattern.matcher(lastNumero);
+                    if (fallbackMatcher.find()) {
+                        try {
+                            newIndex = Long.parseLong(fallbackMatcher.group(1)) + 1;
+                        } catch (NumberFormatException e) {
+                            newIndex = 1;
+                        }
+                    }
+                }
+            }
+        }
+        
+        String indexFormate = String.format("%03d", newIndex);
+        String formattedDate = currentDate.format(DateTimeFormatter.ofPattern("MM-yyyy"));
+        
+        return "EN: " + indexFormate + "-" + formattedDate;
+    }
+
+    /**
+     * Crée une entité EntreeGenerale à partir du DTO
+     */
+    private EntreeGenerale createEntreeGenerale(
+            EntreeGeneraleRequestDTO request,
+            User user,
+            User responsable,
+            CategorieEntree categorie,
+            SourceDepense source,
+            ModePaiement modeEntree,
+            String numeroModeEntree) {
+        
+        EntreeGenerale entree = new EntreeGenerale();
+        
+        String numero = genererNumeroEntree(user.getEntreprise().getId());
+        entree.setNumero(numero);
+        
+        entree.setDesignation(request.getDesignation().trim());
+        entree.setCategorie(categorie);
+        entree.setPrixUnitaire(request.getPrixUnitaire());
+        entree.setQuantite(request.getQuantite());
+        entree.setMontant(request.getPrixUnitaire() * request.getQuantite());
+        entree.setSource(source);
+        entree.setModeEntree(modeEntree);
+        entree.setNumeroModeEntree(numeroModeEntree);
+        entree.setPieceJointe(request.getPieceJointe());
+        entree.setEntreprise(user.getEntreprise());
+        entree.setCreePar(user);
+        entree.setResponsable(responsable);
+        
+        return entree;
+    }
+
+    /**
+     * Mappe une EntreeGenerale vers EntreeGeneraleResponseDTO
+     */
+    private EntreeGeneraleResponseDTO mapEntreeGeneraleToResponse(EntreeGenerale entree) {
+        EntreeGeneraleResponseDTO dto = new EntreeGeneraleResponseDTO();
+        dto.setId(entree.getId());
+        dto.setNumero(entree.getNumero());
+        dto.setDesignation(entree.getDesignation());
+        if (entree.getCategorie() != null) {
+            dto.setCategorieId(entree.getCategorie().getId());
+            dto.setCategorieNom(entree.getCategorie().getNom());
+        }
+        dto.setPrixUnitaire(entree.getPrixUnitaire());
+        dto.setQuantite(entree.getQuantite());
+        dto.setMontant(entree.getMontant());
+        dto.setSource(entree.getSource() != null ? entree.getSource().name() : null);
+        dto.setModeEntree(entree.getModeEntree() != null ? entree.getModeEntree().name() : null);
+        dto.setNumeroModeEntree(entree.getNumeroModeEntree());
+        dto.setPieceJointe(entree.getPieceJointe());
+        if (entree.getEntreprise() != null) {
+            dto.setEntrepriseId(entree.getEntreprise().getId());
+            dto.setEntrepriseNom(entree.getEntreprise().getNomEntreprise());
+        }
+        if (entree.getCreePar() != null) {
+            dto.setCreeParId(entree.getCreePar().getId());
+            dto.setCreeParNom(entree.getCreePar().getNomComplet());
+            dto.setCreeParEmail(entree.getCreePar().getEmail());
+        }
+        if (entree.getResponsable() != null) {
+            dto.setResponsableId(entree.getResponsable().getId());
+            dto.setResponsableNom(entree.getResponsable().getNomComplet());
+            dto.setResponsableEmail(entree.getResponsable().getEmail());
+        }
+        dto.setDateCreation(entree.getDateCreation());
+        return dto;
+    }
+
+    /**
+     * Mappe une CategorieEntree vers CategorieEntreeDTO
+     */
+    private CategorieEntreeDTO mapCategorieEntreeToDTO(CategorieEntree categorie) {
+        CategorieEntreeDTO dto = new CategorieEntreeDTO();
         dto.setId(categorie.getId());
         dto.setNom(categorie.getNom());
         dto.setDescription(categorie.getDescription());

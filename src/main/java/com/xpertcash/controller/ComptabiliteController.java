@@ -2,6 +2,7 @@ package com.xpertcash.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.xpertcash.DTOs.DepenseGeneraleRequestDTO;
+import com.xpertcash.DTOs.EntreeGeneraleRequestDTO;
 import com.xpertcash.service.ComptabiliteService;
 import com.xpertcash.service.IMAGES.ImageStorageService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -83,6 +84,42 @@ public class ComptabiliteController {
         return handleRequest(() -> comptabiliteService.listerCategoriesDepense(request));
     }
 
+    @PostMapping("/create/categories-entree")
+    public ResponseEntity<?> creerCategorieEntree(@RequestBody Map<String, String> request, HttpServletRequest httpRequest) {
+        return handleRequest(() -> {
+            String nom = request.get("nom");
+            String description = request.get("description");
+            return comptabiliteService.creerCategorieEntree(nom, description, httpRequest);
+        });
+    }
+
+    @GetMapping("/list/categories-entree")
+    public ResponseEntity<?> listerCategoriesEntree(HttpServletRequest request) {
+        return handleRequest(() -> comptabiliteService.listerCategoriesEntree(request));
+    }
+
+    /**
+     * Crée une entrée générale pour l'entreprise.
+     * Accepte multipart/form-data pour permettre l'upload de pièces jointes.
+     */
+    @PostMapping(value = "/create/entrees-generales", consumes = { MediaType.MULTIPART_FORM_DATA_VALUE })
+    public ResponseEntity<?> creerEntreeGenerale(
+            @RequestParam("entree") String entreeJson,
+            @RequestParam(value = "pieceJointe", required = false) MultipartFile pieceJointeFile,
+            HttpServletRequest httpRequest) {
+        return handleRequest(() -> {
+            EntreeGeneraleRequestDTO request = parseEntreeJson(entreeJson);
+            String pieceJointeUrl = savePieceJointe(pieceJointeFile);
+            request.setPieceJointe(pieceJointeUrl);
+            return comptabiliteService.creerEntreeGenerale(request, httpRequest);
+        });
+    }
+
+    @GetMapping("/list/entrees-generales")
+    public ResponseEntity<?> listerEntreesGenerales(HttpServletRequest request) {
+        return handleRequest(() -> comptabiliteService.listerEntreesGenerales(request));
+    }
+
     // ========== Méthodes utilitaires privées ==========
 
     /**
@@ -150,6 +187,18 @@ public class ComptabiliteController {
             return imageStorageService.saveDepensePieceJointe(pieceJointeFile);
         }
         return null;
+    }
+
+    /**
+     * Parse le JSON d'entrée et corrige les problèmes de format
+     */
+    private EntreeGeneraleRequestDTO parseEntreeJson(String entreeJson) {
+        try {
+            String cleanedJson = cleanJson(entreeJson);
+            return objectMapper.readValue(cleanedJson, EntreeGeneraleRequestDTO.class);
+        } catch (Exception e) {
+            throw new RuntimeException("Format JSON invalide : " + e.getMessage(), e);
+        }
     }
 }
 
