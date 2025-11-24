@@ -17,7 +17,8 @@ public class CategorieResponseDTO {
     private Long id;
     private String nom;
     private long produitCount;
-     private LocalDateTime createdAt;
+    private LocalDateTime createdAt;
+    private String origineCreation;
     private List<ProduitDetailsResponseDTO> produits;
 
     public CategorieResponseDTO(Categorie categorie) {
@@ -25,6 +26,7 @@ public class CategorieResponseDTO {
         this.nom = categorie.getNom();
         this.produitCount = categorie.getProduitCount();
         this.createdAt = categorie.getCreatedAt();
+        this.origineCreation = categorie.getOrigineCreation();
     }
 
     // Setter pour les produits en DTO

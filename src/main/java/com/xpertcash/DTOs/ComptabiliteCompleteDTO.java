@@ -14,7 +14,7 @@ import java.util.List;
 public class ComptabiliteCompleteDTO {
     private List<DepenseGeneraleResponseDTO> depensesGenerales;
     private List<CategorieDepenseDTO> categoriesDepense;
-    private List<CategorieEntreeDTO> categoriesEntree;
+    private List<CategorieResponseDTO> categoriesEntree;
     private List<EntreeGeneraleResponseDTO> entreesGenerales;
     private TransactionSummaryDTO transactionSummary;
     private List<VenteResponse> ventesCaissesFermees;

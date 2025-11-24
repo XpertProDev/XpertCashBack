@@ -13,7 +13,7 @@ import java.util.List;
 public class ComptabiliteCompletePaginatedDTO {
     private List<Object> transactions; // Liste combinée de toutes les transactions paginées
     private List<CategorieDepenseDTO> categoriesDepense;
-    private List<CategorieEntreeDTO> categoriesEntree;
+    private List<CategorieResponseDTO> categoriesEntree;
     private TransactionSummaryDTO transactionSummary;
     
     // Informations de pagination

@@ -13,6 +13,7 @@ public class CategorieEntreeDTO {
     private Long id;
     private String nom;
     private String description;
+    private String origineCreation;
     private Long entrepriseId;
     private LocalDateTime createdAt;
 }

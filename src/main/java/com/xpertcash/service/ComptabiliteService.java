@@ -5,6 +5,7 @@ import com.xpertcash.DTOs.ComptabiliteCompleteDTO;
 import com.xpertcash.DTOs.ComptabiliteCompletePaginatedDTO;
 import com.xpertcash.DTOs.CategorieDepenseDTO;
 import com.xpertcash.DTOs.CategorieEntreeDTO;
+import com.xpertcash.DTOs.CategorieResponseDTO;
 import com.xpertcash.DTOs.DepenseGeneraleRequestDTO;
 import com.xpertcash.DTOs.DepenseGeneraleResponseDTO;
 import com.xpertcash.DTOs.EntreeGeneraleRequestDTO;
@@ -88,7 +89,7 @@ public class ComptabiliteService {
     private CategorieDepenseRepository categorieDepenseRepository;
 
     @Autowired
-    private CategorieEntreeRepository categorieEntreeRepository;
+    private CategorieRepository categorieRepository;
 
     @Autowired
     private ProduitRepository produitRepository;
@@ -104,6 +105,9 @@ public class ComptabiliteService {
 
     @Autowired
     private TransfertFondsService transfertFondsService;
+
+    @Autowired
+    private CategorieService categorieService;
 
     /**
      * Récupère toutes les données comptables de l'entreprise
@@ -1295,32 +1299,27 @@ public class ComptabiliteService {
         }
         
         String nomTrim = nom.trim();
-        if (categorieEntreeRepository.existsByNomAndEntrepriseId(nomTrim, user.getEntreprise().getId())) {
-            throw new RuntimeException("Une catégorie avec ce nom existe déjà.");
+        Categorie categorieExistante = categorieRepository.findByNomAndEntrepriseId(nomTrim, user.getEntreprise().getId());
+        if (categorieExistante != null) {
+            return mapCategorieToCategorieEntreeDTO(categorieExistante);
         }
 
-        CategorieEntree categorie = new CategorieEntree();
+        Categorie categorie = new Categorie();
         categorie.setNom(nomTrim);
-        categorie.setDescription(description != null ? description.trim() : null);
         categorie.setEntreprise(user.getEntreprise());
+        categorie.setCreatedAt(LocalDateTime.now());
+        categorie.setProduitCount(0);
+        categorie.setOrigineCreation("COMPTABILITE");
         
-        categorie = categorieEntreeRepository.save(categorie);
-        return mapCategorieEntreeToDTO(categorie);
+        categorie = categorieRepository.save(categorie);
+        return mapCategorieToCategorieEntreeDTO(categorie);
     }
 
-    @Transactional(readOnly = true)
-    public List<CategorieEntreeDTO> listerCategoriesEntree(HttpServletRequest httpRequest) {
-        User user = authHelper.getAuthenticatedUserWithFallback(httpRequest);
-        
-        if (user.getEntreprise() == null) {
-            throw new RuntimeException("Vous n'êtes associé à aucune entreprise.");
-        }
-
-        List<CategorieEntree> categories = categorieEntreeRepository.findByEntrepriseId(user.getEntreprise().getId());
-        return categories.stream()
-                .map(this::mapCategorieEntreeToDTO)
-                .collect(Collectors.toList());
-    }
+    // @Transactional(readOnly = true)
+    // public List<CategorieResponseDTO> listerCategoriesEntree(HttpServletRequest httpRequest) {
+    //     // Utiliser CategorieService pour obtenir les catégories avec CategorieResponseDTO
+    //     return categorieService.getAllCategoriesWithProduitCount(httpRequest);
+    // }
 
     // ========== Méthodes utilitaires privées pour les dépenses générales ==========
 
@@ -1620,7 +1619,7 @@ public class ComptabiliteService {
         User user = validateComptabilitePermission(httpRequest);
         validateEntreeRequest(request);
         
-        CategorieEntree categorie = getOrCreateCategorieEntree(request, user);
+        Categorie categorie = getOrCreateCategorie(request, user);
         SourceDepense source = parseEnum(SourceDepense.class, request.getSource(), "Source");
         
         ModePaiement modeEntree = null;
@@ -1692,24 +1691,26 @@ public class ComptabiliteService {
     }
 
     /**
-     * Récupère ou crée une catégorie d'entrée
+     * Récupère ou crée une catégorie de produit pour les entrées générales
      */
-    private CategorieEntree getOrCreateCategorieEntree(EntreeGeneraleRequestDTO request, User user) {
+    private Categorie getOrCreateCategorie(EntreeGeneraleRequestDTO request, User user) {
         if (request.getCategorieId() != null) {
-            return categorieEntreeRepository.findByIdAndEntrepriseId(request.getCategorieId(), user.getEntreprise().getId())
-                    .orElseThrow(() -> new RuntimeException("Catégorie d'entrée non trouvée."));
+            return categorieRepository.findByIdAndEntrepriseId(request.getCategorieId(), user.getEntreprise().getId())
+                    .orElseThrow(() -> new RuntimeException("Catégorie non trouvée."));
         }
         
         if (request.getNouvelleCategorieNom() != null && !request.getNouvelleCategorieNom().trim().isEmpty()) {
             String nomCategorie = request.getNouvelleCategorieNom().trim();
-            CategorieEntree categorie = categorieEntreeRepository.findByNomAndEntrepriseId(nomCategorie, user.getEntreprise().getId())
-                    .orElse(null);
+            Categorie categorie = categorieRepository.findByNomAndEntrepriseId(nomCategorie, user.getEntreprise().getId());
             
             if (categorie == null) {
-                categorie = new CategorieEntree();
+                categorie = new Categorie();
                 categorie.setNom(nomCategorie);
                 categorie.setEntreprise(user.getEntreprise());
-                categorie = categorieEntreeRepository.save(categorie);
+                categorie.setCreatedAt(LocalDateTime.now());
+                categorie.setProduitCount(0);
+                categorie.setOrigineCreation("COMPTABILITE");
+                categorie = categorieRepository.save(categorie);
             }
             return categorie;
         }
@@ -1770,7 +1771,7 @@ public class ComptabiliteService {
             EntreeGeneraleRequestDTO request,
             User user,
             User responsable,
-            CategorieEntree categorie,
+            Categorie categorie,
             SourceDepense source,
             ModePaiement modeEntree,
             String numeroModeEntree) {
@@ -1835,13 +1836,14 @@ public class ComptabiliteService {
     }
 
     /**
-     * Mappe une CategorieEntree vers CategorieEntreeDTO
+     * Mappe une Categorie (produit) vers CategorieEntreeDTO pour les entrées générales
      */
-    private CategorieEntreeDTO mapCategorieEntreeToDTO(CategorieEntree categorie) {
+    private CategorieEntreeDTO mapCategorieToCategorieEntreeDTO(Categorie categorie) {
         CategorieEntreeDTO dto = new CategorieEntreeDTO();
         dto.setId(categorie.getId());
         dto.setNom(categorie.getNom());
-        dto.setDescription(categorie.getDescription());
+        dto.setDescription(categorie.getOrigineCreation() != null ? "Créée depuis " + categorie.getOrigineCreation() : null);
+        dto.setOrigineCreation(categorie.getOrigineCreation());
         if (categorie.getEntreprise() != null) {
             dto.setEntrepriseId(categorie.getEntreprise().getId());
         }
@@ -1856,7 +1858,7 @@ public class ComptabiliteService {
 
         List<DepenseGeneraleResponseDTO> depensesGenerales = listerDepensesGenerales(httpRequest);
         List<CategorieDepenseDTO> categoriesDepense = listerCategoriesDepense(httpRequest);
-        List<CategorieEntreeDTO> categoriesEntree = listerCategoriesEntree(httpRequest);
+        List<CategorieResponseDTO> categoriesEntree = categorieService.getAllCategoriesWithProduitCount(httpRequest);
         List<EntreeGeneraleResponseDTO> entreesGenerales = listerEntreesGenerales(httpRequest);
         TransactionSummaryDTO transactionSummary = transactionSummaryService.getTransactionSummary(httpRequest);
 
@@ -1901,7 +1903,7 @@ public class ComptabiliteService {
 
         // Charger les catégories et le résumé (petites données, pas besoin de pagination)
         List<CategorieDepenseDTO> categoriesDepense = listerCategoriesDepense(httpRequest);
-        List<CategorieEntreeDTO> categoriesEntree = listerCategoriesEntree(httpRequest);
+        List<CategorieResponseDTO> categoriesEntree = categorieService.getAllCategoriesWithProduitCount(httpRequest);
         TransactionSummaryDTO transactionSummary = transactionSummaryService.getTransactionSummary(httpRequest);
        
         int limitParType = Math.max((page + 1) * size, 1000);

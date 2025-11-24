@@ -14,7 +14,7 @@ public class Categorie {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
     private String nom;
-     private long produitCount;
+    private long produitCount;
 
     private LocalDateTime createdAt;
     @OneToMany(mappedBy = "categorie")
@@ -22,7 +22,8 @@ public class Categorie {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "entreprise_id", nullable = false)
-    private Entreprise entreprise; 
+    private Entreprise entreprise;
 
-
+    @Column(name = "origine_creation", length = 50)
+    private String origineCreation; // "PRODUIT" ou "COMPTABILITE"
 }

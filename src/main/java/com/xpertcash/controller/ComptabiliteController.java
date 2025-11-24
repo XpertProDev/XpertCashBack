@@ -93,10 +93,10 @@ public class ComptabiliteController {
         });
     }
 
-    @GetMapping("/list/categories-entree")
-    public ResponseEntity<?> listerCategoriesEntree(HttpServletRequest request) {
-        return handleRequest(() -> comptabiliteService.listerCategoriesEntree(request));
-    }
+    // @GetMapping("/list/categories-entree")
+    // public ResponseEntity<?> listerCategoriesEntree(HttpServletRequest request) {
+    //     return handleRequest(() -> comptabiliteService.listerCategoriesEntree(request));
+    // }
 
     /**
      * Crée une entrée générale pour l'entreprise.

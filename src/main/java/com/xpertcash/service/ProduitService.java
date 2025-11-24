@@ -1562,6 +1562,7 @@ public class ProduitService {
                     newCategorie.setEntreprise(entreprise);
                     newCategorie.setCreatedAt(LocalDateTime.now());
                     newCategorie.setProduitCount(0);
+                    newCategorie.setOrigineCreation("PRODUIT");
                     Categorie savedCategorie = categorieRepository.save(newCategorie);
                     request.setCategorieId(savedCategorie.getId());
                 }
@@ -1685,6 +1686,7 @@ public class ProduitService {
         sansCategory.setCreatedAt(LocalDateTime.now());
         sansCategory.setProduitCount(0);
         sansCategory.setEntreprise(entreprise);
+        sansCategory.setOrigineCreation("PRODUIT");
         
         return categorieRepository.save(sansCategory);
     }

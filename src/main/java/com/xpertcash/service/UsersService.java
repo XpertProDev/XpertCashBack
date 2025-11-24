@@ -914,7 +914,7 @@ public class UsersService {
     // Vérification des permissions de l'utilisateur
     boolean isAdminOrManager = CentralAccess.isAdminOrManagerOfEntreprise(user, entreprise.getId());
     boolean hasPermission = user.getRole().hasPermission(PermissionType.GERER_UTILISATEURS);
-    boolean isComptable = user.getRole().hasPermission(PermissionType.COMPTABILITE);
+    boolean isComptable = user.getRole().hasPermission(PermissionType.VOIR_FLUX_COMPTABLE);
    
 
     

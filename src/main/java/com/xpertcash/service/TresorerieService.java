@@ -73,7 +73,10 @@ public class TresorerieService {
                     .mapToDouble(d -> getValeurDouble(d.getMontant()))
                     .sum();
             
-            double montantCaisseReel = caisseDetail.getMontantTotal() - depensesGeneralesCaisse;
+            double entreesGeneralesCaisse = calculerEntreesGeneralesCaisse(data);
+            
+            // montantCaisse = montantTotal (des caisses fermées) + entrées générales - dépenses générales
+            double montantCaisseReel = caisseDetail.getMontantTotal() + entreesGeneralesCaisse - depensesGeneralesCaisse;
             tresorerie.setMontantCaisse(Math.max(0.0, montantCaisseReel));
 
             TresorerieDTO.BanqueDetail banqueDetail = calculerBanque(data);
