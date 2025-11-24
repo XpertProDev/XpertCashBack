@@ -67,7 +67,14 @@ public class TresorerieService {
 
             TresorerieDTO.CaisseDetail caisseDetail = calculerCaisse(data);
             tresorerie.setCaisseDetail(caisseDetail);
-            tresorerie.setMontantCaisse(caisseDetail.getMontantTotal());
+            
+            double depensesGeneralesCaisse = data.depensesGenerales.stream()
+                    .filter(d -> d.getSource() == SourceDepense.CAISSE)
+                    .mapToDouble(d -> getValeurDouble(d.getMontant()))
+                    .sum();
+            
+            double montantCaisseReel = caisseDetail.getMontantTotal() - depensesGeneralesCaisse;
+            tresorerie.setMontantCaisse(Math.max(0.0, montantCaisseReel));
 
             TresorerieDTO.BanqueDetail banqueDetail = calculerBanque(data);
             tresorerie.setBanqueDetail(banqueDetail);
@@ -141,18 +148,30 @@ public class TresorerieService {
                 .collect(Collectors.toList());
 
         List<Caisse> caissesFermees = chargerCaissesFermees(entrepriseId);
+        List<Long> caisseIdsFermees = caissesFermees.stream().map(Caisse::getId).collect(Collectors.toList());
         List<Vente> toutesVentes = venteRepository.findAllByEntrepriseId(entrepriseId);
-        Map<Long, Double> remboursementsParVente = calculerRemboursementsParVente(toutesVentes);
+        List<Vente> ventesCaissesFermees = toutesVentes.stream()
+                .filter(v -> v.getCaisse() != null && caisseIdsFermees.contains(v.getCaisse().getId()))
+                .collect(Collectors.toList());
+        Map<Long, Double> remboursementsParVente = calculerRemboursementsParVente(ventesCaissesFermees);
         List<FactureReelle> factures = factureReelleRepository.findByEntrepriseId(entrepriseId);
         Map<Long, BigDecimal> paiementsParFacture = chargerPaiementsParFacture(factures);
         List<DepenseGenerale> depensesGenerales = depenseGeneraleRepository.findByEntrepriseId(entrepriseId);
         List<EntreeGenerale> entreesGenerales = entreeGeneraleRepository.findByEntrepriseId(entrepriseId);
-        List<MouvementCaisse> mouvementsDepense = mouvementCaisseRepository
+        
+        List<MouvementCaisse> tousMouvementsDepense = mouvementCaisseRepository
                 .findByCaisse_Boutique_Entreprise_IdAndTypeMouvement(entrepriseId, TypeMouvementCaisse.DEPENSE);
-        List<MouvementCaisse> mouvementsRetrait = mouvementCaisseRepository
+        List<MouvementCaisse> mouvementsDepense = tousMouvementsDepense.stream()
+                .filter(m -> m.getCaisse() != null && caisseIdsFermees.contains(m.getCaisse().getId()))
+                .collect(Collectors.toList());
+        
+        List<MouvementCaisse> tousMouvementsRetrait = mouvementCaisseRepository
                 .findByCaisse_Boutique_Entreprise_IdAndTypeMouvement(entrepriseId, TypeMouvementCaisse.RETRAIT);
+        List<MouvementCaisse> mouvementsRetrait = tousMouvementsRetrait.stream()
+                .filter(m -> m.getCaisse() != null && caisseIdsFermees.contains(m.getCaisse().getId()))
+                .collect(Collectors.toList());
 
-        return new TresorerieData(boutiqueIds, caissesFermees, toutesVentes,
+        return new TresorerieData(boutiqueIds, caissesFermees, ventesCaissesFermees,
                 remboursementsParVente, factures, paiementsParFacture, depensesGenerales, entreesGenerales,
                 mouvementsDepense, mouvementsRetrait);
     }
@@ -202,10 +221,31 @@ public class TresorerieService {
         }
 
         double montantTotalCaisse = calculerMontantTotalCaisses(data.caissesFermees);
-        double entreesVentes = calculerEntreesVentes(data.toutesVentes, data.remboursementsParVente,
-                ModePaiement.ESPECES);
+        
+        List<Long> caisseIdsFermees = data.caissesFermees.stream().map(Caisse::getId).collect(Collectors.toList());
+        
+        double entreesMouvementsVente = 0.0;
+        double entreesMouvementsAjout = 0.0;
+        if (!caisseIdsFermees.isEmpty()) {
+            List<MouvementCaisse> mouvementsVente = mouvementCaisseRepository.findByCaisseIdInAndTypeMouvement(
+                caisseIdsFermees, TypeMouvementCaisse.VENTE);
+            entreesMouvementsVente = mouvementsVente.stream()
+                    .filter(m -> m.getModePaiement() == ModePaiement.ESPECES)
+                    .mapToDouble(m -> getValeurDouble(m.getMontant()))
+                    .sum();
+            
+            List<MouvementCaisse> mouvementsAjout = mouvementCaisseRepository.findByCaisseIdInAndTypeMouvement(
+                caisseIdsFermees, TypeMouvementCaisse.AJOUT);
+            entreesMouvementsAjout = mouvementsAjout.stream()
+                    .filter(m -> m.getModePaiement() == ModePaiement.ESPECES)
+                    .mapToDouble(m -> getValeurDouble(m.getMontant()))
+                    .sum();
+        }
+        
+        double entreesPaiementsEspeces = calculerEntreesPaiementsFactures(data, ModePaiement.ESPECES, null);
         double entreesGeneralesCaisse = calculerEntreesGeneralesCaisse(data);
-        double entrees = entreesVentes + entreesGeneralesCaisse;
+        double entrees = entreesMouvementsVente + entreesMouvementsAjout + entreesPaiementsEspeces + entreesGeneralesCaisse;
+        
         double sorties = calculerSortiesCaisse(data);
 
         TresorerieDTO.CaisseDetail detail = new TresorerieDTO.CaisseDetail();
@@ -259,8 +299,35 @@ public class TresorerieService {
     }
 
     private TresorerieDTO.BanqueDetail calculerBanque(TresorerieData data) {
-        return calculerDetailBanqueOuMobileMoney(data, SourceDepense.BANQUE,
-                ModePaiement.VIREMENT, ModePaiement.CHEQUE);
+        double entreesVentesVirement = calculerEntreesVentesBanqueOuMobileMoney(data, ModePaiement.VIREMENT, ModePaiement.CHEQUE);
+        double entreesVentesCarte = calculerEntreesVentesBanqueOuMobileMoney(data, ModePaiement.CARTE, null);
+        double entreesVentes = entreesVentesVirement + entreesVentesCarte;
+        
+        double entreesPaiementsVirement = calculerEntreesPaiementsFactures(data, ModePaiement.VIREMENT, ModePaiement.CHEQUE);
+        double entreesPaiementsCarte = calculerEntreesPaiementsFactures(data, ModePaiement.CARTE, null);
+        double entreesPaiements = entreesPaiementsVirement + entreesPaiementsCarte;
+        
+        double entreesGenerales = calculerEntreesGeneralesParSource(data, SourceDepense.BANQUE);
+        double entrees = entreesVentes + entreesPaiements + entreesGenerales;
+
+        double sortiesDepenses = data.depensesGenerales.stream()
+                .filter(d -> d.getSource() == SourceDepense.BANQUE)
+                .mapToDouble(d -> getValeurDouble(d.getMontant()))
+                .sum();
+
+        double sortiesMouvements = data.mouvementsDepense.stream()
+                .filter(m -> correspondModePaiement(m.getModePaiement(), ModePaiement.VIREMENT, ModePaiement.CHEQUE)
+                        || correspondModePaiement(m.getModePaiement(), ModePaiement.CARTE, null))
+                .mapToDouble(m -> getValeurDouble(m.getMontant()))
+                .sum();
+
+        double sorties = sortiesDepenses + sortiesMouvements;
+
+        TresorerieDTO.BanqueDetail detail = new TresorerieDTO.BanqueDetail();
+        detail.setEntrees(entrees);
+        detail.setSorties(sorties);
+        detail.setSolde(entrees - sorties);
+        return detail;
     }
 
     private TresorerieDTO.MobileMoneyDetail calculerMobileMoney(TresorerieData data) {
@@ -332,11 +399,36 @@ public class TresorerieService {
                 .map(FactureReelle::getId)
                 .collect(Collectors.toList());
 
+        if (factureIds.isEmpty()) {
+            return 0.0;
+        }
+
         List<Paiement> paiements = paiementRepository.findByFactureReelle_IdIn(factureIds);
-        return paiements.stream()
-                .filter(p -> correspondModePaiementString(p.getModePaiement(), modePaiement1, modePaiement2))
+        
+        logger.info("Calcul paiements factures - Factures: {}, Mode1: {}, Mode2: {}, Total paiements récupérés: {}", 
+                factureIds.size(), modePaiement1, modePaiement2, paiements.size());
+        
+        for (Paiement p : paiements) {
+            logger.info("Paiement trouvé - ID: {}, Mode: '{}', Montant: {}, FactureID: {}", 
+                    p.getId(), p.getModePaiement(), p.getMontant(), 
+                    p.getFactureReelle() != null ? p.getFactureReelle().getId() : null);
+        }
+        
+        double total = paiements.stream()
+                .filter(p -> {
+                    String modeNormalise = p.getModePaiement() != null ? normaliserModePaiement(p.getModePaiement()) : null;
+                    boolean correspond = correspondModePaiementString(p.getModePaiement(), modePaiement1, modePaiement2);
+                    logger.info("Paiement ID {} - Mode original: '{}', Mode normalisé: '{}', Correspond à {} ou {}: {}", 
+                            p.getId(), p.getModePaiement(), modeNormalise, modePaiement1, modePaiement2, correspond);
+                    return correspond;
+                })
                 .mapToDouble(p -> getValeurDouble(p.getMontant()))
                 .sum();
+        
+        logger.info("Total paiements factures calculé - Mode1: {}, Mode2: {}, Total montant: {}", 
+                modePaiement1, modePaiement2, total);
+        
+        return total;
     }
 
     private boolean correspondModePaiement(ModePaiement modePaiement, ModePaiement mode1, ModePaiement mode2) {
@@ -347,12 +439,39 @@ public class TresorerieService {
     }
 
     private boolean correspondModePaiementString(String modePaiement, ModePaiement mode1, ModePaiement mode2) {
-        if (modePaiement == null) {
+        if (modePaiement == null || modePaiement.trim().isEmpty()) {
             return false;
         }
+        String modePaiementNormalise = normaliserModePaiement(modePaiement.trim().toUpperCase());
         String mode1Str = mode1.name();
         String mode2Str = mode2 != null ? mode2.name() : null;
-        return modePaiement.equals(mode1Str) || (mode2Str != null && modePaiement.equals(mode2Str));
+        return modePaiementNormalise.equals(mode1Str) || (mode2Str != null && modePaiementNormalise.equals(mode2Str));
+    }
+
+    private String normaliserModePaiement(String modePaiement) {
+        if (modePaiement == null) {
+            return null;
+        }
+        String normalise = modePaiement.trim().toUpperCase();
+        switch (normalise) {
+            case "CASH":
+                return "ESPECES";
+            case "MOBILE":
+                return "MOBILE_MONEY";
+            case "VIREMENT":
+            case "TRANSFERT":
+                return "VIREMENT";
+            case "CHEQUE":
+            case "CHECK":
+                return "CHEQUE";
+            case "CARTE":
+            case "CARD":
+                return "CARTE";
+            case "RETRAIT":
+                return "RETRAIT";
+            default:
+                return normalise;
+        }
     }
 
     private TresorerieDTO.DetteDetail calculerDette(TresorerieData data) {

@@ -1,12 +1,22 @@
 package com.xpertcash.service;
 
 import com.xpertcash.DTOs.ComptabiliteDTO;
+import com.xpertcash.DTOs.ComptabiliteCompleteDTO;
+import com.xpertcash.DTOs.ComptabiliteCompletePaginatedDTO;
 import com.xpertcash.DTOs.CategorieDepenseDTO;
 import com.xpertcash.DTOs.CategorieEntreeDTO;
 import com.xpertcash.DTOs.DepenseGeneraleRequestDTO;
 import com.xpertcash.DTOs.DepenseGeneraleResponseDTO;
 import com.xpertcash.DTOs.EntreeGeneraleRequestDTO;
 import com.xpertcash.DTOs.EntreeGeneraleResponseDTO;
+import com.xpertcash.DTOs.PaiementDTO;
+import com.xpertcash.DTOs.TransfertFondsResponseDTO;
+import com.xpertcash.DTOs.VENTE.TransactionSummaryDTO;
+import com.xpertcash.DTOs.VENTE.VenteResponse;
+import com.xpertcash.entity.Paiement;
+import com.xpertcash.entity.FactureVente;
+import com.xpertcash.service.TransfertFondsService;
+import com.xpertcash.service.VENTE.TransactionSummaryService;
 import com.xpertcash.entity.*;
 import com.xpertcash.entity.Enum.*;
 import com.xpertcash.entity.VENTE.*;
@@ -88,6 +98,12 @@ public class ComptabiliteService {
 
     @Autowired
     private EntreeGeneraleRepository entreeGeneraleRepository;
+
+    @Autowired
+    private TransactionSummaryService transactionSummaryService;
+
+    @Autowired
+    private TransfertFondsService transfertFondsService;
 
     /**
      * Récupère toutes les données comptables de l'entreprise
@@ -1577,6 +1593,7 @@ public class ComptabiliteService {
             dto.setCreeParEmail(depense.getCreePar().getEmail());
         }
         dto.setDateCreation(depense.getDateCreation());
+        dto.setTypeTransaction("SORTIE");
         return dto;
     }
 
@@ -1813,6 +1830,7 @@ public class ComptabiliteService {
             dto.setResponsableEmail(entree.getResponsable().getEmail());
         }
         dto.setDateCreation(entree.getDateCreation());
+        dto.setTypeTransaction("ENTREE");
         return dto;
     }
 
@@ -1829,6 +1847,254 @@ public class ComptabiliteService {
         }
         dto.setCreatedAt(categorie.getCreatedAt());
         return dto;
+    }
+
+    @Transactional(readOnly = true)
+    public ComptabiliteCompleteDTO getComptabiliteComplete(HttpServletRequest httpRequest) {
+        User user = validateComptabilitePermission(httpRequest);
+        Long entrepriseId = user.getEntreprise().getId();
+
+        List<DepenseGeneraleResponseDTO> depensesGenerales = listerDepensesGenerales(httpRequest);
+        List<CategorieDepenseDTO> categoriesDepense = listerCategoriesDepense(httpRequest);
+        List<CategorieEntreeDTO> categoriesEntree = listerCategoriesEntree(httpRequest);
+        List<EntreeGeneraleResponseDTO> entreesGenerales = listerEntreesGenerales(httpRequest);
+        TransactionSummaryDTO transactionSummary = transactionSummaryService.getTransactionSummary(httpRequest);
+
+        List<Vente> ventesCaissesFermees = venteRepository.findByEntrepriseIdAndCaisseFermee(entrepriseId);
+        List<VenteResponse> ventesCaissesFermeesDTO = ventesCaissesFermees.stream()
+                .map(this::mapVenteToResponse)
+                .collect(Collectors.toList());
+
+        List<Paiement> paiements = paiementRepository.findByEntrepriseId(entrepriseId);
+        List<PaiementDTO> paiementsDTO = paiements.stream()
+                .map(p -> {
+                    PaiementDTO dto = new PaiementDTO(p);
+                    dto.setTypeTransaction("ENTREE");
+                    return dto;
+                })
+                .collect(Collectors.toList());
+
+        List<TransfertFondsResponseDTO> transfertsFonds = transfertFondsService.listerTransferts(httpRequest);
+
+        ComptabiliteCompleteDTO result = new ComptabiliteCompleteDTO();
+        result.setDepensesGenerales(depensesGenerales);
+        result.setCategoriesDepense(categoriesDepense);
+        result.setCategoriesEntree(categoriesEntree);
+        result.setEntreesGenerales(entreesGenerales);
+        result.setTransactionSummary(transactionSummary);
+        result.setVentesCaissesFermees(ventesCaissesFermeesDTO);
+        result.setPaiementsFactures(paiementsDTO);
+        result.setTransfertsFonds(transfertsFonds);
+
+        return result;
+    }
+
+    @Transactional(readOnly = true)
+    public ComptabiliteCompletePaginatedDTO getComptabiliteCompletePaginated(HttpServletRequest httpRequest, int page, int size) {
+        // Validation des paramètres de pagination
+        if (page < 0) page = 0;
+        if (size <= 0) size = 20;
+        if (size > 100) size = 100; 
+
+        User user = validateComptabilitePermission(httpRequest);
+        Long entrepriseId = user.getEntreprise().getId();
+
+        // Charger les catégories et le résumé (petites données, pas besoin de pagination)
+        List<CategorieDepenseDTO> categoriesDepense = listerCategoriesDepense(httpRequest);
+        List<CategorieEntreeDTO> categoriesEntree = listerCategoriesEntree(httpRequest);
+        TransactionSummaryDTO transactionSummary = transactionSummaryService.getTransactionSummary(httpRequest);
+       
+        int limitParType = Math.max((page + 1) * size, 1000);
+
+        // Charger les transactions avec limite
+        List<DepenseGeneraleResponseDTO> depensesGenerales = listerDepensesGenerales(httpRequest).stream()
+                .sorted((a, b) -> {
+                    LocalDateTime dateA = a.getDateCreation();
+                    LocalDateTime dateB = b.getDateCreation();
+                    if (dateA == null && dateB == null) return 0;
+                    if (dateA == null) return 1;
+                    if (dateB == null) return -1;
+                    return dateB.compareTo(dateA);
+                })
+                .limit(limitParType)
+                .collect(Collectors.toList());
+
+        List<EntreeGeneraleResponseDTO> entreesGenerales = listerEntreesGenerales(httpRequest).stream()
+                .sorted((a, b) -> {
+                    LocalDateTime dateA = a.getDateCreation();
+                    LocalDateTime dateB = b.getDateCreation();
+                    if (dateA == null && dateB == null) return 0;
+                    if (dateA == null) return 1;
+                    if (dateB == null) return -1;
+                    return dateB.compareTo(dateA);
+                })
+                .limit(limitParType)
+                .collect(Collectors.toList());
+
+        List<Vente> ventesCaissesFermees = venteRepository.findByEntrepriseIdAndCaisseFermee(entrepriseId).stream()
+                .sorted((a, b) -> {
+                    LocalDateTime dateA = a.getDateVente();
+                    LocalDateTime dateB = b.getDateVente();
+                    if (dateA == null && dateB == null) return 0;
+                    if (dateA == null) return 1;
+                    if (dateB == null) return -1;
+                    return dateB.compareTo(dateA);
+                })
+                .limit(limitParType)
+                .collect(Collectors.toList());
+        List<VenteResponse> ventesCaissesFermeesDTO = ventesCaissesFermees.stream()
+                .map(this::mapVenteToResponse)
+                .collect(Collectors.toList());
+
+        List<Paiement> paiements = paiementRepository.findByEntrepriseId(entrepriseId).stream()
+                .sorted((a, b) -> {
+                    LocalDate dateA = a.getDatePaiement();
+                    LocalDate dateB = b.getDatePaiement();
+                    if (dateA == null && dateB == null) return 0;
+                    if (dateA == null) return 1;
+                    if (dateB == null) return -1;
+                    return dateB.compareTo(dateA);
+                })
+                .limit(limitParType)
+                .collect(Collectors.toList());
+        List<PaiementDTO> paiementsDTO = paiements.stream()
+                .map(p -> {
+                    PaiementDTO dto = new PaiementDTO(p);
+                    dto.setTypeTransaction("ENTREE");
+                    return dto;
+                })
+                .collect(Collectors.toList());
+
+        List<TransfertFondsResponseDTO> transfertsFonds = transfertFondsService.listerTransferts(httpRequest).stream()
+                .sorted((a, b) -> {
+                    LocalDateTime dateA = a.getDateTransfert();
+                    LocalDateTime dateB = b.getDateTransfert();
+                    if (dateA == null && dateB == null) return 0;
+                    if (dateA == null) return 1;
+                    if (dateB == null) return -1;
+                    return dateB.compareTo(dateA);
+                })
+                .limit(limitParType)
+                .collect(Collectors.toList());
+
+        // Combiner toutes les transactions dans une seule liste
+        List<Object> toutesTransactions = new ArrayList<>();
+        toutesTransactions.addAll(depensesGenerales);
+        toutesTransactions.addAll(entreesGenerales);
+        toutesTransactions.addAll(ventesCaissesFermeesDTO);
+        toutesTransactions.addAll(paiementsDTO);
+        toutesTransactions.addAll(transfertsFonds);
+
+        // Trier par date (plus récent en premier) - maintenant sur un ensemble limité
+        toutesTransactions.sort((a, b) -> {
+            LocalDateTime dateA = getDateFromTransaction(a);
+            LocalDateTime dateB = getDateFromTransaction(b);
+            if (dateA == null && dateB == null) return 0;
+            if (dateA == null) return 1;
+            if (dateB == null) return -1;
+            return dateB.compareTo(dateA); // Tri décroissant
+        });
+
+        // Pagination manuelle
+        int totalElements = toutesTransactions.size();
+        int totalPages = (int) Math.ceil((double) totalElements / size);
+        int start = page * size;
+        int end = Math.min(start + size, totalElements);
+        List<Object> transactionsPage = start < totalElements ? toutesTransactions.subList(start, end) : new ArrayList<>();
+
+        ComptabiliteCompletePaginatedDTO result = new ComptabiliteCompletePaginatedDTO();
+        result.setTransactions(transactionsPage);
+        result.setCategoriesDepense(categoriesDepense);
+        result.setCategoriesEntree(categoriesEntree);
+        result.setTransactionSummary(transactionSummary);
+        result.setPageNumber(page);
+        result.setPageSize(size);
+        result.setTotalElements(totalElements);
+        result.setTotalPages(totalPages);
+        result.setHasNext(page < totalPages - 1);
+        result.setHasPrevious(page > 0);
+        result.setFirst(page == 0);
+        result.setLast(page >= totalPages - 1);
+
+        return result;
+    }
+
+    private LocalDateTime getDateFromTransaction(Object transaction) {
+        if (transaction instanceof DepenseGeneraleResponseDTO) {
+            DepenseGeneraleResponseDTO dto = (DepenseGeneraleResponseDTO) transaction;
+            return dto.getDateCreation() != null ? dto.getDateCreation() : null;
+        } else if (transaction instanceof EntreeGeneraleResponseDTO) {
+            EntreeGeneraleResponseDTO dto = (EntreeGeneraleResponseDTO) transaction;
+            return dto.getDateCreation() != null ? dto.getDateCreation() : null;
+        } else if (transaction instanceof VenteResponse) {
+            VenteResponse dto = (VenteResponse) transaction;
+            return dto.getDateVente() != null ? dto.getDateVente() : null;
+        } else if (transaction instanceof PaiementDTO) {
+            PaiementDTO dto = (PaiementDTO) transaction;
+            return dto.getDatePaiement() != null ? dto.getDatePaiement().atStartOfDay() : null;
+        } else if (transaction instanceof TransfertFondsResponseDTO) {
+            TransfertFondsResponseDTO dto = (TransfertFondsResponseDTO) transaction;
+            return dto.getDateTransfert() != null ? dto.getDateTransfert() : null;
+        }
+        return null;
+    }
+
+    private VenteResponse mapVenteToResponse(Vente vente) {
+        VenteResponse response = new VenteResponse();
+        response.setVenteId(vente.getId());
+        
+        if (vente.getCaisse() != null) {
+            VenteResponse.CaisseDTO caisseDTO = new VenteResponse.CaisseDTO();
+            caisseDTO.setId(vente.getCaisse().getId());
+            caisseDTO.setMontantCourant(vente.getCaisse().getMontantCourant());
+            caisseDTO.setStatut(vente.getCaisse().getStatut().name());
+            caisseDTO.setDateOuverture(vente.getCaisse().getDateOuverture());
+            caisseDTO.setDateFermeture(vente.getCaisse().getDateFermeture());
+            response.setCaisse(caisseDTO);
+        }
+        
+        response.setBoutiqueId(vente.getBoutique() != null ? vente.getBoutique().getId() : null);
+        response.setVendeurId(vente.getVendeur() != null ? vente.getVendeur().getId() : null);
+        response.setDateVente(vente.getDateVente());
+        response.setMontantTotal(vente.getMontantTotal());
+        response.setDescription(vente.getDescription());
+        response.setClientNom(vente.getClientNom());
+        response.setClientNumero(vente.getClientNumero());
+        response.setModePaiement(vente.getModePaiement() != null ? vente.getModePaiement().name() : null);
+        response.setMontantPaye(vente.getMontantPaye());
+        
+        List<VenteResponse.LigneVenteDTO> lignesDTO = new ArrayList<>();
+        if (vente.getProduits() != null) {
+            for (VenteProduit ligne : vente.getProduits()) {
+                VenteResponse.LigneVenteDTO dto = new VenteResponse.LigneVenteDTO();
+                dto.setProduitId(ligne.getProduit().getId());
+                dto.setNomProduit(ligne.getProduit().getNom());
+                dto.setQuantite(ligne.getQuantite());
+                dto.setPrixUnitaire(ligne.getPrixUnitaire());
+                dto.setMontantLigne(ligne.getMontantLigne());
+                dto.setRemise(ligne.getRemise());
+                dto.setQuantiteRemboursee(ligne.getQuantiteRemboursee());
+                dto.setMontantRembourse(ligne.getMontantRembourse());
+                dto.setEstRemboursee(ligne.isEstRemboursee());
+                lignesDTO.add(dto);
+            }
+        }
+        response.setRemiseGlobale(vente.getRemiseGlobale());
+        response.setLignes(lignesDTO);
+        
+        FactureVente facture = factureVenteRepository.findByVente(vente).orElse(null);
+        if (facture != null) {
+            response.setNumeroFacture(facture.getNumeroFacture());
+        }
+        
+        response.setNomVendeur(vente.getVendeur() != null ? vente.getVendeur().getNomComplet() : null);
+        response.setNomBoutique(vente.getBoutique() != null ? vente.getBoutique().getNomBoutique() : null);
+        response.setMontantTotalRembourse(vente.getMontantTotalRembourse());
+        response.setDateDernierRemboursement(vente.getDateDernierRemboursement());
+        response.setNombreRemboursements(vente.getNombreRemboursements());
+        response.setTypeTransaction("ENTREE");
+        
+        return response;
     }
 }
 

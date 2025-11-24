@@ -245,6 +245,112 @@ public class MailService {
         """.formatted(factureNumero, destinataireLabel, clientName, relanceDate);
     }
 
+    // Méthode d'envoi d'email pour demande d'approbation de facture
+    public void sendDemandeApprobationEmail(String to, String fullName, String factureNumero, String createurNom, String montantTotal, String objetFacture) throws MessagingException {
+        System.out.println("📧 Envoi d'un email d'approbation à : " + to);
+        String subject = "Demande d'approbation - Facture " + factureNumero;
+        String htmlContent = generateDemandeApprobationMessage(fullName, factureNumero, createurNom, montantTotal, objetFacture);
+        sendEmail(to, subject, htmlContent);
+    }
+
+    // Génération du message HTML pour la demande d'approbation
+    private String generateDemandeApprobationMessage(String fullName, String factureNumero, String createurNom, String montantTotal, String objetFacture) {
+        String objetDisplay = (objetFacture != null && !objetFacture.isBlank()) ? objetFacture : "Aucun objet spécifié";
+        
+        return """
+            <html>
+            <body style="font-family: Arial, sans-serif; background-color: #f4f4f4; padding: 20px;">
+                <div style="max-width: 600px; margin: auto; background: white; padding: 17px; border-radius: 10px; text-align: center;">
+                    <img src="cid:logo" alt="Logo" style="width: 100px; margin-bottom: 10px;">
+                    <h2 style="color: #333; margin-top: -9px; font-size: 19px;">Demande d'approbation de facture</h2>
+                    <p style="text-align: start;">Bonjour <strong>%s</strong>,</p>
+                    <p style="text-align: left; line-height: 1.6;">
+                        Une nouvelle facture nécessite votre approbation. <br> 
+                        La facture <strong>%s</strong> créée par <strong>%s</strong> 
+                        pour un montant total de <strong>%s FCFA</strong> nécessite votre validation. 
+                        <br><br>
+                        <strong>Objet de la facture :</strong> %s
+                        <br><br>
+                        Veuillez vous connecter à votre compte pour examiner les détails et approuver cette facture.
+                    </p>
+                    <p style="font-size: 12px; color: #555; margin-top: 30px;">Si vous n'avez pas effectué cette demande, veuillez ignorer cet e-mail.</p>
+                    <p style="font-size: 10px; color: #777;">L'équipe Tchakeda</p>
+                </div>
+            </body>
+            </html>
+        """.formatted(fullName, factureNumero, createurNom, montantTotal, objetDisplay);
+    }
+
+    // Méthode d'envoi d'email pour notification d'approbation de facture
+    public void sendFactureApprouveeEmail(String to, String fullName, String factureNumero, String approbateurNom, String montantTotal, String objetFacture) throws MessagingException {
+        System.out.println("📧 Envoi d'un email d'approbation confirmée à : " + to);
+        String subject = "Facture approuvée - " + factureNumero;
+        String htmlContent = generateFactureApprouveeMessage(fullName, factureNumero, approbateurNom, montantTotal, objetFacture);
+        sendEmail(to, subject, htmlContent);
+    }
+
+    // Génération du message HTML pour la notification d'approbation
+    private String generateFactureApprouveeMessage(String fullName, String factureNumero, String approbateurNom, String montantTotal, String objetFacture) {
+        String objetDisplay = (objetFacture != null && !objetFacture.isBlank()) ? objetFacture : "Aucun objet spécifié";
+        
+        return """
+            <html>
+            <body style="font-family: Arial, sans-serif; background-color: #f4f4f4; padding: 20px;">
+                <div style="max-width: 600px; margin: auto; background: white; padding: 17px; border-radius: 10px; text-align: center;">
+                    <img src="cid:logo" alt="Logo" style="width: 100px; margin-bottom: 10px;">
+                    <h2 style="color: #333; margin-top: -9px; font-size: 19px;">Facture approuvée</h2>
+                    <p style="text-align: start;">Bonjour <strong>%s</strong>,</p>
+                    <p style="text-align: left; line-height: 1.6;">
+                        Votre facture <strong>%s</strong> a été approuvée par <strong>%s</strong>. 
+                        La facture d'un montant total de <strong>%s FCFA</strong> a été validée avec succès.
+                        <br><br>
+                        <strong>Objet de la facture :</strong> %s
+                        <br><br>
+                        Vous pouvez maintenant procéder aux prochaines étapes de traitement de cette facture.
+                    </p>
+                    <p style="font-size: 12px; color: #555; margin-top: 30px;">Si vous n'avez pas effectué cette demande, veuillez ignorer cet e-mail.</p>
+                    <p style="font-size: 10px; color: #777;">L'équipe Tchakeda</p>
+                </div>
+            </body>
+            </html>
+        """.formatted(fullName, factureNumero, approbateurNom, montantTotal, objetDisplay);
+    }
+
+    // Méthode d'envoi d'email pour notification de modification de facture
+    public void sendFactureModifieeEmail(String to, String fullName, String factureNumero, String modificateurNom, String montantTotal, String objetFacture) throws MessagingException {
+        System.out.println("📧 Envoi d'un email de modification de facture à : " + to);
+        String subject = "Facture modifiée - " + factureNumero;
+        String htmlContent = generateFactureModifieeMessage(fullName, factureNumero, modificateurNom, montantTotal, objetFacture);
+        sendEmail(to, subject, htmlContent);
+    }
+
+    // Génération du message HTML pour la notification de modification
+    private String generateFactureModifieeMessage(String fullName, String factureNumero, String modificateurNom, String montantTotal, String objetFacture) {
+        String objetDisplay = (objetFacture != null && !objetFacture.isBlank()) ? objetFacture : "Aucun objet spécifié";
+        
+        return """
+            <html>
+            <body style="font-family: Arial, sans-serif; background-color: #f4f4f4; padding: 20px;">
+                <div style="max-width: 600px; margin: auto; background: white; padding: 17px; border-radius: 10px; text-align: center;">
+                    <img src="cid:logo" alt="Logo" style="width: 100px; margin-bottom: 10px;">
+                    <h2 style="color: #333; margin-top: -9px; font-size: 19px;">Facture modifiée</h2>
+                    <p style="text-align: start;">Bonjour <strong>%s</strong>,</p>
+                    <p style="text-align: left; line-height: 1.6;">
+                        La facture <strong>%s</strong> a été modifiée par <strong>%s</strong>. 
+                        Le montant total de la facture est maintenant de <strong>%s FCFA</strong>.
+                        <br><br>
+                        <strong>Objet de la facture :</strong> %s
+                        <br><br>
+                        Veuillez vous connecter à votre compte pour consulter les détails de la modification.
+                    </p>
+                    <p style="font-size: 12px; color: #555; margin-top: 30px;">Si vous n'avez pas effectué cette demande, veuillez ignorer cet e-mail.</p>
+                    <p style="font-size: 10px; color: #777;">L'équipe Tchakeda</p>
+                </div>
+            </body>
+            </html>
+        """.formatted(fullName, factureNumero, modificateurNom, montantTotal, objetDisplay);
+    }
+
     public void sendEmailWithAttachments(
         String toEmail,
         String ccEmail,
@@ -273,10 +379,14 @@ public class MailService {
 
     for (MultipartFile file : attachments) {
         if (!file.isEmpty()) {
+            String contentType = file.getContentType();
+            if (contentType == null) {
+                contentType = "application/octet-stream";
+            }
             helper.addAttachment(
                 Objects.requireNonNull(file.getOriginalFilename()),
                 new ByteArrayResource(file.getBytes()),
-                file.getContentType()
+                contentType
             );
         }
     }

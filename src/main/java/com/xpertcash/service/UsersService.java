@@ -914,9 +914,13 @@ public class UsersService {
     // Vérification des permissions de l'utilisateur
     boolean isAdminOrManager = CentralAccess.isAdminOrManagerOfEntreprise(user, entreprise.getId());
     boolean hasPermission = user.getRole().hasPermission(PermissionType.GERER_UTILISATEURS);
+    boolean isComptable = user.getRole().hasPermission(PermissionType.COMPTABILITE);
+   
+
+    
 
     // Vérification des droits d'accès
-    if (!isAdminOrManager && !hasPermission) {
+    if (!isAdminOrManager && !hasPermission && isComptable) {
         throw new RuntimeException("Accès refusé : vous n'avez pas les droits nécessaires.");
     }
 

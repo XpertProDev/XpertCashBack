@@ -265,6 +265,9 @@ public class TransfertFondsService {
         dto.setVers(transfert.getDestination().name());
         dto.setMontant(transfert.getMontant());
         dto.setPersonneALivrer(transfert.getPersonneALivrer());
+        dto.setEntrepriseId(transfert.getEntreprise().getId());
+        dto.setEntrepriseNom(transfert.getEntreprise().getNomEntreprise());
+        dto.setTypeTransaction("TRANSFERT");
         return dto;
     }
 }

@@ -28,6 +28,20 @@ public class CentralAccess {
         return isAdminOrManager && user.getEntreprise().getId().equals(targetEntrepriseId);
     }
 
+
+    public static boolean isComptable(User user, Long targetEntrepriseId) {
+        if (user == null || user.getEntreprise() == null || targetEntrepriseId == null) {
+            return false;
+        }
+
+        RoleType role = user.getRole().getName();
+        boolean isComptable = role == RoleType.ADMIN || role == RoleType.COMPTABLE;
+
+        return isComptable && user.getEntreprise().getId().equals(targetEntrepriseId);
+    }
+
+
+
     public static boolean isSelfOrAdminOrManager(User user, Long targetUserId) {
         if (user == null || targetUserId == null) {
             return false;

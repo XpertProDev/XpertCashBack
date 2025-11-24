@@ -120,6 +120,14 @@ public class ComptabiliteController {
         return handleRequest(() -> comptabiliteService.listerEntreesGenerales(request));
     }
 
+    @GetMapping("/comptabilite/complete")
+    public ResponseEntity<?> getComptabiliteComplete(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            HttpServletRequest request) {
+        return handleRequest(() -> comptabiliteService.getComptabiliteCompletePaginated(request, page, size));
+    }
+
     // ========== Méthodes utilitaires privées ==========
 
     /**

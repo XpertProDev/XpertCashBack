@@ -46,6 +46,9 @@ public class TransactionSummaryService {
     
     @Autowired
     private FactureReelleRepository factureReelleRepository;
+    
+    @Autowired
+    private CaisseRepository caisseRepository;
 
     /**
      * Récupère le résumé complet de toutes les transactions financières
@@ -86,12 +89,18 @@ public class TransactionSummaryService {
         
         List<TransactionSummaryDTO.TransactionDetailDTO> allTransactions = new ArrayList<>();
         
-        // 1. ENTRÉES - VENTES
+        // 1. ENTRÉES - VENTES (uniquement des caisses fermées)
         List<Vente> ventes = venteRepository.findByBoutique_Entreprise_IdAndDateVenteBetween(
             entrepriseId, dateDebut, dateFin);
         
+        List<Caisse> caissesFermees = caisseRepository.findByEntrepriseIdAndStatut(entrepriseId, StatutCaisse.FERMEE);
+        List<Long> caisseIdsFermees = caissesFermees.stream().map(Caisse::getId).collect(java.util.stream.Collectors.toList());
+        
         double totalVentes = 0.0;
         for (Vente vente : ventes) {
+            if (vente.getCaisse() == null || !caisseIdsFermees.contains(vente.getCaisse().getId())) {
+                continue;
+            }
             double montantVente = vente.getMontantTotal() != null ? vente.getMontantTotal() : 0.0;
             totalVentes += montantVente;
             
@@ -105,7 +114,9 @@ public class TransactionSummaryService {
             transaction.setUtilisateur(vente.getVendeur().getNomComplet());
             transaction.setModePaiement(vente.getModePaiement() != null ? vente.getModePaiement().name() : null);
             transaction.setStatut(vente.getStatus() != null ? vente.getStatus().name() : null);
-            allTransactions.add(transaction);
+            if (vente.getCaisse() != null && caisseIdsFermees.contains(vente.getCaisse().getId())) {
+                allTransactions.add(transaction);
+            }
         }
         summary.setTotalVentes(totalVentes);
         

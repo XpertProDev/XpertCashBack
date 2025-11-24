@@ -105,6 +105,9 @@ public class FactureProformaService {
     @Autowired
     private GlobalNotificationService globalNotificationService;
 //    private NotificationService notificationService;
+
+    @Autowired
+    private MailService mailService;
     
     // Methode pour creer une facture pro forma
     public FactureProForma ajouterFacture(FactureProForma facture, Double remisePourcentage, Boolean appliquerTVA, HttpServletRequest request) {
@@ -516,6 +519,44 @@ public class FactureProformaService {
                     "Approbation",
                     "Facture approuvée par " + user.getNomComplet()
             );
+
+            // 📧 Envoi d'email au créateur/modificateur pour notification d'approbation
+            User destinataireEmail = facture.getUtilisateurModificateur() != null 
+                    ? facture.getUtilisateurModificateur() 
+                    : facture.getUtilisateurCreateur();
+            
+            if (destinataireEmail != null && destinataireEmail.getEmail() != null && !destinataireEmail.getEmail().isBlank()) {
+                // Ne pas envoyer d'email si c'est la même personne qui approuve
+                if (!destinataireEmail.getId().equals(user.getId())) {
+                    try {
+                        String numero = Optional.ofNullable(facture.getNumeroFacture())
+                                .filter(s -> !s.isBlank())
+                                .orElseGet(() -> "Facture #" + facture.getId());
+                        String nomDestinataire = destinataireEmail.getNomComplet() != null && !destinataireEmail.getNomComplet().isBlank()
+                                ? destinataireEmail.getNomComplet()
+                                : destinataireEmail.getEmail();
+                        String approbateurNom = user.getNomComplet() != null && !user.getNomComplet().isBlank()
+                                ? user.getNomComplet()
+                                : user.getEmail();
+                        String montantTotalFormate = String.format(Locale.GERMAN, "%,.0f", facture.getTotalFacture());
+                        String objetFacture = facture.getDescription() != null ? facture.getDescription() : "";
+
+                        mailService.sendFactureApprouveeEmail(
+                                destinataireEmail.getEmail(),
+                                nomDestinataire,
+                                numero,
+                                approbateurNom,
+                                montantTotalFormate,
+                                objetFacture
+                        );
+                        log.info("✅ Email d'approbation envoyé au créateur/modificateur : {}", destinataireEmail.getEmail());
+                    } catch (Exception e) {
+                        log.error("❌ Erreur lors de l'envoi de l'email d'approbation à {} : {}", 
+                                destinataireEmail.getEmail(), e.getMessage());
+                        e.printStackTrace();
+                    }
+                }
+            }
         }
 
 
@@ -593,6 +634,36 @@ public class FactureProformaService {
             // Notifications
             globalNotificationService.notifyRecipients(approbateurs, msgAppro);
             globalNotificationService.notifySingle(user, msgSender);
+
+            // 📧 Envoi d'emails aux approbateurs
+            String montantTotalFormate = String.format(Locale.GERMAN, "%,.0f", facture.getTotalFacture());
+            String objetFacture = facture.getDescription() != null ? facture.getDescription() : "";
+            for (User approbateur : approbateurs) {
+                if (approbateur.getEmail() != null && !approbateur.getEmail().isBlank()) {
+                    try {
+                        String nomApprobateur = approbateur.getNomComplet() != null && !approbateur.getNomComplet().isBlank() 
+                                ? approbateur.getNomComplet() 
+                                : approbateur.getEmail();
+                        mailService.sendDemandeApprobationEmail(
+                                approbateur.getEmail(),
+                                nomApprobateur,
+                                numero,
+                                createur,
+                                montantTotalFormate,
+                                objetFacture
+                        );
+                        log.info("✅ Email d'approbation envoyé à : {}", approbateur.getEmail());
+                    } catch (Exception e) {
+                        // Log l'erreur mais ne fait pas échouer le processus
+                        log.error("❌ Erreur lors de l'envoi de l'email d'approbation à {} : {}", 
+                                approbateur.getEmail(), e.getMessage());
+                        e.printStackTrace();
+                    }
+                } else {
+                    log.warn("⚠️ L'approbateur {} n'a pas d'email configuré, email non envoyé", 
+                            approbateur.getNomComplet() != null ? approbateur.getNomComplet() : approbateur.getId());
+                }
+            }
 
             // Mettre à jour le statut à APPROBATION
             facture.setStatut(StatutFactureProForma.APPROBATION);
@@ -736,6 +807,69 @@ public class FactureProformaService {
                     "Modification",
                     "La facture a été modifiée (montant: " + montantFormate + ")"
             );
+
+            // 📧 Envoi d'emails aux approbateurs et au créateur pour notification de modification
+            String numero = Optional.ofNullable(facture.getNumeroFacture())
+                    .filter(s -> !s.isBlank())
+                    .orElseGet(() -> "Facture #" + facture.getId());
+            String modificateurNom = user.getNomComplet() != null && !user.getNomComplet().isBlank()
+                    ? user.getNomComplet()
+                    : user.getEmail();
+            String montantTotalFormate = String.format(Locale.GERMAN, "%,.0f", montantTotalAPayer);
+            String objetFacture = facture.getDescription() != null ? facture.getDescription() : "";
+
+            // Envoyer aux approbateurs
+            List<User> approbateurs = facture.getApprobateurs();
+            if (approbateurs != null && !approbateurs.isEmpty()) {
+                for (User approbateur : approbateurs) {
+                    // Ne pas envoyer d'email si c'est le même utilisateur qui modifie
+                    if (!approbateur.getId().equals(user.getId()) && 
+                        approbateur.getEmail() != null && !approbateur.getEmail().isBlank()) {
+                        try {
+                            String nomApprobateur = approbateur.getNomComplet() != null && !approbateur.getNomComplet().isBlank()
+                                    ? approbateur.getNomComplet()
+                                    : approbateur.getEmail();
+                            mailService.sendFactureModifieeEmail(
+                                    approbateur.getEmail(),
+                                    nomApprobateur,
+                                    numero,
+                                    modificateurNom,
+                                    montantTotalFormate,
+                                    objetFacture
+                            );
+                            log.info("✅ Email de modification envoyé à l'approbateur : {}", approbateur.getEmail());
+                        } catch (Exception e) {
+                            log.error("❌ Erreur lors de l'envoi de l'email de modification à {} : {}", 
+                                    approbateur.getEmail(), e.getMessage());
+                            e.printStackTrace();
+                        }
+                    }
+                }
+            }
+
+            // Envoyer au créateur si différent du modificateur
+            User createur = facture.getUtilisateurCreateur();
+            if (createur != null && !createur.getId().equals(user.getId()) && 
+                createur.getEmail() != null && !createur.getEmail().isBlank()) {
+                try {
+                    String nomCreateur = createur.getNomComplet() != null && !createur.getNomComplet().isBlank()
+                            ? createur.getNomComplet()
+                            : createur.getEmail();
+                    mailService.sendFactureModifieeEmail(
+                            createur.getEmail(),
+                            nomCreateur,
+                            numero,
+                            modificateurNom,
+                            montantTotalFormate,
+                            objetFacture
+                    );
+                    log.info("✅ Email de modification envoyé au créateur : {}", createur.getEmail());
+                } catch (Exception e) {
+                    log.error("❌ Erreur lors de l'envoi de l'email de modification au créateur {} : {}", 
+                            createur.getEmail(), e.getMessage());
+                    e.printStackTrace();
+                }
+            }
         }
 
         if (modifications.getNoteModification() != null && !modifications.getNoteModification().isBlank()) {

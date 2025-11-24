@@ -31,5 +31,6 @@ public class EntreeGeneraleResponseDTO {
     private String responsableNom;
     private String responsableEmail;
     private LocalDateTime dateCreation;
+    private String typeTransaction;
 }
 
