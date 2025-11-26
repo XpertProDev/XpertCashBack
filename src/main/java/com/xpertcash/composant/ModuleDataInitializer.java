@@ -44,7 +44,9 @@ public class ModuleDataInitializer implements CommandLineRunner {
             creerModule("MARKETING", "Gestion du Marketing", "Gestion du marketing", true, false, null),
         
 
-            creerModule("GESTION_FACTURATION", "Gestion de Facturation", "Gestion centralisée des factures", false, true, new BigDecimal("10000")),
+            // creerModule("GESTION_FACTURATION", "Gestion de Facturation", "Gestion centralisée des factures", false, true, new BigDecimal("10000")),
+            creerModule("GESTION_FACTURATION", "Gestion de Facturation", "Gestion centralisée des factures", true, false, null),
+
             // Sous-modules structurels
             creerModule("FACTURE_PROFORMA", "Factures Proforma", "Création de devis/factures proforma", false, false, null),
             creerModule("FACTURE_REELLE", "Factures Réelles", "Émission de factures définitives", false, false, null)
