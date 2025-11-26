@@ -64,4 +64,8 @@ public interface VenteRepository extends JpaRepository<Vente, Long> {
     @Query("SELECT v FROM Vente v WHERE v.boutique.entreprise.id = :entrepriseId AND v.caisse.statut = 'FERMEE' ORDER BY v.dateVente DESC")
     List<Vente> findByEntrepriseIdAndCaisseFermee(@Param("entrepriseId") Long entrepriseId);
 
+    // Compter toutes les ventes des boutiques d'une entreprise
+    @Query("SELECT COUNT(v) FROM Vente v WHERE v.boutique.entreprise.id = :entrepriseId")
+    long countByEntrepriseId(@Param("entrepriseId") Long entrepriseId);
+
 }

@@ -20,6 +20,14 @@ public interface ClientRepository extends JpaRepository<Client, Long>{
     @Query("SELECT c FROM Client c WHERE c.entreprise.id = :entrepriseId OR c.entrepriseClient.entreprise.id = :entrepriseId")
     List<Client> findClientsByEntrepriseOrEntrepriseClient(@Param("entrepriseId") Long entrepriseId);
 
+    // Compter séparément les clients rattachés directement à l'entreprise (PARTICULIERS)
+    @Query("SELECT COUNT(c) FROM Client c WHERE c.entreprise.id = :entrepriseId")
+    long countClientsDirectByEntrepriseId(@Param("entrepriseId") Long entrepriseId);
+
+    // Compter les clients rattachés via une EntrepriseClient (ENTREPRISE_CLIENT)
+    @Query("SELECT COUNT(c) FROM Client c WHERE c.entrepriseClient.entreprise.id = :entrepriseId")
+    long countClientsEntrepriseByEntrepriseId(@Param("entrepriseId") Long entrepriseId);
+
     
 
 }

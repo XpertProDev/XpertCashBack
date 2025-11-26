@@ -16,5 +16,8 @@ public interface BoutiqueRepository extends JpaRepository<Boutique, Long> {
     Optional<Boutique> findByEntreprise(Entreprise entreprise);
     List<Boutique> findByEntrepriseIdAndActifTrue(Long entrepriseId);
 
+    // Compter toutes les boutiques d'une entreprise
+    long countByEntrepriseId(Long entrepriseId);
+
 }
 

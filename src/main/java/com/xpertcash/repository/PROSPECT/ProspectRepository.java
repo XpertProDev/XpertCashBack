@@ -22,4 +22,7 @@ public interface ProspectRepository extends JpaRepository<Prospect, Long>{
     Optional<Prospect> findByEmailAndEntrepriseId(String email, Long entrepriseId);
     Optional<Prospect> findByTelephoneAndEntrepriseId(String telephone, Long entrepriseId);
 
+    // Compter tous les prospects d'une entreprise
+    long countByEntrepriseId(Long entrepriseId);
+
 }

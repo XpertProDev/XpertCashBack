@@ -1,15 +1,12 @@
 package com.xpertcash.service;
 
 import java.nio.file.Files;
-import java.util.List;
-import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
-import com.xpertcash.DTOs.EntrepriseDTO;
 import com.xpertcash.DTOs.UpdateEntrepriseDTO;
 import com.xpertcash.entity.Entreprise;
 import com.xpertcash.repository.EntrepriseRepository;
@@ -35,79 +32,13 @@ public class EntrepriseService {
 
     /**
      * Récupérer une entreprise par son id.
+     * (Méthode générique pouvant être utilisée par plusieurs services.)
      */
     public Entreprise getEntrepriseById(Long id) {
         return entrepriseRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Entreprise non trouvée"));
     }
 
-    /**
-     * Activer ou désactiver une entreprise.
-     * Si active == false, aucun utilisateur de cette entreprise ne devra pouvoir se connecter.
-     */
-    public void setEntrepriseActive(Long id, boolean active) {
-        Entreprise entreprise = getEntrepriseById(id);
-        entreprise.setActive(active);
-        entrepriseRepository.save(entreprise);
-    }
-
-    /**
-     * Désactiver une entreprise.
-     */
-    public void desactiverEntreprise(Long id) {
-        setEntrepriseActive(id, false);
-    }
-
-    /**
-     * Réactiver une entreprise.
-     */
-    public void activerEntreprise(Long id) {
-        setEntrepriseActive(id, true);
-    }
-
-
-    public List<EntrepriseDTO> getAllEntreprisesWithInfo() {
-        // Récupérer toutes les entreprises
-        List<Entreprise> entreprises = entrepriseRepository.findAll();
-
-        if (entreprises.isEmpty()) {
-            throw new RuntimeException("Aucune entreprise trouvée.");
-        }
-
-        // Mapper les entreprises en DTO
-        List<EntrepriseDTO> entrepriseDTOs = entreprises.stream()
-                .map(entreprise -> new EntrepriseDTO(
-                        entreprise.getId(),
-                        entreprise.getNomEntreprise(),
-                        entreprise.getAdmin() != null ? entreprise.getAdmin().getNomComplet() : "Aucun Admin", 
-                        entreprise.getCreatedAt(),
-                        entreprise.getAdresse(),
-                        entreprise.getLogo(),
-                        entreprise.getSiege(),
-                        entreprise.getNina(),
-                        entreprise.getNif(),
-                        entreprise.getBanque(),
-                        entreprise.getEmail(),
-                        entreprise.getTelephone(),
-                        entreprise.getPays(),
-                        entreprise.getSecteur(),
-                        entreprise.getRccm(),
-                        entreprise.getSiteWeb(),
-                        entreprise.getSignataire(),
-                        entreprise.getSignataireNom(),
-                        entreprise.getPrefixe(),
-                        entreprise.getSuffixe(),
-                        entreprise.getTauxTva(),
-                        entreprise.getSignaturNum(),
-                        entreprise.getCachetNum()
-
-                ))
-                .collect(Collectors.toList());
-
-        return entrepriseDTOs;
-    }
-
-   
     @Transactional
     public void updateEntreprise(Long id, UpdateEntrepriseDTO dto, MultipartFile logoFile,
     MultipartFile imageSignatureFile, MultipartFile imageCachetFile) {

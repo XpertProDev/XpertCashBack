@@ -367,11 +367,13 @@ public class UsersService {
             Date now = new Date();
             Date expirationDate = new Date(now.getTime() + expirationTime);
 
-            boolean isAdmin = user.getRole().getName().equals(RoleType.ADMIN);
+            boolean isAdminRole = user.getRole().getName().equals(RoleType.ADMIN)
+                    || user.getRole().getName().equals(RoleType.SUPER_ADMIN);
 
             boolean userActivated = user.isEnabledLien();
-            boolean adminActivated = admin.isEnabledLien();
-            boolean userActivationPossible = isAdmin ? (user.isActivatedLien() || within24Hours) : true;
+            // Pour éviter les NullPointer (cas du SUPER_ADMIN ou entreprises sans admin défini)
+            boolean adminActivated = (admin != null) ? admin.isEnabledLien() : true;
+            boolean userActivationPossible = isAdminRole ? (user.isActivatedLien() || within24Hours) : true;
 
             return Jwts.builder()
                     .setSubject(user.getUuid())
