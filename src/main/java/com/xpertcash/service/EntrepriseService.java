@@ -33,6 +33,39 @@ public class EntrepriseService {
     private ImageStorageService imageStorageService;
 
 
+    /**
+     * Récupérer une entreprise par son id.
+     */
+    public Entreprise getEntrepriseById(Long id) {
+        return entrepriseRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Entreprise non trouvée"));
+    }
+
+    /**
+     * Activer ou désactiver une entreprise.
+     * Si active == false, aucun utilisateur de cette entreprise ne devra pouvoir se connecter.
+     */
+    public void setEntrepriseActive(Long id, boolean active) {
+        Entreprise entreprise = getEntrepriseById(id);
+        entreprise.setActive(active);
+        entrepriseRepository.save(entreprise);
+    }
+
+    /**
+     * Désactiver une entreprise.
+     */
+    public void desactiverEntreprise(Long id) {
+        setEntrepriseActive(id, false);
+    }
+
+    /**
+     * Réactiver une entreprise.
+     */
+    public void activerEntreprise(Long id) {
+        setEntrepriseActive(id, true);
+    }
+
+
     public List<EntrepriseDTO> getAllEntreprisesWithInfo() {
         // Récupérer toutes les entreprises
         List<Entreprise> entreprises = entrepriseRepository.findAll();

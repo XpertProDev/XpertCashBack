@@ -90,6 +90,9 @@ public class Entreprise {
     @Column(nullable = true)
     private String adresse;
 
+    @Column(nullable = true)
+    private Boolean active = true;
+
     @ManyToOne
     @JoinColumn(name = "admin_id", nullable = true)  
     private User admin;

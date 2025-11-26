@@ -330,6 +330,13 @@ public class UsersService {
     User user = usersRepository.findByEmail(email)
         .orElseThrow(() -> new RuntimeException("Email ou mot de passe incorrect"));
 
+    // Vérifier si l'entreprise de l'utilisateur est désactivée
+    Entreprise entreprise = user.getEntreprise();
+    // On considère qu'une valeur null pour "active" signifie "active" (compatibilité anciennes données)
+    if (entreprise != null && Boolean.FALSE.equals(entreprise.getActive())) {
+        throw new RuntimeException("Cette entreprise est désactivée. La connexion est impossible.");
+    }
+
     if (!passwordEncoder.matches(password, user.getPassword())) {
         throw new RuntimeException("Email ou mot de passe incorrect");
     }

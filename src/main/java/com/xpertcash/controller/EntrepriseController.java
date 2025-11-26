@@ -55,6 +55,35 @@ public class EntrepriseController {
         return ResponseEntity.ok(dto);
     }
 
+    /**
+     * Désactiver une entreprise.
+     * Une fois désactivée, aucun utilisateur de cette entreprise ne doit pouvoir se connecter.
+     */
+    @PatchMapping("/entreprise/{entrepriseId}/desactiver")
+    public ResponseEntity<?> desactiverEntreprise(@PathVariable Long entrepriseId) {
+        try {
+            entrepriseService.desactiverEntreprise(entrepriseId);
+            return ResponseEntity.ok(Collections.singletonMap("message", "Entreprise désactivée avec succès."));
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Collections.singletonMap("error", e.getMessage()));
+        }
+    }
+
+    /**
+     * Réactiver une entreprise précédemment désactivée.
+     */
+    @PatchMapping("/entreprise/{entrepriseId}/activer")
+    public ResponseEntity<?> activerEntreprise(@PathVariable Long entrepriseId) {
+        try {
+            entrepriseService.activerEntreprise(entrepriseId);
+            return ResponseEntity.ok(Collections.singletonMap("message", "Entreprise réactivée avec succès."));
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Collections.singletonMap("error", e.getMessage()));
+        }
+    }
+
     
     @PatchMapping(value = "/updateEntreprise/{entrepriseId}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE) 
     public ResponseEntity<?> updateEntreprise(
