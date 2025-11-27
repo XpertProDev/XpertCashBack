@@ -9,6 +9,7 @@ import org.springframework.boot.CommandLineRunner;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Component;
 
+import com.xpertcash.configuration.QRCodeGenerator;
 import com.xpertcash.entity.Entreprise;
 import com.xpertcash.entity.Role;
 import com.xpertcash.entity.User;
@@ -16,6 +17,7 @@ import com.xpertcash.entity.Enum.RoleType;
 import com.xpertcash.repository.EntrepriseRepository;
 import com.xpertcash.repository.RoleRepository;
 import com.xpertcash.repository.UsersRepository;
+import com.xpertcash.service.IMAGES.ImageStorageService;
 
 /**
  * Initialise automatiquement un compte SUPER_ADMIN au démarrage de l'application.
@@ -39,6 +41,9 @@ public class SuperAdminInitializer implements CommandLineRunner {
 
     @Autowired
     private BCryptPasswordEncoder passwordEncoder;
+
+    @Autowired
+    private ImageStorageService imageStorageService;
 
     @Override
     public void run(String... args) {
@@ -80,6 +85,7 @@ public class SuperAdminInitializer implements CommandLineRunner {
                     e.setLogo("");
                     e.setSiege("Ville");
                     e.setActive(true);
+                    //codeqr
                     return entrepriseRepository.save(e);
                 });
 
@@ -108,6 +114,19 @@ public class SuperAdminInitializer implements CommandLineRunner {
         superAdmin.setLocked(false);
         superAdmin.setEntreprise(superAdminEntreprise);
         superAdmin.setRole(superAdminRole);
+
+        // Générer le QR code pour le SUPER_ADMIN (même logique que pour registerUsers)
+        try {
+            String qrContent = personalCode;
+            byte[] qrCodeBytes = QRCodeGenerator.generateQRCode(qrContent, 200, 200);
+
+            String fileName = UUID.randomUUID().toString();
+            String qrCodeUrl = imageStorageService.saveQrCodeImage(qrCodeBytes, fileName);
+
+            superAdmin.setQrCodeUrl(qrCodeUrl);
+        } catch (Exception e) {
+            System.err.println("Erreur génération QR Code SUPER_ADMIN: " + e.getMessage());
+        }
 
         // Sauvegarder le super admin
         superAdmin = usersRepository.save(superAdmin);
