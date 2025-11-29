@@ -38,7 +38,7 @@ public class EntrepriseService {
         return entrepriseRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Entreprise non trouvée"));
     }
-
+   
     @Transactional
     public void updateEntreprise(Long id, UpdateEntrepriseDTO dto, MultipartFile logoFile,
     MultipartFile imageSignatureFile, MultipartFile imageCachetFile) {

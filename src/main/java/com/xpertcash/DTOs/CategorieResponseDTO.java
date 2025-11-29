@@ -16,6 +16,7 @@ import lombok.Data;
 public class CategorieResponseDTO {
     private Long id;
     private String nom;
+    private String description;
     private long produitCount;
     private LocalDateTime createdAt;
     private String origineCreation;
@@ -24,6 +25,7 @@ public class CategorieResponseDTO {
     public CategorieResponseDTO(Categorie categorie) {
         this.id = categorie.getId();
         this.nom = categorie.getNom();
+        this.description = categorie.getDescription();
         this.produitCount = categorie.getProduitCount();
         this.createdAt = categorie.getCreatedAt();
         this.origineCreation = categorie.getOrigineCreation();

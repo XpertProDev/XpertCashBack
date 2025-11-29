@@ -15,6 +15,7 @@ public class EntreeGeneraleResponseDTO {
     private String designation;
     private Long categorieId;
     private String categorieNom;
+    private String categorieDescription;
     private Double prixUnitaire;
     private Integer quantite;
     private Double montant;

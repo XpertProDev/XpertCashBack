@@ -114,8 +114,10 @@ public class BoutiqueService {
     boolean isAdminOrManager = CentralAccess.isAdminOrManagerOfEntreprise(user, entrepriseId);
     boolean hasPermission = user.getRole().hasPermission(PermissionType.GERER_BOUTIQUE);
     boolean isVendeur = user.getRole().getName() == RoleType.VENDEUR;
+    //soit role type UTILISATEUR avec la permission VENDRE_PRODUITS
+    boolean isUtilisateur = user.getRole().getName() == RoleType.UTILISATEUR && user.getRole().hasPermission(PermissionType.VENDRE_PRODUITS);
 
-    if (!isAdminOrManager && !hasPermission && !isVendeur) {
+    if (!isAdminOrManager && !hasPermission && !isVendeur && !isUtilisateur) {
         throw new RuntimeException("Vous n'avez pas les droits pour consulter les boutiques de cette entreprise !");
     }
 

@@ -80,13 +80,13 @@ public class CategorieService {
         Entreprise entreprise = user.getEntreprise();
         if (entreprise == null) throw new RuntimeException("Aucune entreprise associée");
 
-        boolean isAdminOrManager = CentralAccess.isAdminOrManagerOfEntreprise(user, entreprise.getId());
-        boolean hasPermissionGestionProduits = user.getRole().hasPermission(PermissionType.GERER_PRODUITS);
-        boolean isVendeur = user.getRole().hasPermission(PermissionType.VENDRE_PRODUITS);
+        // boolean isAdminOrManager = CentralAccess.isAdminOrManagerOfEntreprise(user, entreprise.getId());
+        // boolean hasPermissionGestionProduits = user.getRole().hasPermission(PermissionType.GERER_PRODUITS);
+        // boolean isVendeur = user.getRole().hasPermission(PermissionType.VENDRE_PRODUITS);
 
-        if (!isAdminOrManager && !hasPermissionGestionProduits && !isVendeur) {
-            throw new RuntimeException("Accès refusé");
-        }
+        // if (!isAdminOrManager && !hasPermissionGestionProduits && !isVendeur) {
+        //     throw new RuntimeException("Accès refusé");
+        // }
 
         // --- Récupérer toutes les catégories de l'entreprise ---
         List<Categorie> allCategories = categorieRepository.findByEntrepriseId(entreprise.getId());

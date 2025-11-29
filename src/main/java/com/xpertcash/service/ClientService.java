@@ -77,15 +77,15 @@ public class ClientService {
     }
 
     // 🔐 Vérifier que l'utilisateur a le rôle ou la permission appropriée
-    RoleType role = user.getRole().getName();
-    boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
-    boolean hasPermission = user.getRole().hasPermission(PermissionType.GERER_CLIENTS);
-    boolean hasPermissionGestionFacturation = user.getRole().hasPermission(PermissionType.GESTION_FACTURATION);
+    // RoleType role = user.getRole().getName();
+    // boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
+    // boolean hasPermission = user.getRole().hasPermission(PermissionType.GERER_CLIENTS);
+    // boolean hasPermissionGestionFacturation = user.getRole().hasPermission(PermissionType.GESTION_FACTURATION);
 
 
-    if (!isAdminOrManager && !hasPermission && !hasPermissionGestionFacturation) {
-        throw new RuntimeException("Accès refusé : vous n'avez pas les droits pour créer un client !");
-    }
+    // if (!isAdminOrManager && !hasPermission && !hasPermissionGestionFacturation) {
+    //     throw new RuntimeException("Accès refusé : vous n'avez pas les droits pour créer un client !");
+    // }
 
 
         client.setEntreprise(entrepriseUtilisateur);
@@ -221,16 +221,16 @@ public class ClientService {
     }
 
     // 2. Vérification des droits
-    boolean isAdminOrManager = CentralAccess.isAdminOrManagerOfEntreprise(user, entreprise.getId());
-    boolean hasPermissionGestionClients = user.getRole().hasPermission(PermissionType.GERER_CLIENTS);
-    boolean hasPermissionGestionFacturation = user.getRole().hasPermission(PermissionType.GESTION_FACTURATION);
+    // boolean isAdminOrManager = CentralAccess.isAdminOrManagerOfEntreprise(user, entreprise.getId());
+    // boolean hasPermissionGestionClients = user.getRole().hasPermission(PermissionType.GERER_CLIENTS);
+    // boolean hasPermissionGestionFacturation = user.getRole().hasPermission(PermissionType.GESTION_FACTURATION);
     
 
 
-    // Si l'utilisateur n'est ni Admin, ni Manager, ni n'a la permission de gérer les clients
-    if (!isAdminOrManager && !hasPermissionGestionClients && !hasPermissionGestionFacturation) {
-        throw new RuntimeException("Accès refusé : vous n'avez pas les droits nécessaires pour consulter les clients.");
-    }
+    // // Si l'utilisateur n'est ni Admin, ni Manager, ni n'a la permission de gérer les clients
+    // if (!isAdminOrManager && !hasPermissionGestionClients && !hasPermissionGestionFacturation) {
+    //     throw new RuntimeException("Accès refusé : vous n'avez pas les droits nécessaires pour consulter les clients.");
+    // }
 
     // 3. Vérification que l'utilisateur est bien associé à l'entreprise
     if (!entreprise.getId().equals(user.getEntreprise().getId())) {
@@ -261,12 +261,12 @@ public class ClientService {
     }
 
     // Vérification avec CentralAccess
-    boolean isAdminOrManager = CentralAccess.isAdminOrManagerOfEntreprise(user, entreprise.getId());
-    boolean hasPermissionGestionClients = user.getRole().hasPermission(PermissionType.GERER_CLIENTS);
+    // boolean isAdminOrManager = CentralAccess.isAdminOrManagerOfEntreprise(user, entreprise.getId());
+    // boolean hasPermissionGestionClients = user.getRole().hasPermission(PermissionType.GERER_CLIENTS);
 
-    if (!isAdminOrManager && !hasPermissionGestionClients) {
-        throw new RuntimeException("Accès refusé : vous n'avez pas les droits nécessaires pour consulter les clients.");
-    }
+    // if (!isAdminOrManager && !hasPermissionGestionClients) {
+    //     throw new RuntimeException("Accès refusé : vous n'avez pas les droits nécessaires pour consulter les clients.");
+    // }
 
     // 2. Retourner uniquement les EntrepriseClient liés à cette entreprise
     return entrepriseClientRepository.findByEntrepriseId(entreprise.getId());
