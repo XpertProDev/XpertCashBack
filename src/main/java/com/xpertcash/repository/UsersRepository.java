@@ -2,6 +2,7 @@ package com.xpertcash.repository;
 
 import com.xpertcash.entity.Entreprise;
 import com.xpertcash.entity.User;
+import com.xpertcash.entity.Role;
 import com.xpertcash.entity.Enum.RoleType;
 
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -38,6 +39,9 @@ public interface UsersRepository extends JpaRepository<User, Long> {
     
 
     boolean existsByPersonalCode(String personalCode);
+    
+    // Utilisateurs partageant un même rôle
+    List<User> findByRole(Role role);
     //List<User> findByBoutiqueIdAndRole_Name(Long boutiqueId, RoleType roleName);
 
     Optional<User> findByEntrepriseIdAndRole_NameIn(Long entrepriseId, List<RoleType> roles);
