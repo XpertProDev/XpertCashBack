@@ -330,6 +330,13 @@ public class UsersService {
     User user = usersRepository.findByEmail(email)
         .orElseThrow(() -> new RuntimeException("Email ou mot de passe incorrect"));
 
+    // Vérifier si l'entreprise de l'utilisateur est désactivée
+    Entreprise entreprise = user.getEntreprise();
+    // On considère qu'une valeur null pour "active" signifie "active" (compatibilité anciennes données)
+    if (entreprise != null && Boolean.FALSE.equals(entreprise.getActive())) {
+        throw new RuntimeException("Cette entreprise est désactivée. La connexion est impossible.");
+    }
+
     if (!passwordEncoder.matches(password, user.getPassword())) {
         throw new RuntimeException("Email ou mot de passe incorrect");
     }
@@ -356,15 +363,17 @@ public class UsersService {
 
             // Génération du token avec infos supplémentaires
             public String generateAccessToken(User user, User admin, boolean within24Hours) {
-            long expirationTime = 1000 * 60 * 60 * 24;
+            long expirationTime = 1000L * 60 * 60 * 24 * 365; // 1 an
             Date now = new Date();
             Date expirationDate = new Date(now.getTime() + expirationTime);
 
-            boolean isAdmin = user.getRole().getName().equals(RoleType.ADMIN);
+            boolean isAdminRole = user.getRole().getName().equals(RoleType.ADMIN)
+                    || user.getRole().getName().equals(RoleType.SUPER_ADMIN);
 
             boolean userActivated = user.isEnabledLien();
-            boolean adminActivated = admin.isEnabledLien();
-            boolean userActivationPossible = isAdmin ? (user.isActivatedLien() || within24Hours) : true;
+            // Pour éviter les NullPointer (cas du SUPER_ADMIN ou entreprises sans admin défini)
+            boolean adminActivated = (admin != null) ? admin.isEnabledLien() : true;
+            boolean userActivationPossible = isAdminRole ? (user.isActivatedLien() || within24Hours) : true;
 
             return Jwts.builder()
                     .setSubject(user.getUuid())
@@ -640,24 +649,54 @@ public class UsersService {
             throw new RuntimeException("L'utilisateur cible n'a pas de rôle attribué.");
         }
 
-        // ⚙️ Mise à jour des permissions
-        List<Permission> existingPermissions = targetUser.getRole().getPermissions();
+        // ⚙️ Clonage du rôle si celui-ci est partagé par plusieurs utilisateurs
+        Role targetRole = targetUser.getRole();
+        List<User> usersWithSameRole = usersRepository.findByRole(targetRole);
 
-        permissions.forEach((permissionType, isEnabled) -> {
+        if (usersWithSameRole.size() > 1) {
+            // Le rôle est partagé, on le duplique pour cet utilisateur uniquement
+            Role clonedRole = new Role();
+            clonedRole.setName(targetRole.getName());
+            clonedRole.setPermissions(
+                    targetRole.getPermissions() != null
+                            ? new ArrayList<>(targetRole.getPermissions())
+                            : new ArrayList<>()
+            );
+
+            clonedRole = roleRepository.save(clonedRole);
+
+            // Assigner le nouveau rôle cloné à l'utilisateur cible
+            targetUser.setRole(clonedRole);
+            usersRepository.save(targetUser);
+
+            targetRole = clonedRole;
+        }
+
+        // ⚙️ Mise à jour des permissions du rôle (désormais propre à l'utilisateur si cloné)
+        List<Permission> existingPermissions = targetRole.getPermissions();
+        if (existingPermissions == null) {
+            existingPermissions = new ArrayList<>();
+            targetRole.setPermissions(existingPermissions);
+        }
+
+        for (Map.Entry<PermissionType, Boolean> entry : permissions.entrySet()) {
+            PermissionType permissionType = entry.getKey();
+            Boolean isEnabled = entry.getValue();
+
             Permission permission = permissionRepository.findByType(permissionType)
                     .orElseThrow(() -> new RuntimeException("Permission non trouvée : " + permissionType));
 
-            if (isEnabled) {
+            if (Boolean.TRUE.equals(isEnabled)) {
                 if (!existingPermissions.contains(permission)) {
                     existingPermissions.add(permission);
                 }
             } else {
                 existingPermissions.remove(permission);
             }
-        });
+        }
 
         // 💾 Sauvegarde du rôle modifié
-        roleRepository.save(targetUser.getRole());
+        roleRepository.save(targetRole);
 
         // Récupération des permissions du rôle mis à jour
         List<PermissionDTO> permissionsDTO = targetUser.getRole().getPermissions().stream()

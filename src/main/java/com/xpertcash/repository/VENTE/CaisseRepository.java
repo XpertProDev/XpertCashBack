@@ -40,4 +40,8 @@ public interface CaisseRepository extends JpaRepository<Caisse, Long> {
     @Query("SELECT c FROM Caisse c WHERE c.boutique.entreprise.id = :entrepriseId AND c.statut = :statut ORDER BY c.dateFermeture DESC")
     List<Caisse> findByEntrepriseIdAndStatutOrderByDateFermetureDesc(@Param("entrepriseId") Long entrepriseId, @Param("statut") StatutCaisse statut);
 
+    // Compter les caisses par entreprise et statut
+    @Query("SELECT COUNT(c) FROM Caisse c WHERE c.boutique.entreprise.id = :entrepriseId AND c.statut = :statut")
+    long countByEntrepriseIdAndStatut(@Param("entrepriseId") Long entrepriseId, @Param("statut") StatutCaisse statut);
+
 }

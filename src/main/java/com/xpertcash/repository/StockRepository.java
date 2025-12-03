@@ -31,6 +31,8 @@ public interface StockRepository extends JpaRepository<Stock, Long> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     List<Stock> findAllByProduitIdInWithLock(@Param("ids") List<Long> ids);
 
-
+    // Compter tous les enregistrements de stock pour une entreprise
+    @Query("SELECT COUNT(s) FROM Stock s WHERE s.boutique.entreprise.id = :entrepriseId")
+    long countByEntrepriseId(@Param("entrepriseId") Long entrepriseId);
 }
 

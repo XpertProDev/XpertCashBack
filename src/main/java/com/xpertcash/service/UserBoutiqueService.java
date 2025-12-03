@@ -94,13 +94,13 @@ public class UserBoutiqueService {
     Role currentRole = user.getRole();
 
     if (currentRole != null && currentRole.getName() == RoleType.UTILISATEUR) {
+        // Cas UTILISATEUR : on peut éventuellement le promouvoir au rôle VENDEUR
         if (currentRole.getPermissions().isEmpty()) {
             Role vendeurRole = roleService.getOrCreateVendeurRole();
 
             Permission ventePermission = permissionRepository.findByType(PermissionType.VENDRE_PRODUITS)
                     .orElseThrow(() -> new RuntimeException("Permission 'VENDRE_PRODUITS' non trouvée"));
 
-            // Copier et modifier la liste des permissions
             List<Permission> updatedPermissions = new ArrayList<>(vendeurRole.getPermissions());
             if (!updatedPermissions.contains(ventePermission)) {
                 updatedPermissions.add(ventePermission);
@@ -112,8 +112,9 @@ public class UserBoutiqueService {
             usersRepository.save(user);
             resultMessages.add("Rôle VENDEUR attribué à l'utilisateur avec la permission 'VENDRE_PRODUITS'.");
         } else {
-            if (!currentRole.getPermissions().stream()
-                    .anyMatch(permission -> permission.getType() == PermissionType.VENDRE_PRODUITS)) {
+            // UTILISATEUR avec déjà des permissions : on ajoute juste VENDRE_PRODUITS si manquante
+            if (currentRole.getPermissions().stream()
+                    .noneMatch(permission -> permission.getType() == PermissionType.VENDRE_PRODUITS)) {
                 Permission ventePermission = permissionRepository.findByType(PermissionType.VENDRE_PRODUITS)
                         .orElseThrow(() -> new RuntimeException("Permission 'VENDRE_PRODUITS' non trouvée"));
 
@@ -127,7 +128,28 @@ public class UserBoutiqueService {
                 resultMessages.add("Permission 'VENDRE_PRODUITS' ajoutée au rôle UTILISATEUR.");
             }
         }
+    } else if (currentRole != null && currentRole.getName() == RoleType.MANAGER) {
+        // Cas MANAGER : il doit rester MANAGER, on ajoute seulement la permission VENDRE_PRODUITS
+        if (currentRole.getPermissions() == null) {
+            currentRole.setPermissions(new ArrayList<>());
+        }
+
+        if (currentRole.getPermissions().stream()
+                .noneMatch(permission -> permission.getType() == PermissionType.VENDRE_PRODUITS)) {
+            Permission ventePermission = permissionRepository.findByType(PermissionType.VENDRE_PRODUITS)
+                    .orElseThrow(() -> new RuntimeException("Permission 'VENDRE_PRODUITS' non trouvée"));
+
+            List<Permission> updatedPermissions = new ArrayList<>(currentRole.getPermissions());
+            if (!updatedPermissions.contains(ventePermission)) {
+                updatedPermissions.add(ventePermission);
+            }
+            currentRole.setPermissions(updatedPermissions);
+            roleRepository.save(currentRole);
+
+            resultMessages.add("Permission 'VENDRE_PRODUITS' ajoutée au rôle MANAGER.");
+        }
     } else if (currentRole == null || currentRole.getName() != RoleType.VENDEUR) {
+        // Autres cas (par ex. sans rôle ou autre rôle spécifique) : on bascule vers VENDEUR
         Role vendeurRole = roleService.getOrCreateVendeurRole();
 
         Permission ventePermission = permissionRepository.findByType(PermissionType.VENDRE_PRODUITS)
@@ -235,16 +257,20 @@ public List<String> retirerVendeurDesBoutiques(HttpServletRequest request, Long 
                 resultMessages.add("Permission 'VENDRE_PRODUITS' retirée du rôle VENDEUR.");
             }
 
-            // Si après avoir retiré cette permission, il n'y a plus de permissions, rétrograder au rôle UTILISATEUR
+            // Si après avoir retiré cette permission, il n'y a plus de permissions :
+            // - si le rôle est MANAGER, il reste MANAGER (on ne rétrograde pas)
+            // - sinon, on rétrograde au rôle UTILISATEUR
             if (vendeurRole.getPermissions().isEmpty()) {
-                // Retirer l'utilisateur du rôle VENDEUR
-                Role utilisateurRole = roleRepository.findByName(RoleType.UTILISATEUR)
-                        .orElseThrow(() -> new RuntimeException("Rôle UTILISATEUR non trouvé"));
+                if (vendeurRole.getName() == RoleType.MANAGER) {
+                    resultMessages.add("L'utilisateur conserve le rôle MANAGER sans la permission 'VENDRE_PRODUITS'.");
+                } else {
+                    Role utilisateurRole = roleRepository.findByName(RoleType.UTILISATEUR)
+                            .orElseThrow(() -> new RuntimeException("Rôle UTILISATEUR non trouvé"));
 
-                // Affecter le rôle UTILISATEUR
-                user.setRole(utilisateurRole);
-                usersRepository.save(user);  // Sauvegarde l'utilisateur avec son nouveau rôle
-                resultMessages.add("Utilisateur rétrogradé au rôle UTILISATEUR car il n'a plus de permission 'VENDRE_PRODUITS'.");
+                    user.setRole(utilisateurRole);
+                    usersRepository.save(user);  // Sauvegarde l'utilisateur avec son nouveau rôle
+                    resultMessages.add("Utilisateur rétrogradé au rôle UTILISATEUR car il n'a plus de permission 'VENDRE_PRODUITS'.");
+                }
             }
         }
     }

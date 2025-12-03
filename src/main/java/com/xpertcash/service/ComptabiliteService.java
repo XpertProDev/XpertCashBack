@@ -1301,11 +1301,17 @@ public class ComptabiliteService {
         String nomTrim = nom.trim();
         Categorie categorieExistante = categorieRepository.findByNomAndEntrepriseId(nomTrim, user.getEntreprise().getId());
         if (categorieExistante != null) {
+            // Mettre à jour la description si elle est fournie
+            if (description != null && !description.trim().isEmpty()) {
+                categorieExistante.setDescription(description.trim());
+                categorieExistante = categorieRepository.save(categorieExistante);
+            }
             return mapCategorieToCategorieEntreeDTO(categorieExistante);
         }
 
         Categorie categorie = new Categorie();
         categorie.setNom(nomTrim);
+        categorie.setDescription(description != null ? description.trim() : null);
         categorie.setEntreprise(user.getEntreprise());
         categorie.setCreatedAt(LocalDateTime.now());
         categorie.setProduitCount(0);
@@ -1808,6 +1814,7 @@ public class ComptabiliteService {
         if (entree.getCategorie() != null) {
             dto.setCategorieId(entree.getCategorie().getId());
             dto.setCategorieNom(entree.getCategorie().getNom());
+            dto.setCategorieDescription(entree.getCategorie().getDescription());
         }
         dto.setPrixUnitaire(entree.getPrixUnitaire());
         dto.setQuantite(entree.getQuantite());
@@ -1842,7 +1849,7 @@ public class ComptabiliteService {
         CategorieEntreeDTO dto = new CategorieEntreeDTO();
         dto.setId(categorie.getId());
         dto.setNom(categorie.getNom());
-        dto.setDescription(categorie.getOrigineCreation() != null ? "Créée depuis " + categorie.getOrigineCreation() : null);
+        dto.setDescription(categorie.getDescription());
         dto.setOrigineCreation(categorie.getOrigineCreation());
         if (categorie.getEntreprise() != null) {
             dto.setEntrepriseId(categorie.getEntreprise().getId());

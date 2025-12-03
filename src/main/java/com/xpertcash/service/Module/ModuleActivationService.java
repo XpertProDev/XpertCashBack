@@ -189,7 +189,7 @@ public boolean isModuleActifPourEntreprise(Entreprise entreprise, String codeMod
         essai.setEntreprise(entreprise);
         essai.setModule(module);
         essai.setDateDebutEssai(now);
-        essai.setDateFinEssai(now.plusDays(30));
+        essai.setDateFinEssai(now.plusDays(365));
         essais.add(essai);
     }
 
@@ -407,10 +407,10 @@ public void activerModuleAvecPaiement(Long userId,
     Entreprise entreprise = user.getEntreprise();
     List<AppModule> tousModules = moduleRepository.findAll();
 
-    // 👉 Récupération globale des temps restants par module
+    //  Récupération globale des temps restants par module
     Map<String, String> tempsRestantParModule = consulterTempsRestantEssaiParModule(entreprise);
 
-    // 👉 Transformation de la liste avec filtrage des sous-modules et ajout du temps d'essai
+    // Transformation de la liste avec filtrage des sous-modules et ajout du temps d'essai
     List<ModuleDTO> modules = tousModules.stream()
             .filter(module -> !SOUS_MODULES_MASQUES.contains(module.getCode()))
             .map(module -> {
@@ -452,7 +452,7 @@ public void activerModuleAvecPaiement(Long userId,
     essai.setEntreprise(entreprise);
     essai.setModule(module);
     essai.setDateDebutEssai(now);
-    essai.setDateFinEssai(now.plusDays(30));
+    essai.setDateFinEssai(now.plusDays(365));
 
     entrepriseModuleEssaiRepository.save(essai);
 }

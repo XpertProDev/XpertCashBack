@@ -49,14 +49,14 @@ public class EntrepriseClientService {
         }
 
         // 🔒 Vérifier les droits
-        boolean isAdminOrManager = CentralAccess.isAdminOrManagerOfEntreprise(user, entreprise.getId());
-        boolean hasPermissionGestionClient = user.getRole().hasPermission(PermissionType.GERER_CLIENTS);
-        boolean hasPermissionGestionFacturation = user.getRole().hasPermission(PermissionType.GESTION_FACTURATION);
+        // boolean isAdminOrManager = CentralAccess.isAdminOrManagerOfEntreprise(user, entreprise.getId());
+        // boolean hasPermissionGestionClient = user.getRole().hasPermission(PermissionType.GERER_CLIENTS);
+        // boolean hasPermissionGestionFacturation = user.getRole().hasPermission(PermissionType.GESTION_FACTURATION);
 
 
-        if (!isAdminOrManager && !hasPermissionGestionClient && !hasPermissionGestionFacturation) {
-            throw new RuntimeException("Accès refusé : vous n'avez pas les permissions pour créer une entreprise cliente.");
-        }
+        // if (!isAdminOrManager && !hasPermissionGestionClient && !hasPermissionGestionFacturation) {
+        //     throw new RuntimeException("Accès refusé : vous n'avez pas les permissions pour créer une entreprise cliente.");
+        // }
 
         // ✅ Vérification du nom
         if (entrepriseClient.getNom() == null || entrepriseClient.getNom().trim().isEmpty()) {
@@ -138,14 +138,14 @@ public class EntrepriseClientService {
     }
  
     // 🔒 Autorisation
-    boolean isAdminOrManager = CentralAccess.isAdminOrManagerOfEntreprise(user, entreprise.getId());
-    boolean hasPermissionGestionClient = user.getRole().hasPermission(PermissionType.GERER_CLIENTS);
-    boolean hasPermissionGestionFacturation = user.getRole().hasPermission(PermissionType.GESTION_FACTURATION);
+    // boolean isAdminOrManager = CentralAccess.isAdminOrManagerOfEntreprise(user, entreprise.getId());
+    // boolean hasPermissionGestionClient = user.getRole().hasPermission(PermissionType.GERER_CLIENTS);
+    // boolean hasPermissionGestionFacturation = user.getRole().hasPermission(PermissionType.GESTION_FACTURATION);
 
 
-    if (!isAdminOrManager && !hasPermissionGestionClient  && !hasPermissionGestionFacturation) {
-        throw new RuntimeException("Accès refusé : vous n'avez pas les droits pour voir les entreprises clientes.");
-    }
+    // if (!isAdminOrManager && !hasPermissionGestionClient  && !hasPermissionGestionFacturation) {
+    //     throw new RuntimeException("Accès refusé : vous n'avez pas les droits pour voir les entreprises clientes.");
+    // }
 
     // 🔎 Récupération filtrée
     return entrepriseClientRepository.findByEntrepriseId(entreprise.getId());

@@ -10,6 +10,7 @@ public class EntrepriseDTO {
         private Long id;
         private String nom;
         private String adminNom;
+        private String adminPhone;
         private LocalDateTime createdAt;
         private String adresse;
         private String logo;

@@ -14,17 +14,10 @@ import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.http.MediaType;
-
-
-
-import java.util.Collections;
-
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.xpertcash.DTOs.EntrepriseDTO;
 import com.xpertcash.DTOs.UpdateEntrepriseDTO;
 import com.xpertcash.service.EntrepriseService;
 
-import io.swagger.v3.oas.annotations.parameters.RequestBody;
 import jakarta.servlet.http.HttpServletRequest;
 
 @RestController
@@ -34,28 +27,6 @@ public class EntrepriseController {
      @Autowired
     private EntrepriseService entrepriseService;
   
-
-    @GetMapping("/allentreprises")
-    public ResponseEntity<?> getAllEntreprises() {
-        try {
-            List<EntrepriseDTO> entreprises = entrepriseService.getAllEntreprisesWithInfo();
-            return ResponseEntity.ok(entreprises);
-        } catch (RuntimeException e) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body(Collections.singletonMap("error", e.getMessage()));
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Collections.singletonMap("error", "Erreur interne : " + e.getMessage()));
-        }
-    }
-
-    @PostMapping("/debug-dto")
-    public ResponseEntity<?> debugDto(@RequestBody UpdateEntrepriseDTO dto) {
-        System.out.println("➡️ DTO reçu : " + dto);
-        return ResponseEntity.ok(dto);
-    }
-
-    
     @PatchMapping(value = "/updateEntreprise/{entrepriseId}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE) 
     public ResponseEntity<?> updateEntreprise(
             @PathVariable Long entrepriseId,
@@ -81,10 +52,5 @@ public class EntrepriseController {
         }
     }
     
-
-
-
-
-
    
 }

@@ -70,6 +70,9 @@ public interface FactureReelleRepository extends JpaRepository<FactureReelle, Lo
 
     List<FactureReelle> findByEntrepriseIdAndDateCreationBetween(Long entrepriseId, LocalDate start, LocalDate end);
 
+    // Compter toutes les factures réelles d'une entreprise
+    long countByEntrepriseId(Long entrepriseId);
+
 
 
 

@@ -1,15 +1,12 @@
 package com.xpertcash.service;
 
 import java.nio.file.Files;
-import java.util.List;
-import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
-import com.xpertcash.DTOs.EntrepriseDTO;
 import com.xpertcash.DTOs.UpdateEntrepriseDTO;
 import com.xpertcash.entity.Entreprise;
 import com.xpertcash.repository.EntrepriseRepository;
@@ -33,47 +30,14 @@ public class EntrepriseService {
     private ImageStorageService imageStorageService;
 
 
-    public List<EntrepriseDTO> getAllEntreprisesWithInfo() {
-        // Récupérer toutes les entreprises
-        List<Entreprise> entreprises = entrepriseRepository.findAll();
-
-        if (entreprises.isEmpty()) {
-            throw new RuntimeException("Aucune entreprise trouvée.");
-        }
-
-        // Mapper les entreprises en DTO
-        List<EntrepriseDTO> entrepriseDTOs = entreprises.stream()
-                .map(entreprise -> new EntrepriseDTO(
-                        entreprise.getId(),
-                        entreprise.getNomEntreprise(),
-                        entreprise.getAdmin() != null ? entreprise.getAdmin().getNomComplet() : "Aucun Admin", 
-                        entreprise.getCreatedAt(),
-                        entreprise.getAdresse(),
-                        entreprise.getLogo(),
-                        entreprise.getSiege(),
-                        entreprise.getNina(),
-                        entreprise.getNif(),
-                        entreprise.getBanque(),
-                        entreprise.getEmail(),
-                        entreprise.getTelephone(),
-                        entreprise.getPays(),
-                        entreprise.getSecteur(),
-                        entreprise.getRccm(),
-                        entreprise.getSiteWeb(),
-                        entreprise.getSignataire(),
-                        entreprise.getSignataireNom(),
-                        entreprise.getPrefixe(),
-                        entreprise.getSuffixe(),
-                        entreprise.getTauxTva(),
-                        entreprise.getSignaturNum(),
-                        entreprise.getCachetNum()
-
-                ))
-                .collect(Collectors.toList());
-
-        return entrepriseDTOs;
+    /**
+     * Récupérer une entreprise par son id.
+     * (Méthode générique pouvant être utilisée par plusieurs services.)
+     */
+    public Entreprise getEntrepriseById(Long id) {
+        return entrepriseRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Entreprise non trouvée"));
     }
-
    
     @Transactional
     public void updateEntreprise(Long id, UpdateEntrepriseDTO dto, MultipartFile logoFile,

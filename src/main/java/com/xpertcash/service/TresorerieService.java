@@ -74,9 +74,10 @@ public class TresorerieService {
                     .sum();
             
             double entreesGeneralesCaisse = calculerEntreesGeneralesCaisse(data);
+            double entreesPaiementsEspeces = calculerEntreesPaiementsFactures(data, ModePaiement.ESPECES, null);
             
-            // montantCaisse = montantTotal (des caisses fermées) + entrées générales - dépenses générales
-            double montantCaisseReel = caisseDetail.getMontantTotal() + entreesGeneralesCaisse - depensesGeneralesCaisse;
+            // montantCaisse = montantTotal (des caisses fermées) + entrées générales + paiements en espèces - dépenses générales
+            double montantCaisseReel = caisseDetail.getMontantTotal() + entreesGeneralesCaisse + entreesPaiementsEspeces - depensesGeneralesCaisse;
             tresorerie.setMontantCaisse(Math.max(0.0, montantCaisseReel));
 
             TresorerieDTO.BanqueDetail banqueDetail = calculerBanque(data);

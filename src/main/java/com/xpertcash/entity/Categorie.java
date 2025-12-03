@@ -14,6 +14,8 @@ public class Categorie {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
     private String nom;
+    @Column(length = 1000)
+    private String description;
     private long produitCount;
 
     private LocalDateTime createdAt;
