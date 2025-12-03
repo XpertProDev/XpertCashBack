@@ -20,6 +20,7 @@ import io.jsonwebtoken.Claims;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.HttpHeaders;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -27,6 +28,7 @@ import org.springframework.web.multipart.MultipartFile;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.time.LocalDateTime;
+import java.net.URI;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -146,11 +148,15 @@ public ResponseEntity<RegisterResponse> register(@RequestBody RegistrationReques
 
     // Activation du compte via le lien d'activation (GET avec paramètres dans l'URL)
     @GetMapping("/activate")
-    public ResponseEntity<String> activate(@RequestParam("email") String email,
-                                           @RequestParam("code") String code) {
+    public ResponseEntity<?> activate(@RequestParam("email") String email,
+                                      @RequestParam("code") String code) {
         try {
             usersService.activateAccount(email, code);
-            return ResponseEntity.ok("Compte activé avec succès.");
+
+            // Redirection vers la page de connexion du frontend après activation réussie
+            HttpHeaders headers = new HttpHeaders();
+            headers.setLocation(URI.create("https://fere.tchakeda.com/connexion?message=Compte%20activ%C3%A9%20avec%20succ%C3%A8s"));
+            return ResponseEntity.status(HttpStatus.FOUND).headers(headers).build();
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(e.getMessage());
         }

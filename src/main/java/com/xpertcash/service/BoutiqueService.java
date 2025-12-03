@@ -113,15 +113,22 @@ public class BoutiqueService {
     // 🔐 Vérification des rôles et permissions via CentralAccess
     boolean isAdminOrManager = CentralAccess.isAdminOrManagerOfEntreprise(user, entrepriseId);
     boolean hasPermission = user.getRole().hasPermission(PermissionType.GERER_BOUTIQUE);
-    boolean isVendeur = user.getRole().getName() == RoleType.VENDEUR;
-    //soit role type UTILISATEUR avec la permission VENDRE_PRODUITS
-    boolean isUtilisateur = user.getRole().getName() == RoleType.UTILISATEUR && user.getRole().hasPermission(PermissionType.VENDRE_PRODUITS);
+    // Vérifier si l'utilisateur a la permission VENDRE_PRODUITS
+    boolean hasVendrePermission = user.getRole().hasPermission(PermissionType.VENDRE_PRODUITS);
 
-    if (!isAdminOrManager && !hasPermission && !isVendeur && !isUtilisateur) {
+    if (!isAdminOrManager && !hasPermission && !hasVendrePermission) {
         throw new RuntimeException("Vous n'avez pas les droits pour consulter les boutiques de cette entreprise !");
     }
 
-    // ✅ Récupération des boutiques de l'entreprise
+    // ✅ Si l'utilisateur a la permission VENDRE_PRODUITS, retourner uniquement ses boutiques assignées
+    if (hasVendrePermission && !isAdminOrManager && !hasPermission) {
+        return user.getUserBoutiques().stream()
+                .map(userBoutique -> userBoutique.getBoutique())
+                .filter(boutique -> boutique.getEntreprise().getId().equals(entrepriseId))
+                .collect(Collectors.toList());
+    }
+
+    // ✅ Sinon, récupération de toutes les boutiques de l'entreprise
     return boutiqueRepository.findByEntrepriseId(entrepriseId);
 }
 
@@ -142,12 +149,12 @@ public class BoutiqueService {
     Long entrepriseId = boutique.getEntreprise().getId();
 
     // 🔐 Vérification de l'appartenance et des droits
-    boolean isAdminOrManager = CentralAccess.isAdminOrManagerOfEntreprise(user, entrepriseId);
-    boolean hasPermission = user.getRole().hasPermission(PermissionType.GERER_BOUTIQUE);
+    // boolean isAdminOrManager = CentralAccess.isAdminOrManagerOfEntreprise(user, entrepriseId);
+    // boolean hasPermission = user.getRole().hasPermission(PermissionType.GERER_BOUTIQUE);
 
-    if (!isAdminOrManager && !hasPermission) {
-        throw new RuntimeException("Vous n'avez pas les droits pour accéder à cette boutique.");
-    }
+    // if (!isAdminOrManager && !hasPermission) {
+    //     throw new RuntimeException("Vous n'avez pas les droits pour accéder à cette boutique.");
+    // }
 
     // ✅ Vérifie l'appartenance à la même entreprise
     if (!user.getEntreprise().getId().equals(entrepriseId)) {
