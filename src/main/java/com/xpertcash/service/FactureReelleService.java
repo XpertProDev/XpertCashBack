@@ -421,7 +421,7 @@ public void supprimerFactureReelleLiee(FactureProForma proforma) {
     paiement.setMontant(montant);
     paiement.setDatePaiement(LocalDate.now());
     paiement.setFactureReelle(facture);
-    paiement.setModePaiement(modePaiement);
+    paiement.setModePaiement(normaliserModePaiementPourStockage(modePaiement));
     paiement.setEncaissePar(utilisateur);
 
     paiementRepository.save(paiement);
@@ -716,6 +716,36 @@ public List<FactureReelleDTO> getFacturesParPeriode(Long userIdRequete, HttpServ
                     return new FactureReelleDTO(facture, montantRestant);
                 })
                 .collect(Collectors.toList());
+    }
+
+    private String normaliserModePaiementPourStockage(String modePaiement) {
+        if (modePaiement == null || modePaiement.trim().isEmpty()) {
+            return null;
+        }
+        String normalise = modePaiement.trim().toUpperCase();
+        switch (normalise) {
+            case "CASH":
+                return "ESPECES";
+            case "MOBILE":
+                return "MOBILE_MONEY";
+            case "VIREMENT":
+            case "TRANSFERT":
+                return "VIREMENT";
+            case "CHEQUE":
+            case "CHECK":
+                return "CHEQUE";
+            case "CARTE":
+            case "CARD":
+                return "CARTE";
+            case "RETRAIT":
+                return "RETRAIT";
+            case "ESPECES":
+            case "MOBILE_MONEY":
+            case "AUTRE":
+                return normalise;
+            default:
+                return normalise;
+        }
     }
 
 }

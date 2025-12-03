@@ -33,5 +33,6 @@ public class DepenseGeneraleResponseDTO {
     private String creeParNom;
     private String creeParEmail;
     private LocalDateTime dateCreation;
+    private String typeTransaction;
 }
 

@@ -27,9 +27,9 @@ public class EntreeGenerale {
     private String designation;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "categorie_entree_id", nullable = true)
+    @JoinColumn(name = "categorie_id", nullable = true)
     @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
-    private CategorieEntree categorie;
+    private Categorie categorie;
 
     @Column(nullable = false)
     private Double prixUnitaire;

@@ -27,4 +27,8 @@ public interface PaiementRepository extends JpaRepository<Paiement, Long>{
            "GROUP BY p.factureReelle.id")
     List<Object[]> sumMontantsByFactureReelleIds(@Param("factureIds") List<Long> factureIds);
 
+    // Récupère tous les paiements d'une entreprise
+    @Query("SELECT p FROM Paiement p WHERE p.factureReelle.entreprise.id = :entrepriseId ORDER BY p.datePaiement DESC")
+    List<Paiement> findByEntrepriseId(@Param("entrepriseId") Long entrepriseId);
+
 }

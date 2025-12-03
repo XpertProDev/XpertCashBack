@@ -56,12 +56,13 @@ public class CategorieService {
     Categorie categorie = new Categorie();
     categorie.setNom(nom);
     categorie.setCreatedAt(LocalDateTime.now());
+    categorie.setOrigineCreation("PRODUIT");
     
     // Récupérer l'entreprise par son ID et l'assigner à la catégorie
     Entreprise entreprise = entrepriseRepository.findById(entrepriseId)
             .orElseThrow(() -> new RuntimeException("Entreprise non trouvée"));
 
-    categorie.setEntreprise(entreprise); // Assurer que cette méthode existe dans l'entité Categorie
+    categorie.setEntreprise(entreprise);
 
     return categorieRepository.save(categorie);
 }
@@ -427,6 +428,7 @@ private ProduitDetailsResponseDTO toProduitDTO(Produit produit) {
             categorieInfo.put("nom", categorie.getNom());
             categorieInfo.put("produitCount", produitCountMap.getOrDefault(categorie.getId(), 0L));
             categorieInfo.put("createdAt", categorie.getCreatedAt());
+            categorieInfo.put("origineCreation", categorie.getOrigineCreation());
             result.add(categorieInfo);
         }
 

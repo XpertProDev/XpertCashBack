@@ -18,6 +18,7 @@ public class PaiementDTO {
     private LocalDate datePaiement;
     private String modePaiement;
     private String encaissePar;
+    private String typeTransaction;
 
     // ✅ Constructeur de mapping depuis l'entité Paiement
     public PaiementDTO(Paiement paiement) {

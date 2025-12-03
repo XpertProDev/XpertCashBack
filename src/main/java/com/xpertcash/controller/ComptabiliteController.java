@@ -93,10 +93,10 @@ public class ComptabiliteController {
         });
     }
 
-    @GetMapping("/list/categories-entree")
-    public ResponseEntity<?> listerCategoriesEntree(HttpServletRequest request) {
-        return handleRequest(() -> comptabiliteService.listerCategoriesEntree(request));
-    }
+    // @GetMapping("/list/categories-entree")
+    // public ResponseEntity<?> listerCategoriesEntree(HttpServletRequest request) {
+    //     return handleRequest(() -> comptabiliteService.listerCategoriesEntree(request));
+    // }
 
     /**
      * Crée une entrée générale pour l'entreprise.
@@ -118,6 +118,14 @@ public class ComptabiliteController {
     @GetMapping("/list/entrees-generales")
     public ResponseEntity<?> listerEntreesGenerales(HttpServletRequest request) {
         return handleRequest(() -> comptabiliteService.listerEntreesGenerales(request));
+    }
+
+    @GetMapping("/comptabilite/complete")
+    public ResponseEntity<?> getComptabiliteComplete(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            HttpServletRequest request) {
+        return handleRequest(() -> comptabiliteService.getComptabiliteCompletePaginated(request, page, size));
     }
 
     // ========== Méthodes utilitaires privées ==========

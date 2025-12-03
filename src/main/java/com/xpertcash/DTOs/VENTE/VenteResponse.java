@@ -28,6 +28,9 @@ public class VenteResponse {
     private Double montantTotalRembourse;
     private LocalDateTime dateDernierRemboursement;
     private Integer nombreRemboursements;
+    
+    // Type de transaction
+    private String typeTransaction;
 
 
 
