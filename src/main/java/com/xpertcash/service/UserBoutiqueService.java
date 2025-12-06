@@ -264,12 +264,12 @@ public List<String> retirerVendeurDesBoutiques(HttpServletRequest request, Long 
                 if (vendeurRole.getName() == RoleType.MANAGER) {
                     resultMessages.add("L'utilisateur conserve le rôle MANAGER sans la permission 'VENDRE_PRODUITS'.");
                 } else {
-                    Role utilisateurRole = roleRepository.findByName(RoleType.UTILISATEUR)
-                            .orElseThrow(() -> new RuntimeException("Rôle UTILISATEUR non trouvé"));
+                Role utilisateurRole = roleRepository.findFirstByName(RoleType.UTILISATEUR)
+                        .orElseThrow(() -> new RuntimeException("Rôle UTILISATEUR non trouvé"));
 
-                    user.setRole(utilisateurRole);
-                    usersRepository.save(user);  // Sauvegarde l'utilisateur avec son nouveau rôle
-                    resultMessages.add("Utilisateur rétrogradé au rôle UTILISATEUR car il n'a plus de permission 'VENDRE_PRODUITS'.");
+                user.setRole(utilisateurRole);
+                usersRepository.save(user);  // Sauvegarde l'utilisateur avec son nouveau rôle
+                resultMessages.add("Utilisateur rétrogradé au rôle UTILISATEUR car il n'a plus de permission 'VENDRE_PRODUITS'.");
                 }
             }
         }

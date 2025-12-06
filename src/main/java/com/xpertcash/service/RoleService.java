@@ -93,12 +93,11 @@ public class RoleService {
 
             Role utilisateurRole = new Role();
             utilisateurRole.setName(RoleType.UTILISATEUR);
-
-            Role venteRole = new Role();
-            venteRole.setName(RoleType.VENDEUR);
-            venteRole.setPermissions(Collections.singletonList(
-                permissionMap.get(PermissionType.VENDRE_PRODUITS)
+            utilisateurRole.setPermissions(Arrays.asList(
+                
             ));
+
+        
 
 
             Role gestionClient = new Role();
@@ -185,7 +184,7 @@ public class RoleService {
         }
     
         // Vérifier que le rôle existe dans la base de données
-        Role newRole = roleRepository.findByName(roleType)
+        Role newRole = roleRepository.findFirstByName(roleType)
                 .orElseThrow(() -> new RuntimeException("Rôle non trouvé : " + newRoleName));
     
         // Mettre à jour le rôle de l'utilisateur
@@ -202,7 +201,7 @@ public class RoleService {
 
     //Methode public pour les vendeur
     public Role getOrCreateVendeurRole() {
-    Optional<Role> existingRole = roleRepository.findByName(RoleType.VENDEUR);
+    Optional<Role> existingRole = roleRepository.findFirstByName(RoleType.VENDEUR);
     if (existingRole.isPresent()) {
         return existingRole.get();
     }

@@ -15,4 +15,8 @@ public class Unite {
     private Long id;
     private String nom;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "entreprise_id", nullable = false)
+    private Entreprise entreprise;
+
 }

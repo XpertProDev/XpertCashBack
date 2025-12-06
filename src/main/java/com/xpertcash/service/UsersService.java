@@ -243,8 +243,8 @@ public class UsersService {
         // Créer un stock vide initial
        
     
-        // Attribution du rôle ADMIN à l’utilisateur
-        Role adminRole = roleRepository.findByName(RoleType.ADMIN)
+        // Attribution du rôle ADMIN à l'utilisateur
+        Role adminRole = roleRepository.findFirstByName(RoleType.ADMIN)
                 .orElseThrow(() -> new RuntimeException("Rôle ADMIN non trouvé"));
     
         // Créer l'utilisateur
@@ -524,9 +524,19 @@ public class UsersService {
                     throw new BusinessException("Un utilisateur avec ce numéro de téléphone existe déjà dans votre entreprise.");
                 }
 
-                // Vérifier que le rôle spécifié pour le nouvel utilisateur existe
-                Role role = roleRepository.findByName(userRequest.getRoleType())
-                        .orElseThrow(() -> new RuntimeException("Rôle invalide : " + userRequest.getRoleType()));
+                // 🎯 Créer un nouveau rôle SANS permissions pour chaque nouvel utilisateur
+                // Les permissions seront ajoutées plus tard via assignPermissionsToUser
+                
+                // Vérifier que le RoleType existe dans la base (validation)
+                if (roleRepository.findAllByName(userRequest.getRoleType()).isEmpty()) {
+                    throw new RuntimeException("Rôle invalide : " + userRequest.getRoleType() + ". Ce rôle n'existe pas dans la base de données.");
+                }
+                
+                // Créer un nouveau rôle vide (sans permissions) pour ce nouvel utilisateur
+                Role role = new Role();
+                role.setName(userRequest.getRoleType());
+                role.setPermissions(new ArrayList<>()); // Liste vide : aucune permission par défaut
+                role = roleRepository.save(role);
 
                 // Générer un mot de passe et l'encoder
                 String generatedPassword = PasswordGenerator.generatePassword();

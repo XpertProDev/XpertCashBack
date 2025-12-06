@@ -1,5 +1,6 @@
 package com.xpertcash.repository;
 
+import java.util.List;
 import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -10,17 +11,18 @@ import org.springframework.stereotype.Repository;
 import com.xpertcash.entity.Role;
 import com.xpertcash.entity.Enum.RoleType;
 
-@Repository
-public interface RoleRepository extends JpaRepository<Role, Long>{
-
-    /**
-     * Retourne un rôle par son RoleType.
-     * Depuis que plusieurs rôles peuvent partager le même name (clonage de rôles),
-     * on utilise une requête native avec LIMIT 1 pour éviter les erreurs
-     * IncorrectResultSizeDataAccessException lorsqu'il existe plusieurs entrées.
-     */
-    @Query(value = "SELECT * FROM role r WHERE r.name = :name LIMIT 1", nativeQuery = true)
-    Optional<Role> findByName(@Param("name") RoleType name);
-
-    boolean existsByName(RoleType name);
-}
+    @Repository
+    public interface RoleRepository extends JpaRepository<Role, Long>{
+        Optional<Role> findByName(RoleType name );
+        boolean existsByName(RoleType name);
+        
+        // Méthode pour récupérer le premier rôle d'un type donné (gère les cas où plusieurs rôles existent)
+        @Query("SELECT r FROM Role r WHERE r.name = :name ORDER BY r.id ASC")
+        List<Role> findAllByName(@Param("name") RoleType name);
+        
+        // Méthode pour récupérer le premier rôle d'un type donné
+        default Optional<Role> findFirstByName(RoleType name) {
+            List<Role> roles = findAllByName(name);
+            return roles.isEmpty() ? Optional.empty() : Optional.of(roles.get(0));
+        }
+    }
