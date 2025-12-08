@@ -42,6 +42,10 @@ public interface UsersRepository extends JpaRepository<User, Long> {
     
     // Utilisateurs partageant un même rôle
     List<User> findByRole(Role role);
+    
+    // Utilisateurs d'un rôle spécifique ET d'une entreprise spécifique (pour isolation multi-entreprise)
+    @Query("SELECT u FROM User u WHERE u.role = :role AND u.entreprise.id = :entrepriseId")
+    List<User> findByRoleAndEntrepriseId(@Param("role") Role role, @Param("entrepriseId") Long entrepriseId);
     //List<User> findByBoutiqueIdAndRole_Name(Long boutiqueId, RoleType roleName);
 
     Optional<User> findByEntrepriseIdAndRole_NameIn(Long entrepriseId, List<RoleType> roles);

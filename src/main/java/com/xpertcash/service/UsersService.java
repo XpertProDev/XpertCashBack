@@ -524,19 +524,111 @@ public class UsersService {
                     throw new BusinessException("Un utilisateur avec ce numéro de téléphone existe déjà dans votre entreprise.");
                 }
 
-                // 🎯 Créer un nouveau rôle SANS permissions pour chaque nouvel utilisateur
-                // Les permissions seront ajoutées plus tard via assignPermissionsToUser
+                // 🎯 Stratégie optimale selon le type de rôle
+                // - ADMIN/MANAGER : Utiliser le rôle template avec permissions par défaut
+                // - UTILISATEUR et autres : Créer un rôle sans permissions (ajoutées plus tard)
                 
                 // Vérifier que le RoleType existe dans la base (validation)
-                if (roleRepository.findAllByName(userRequest.getRoleType()).isEmpty()) {
+                List<Role> existingRoles = roleRepository.findAllByName(userRequest.getRoleType());
+                if (existingRoles.isEmpty()) {
                     throw new RuntimeException("Rôle invalide : " + userRequest.getRoleType() + ". Ce rôle n'existe pas dans la base de données.");
                 }
                 
-                // Créer un nouveau rôle vide (sans permissions) pour ce nouvel utilisateur
-                Role role = new Role();
-                role.setName(userRequest.getRoleType());
-                role.setPermissions(new ArrayList<>()); // Liste vide : aucune permission par défaut
-                role = roleRepository.save(role);
+                Role role;
+                Long entrepriseId = admin.getEntreprise().getId();
+                
+                // Rôles avec permissions par défaut (ADMIN, MANAGER) : utiliser le template et cloner
+                boolean isRoleWithDefaultPermissions = userRequest.getRoleType() == RoleType.ADMIN 
+                        || userRequest.getRoleType() == RoleType.MANAGER;
+                
+                if (isRoleWithDefaultPermissions) {
+                    // Pour ADMIN/MANAGER : chercher d'abord un rôle réutilisable dans la même entreprise
+                    // avec les mêmes permissions par défaut
+                    Role templateRole = existingRoles.get(0);
+                    
+                    // Vérifier si ce rôle template a des permissions (doit en avoir)
+                    if (templateRole.getPermissions() == null || templateRole.getPermissions().isEmpty()) {
+                        throw new RuntimeException("Le rôle " + userRequest.getRoleType() + " doit avoir des permissions par défaut.");
+                    }
+                    
+                    // Chercher un rôle existant dans la même entreprise avec les mêmes permissions
+                    // Réutilisation ILLIMITÉE : une entreprise peut créer autant d'utilisateurs qu'elle veut
+                    Role reusableRole = null;
+                    
+                    // Extraire les PermissionType du template pour comparaison
+                    Set<PermissionType> templatePermissionTypes = templateRole.getPermissions().stream()
+                            .map(Permission::getType)
+                            .collect(Collectors.toSet());
+                    
+                    for (Role r : existingRoles) {
+                        // Vérifier si ce rôle est utilisé dans la même entreprise ou pas utilisé du tout
+                        List<User> usersWithRoleInEntreprise = usersRepository.findByRoleAndEntrepriseId(r, entrepriseId);
+                        List<User> allUsersWithRole = usersRepository.findByRole(r); // Tous les utilisateurs avec ce rôle (toutes entreprises)
+                        boolean isUsedInSameEntreprise = !usersWithRoleInEntreprise.isEmpty();
+                        boolean isNotUsedAnywhere = allUsersWithRole.isEmpty(); // Pas utilisé par aucune entreprise
+                        
+                        // Comparer les PermissionType (pas les objets Permission)
+                        boolean hasSamePermissions = false;
+                        if (r.getPermissions() != null && r.getPermissions().size() == templatePermissionTypes.size()) {
+                            Set<PermissionType> rolePermissionTypes = r.getPermissions().stream()
+                                    .map(Permission::getType)
+                                    .collect(Collectors.toSet());
+                            hasSamePermissions = rolePermissionTypes.equals(templatePermissionTypes);
+                        }
+                        
+                        // Réutilisable si :
+                        // 1. Mêmes permissions ET utilisé dans la même entreprise (réutilisation illimitée)
+                        // 2. Mêmes permissions ET pas utilisé du tout (peut être réutilisé)
+                        // Isolation : ne pas réutiliser un rôle utilisé par une autre entreprise
+                        // Pas de limite : une entreprise peut créer autant d'utilisateurs qu'elle veut
+                        if (hasSamePermissions && (isUsedInSameEntreprise || isNotUsedAnywhere)) {
+                            reusableRole = r;
+                            break;
+                        }
+                    }
+                    
+                    if (reusableRole != null) {
+                        // Réutiliser un rôle existant avec les mêmes permissions dans la même entreprise
+                        role = reusableRole;
+                    } else {
+                        // Créer un nouveau rôle cloné avec les permissions par défaut
+                        role = new Role();
+                        role.setName(templateRole.getName());
+                        role.setPermissions(new ArrayList<>(templateRole.getPermissions())); // Copier les permissions
+                        role = roleRepository.save(role);
+                    }
+                } else {
+                    // Pour UTILISATEUR et autres : chercher un rôle réutilisable SANS permissions dans la même entreprise
+                    Role reusableRole = null;
+                    
+                    for (Role r : existingRoles) {
+                        List<User> usersWithRoleInEntreprise = usersRepository.findByRoleAndEntrepriseId(r, entrepriseId);
+                        List<User> allUsersWithRole = usersRepository.findByRole(r); // Tous les utilisateurs avec ce rôle (toutes entreprises)
+                        boolean hasNoPermissions = r.getPermissions() == null || r.getPermissions().isEmpty();
+                        
+                        // Réutilisation ILLIMITÉE : une entreprise peut créer autant d'utilisateurs qu'elle veut
+                        // Réutilisable si : sans permissions ET (utilisé dans la même entreprise OU pas utilisé du tout)
+                        boolean isUsedInSameEntreprise = !usersWithRoleInEntreprise.isEmpty();
+                        boolean isNotUsedAnywhere = allUsersWithRole.isEmpty(); // Pas utilisé par aucune entreprise
+                        
+                        // Isolation : ne pas réutiliser un rôle utilisé par une autre entreprise
+                        if (hasNoPermissions && (isUsedInSameEntreprise || isNotUsedAnywhere)) {
+                            reusableRole = r;
+                            break;
+                        }
+                    }
+                    
+                    if (reusableRole != null) {
+                        // Réutiliser un rôle existant sans permissions
+                        role = reusableRole;
+                    } else {
+                        // Créer un nouveau rôle sans permissions
+                        role = new Role();
+                        role.setName(userRequest.getRoleType());
+                        role.setPermissions(new ArrayList<>()); // Liste vide : aucune permission par défaut
+                        role = roleRepository.save(role);
+                    }
+                }
 
                 // Générer un mot de passe et l'encoder
                 String generatedPassword = PasswordGenerator.generatePassword();
