@@ -65,7 +65,7 @@ public class SuperAdminInitializer implements CommandLineRunner {
                 });
 
         // Créer ou récupérer une entreprise spéciale pour le super admin
-        String nomEntreprise = "XpertCash Super Admin";
+        String nomEntreprise = "Tchakeda Super Admin";
         Entreprise superAdminEntreprise = entrepriseRepository.findByNomEntreprise(nomEntreprise)
                 .orElseGet(() -> {
                     Entreprise e = new Entreprise();
