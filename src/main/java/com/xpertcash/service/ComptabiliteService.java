@@ -1969,7 +1969,43 @@ public class ComptabiliteService {
         List<PaiementDTO> paiementsDTO = paiements.stream()
                 .map(p -> {
                     PaiementDTO dto = new PaiementDTO(p);
-                    dto.setTypeTransaction("ENTREE");
+                    dto.setTypeTransaction("PAIEMENT_FACTURE");
+                    
+                    // Construire la description avec les informations de la facture
+                    if (p.getFactureReelle() != null) {
+                        FactureReelle facture = p.getFactureReelle();
+                        
+                        // Définir l'objet (description de la facture)
+                        String objetFacture = facture.getDescription() != null && !facture.getDescription().trim().isEmpty() 
+                            ? facture.getDescription() 
+                            : null;
+                        dto.setObjet(objetFacture);
+                        
+                        // Construire la description principale
+                        String description = "Paiement facture " + facture.getNumeroFacture();
+                        
+                        // Ajouter la description de la facture si elle existe
+                        if (objetFacture != null) {
+                            description += " - " + objetFacture;
+                        }
+                        
+                        // Ajouter le montant restant si la facture est partiellement payée
+                        String statutFacture = facture.getStatutPaiement() != null ? facture.getStatutPaiement().name() : "INCONNU";
+                        if ("PARTIELLEMENT_PAYEE".equals(statutFacture)) {
+                            java.math.BigDecimal totalPaye = paiementRepository.sumMontantsByFactureReelle(facture.getId());
+                            if (totalPaye == null) totalPaye = java.math.BigDecimal.ZERO;
+                            double montantRestant = facture.getTotalFacture() - totalPaye.doubleValue();
+                            description += " (Montant restant: " + montantRestant + ")";
+                        }
+                        
+                        dto.setDescription(description);
+                        dto.setStatut(statutFacture);
+                    } else {
+                        dto.setDescription("Paiement sans facture associée");
+                        dto.setObjet(null);
+                        dto.setStatut("INCONNU");
+                    }
+                    
                     return dto;
                 })
                 .collect(Collectors.toList());
