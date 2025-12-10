@@ -33,5 +33,6 @@ public class EntreeGeneraleResponseDTO {
     private String responsableEmail;
     private LocalDateTime dateCreation;
     private String typeTransaction;
+    private String origine; // COMPTABILITE, FACTURE, BOUTIQUE (nom de la boutique)
 }
 

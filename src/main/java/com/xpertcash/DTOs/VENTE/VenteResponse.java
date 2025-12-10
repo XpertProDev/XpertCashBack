@@ -31,6 +31,7 @@ public class VenteResponse {
     
     // Type de transaction
     private String typeTransaction;
+    private String origine; // COMPTABILITE, FACTURE, BOUTIQUE (nom de la boutique)
 
 
 

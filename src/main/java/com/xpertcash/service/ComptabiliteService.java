@@ -14,6 +14,7 @@ import com.xpertcash.DTOs.PaiementDTO;
 import com.xpertcash.DTOs.TransfertFondsResponseDTO;
 import com.xpertcash.DTOs.VENTE.TransactionSummaryDTO;
 import com.xpertcash.DTOs.VENTE.VenteResponse;
+import com.xpertcash.DTOs.VENTE.FermetureCaisseResponseDTO;
 import com.xpertcash.entity.Paiement;
 import com.xpertcash.entity.FactureVente;
 import com.xpertcash.service.TransfertFondsService;
@@ -1523,6 +1524,42 @@ public class ComptabiliteService {
     }
 
     /**
+     * Génère un numéro unique pour une fermeture de caisse
+     * Format: "FERM-001-MM-YYYY" avec compteur qui se réinitialise chaque mois
+     */
+    private String genererNumeroFermeture(Long entrepriseId, LocalDateTime dateFermeture) {
+        if (dateFermeture == null) {
+            dateFermeture = LocalDateTime.now();
+        }
+        
+        LocalDate dateFermetureLocal = dateFermeture.toLocalDate();
+        int month = dateFermetureLocal.getMonthValue();
+        int year = dateFermetureLocal.getYear();
+        
+        // Récupérer toutes les caisses fermées du mois pour cette entreprise
+        List<Caisse> caissesFermeesDuMois = caisseRepository.findByEntrepriseIdAndStatut(entrepriseId, StatutCaisse.FERMEE)
+                .stream()
+                .filter(c -> c.getDateFermeture() != null 
+                        && c.getDateFermeture().getMonthValue() == month 
+                        && c.getDateFermeture().getYear() == year)
+                .sorted((a, b) -> {
+                    if (a.getDateFermeture() == null && b.getDateFermeture() == null) return 0;
+                    if (a.getDateFermeture() == null) return 1;
+                    if (b.getDateFermeture() == null) return -1;
+                    return b.getDateFermeture().compareTo(a.getDateFermeture());
+                })
+                .collect(Collectors.toList());
+        
+        long newIndex = caissesFermeesDuMois.size() + 1;
+        
+        // Formater le numéro : "FERM-001-12-2025"
+        String indexFormate = String.format("%03d", newIndex);
+        String formattedDate = dateFermetureLocal.format(DateTimeFormatter.ofPattern("MM-yyyy"));
+        
+        return "FERM-" + indexFormate + "-" + formattedDate;
+    }
+
+    /**
      * Crée une entité DepenseGenerale à partir du DTO
      */
     private DepenseGenerale createDepenseGenerale(
@@ -1599,6 +1636,7 @@ public class ComptabiliteService {
         }
         dto.setDateCreation(depense.getDateCreation());
         dto.setTypeTransaction("SORTIE");
+        dto.setOrigine("COMPTABILITE"); // Les dépenses générales viennent de la comptabilité
         return dto;
     }
 
@@ -1839,6 +1877,7 @@ public class ComptabiliteService {
         }
         dto.setDateCreation(entree.getDateCreation());
         dto.setTypeTransaction("ENTREE");
+        dto.setOrigine("COMPTABILITE"); // Les entrées générales viennent de la comptabilité
         return dto;
     }
 
@@ -1940,19 +1979,33 @@ public class ComptabiliteService {
                 .limit(limitParType)
                 .collect(Collectors.toList());
 
-        List<Vente> ventesCaissesFermees = venteRepository.findByEntrepriseIdAndCaisseFermee(entrepriseId).stream()
+        // Récupérer toutes les ventes des caisses fermées
+        List<Vente> toutesVentesCaissesFermees = venteRepository.findByEntrepriseIdAndCaisseFermee(entrepriseId);
+        
+        // Grouper les ventes par caisse fermée
+        Map<Long, List<Vente>> ventesParCaisse = toutesVentesCaissesFermees.stream()
+                .filter(v -> v.getCaisse() != null)
+                .collect(Collectors.groupingBy(v -> v.getCaisse().getId()));
+        
+        // Récupérer toutes les caisses fermées
+        List<Caisse> caissesFermees = caisseRepository.findByEntrepriseIdAndStatut(entrepriseId, StatutCaisse.FERMEE);
+        
+        // Créer les DTOs de fermeture de caisse avec leurs ventes
+        List<FermetureCaisseResponseDTO> fermeturesCaissesDTO = caissesFermees.stream()
+                .filter(c -> ventesParCaisse.containsKey(c.getId()) && !ventesParCaisse.get(c.getId()).isEmpty())
                 .sorted((a, b) -> {
-                    LocalDateTime dateA = a.getDateVente();
-                    LocalDateTime dateB = b.getDateVente();
+                    LocalDateTime dateA = a.getDateFermeture();
+                    LocalDateTime dateB = b.getDateFermeture();
                     if (dateA == null && dateB == null) return 0;
                     if (dateA == null) return 1;
                     if (dateB == null) return -1;
-                    return dateB.compareTo(dateA);
+                    return dateB.compareTo(dateA); // Plus récent en premier
                 })
                 .limit(limitParType)
-                .collect(Collectors.toList());
-        List<VenteResponse> ventesCaissesFermeesDTO = ventesCaissesFermees.stream()
-                .map(this::mapVenteToResponse)
+                .map(caisse -> {
+                    List<Vente> ventesDeLaCaisse = ventesParCaisse.get(caisse.getId());
+                    return mapCaisseFermeeToResponse(caisse, ventesDeLaCaisse, entrepriseId);
+                })
                 .collect(Collectors.toList());
 
         List<Paiement> paiements = paiementRepository.findByEntrepriseId(entrepriseId).stream()
@@ -1974,6 +2027,9 @@ public class ComptabiliteService {
                     // Construire la description avec les informations de la facture
                     if (p.getFactureReelle() != null) {
                         FactureReelle facture = p.getFactureReelle();
+                        
+                        // Définir le numéro de facture
+                        dto.setNumeroFacture(facture.getNumeroFacture());
                         
                         // Définir l'objet (description de la facture)
                         String objetFacture = facture.getDescription() != null && !facture.getDescription().trim().isEmpty() 
@@ -2000,10 +2056,13 @@ public class ComptabiliteService {
                         
                         dto.setDescription(description);
                         dto.setStatut(statutFacture);
+                        dto.setOrigine("FACTURE"); // Les paiements viennent des factures réelles
                     } else {
                         dto.setDescription("Paiement sans facture associée");
                         dto.setObjet(null);
+                        dto.setNumeroFacture(null);
                         dto.setStatut("INCONNU");
+                        dto.setOrigine("FACTURE"); // Par défaut même sans facture associée
                     }
                     
                     return dto;
@@ -2026,7 +2085,7 @@ public class ComptabiliteService {
         List<Object> toutesTransactions = new ArrayList<>();
         toutesTransactions.addAll(depensesGenerales);
         toutesTransactions.addAll(entreesGenerales);
-        toutesTransactions.addAll(ventesCaissesFermeesDTO);
+        toutesTransactions.addAll(fermeturesCaissesDTO); // Utiliser les fermetures regroupées au lieu des ventes individuelles
         toutesTransactions.addAll(paiementsDTO);
         toutesTransactions.addAll(transfertsFonds);
 
@@ -2080,8 +2139,62 @@ public class ComptabiliteService {
         } else if (transaction instanceof TransfertFondsResponseDTO) {
             TransfertFondsResponseDTO dto = (TransfertFondsResponseDTO) transaction;
             return dto.getDateTransfert() != null ? dto.getDateTransfert() : null;
+        } else if (transaction instanceof FermetureCaisseResponseDTO) {
+            FermetureCaisseResponseDTO dto = (FermetureCaisseResponseDTO) transaction;
+            return dto.getDateFermeture() != null ? dto.getDateFermeture() : null;
         }
         return null;
+    }
+
+    /**
+     * Mappe une caisse fermée avec ses ventes vers FermetureCaisseResponseDTO
+     */
+    private FermetureCaisseResponseDTO mapCaisseFermeeToResponse(Caisse caisse, List<Vente> ventes, Long entrepriseId) {
+        FermetureCaisseResponseDTO dto = new FermetureCaisseResponseDTO();
+        
+        dto.setCaisseId(caisse.getId());
+        dto.setDateFermeture(caisse.getDateFermeture());
+        dto.setDateOuverture(caisse.getDateOuverture());
+        dto.setMontantInitial(caisse.getMontantInitial());
+        dto.setMontantCourant(caisse.getMontantCourant());
+        dto.setMontantEnMain(caisse.getMontantEnMain());
+        dto.setEcart(caisse.getEcart());
+        
+        // Générer le numéro de fermeture
+        String numeroFermeture = genererNumeroFermeture(entrepriseId, caisse.getDateFermeture());
+        dto.setNumeroFermeture(numeroFermeture);
+        
+        // Informations de la boutique
+        if (caisse.getBoutique() != null) {
+            dto.setBoutiqueId(caisse.getBoutique().getId());
+            dto.setNomBoutique(caisse.getBoutique().getNomBoutique());
+            dto.setOrigine(caisse.getBoutique().getNomBoutique());
+        } else {
+            dto.setOrigine("BOUTIQUE");
+        }
+        
+        // Informations du vendeur
+        if (caisse.getVendeur() != null) {
+            dto.setVendeurId(caisse.getVendeur().getId());
+            dto.setNomVendeur(caisse.getVendeur().getNomComplet());
+        }
+        
+        // Calculer le montant total et le nombre de ventes
+        Double montantTotal = ventes.stream()
+                .mapToDouble(v -> v.getMontantTotal() != null ? v.getMontantTotal() : 0.0)
+                .sum();
+        dto.setMontantTotal(montantTotal);
+        dto.setNombreVentes(ventes.size());
+        
+        // Mapper les ventes en VenteResponse
+        List<VenteResponse> ventesDTO = ventes.stream()
+                .map(this::mapVenteToResponse)
+                .collect(Collectors.toList());
+        dto.setVentes(ventesDTO);
+        
+        dto.setTypeTransaction("ENTREE");
+        
+        return dto;
     }
 
     private VenteResponse mapVenteToResponse(Vente vente) {
@@ -2133,11 +2246,14 @@ public class ComptabiliteService {
         }
         
         response.setNomVendeur(vente.getVendeur() != null ? vente.getVendeur().getNomComplet() : null);
-        response.setNomBoutique(vente.getBoutique() != null ? vente.getBoutique().getNomBoutique() : null);
+        String nomBoutique = vente.getBoutique() != null ? vente.getBoutique().getNomBoutique() : null;
+        response.setNomBoutique(nomBoutique);
         response.setMontantTotalRembourse(vente.getMontantTotalRembourse());
         response.setDateDernierRemboursement(vente.getDateDernierRemboursement());
         response.setNombreRemboursements(vente.getNombreRemboursements());
         response.setTypeTransaction("ENTREE");
+        // L'origine pour les ventes est le nom de la boutique
+        response.setOrigine(nomBoutique != null ? nomBoutique : "BOUTIQUE");
         
         return response;
     }

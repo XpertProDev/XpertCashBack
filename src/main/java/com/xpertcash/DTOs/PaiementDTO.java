@@ -22,8 +22,10 @@ public class PaiementDTO {
     private String typeTransaction;
     private String description;
     private String objet; // Description de la facture (facture.getDescription())
+    private String numeroFacture; // Numéro de la facture réelle
     private String statut;
     private String boutique;
+    private String origine; // COMPTABILITE, FACTURE, BOUTIQUE (nom de la boutique)
 
     // ✅ Constructeur de mapping depuis l'entité Paiement
     public PaiementDTO(Paiement paiement) {
