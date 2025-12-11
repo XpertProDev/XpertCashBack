@@ -2,6 +2,7 @@ package com.xpertcash.DTOs;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 
 import com.xpertcash.entity.Paiement;
 
@@ -26,6 +27,7 @@ public class PaiementDTO {
     private String statut;
     private String boutique;
     private String origine; // COMPTABILITE, FACTURE, BOUTIQUE (nom de la boutique)
+    private List<LigneFactureDTO> lignesFacture; // Lignes de facture (produits/articles de la facture)
 
     // ✅ Constructeur de mapping depuis l'entité Paiement
     public PaiementDTO(Paiement paiement) {

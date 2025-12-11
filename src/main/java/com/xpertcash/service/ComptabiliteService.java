@@ -11,6 +11,7 @@ import com.xpertcash.DTOs.DepenseGeneraleResponseDTO;
 import com.xpertcash.DTOs.EntreeGeneraleRequestDTO;
 import com.xpertcash.DTOs.EntreeGeneraleResponseDTO;
 import com.xpertcash.DTOs.PaiementDTO;
+import com.xpertcash.DTOs.LigneFactureDTO;
 import com.xpertcash.DTOs.TransfertFondsResponseDTO;
 import com.xpertcash.DTOs.VENTE.TransactionSummaryDTO;
 import com.xpertcash.DTOs.VENTE.VenteResponse;
@@ -2028,6 +2029,11 @@ public class ComptabiliteService {
                     if (p.getFactureReelle() != null) {
                         FactureReelle facture = p.getFactureReelle();
                         
+                        // Charger explicitement les lignes de facture si elles ne sont pas déjà chargées
+                        if (facture.getLignesFacture() != null) {
+                            org.hibernate.Hibernate.initialize(facture.getLignesFacture());
+                        }
+                        
                         // Définir le numéro de facture
                         dto.setNumeroFacture(facture.getNumeroFacture());
                         
@@ -2036,6 +2042,16 @@ public class ComptabiliteService {
                             ? facture.getDescription() 
                             : null;
                         dto.setObjet(objetFacture);
+                        
+                        // Mapper les lignes de facture
+                        if (facture.getLignesFacture() != null && !facture.getLignesFacture().isEmpty()) {
+                            List<LigneFactureDTO> lignesDTO = facture.getLignesFacture().stream()
+                                    .map(LigneFactureDTO::new)
+                                    .collect(Collectors.toList());
+                            dto.setLignesFacture(lignesDTO);
+                        } else {
+                            dto.setLignesFacture(new ArrayList<>());
+                        }
                         
                         // Construire la description principale
                         String description = "Paiement facture " + facture.getNumeroFacture();
@@ -2063,6 +2079,7 @@ public class ComptabiliteService {
                         dto.setNumeroFacture(null);
                         dto.setStatut("INCONNU");
                         dto.setOrigine("FACTURE"); // Par défaut même sans facture associée
+                        dto.setLignesFacture(new ArrayList<>());
                     }
                     
                     return dto;
