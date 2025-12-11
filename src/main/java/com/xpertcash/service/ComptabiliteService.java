@@ -1556,7 +1556,7 @@ public class ComptabiliteService {
         String indexFormate = String.format("%03d", newIndex);
         String formattedDate = dateFermetureLocal.format(DateTimeFormatter.ofPattern("MM-yyyy"));
         
-        return "FERM-" + indexFormate + "-" + formattedDate;
+        return "C-" + indexFormate + "-" + formattedDate;
     }
 
     /**
@@ -2069,7 +2069,8 @@ public class ComptabiliteService {
                 })
                 .collect(Collectors.toList());
 
-        List<TransfertFondsResponseDTO> transfertsFonds = transfertFondsService.listerTransferts(httpRequest).stream()
+        // Récupérer les transferts de fonds et créer deux transactions par transfert (SORTIE et ENTREE)
+        List<TransfertFondsResponseDTO> transfertsFondsBruts = transfertFondsService.listerTransferts(httpRequest).stream()
                 .sorted((a, b) -> {
                     LocalDateTime dateA = a.getDateTransfert();
                     LocalDateTime dateB = b.getDateTransfert();
@@ -2080,6 +2081,18 @@ public class ComptabiliteService {
                 })
                 .limit(limitParType)
                 .collect(Collectors.toList());
+        
+        // Créer deux transactions par transfert : une SORTIE (source) et une ENTREE (destination)
+        List<TransfertFondsResponseDTO> transfertsFonds = new ArrayList<>();
+        for (TransfertFondsResponseDTO transfert : transfertsFondsBruts) {
+            // Transaction SORTIE (depuis la source)
+            TransfertFondsResponseDTO sortie = creerTransactionTransfert(transfert, "SORTIE", transfert.getDe());
+            transfertsFonds.add(sortie);
+            
+            // Transaction ENTREE (vers la destination)
+            TransfertFondsResponseDTO entree = creerTransactionTransfert(transfert, "ENTREE", transfert.getVers());
+            transfertsFonds.add(entree);
+        }
 
         // Combiner toutes les transactions dans une seule liste
         List<Object> toutesTransactions = new ArrayList<>();
@@ -2256,6 +2269,37 @@ public class ComptabiliteService {
         response.setOrigine(nomBoutique != null ? nomBoutique : "BOUTIQUE");
         
         return response;
+    }
+
+    /**
+     * Crée une transaction de transfert (SORTIE ou ENTREE) à partir d'un transfert de fonds
+     */
+    private TransfertFondsResponseDTO creerTransactionTransfert(TransfertFondsResponseDTO transfert, String sens, String origine) {
+        TransfertFondsResponseDTO transaction = new TransfertFondsResponseDTO();
+        transaction.setId(transfert.getId());
+        transaction.setDateTransfert(transfert.getDateTransfert());
+        transaction.setMotif(transfert.getMotif());
+        transaction.setResponsable(transfert.getResponsable());
+        transaction.setDe(transfert.getDe());
+        transaction.setVers(transfert.getVers());
+        transaction.setMontant(transfert.getMontant());
+        transaction.setPersonneALivrer(transfert.getPersonneALivrer());
+        transaction.setEntrepriseId(transfert.getEntrepriseId());
+        transaction.setEntrepriseNom(transfert.getEntrepriseNom());
+        transaction.setTypeTransaction(sens); // SORTIE ou ENTREE
+        transaction.setSensTransfert(sens); // SORTIE ou ENTREE
+        transaction.setOrigine(origine); // Source ou destination selon le sens
+        
+        // Créer une description explicite selon le sens
+        String description;
+        if ("SORTIE".equals(sens)) {
+            description = "Transfert sortant de " + origine + " vers " + transfert.getVers() + " - " + transfert.getMotif();
+        } else {
+            description = "Transfert entrant depuis " + transfert.getDe() + " vers " + origine + " - " + transfert.getMotif();
+        }
+        transaction.setDescription(description);
+        
+        return transaction;
     }
 }
 

@@ -12,6 +12,7 @@ public class TransfertFondsResponseDTO {
     private Long id;
     private LocalDateTime dateTransfert;
     private String motif;
+    private String description; // Description explicite pour SORTIE ou ENTREE
     private String responsable;
     private String de;
     private String vers;
@@ -19,6 +20,8 @@ public class TransfertFondsResponseDTO {
     private String personneALivrer;
     private Long entrepriseId;
     private String entrepriseNom;
-    private String typeTransaction;
+    private String typeTransaction; // SORTIE ou ENTREE pour les transferts
+    private String sensTransfert; // "SORTIE" ou "ENTREE" pour indiquer le sens du transfert
+    private String origine; // Source ou destination selon le sens
 }
 
