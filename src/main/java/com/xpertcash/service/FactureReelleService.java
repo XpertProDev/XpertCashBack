@@ -419,7 +419,7 @@ public void supprimerFactureReelleLiee(FactureProForma proforma) {
     // 📝 Création du paiement
     Paiement paiement = new Paiement();
     paiement.setMontant(montant);
-    paiement.setDatePaiement(LocalDate.now());
+    paiement.setDatePaiement(LocalDateTime.now());
     paiement.setFactureReelle(facture);
     paiement.setModePaiement(normaliserModePaiementPourStockage(modePaiement));
     paiement.setEncaissePar(utilisateur);

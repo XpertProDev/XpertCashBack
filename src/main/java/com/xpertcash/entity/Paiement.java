@@ -1,7 +1,7 @@
 package com.xpertcash.entity;
 
 import java.math.BigDecimal;
-import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
@@ -19,7 +19,7 @@ public class Paiement {
 
     private BigDecimal montant;
 
-    private LocalDate datePaiement;
+    private LocalDateTime datePaiement;
 
      private String modePaiement;
 

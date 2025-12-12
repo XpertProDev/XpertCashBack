@@ -16,7 +16,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.xpertcash.entity.Unite;
-import com.xpertcash.repository.UniteRepository;
 import com.xpertcash.service.UniteService;
 
 import jakarta.servlet.http.HttpServletRequest;
@@ -27,13 +26,11 @@ public class UniteController {
 
      @Autowired
     private UniteService uniteService;
-    @Autowired
-    private UniteRepository uniteRepository;
 
      // Créer une unité de mesure
 
     @PostMapping("/createUnite")
-    public ResponseEntity<Object> createUnite(@RequestBody Map<String, String> payload) {
+    public ResponseEntity<Object> createUnite(@RequestBody Map<String, String> payload, HttpServletRequest request) {
     try {
         String nom = payload.get("nom");
 
@@ -41,18 +38,21 @@ public class UniteController {
             throw new RuntimeException("L'unité ne doit pas être vide !");
         }
 
-        if (uniteRepository.existsByNom(nom)) {
-            Map<String, String> errorResponse = new HashMap<>();
-            errorResponse.put("error", "Cette unité de mesure existe déjà !");
-            return ResponseEntity.status(HttpStatus.CONFLICT).body(errorResponse);
-        }
-
         Unite unite = new Unite();
         unite.setNom(nom);
 
-        Unite createdUnite = uniteRepository.save(unite);
+        // Utiliser le service qui va associer automatiquement l'entreprise de l'utilisateur
+        Unite createdUnite = uniteService.createUnite(unite, request);
 
         return ResponseEntity.status(HttpStatus.CREATED).body(createdUnite);
+    } catch (IllegalArgumentException e) {
+        Map<String, String> errorResponse = new HashMap<>();
+        errorResponse.put("error", e.getMessage());
+        // Vérifier si c'est une erreur de duplication
+        if (e.getMessage().contains("existe déjà")) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(errorResponse);
+        }
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
     } catch (RuntimeException e) {
         Map<String, String> errorResponse = new HashMap<>();
         errorResponse.put("error", e.getMessage());
@@ -74,24 +74,26 @@ public class UniteController {
         }
     }
 
-     // Récupérer toutes les unités 
+     // Récupérer toutes les unités de l'entreprise de l'utilisateur connecté
      @GetMapping("/allUnite")
-     public ResponseEntity<List<Unite>> getAllUnites() {
+     public ResponseEntity<List<Unite>> getAllUnites(HttpServletRequest request) {
          try {
-             List<Unite> unites = uniteRepository.findAll();
+             List<Unite> unites = uniteService.getAllUnites(request);
              return ResponseEntity.ok(unites);
+         } catch (RuntimeException e) {
+             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(null);
          } catch (Exception e) {
              return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
          }
      }
-     
+    
 
     
-     //Récupérer unité par son ID
+     //Récupérer unité par son ID (vérifie qu'elle appartient à l'entreprise de l'utilisateur)
     @GetMapping("/unite/{id}")
-    public ResponseEntity<Unite> getUniteById(@PathVariable Long id) {
+    public ResponseEntity<Unite> getUniteById(@PathVariable Long id, HttpServletRequest request) {
         try {
-            Unite unite = uniteService.getUniteById(id);
+            Unite unite = uniteService.getUniteById(id, request);
             return ResponseEntity.status(HttpStatus.OK).body(unite);
         } catch (RuntimeException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);

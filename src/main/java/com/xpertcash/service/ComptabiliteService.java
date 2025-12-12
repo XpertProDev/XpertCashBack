@@ -1957,8 +1957,8 @@ public class ComptabiliteService {
 
         List<Paiement> paiements = paiementRepository.findByEntrepriseId(entrepriseId).stream()
                 .sorted((a, b) -> {
-                    LocalDate dateA = a.getDatePaiement();
-                    LocalDate dateB = b.getDatePaiement();
+                    LocalDateTime dateA = a.getDatePaiement();
+                    LocalDateTime dateB = b.getDatePaiement();
                     if (dateA == null && dateB == null) return 0;
                     if (dateA == null) return 1;
                     if (dateB == null) return -1;
@@ -2040,7 +2040,7 @@ public class ComptabiliteService {
             return dto.getDateVente() != null ? dto.getDateVente() : null;
         } else if (transaction instanceof PaiementDTO) {
             PaiementDTO dto = (PaiementDTO) transaction;
-            return dto.getDatePaiement() != null ? dto.getDatePaiement().atStartOfDay() : null;
+            return dto.getDatePaiement() != null ? dto.getDatePaiement() : null;
         } else if (transaction instanceof TransfertFondsResponseDTO) {
             TransfertFondsResponseDTO dto = (TransfertFondsResponseDTO) transaction;
             return dto.getDateTransfert() != null ? dto.getDateTransfert() : null;

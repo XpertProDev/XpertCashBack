@@ -1,4 +1,5 @@
 package com.xpertcash.repository;
+import java.util.List;
 import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -11,9 +12,14 @@ public interface UniteRepository extends JpaRepository<Unite, Long>{
     Optional<Unite> findByNom(String nom);
     
     boolean existsByNom(String nom);
-
-    Optional<Unite> findById(Long id);
     
-
+    // Méthodes de filtrage par entreprise
+    List<Unite> findByEntrepriseId(Long entrepriseId);
+    
+    Optional<Unite> findByNomAndEntrepriseId(String nom, Long entrepriseId);
+    
+    boolean existsByNomAndEntrepriseId(String nom, Long entrepriseId);
+    
+    Optional<Unite> findByIdAndEntrepriseId(Long id, Long entrepriseId);
 
 }

@@ -1,5 +1,6 @@
 package com.xpertcash.service;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -91,16 +92,13 @@ public class RoleService {
 
 
 
+            // Rôle UTILISATEUR : créé sans permissions (les permissions seront ajoutées plus tard via assignPermissionsToUser)
             Role utilisateurRole = new Role();
             utilisateurRole.setName(RoleType.UTILISATEUR);
+            utilisateurRole.setPermissions(new ArrayList<>()); // Liste vide : aucune permission par défaut
 
-            Role venteRole = new Role();
-            venteRole.setName(RoleType.VENDEUR);
-            venteRole.setPermissions(Collections.singletonList(
-                permissionMap.get(PermissionType.VENDRE_PRODUITS)
-            ));
-
-
+            // ⚠️ Rôles suivants non utilisés (jamais sauvegardés) - commentés car non nécessaires
+            /*
             Role gestionClient = new Role();
             gestionClient.setName(RoleType.Clientel);
             gestionClient.setPermissions(Collections.singletonList(
@@ -119,13 +117,13 @@ public class RoleService {
                 permissionMap.get(PermissionType.GERER_UTILISATEURS)
             ));
 
-
             Role comptableRole = new Role();
             comptableRole.setName(RoleType.COMPTABLE);
             comptableRole.setPermissions(Arrays.asList(
                 permissionMap.get(PermissionType.VOIR_FLUX_COMPTABLE),
                 permissionMap.get(PermissionType.APPROVISIONNER_STOCK)
             ));
+            */
 
             // 4️⃣ Sauvegarder les rôles avec les permissions associées
             roleRepository.saveAll(Arrays.asList( adminRole ,managerRole, utilisateurRole ));
@@ -185,7 +183,7 @@ public class RoleService {
         }
     
         // Vérifier que le rôle existe dans la base de données
-        Role newRole = roleRepository.findByName(roleType)
+        Role newRole = roleRepository.findFirstByName(roleType)
                 .orElseThrow(() -> new RuntimeException("Rôle non trouvé : " + newRoleName));
     
         // Mettre à jour le rôle de l'utilisateur
@@ -202,7 +200,7 @@ public class RoleService {
 
     //Methode public pour les vendeur
     public Role getOrCreateVendeurRole() {
-    Optional<Role> existingRole = roleRepository.findByName(RoleType.VENDEUR);
+    Optional<Role> existingRole = roleRepository.findFirstByName(RoleType.VENDEUR);
     if (existingRole.isPresent()) {
         return existingRole.get();
     }

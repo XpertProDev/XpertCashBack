@@ -128,8 +128,9 @@ public class TransactionSummaryService {
         for (FactureReelle facture : factures) {
             List<Paiement> paiements = paiementRepository.findByFactureReelle(facture);
             for (Paiement paiement : paiements) {
-                if (paiement.getDatePaiement().atStartOfDay().isAfter(dateDebut.minusDays(1)) && 
-                    paiement.getDatePaiement().atStartOfDay().isBefore(dateFin.plusDays(1))) {
+                if (paiement.getDatePaiement() != null && 
+                    paiement.getDatePaiement().isAfter(dateDebut.minusDays(1)) && 
+                    paiement.getDatePaiement().isBefore(dateFin.plusDays(1))) {
                     
                     double montantPaiement = paiement.getMontant().doubleValue();
                     totalPaiementsFactures += montantPaiement;
@@ -150,7 +151,7 @@ public class TransactionSummaryService {
                     
                     transaction.setDescription(description);
                     transaction.setMontant(montantPaiement);
-                    transaction.setDate(paiement.getDatePaiement().atStartOfDay());
+                    transaction.setDate(paiement.getDatePaiement());
                     transaction.setBoutique("N/A");
                     transaction.setUtilisateur(paiement.getEncaissePar().getNomComplet());
                     transaction.setModePaiement(paiement.getModePaiement());

@@ -56,7 +56,7 @@ public class SuperAdminInitializer implements CommandLineRunner {
         System.out.println("🚀 Initialisation du compte SUPER_ADMIN...");
 
         // Rôle SUPER_ADMIN : on le crée s'il n'existe pas encore
-        Role superAdminRole = roleRepository.findByName(RoleType.SUPER_ADMIN)
+        Role superAdminRole = roleRepository.findFirstByName(RoleType.SUPER_ADMIN)
                 .orElseGet(() -> {
                     Role role = new Role();
                     role.setName(RoleType.SUPER_ADMIN);
@@ -65,7 +65,7 @@ public class SuperAdminInitializer implements CommandLineRunner {
                 });
 
         // Créer ou récupérer une entreprise spéciale pour le super admin
-        String nomEntreprise = "XpertCash Super Admin";
+        String nomEntreprise = "Tchakeda Super Admin";
         Entreprise superAdminEntreprise = entrepriseRepository.findByNomEntreprise(nomEntreprise)
                 .orElseGet(() -> {
                     Entreprise e = new Entreprise();

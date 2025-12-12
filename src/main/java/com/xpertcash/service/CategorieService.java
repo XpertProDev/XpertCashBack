@@ -157,11 +157,19 @@ public class CategorieService {
         List<ProduitDetailsResponseDTO> produitDTOs = produitsPage.getContent().stream()
                 .filter(produit -> {
                     if (Boolean.TRUE.equals(produit.getDeleted())) return false;
+                    // ADMIN et MANAGER voient tous les produits (sauf deleted et SERVICE)
+                    if (isAdminOrManager) {
+                        return !TypeProduit.SERVICE.equals(produit.getTypeProduit());
+                    }
+                    // Pour les vendeurs (avec VENDRE_PRODUITS mais pas admin/manager), filtrer par boutique
                     if (isVendeur && produit.getBoutique() != null) {
                         List<UserBoutique> userBoutiques = user.getUserBoutiques();
                         if (userBoutiques != null && !userBoutiques.isEmpty()) {
-                            return produit.getBoutique().getId().equals(userBoutiques.get(0).getBoutique().getId());
+                            // Vérifier si le produit appartient à n'importe quelle boutique assignée à l'utilisateur
+                            return userBoutiques.stream()
+                                    .anyMatch(ub -> ub.getBoutique().getId().equals(produit.getBoutique().getId()));
                         }
+                        return false; // Si l'utilisateur n'a pas de boutiques assignées, ne pas afficher le produit
                     }
                     return !TypeProduit.SERVICE.equals(produit.getTypeProduit());
                 })
@@ -245,11 +253,19 @@ public class CategorieService {
                     .stream()
                     .filter(produit -> {
                         if (Boolean.TRUE.equals(produit.getDeleted())) return false;
+                        // ADMIN et MANAGER voient tous les produits (sauf deleted et SERVICE)
+                        if (isAdminOrManager) {
+                            return !TypeProduit.SERVICE.equals(produit.getTypeProduit());
+                        }
+                        // Pour les vendeurs (avec VENDRE_PRODUITS mais pas admin/manager), filtrer par boutique
                         if (isVendeur && produit.getBoutique() != null) {
                             List<UserBoutique> userBoutiques = user.getUserBoutiques();
                             if (userBoutiques != null && !userBoutiques.isEmpty()) {
-                                return produit.getBoutique().getId().equals(userBoutiques.get(0).getBoutique().getId());
+                                // Vérifier si le produit appartient à n'importe quelle boutique assignée à l'utilisateur
+                                return userBoutiques.stream()
+                                        .anyMatch(ub -> ub.getBoutique().getId().equals(produit.getBoutique().getId()));
                             }
+                            return false; // Si l'utilisateur n'a pas de boutiques assignées, ne pas afficher le produit
                         }
                         return !TypeProduit.SERVICE.equals(produit.getTypeProduit());
                     })

@@ -1,7 +1,7 @@
 package com.xpertcash.DTOs;
 
 import java.math.BigDecimal;
-import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 import com.xpertcash.entity.Paiement;
 
@@ -15,7 +15,7 @@ import lombok.NoArgsConstructor;
 public class PaiementDTO {
 
     private BigDecimal montant;
-    private LocalDate datePaiement;
+    private LocalDateTime datePaiement;
     private String modePaiement;
     private String encaissePar;
     private String typeTransaction;
