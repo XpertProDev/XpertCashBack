@@ -34,5 +34,6 @@ public class DepenseGeneraleResponseDTO {
     private String creeParEmail;
     private LocalDateTime dateCreation;
     private String typeTransaction;
+    private String origine; // COMPTABILITE, FACTURE, BOUTIQUE (nom de la boutique)
 }
 
