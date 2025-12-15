@@ -1065,6 +1065,22 @@ private VenteParClientResponse toVenteParClientResponse(Vente vente) {
     dto.setModePaiement(vente.getModePaiement());
     dto.setMontantPaye(vente.getMontantPaye());
 
+    Double total = vente.getMontantTotal() != null ? vente.getMontantTotal() : 0.0;
+    Double dejaRembourse = vente.getMontantTotalRembourse() != null ? vente.getMontantTotalRembourse() : 0.0;
+    dto.setMontantRestant(total - dejaRembourse);
+
+    // Statut lisible pour le client :
+    // - si vente à crédit et rien n'a été payé → "CREDIT"
+    // - sinon → statut interne de la vente (PAYEE, EN_COURS, PARTIELLEMENT_REMBOURSEE, REMBOURSEE)
+    String statut;
+    if (vente.getModePaiement() == ModePaiement.CREDIT
+            && (vente.getMontantTotalRembourse() == null || vente.getMontantTotalRembourse() == 0.0)) {
+        statut = "CREDIT";
+    } else {
+        statut = vente.getStatus() != null ? vente.getStatus().name() : null;
+    }
+    dto.setStatut(statut);
+
     if (vente.getProduits() != null) {
         List<VenteLigneResponse> lignes = vente.getProduits().stream().map(vp -> {
             VenteLigneResponse ligne = new VenteLigneResponse();

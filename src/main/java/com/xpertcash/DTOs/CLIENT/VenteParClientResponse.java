@@ -23,6 +23,8 @@ public class VenteParClientResponse {
     private String clientNumero;
     private ModePaiement modePaiement;
     private Double montantPaye;
+    private Double montantRestant;
+    private String statut;
     private List<VenteLigneResponse> lignes;
     private Double remiseGlobale;
     private String numeroFacture;

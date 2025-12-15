@@ -25,6 +25,7 @@ import com.xpertcash.entity.Enum.*;
 import com.xpertcash.entity.VENTE.*;
 import com.xpertcash.repository.*;
 import com.xpertcash.repository.VENTE.*;
+import com.xpertcash.DTOs.PayerDetteRequest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -138,6 +139,138 @@ public class ComptabiliteService {
         comptabilite.setActivites(calculerActivites(entrepriseId));
 
         return comptabilite;
+    }
+
+    /**
+     * Payer une dette depuis la comptabilité (actuellement supporte VENTE_CREDIT).
+     * Réduit la dette et met à jour le statut de la vente.
+     */
+    @Transactional
+    public void payerDette(PayerDetteRequest request, HttpServletRequest httpRequest) {
+        User user = authHelper.getAuthenticatedUserWithFallback(httpRequest);
+
+        if (user.getEntreprise() == null) {
+            throw new RuntimeException("Vous n'êtes associé à aucune entreprise.");
+        }
+
+        if (request.getId() == null) {
+            throw new RuntimeException("L'id de la dette est obligatoire.");
+        }
+        if (request.getType() == null || request.getType().isBlank()) {
+            throw new RuntimeException("Le type de dette est obligatoire.");
+        }
+        if (request.getMontant() == null || request.getMontant() <= 0) {
+            throw new RuntimeException("Le montant du paiement doit être supérieur à 0.");
+        }
+        if (request.getModePaiement() == null || request.getModePaiement().isBlank()) {
+            throw new RuntimeException("Le mode de paiement est obligatoire.");
+        }
+
+        String type = request.getType();
+
+        // Pour l'instant, on gère seulement les ventes à crédit
+        if ("VENTE_CREDIT".equals(type)) {
+            payerVenteCreditDepuisComptabilite(request, user);
+        } else {
+            throw new RuntimeException("Type de dette non supporté pour le paiement depuis la comptabilité : " + type);
+        }
+    }
+
+    private void payerVenteCreditDepuisComptabilite(PayerDetteRequest request, User user) {
+        Vente vente = venteRepository.findById(request.getId())
+                .orElseThrow(() -> new RuntimeException("Vente introuvable"));
+
+        if (vente.getBoutique() == null || vente.getBoutique().getEntreprise() == null) {
+            throw new RuntimeException("La vente n'est pas rattachée à une entreprise.");
+        }
+
+        if (!vente.getBoutique().getEntreprise().getId().equals(user.getEntreprise().getId())) {
+            throw new RuntimeException("Accès interdit : cette vente n'appartient pas à votre entreprise.");
+        }
+
+        if (vente.getModePaiement() != ModePaiement.CREDIT) {
+            throw new RuntimeException("Cette vente n'est pas une vente à crédit.");
+        }
+
+        double total = vente.getMontantTotal() != null ? vente.getMontantTotal() : 0.0;
+        double dejaRembourse = vente.getMontantTotalRembourse() != null ? vente.getMontantTotalRembourse() : 0.0;
+        double restant = total - dejaRembourse;
+
+        if (restant <= 0) {
+            throw new RuntimeException("Cette vente à crédit est déjà totalement payée.");
+        }
+        if (request.getMontant() > restant) {
+            throw new RuntimeException("Le montant du paiement (" + request.getMontant() +
+                    ") dépasse le montant restant dû (" + restant + ").");
+        }
+
+        double montantPaiement = request.getMontant();
+
+        // 💰 Enregistrer l'entrée de trésorerie dans le bon canal (CAISSE / BANQUE / MOBILE_MONEY)
+        ModePaiement mode;
+        try {
+            mode = ModePaiement.valueOf(request.getModePaiement());
+        } catch (IllegalArgumentException e) {
+            throw new RuntimeException("Mode de paiement invalide : " + request.getModePaiement());
+        }
+
+        SourceDepense source;
+        switch (mode) {
+            case ESPECES:
+                source = SourceDepense.CAISSE;
+                break;
+            case VIREMENT:
+            case CHEQUE:
+            case CARTE:
+                source = SourceDepense.BANQUE;
+                break;
+            case MOBILE_MONEY:
+                source = SourceDepense.MOBILE_MONEY;
+                break;
+            default:
+                source = SourceDepense.CAISSE;
+                break;
+        }
+
+        EntreeGenerale entree = new EntreeGenerale();
+        entree.setDesignation("Paiement crédit POS vente ID " + vente.getId());
+        entree.setCategorie(null);
+        entree.setPrixUnitaire(montantPaiement);
+        entree.setQuantite(1);
+        entree.setSource(source);
+        entree.setModeEntree(mode);
+        entree.setNumeroModeEntree(null);
+        entree.setPieceJointe(null);
+        entree.setEntreprise(user.getEntreprise());
+        entree.setCreePar(user);
+        entree.setResponsable(user);
+        entreeGeneraleRepository.save(entree);
+
+        // Mise à jour de la vente (dette)
+        double nouveauTotalRembourse = dejaRembourse + montantPaiement;
+        vente.setMontantTotalRembourse(nouveauTotalRembourse);
+        vente.setDateDernierRemboursement(LocalDateTime.now());
+
+        if (nouveauTotalRembourse >= total) {
+            vente.setStatus(VenteStatus.PAYEE);
+        } else {
+            vente.setStatus(VenteStatus.EN_COURS);
+        }
+
+        // On peut refléter le montant payé cumulé dans montantPaye
+        vente.setMontantPaye(nouveauTotalRembourse);
+
+        venteRepository.save(vente);
+
+        // Historique
+        VenteHistorique historique = new VenteHistorique();
+        historique.setVente(vente);
+        historique.setDateAction(LocalDateTime.now());
+        historique.setAction("PAIEMENT_VENTE_CREDIT");
+        historique.setDetails("Paiement de " + montantPaiement + " sur vente à crédit depuis la comptabilité par "
+                + user.getNomComplet() + " via " + request.getModePaiement());
+        historique.setMontant(montantPaiement);
+        venteHistoriqueRepository.save(historique);
     }
 
     /**
