@@ -248,8 +248,6 @@ public VenteResponse enregistrerVente(VenteRequest request, HttpServletRequest h
 
     vente.setMontantTotal(montantTotal);
     vente.setProduits(lignes);
-    vente.setStatus(VenteStatus.PAYEE);
-    vente.setMontantPaye(montantTotal);
     vente.setCaisse(caisse);
 
     // ✅ Persist groupé
@@ -286,18 +284,35 @@ public VenteResponse enregistrerVente(VenteRequest request, HttpServletRequest h
             throw new RuntimeException("Mode de paiement invalide : " + request.getModePaiement());
         }
     }
-    vente.setModePaiement(modePaiement);
 
-    // ✅ Encaissement : ajouter le montant de la vente à la caisse
-    caisseService.ajouterMouvement(
-        caisse,
-        TypeMouvementCaisse.VENTE,
-        montantTotal,
-        "Encaissement vente ID " + vente.getId(),
-        vente,
-        modePaiement,
-        montantTotal
-    );
+    // ✅ Logique spécifique pour le crédit (dette client)
+    if (modePaiement == ModePaiement.CREDIT) {
+        // Il faut obligatoirement un client ou une entreprise cliente
+        if (vente.getClient() == null && vente.getEntrepriseClient() == null) {
+            throw new RuntimeException("Pour une vente à crédit, vous devez sélectionner un client ou une entreprise cliente.");
+        }
+
+        vente.setModePaiement(modePaiement);
+        // La vente est une dette : rien n'est encaissé pour l'instant
+        vente.setMontantPaye(0.0);
+        vente.setStatus(VenteStatus.EN_COURS);
+        // ⚠️ Pas de mouvement de caisse pour une vente à crédit
+    } else {
+        vente.setModePaiement(modePaiement);
+        vente.setMontantPaye(montantTotal);
+        vente.setStatus(VenteStatus.PAYEE);
+
+        // ✅ Encaissement : ajouter le montant de la vente à la caisse
+        caisseService.ajouterMouvement(
+            caisse,
+            TypeMouvementCaisse.VENTE,
+            montantTotal,
+            "Encaissement vente ID " + vente.getId(),
+            vente,
+            modePaiement,
+            montantTotal
+        );
+    }
 
     // ✅ Réponse finale
     return toVenteResponse(vente);
