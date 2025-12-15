@@ -7,5 +7,6 @@ public enum ModePaiement {
     CHEQUE,
     VIREMENT,
     RETRAIT,
+    CREDIT,
     AUTRE
 }

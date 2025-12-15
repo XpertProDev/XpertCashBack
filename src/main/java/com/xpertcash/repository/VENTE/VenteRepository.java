@@ -9,6 +9,7 @@ import org.springframework.data.repository.query.Param;
 
 import com.xpertcash.entity.Entreprise;
 import com.xpertcash.entity.User;
+import com.xpertcash.entity.ModePaiement;
 import com.xpertcash.entity.VENTE.Vente;
 
 public interface VenteRepository extends JpaRepository<Vente, Long> {
@@ -67,5 +68,8 @@ public interface VenteRepository extends JpaRepository<Vente, Long> {
     // Compter toutes les ventes des boutiques d'une entreprise
     @Query("SELECT COUNT(v) FROM Vente v WHERE v.boutique.entreprise.id = :entrepriseId")
     long countByEntrepriseId(@Param("entrepriseId") Long entrepriseId);
+
+    // Ventes à crédit (dette clients) pour une entreprise
+    List<Vente> findByBoutique_Entreprise_IdAndModePaiement(Long entrepriseId, ModePaiement modePaiement);
 
 }

@@ -88,7 +88,7 @@ public class TresorerieService {
             tresorerie.setMobileMoneyDetail(mobileMoneyDetail);
             tresorerie.setMontantMobileMoney(mobileMoneyDetail.getSolde());
 
-            TresorerieDTO.DetteDetail detteDetail = calculerDette(data);
+            TresorerieDTO.DetteDetail detteDetail = calculerDette(data, entrepriseId);
             tresorerie.setDetteDetail(detteDetail);
             tresorerie.setMontantDette(detteDetail.getTotal());
 
@@ -478,9 +478,11 @@ public class TresorerieService {
         }
     }
 
-    private TresorerieDTO.DetteDetail calculerDette(TresorerieData data) {
+    private TresorerieDTO.DetteDetail calculerDette(TresorerieData data, Long entrepriseId) {
         double facturesImpayees = 0.0;
         int nombreFacturesImpayees = 0;
+
+        logger.info("Calcul de la dette pour l'entreprise {}", entrepriseId);
 
         for (FactureReelle facture : data.factures) {
             BigDecimal totalPaye = data.paiementsParFacture.getOrDefault(facture.getId(), BigDecimal.ZERO);
@@ -500,12 +502,35 @@ public class TresorerieService {
                 .mapToDouble(d -> getValeurDouble(d.getMontant()))
                 .sum();
 
+        // 💳 Dettes issues des ventes à crédit (CREDIT) pour cette entreprise
+        List<Vente> ventesCredit = venteRepository.findByBoutique_Entreprise_IdAndModePaiement(entrepriseId, ModePaiement.CREDIT);
+        logger.info("Ventes à crédit trouvées pour l'entreprise {} : {}", entrepriseId, ventesCredit.size());
+
+        double montantVentesCredit = 0.0;
+        int nombreVentesCredit = 0;
+
+        for (Vente v : ventesCredit) {
+            double total = getValeurDouble(v.getMontantTotal());
+            double rembourse = getValeurDouble(v.getMontantTotalRembourse());
+            double restant = total - rembourse;
+            logger.info("Vente CREDIT id={}, total={}, rembourse={}, restant={}", v.getId(), total, rembourse, restant);
+            if (restant > 0) {
+                montantVentesCredit += restant;
+                nombreVentesCredit++;
+            }
+        }
+
+        logger.info("Total ventes à crédit restantes: {}, nombreVentesCredit: {}", montantVentesCredit, nombreVentesCredit);
+
+        double totalFacturesEtCredits = facturesImpayees + montantVentesCredit;
+        int totalNombreFacturesEtCredits = nombreFacturesImpayees + nombreVentesCredit;
+
         TresorerieDTO.DetteDetail detail = new TresorerieDTO.DetteDetail();
-        detail.setFacturesImpayees(facturesImpayees);
-        detail.setNombreFacturesImpayees(nombreFacturesImpayees);
+        detail.setFacturesImpayees(totalFacturesEtCredits);
+        detail.setNombreFacturesImpayees(totalNombreFacturesEtCredits);
         detail.setDepensesDette(montantDepensesDette);
         detail.setNombreDepensesDette(depensesDette.size());
-        detail.setTotal(facturesImpayees + montantDepensesDette);
+        detail.setTotal(totalFacturesEtCredits + montantDepensesDette);
         return detail;
     }
 
