@@ -1,5 +1,7 @@
 package com.xpertcash.service;
 
+import com.xpertcash.DTOs.DetteItemDTO;
+import com.xpertcash.DTOs.PaginatedResponseDTO;
 import com.xpertcash.DTOs.TresorerieDTO;
 import com.xpertcash.entity.*;
 import com.xpertcash.entity.Enum.SourceDepense;
@@ -53,6 +55,9 @@ public class TresorerieService {
     @Autowired
     private VenteHistoriqueRepository venteHistoriqueRepository;
 
+    @Autowired
+    private FactureVenteRepository factureVenteRepository;
+
     @Transactional(readOnly = true)
     public TresorerieDTO calculerTresorerie(HttpServletRequest request) {
         Long entrepriseId = validerEntreprise(request);
@@ -105,6 +110,136 @@ public class TresorerieService {
             logger.error("Erreur lors du calcul de la trésorerie pour l'entreprise {}", entrepriseId, e);
             throw new BusinessException("Erreur lors du calcul de la trésorerie : " + e.getMessage());
         }
+    }
+
+    /**
+     * Récupère la liste paginée des dettes (factures impayées, ventes à crédit, dépenses en DETTE)
+     * pour l'entreprise de l'utilisateur connecté.
+     */
+    @Transactional(readOnly = true)
+    public PaginatedResponseDTO<DetteItemDTO> getDettesDetaillees(HttpServletRequest request, int page, int size) {
+        Long entrepriseId = validerEntreprise(request);
+        TresorerieData data = chargerDonnees(entrepriseId);
+
+        // Construire la liste complète des dettes
+        java.util.List<DetteItemDTO> items = new java.util.ArrayList<>();
+
+        // 1️⃣ Factures réelles impayées
+        for (FactureReelle facture : data.factures) {
+            BigDecimal totalPaye = data.paiementsParFacture.getOrDefault(facture.getId(), BigDecimal.ZERO);
+            double montantRestant = facture.getTotalFacture() - totalPaye.doubleValue();
+
+            if (montantRestant > 0) {
+                DetteItemDTO dto = new DetteItemDTO();
+                dto.setId(facture.getId());
+                dto.setType("FACTURE_IMPAYEE");
+                // dto.setSource("FACTURE");
+                dto.setMontantRestant(montantRestant);
+                dto.setDate(facture.getDateCreationPro() != null
+                        ? facture.getDateCreationPro()
+                        : (facture.getDateCreation() != null ? facture.getDateCreation().atStartOfDay() : null));
+                dto.setDescription(facture.getDescription());
+                dto.setNumero(facture.getNumeroFacture());
+
+                if (facture.getClient() != null) {
+                    dto.setClient(facture.getClient().getNomComplet());
+                    dto.setContact(facture.getClient().getTelephone());
+                } else if (facture.getEntrepriseClient() != null) {
+                    dto.setClient(facture.getEntrepriseClient().getNom());
+                    dto.setContact(facture.getEntrepriseClient().getTelephone());
+                }
+
+                items.add(dto);
+            }
+        }
+
+        // 2️⃣ Dépenses générales avec source DETTE
+        java.util.List<DepenseGenerale> depensesDette = data.depensesGenerales.stream()
+                .filter(d -> d.getSource() == SourceDepense.DETTE)
+                .collect(Collectors.toList());
+
+        for (DepenseGenerale depense : depensesDette) {
+            DetteItemDTO dto = new DetteItemDTO();
+            dto.setId(depense.getId());
+            dto.setType("DEPENSE_DETTE");
+            // dto.setSource("DEPENSE");
+            dto.setMontantRestant(getValeurDouble(depense.getMontant()));
+            dto.setDate(depense.getDateCreation());
+            dto.setDescription(depense.getDesignation());
+            dto.setNumero(depense.getNumero());
+
+            if (depense.getFournisseur() != null) {
+                dto.setClient(depense.getFournisseur().getNomComplet());
+                dto.setContact(depense.getFournisseur().getTelephone());
+            }
+
+            items.add(dto);
+        }
+
+        // 3️⃣ Ventes à crédit (CREDIT)
+        java.util.List<Vente> ventesCredit = venteRepository.findByBoutique_Entreprise_IdAndModePaiement(entrepriseId, ModePaiement.CREDIT);
+        for (Vente v : ventesCredit) {
+            double total = getValeurDouble(v.getMontantTotal());
+            double rembourse = getValeurDouble(v.getMontantTotalRembourse());
+            double restant = total - rembourse;
+            if (restant <= 0) {
+                continue;
+            }
+
+            DetteItemDTO dto = new DetteItemDTO();
+            dto.setId(v.getId());
+            dto.setType("VENTE_CREDIT");
+            // dto.setSource("POS");
+            dto.setMontantRestant(restant);
+            dto.setDate(v.getDateVente());
+            dto.setDescription(v.getDescription());
+            // Numéro de facture vente si disponible
+            factureVenteRepository.findByVenteId(v.getId())
+                    .ifPresent(f -> dto.setNumero(f.getNumeroFacture()));
+            // Client pouvant être un Client ou une EntrepriseClient, ou juste un nom/numéro libre
+            if (v.getClient() != null) {
+                dto.setClient(v.getClient().getNomComplet());
+                dto.setContact(v.getClient().getTelephone());
+            } else if (v.getEntrepriseClient() != null) {
+                dto.setClient(v.getEntrepriseClient().getNom());
+                dto.setContact(v.getEntrepriseClient().getTelephone());
+            } else {
+                dto.setClient(v.getClientNom());
+                dto.setContact(v.getClientNumero());
+            }
+
+            items.add(dto);
+        }
+
+        // Tri par date décroissante (nulls en dernier)
+        items.sort((a, b) -> {
+            if (a.getDate() == null && b.getDate() == null) return 0;
+            if (a.getDate() == null) return 1;
+            if (b.getDate() == null) return -1;
+            return b.getDate().compareTo(a.getDate());
+        });
+
+        // Pagination manuelle
+        int totalElements = items.size();
+        int totalPages = (int) Math.ceil((double) totalElements / size);
+        int fromIndex = page * size;
+        int toIndex = Math.min(fromIndex + size, totalElements);
+
+        java.util.List<DetteItemDTO> pageContent =
+                (fromIndex >= totalElements) ? java.util.Collections.emptyList() : items.subList(fromIndex, toIndex);
+
+        PaginatedResponseDTO<DetteItemDTO> response = new PaginatedResponseDTO<>();
+        response.setContent(pageContent);
+        response.setPageNumber(page);
+        response.setPageSize(size);
+        response.setTotalElements(totalElements);
+        response.setTotalPages(totalPages);
+        response.setHasNext(page < totalPages - 1);
+        response.setHasPrevious(page > 0);
+        response.setFirst(page == 0);
+        response.setLast(page >= totalPages - 1 || totalPages == 0);
+
+        return response;
     }
 
     private Long validerEntreprise(HttpServletRequest request) {
