@@ -3,6 +3,7 @@ package com.xpertcash.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.xpertcash.DTOs.DepenseGeneraleRequestDTO;
 import com.xpertcash.DTOs.EntreeGeneraleRequestDTO;
+import com.xpertcash.DTOs.PayerDetteRequest;
 import com.xpertcash.service.ComptabiliteService;
 import com.xpertcash.service.IMAGES.ImageStorageService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -126,6 +127,20 @@ public class ComptabiliteController {
             @RequestParam(defaultValue = "20") int size,
             HttpServletRequest request) {
         return handleRequest(() -> comptabiliteService.getComptabiliteCompletePaginated(request, page, size));
+    }
+
+    /**
+     * Payer une dette depuis la comptabilité (actuellement pour VENTE_CREDIT).
+     */
+    @PostMapping("/comptabilite/dettes/payer")
+    public ResponseEntity<?> payerDette(@RequestBody PayerDetteRequest request, HttpServletRequest httpRequest) {
+        return handleRequest(() -> {
+            comptabiliteService.payerDette(request, httpRequest);
+            Map<String, Object> response = new HashMap<>();
+            response.put("status", "success");
+            response.put("message", "Dette payée avec succès");
+            return response;
+        });
     }
 
     // ========== Méthodes utilitaires privées ==========
