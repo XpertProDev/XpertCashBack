@@ -22,6 +22,14 @@ public class TresorerieController {
         return handleRequest(() -> tresorerieService.calculerTresorerie(request));
     }
 
+    @GetMapping("/tresorerie/dettes")
+    public ResponseEntity<?> getDettesDetaillees(
+            HttpServletRequest request,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return handleRequest(() -> tresorerieService.getDettesDetaillees(request, page, size));
+    }
+
     private ResponseEntity<?> handleRequest(Supplier<Object> supplier) {
         try {
             return ResponseEntity.ok(supplier.get());
