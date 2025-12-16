@@ -4,6 +4,7 @@ import com.xpertcash.entity.*;
 import com.xpertcash.repository.*;
 import com.xpertcash.repository.VENTE.CaisseRepository;
 import com.xpertcash.repository.VENTE.MouvementCaisseRepository;
+import com.xpertcash.repository.VENTE.VenteRepository;
 import com.xpertcash.repository.VENTE.VersementComptableRepository;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -46,6 +47,8 @@ public class CaisseService {
     private Utilitaire utilitaire;
     @Autowired
     private VersementComptableRepository versementComptableRepository;
+    @Autowired
+    private VenteRepository venteRepository;
 
         private User getUserFromRequest(HttpServletRequest request) {
         String token = request.getHeader("Authorization");
@@ -357,7 +360,15 @@ public FermerCaisseResponseDTO fermerCaisse(FermerCaisseRequest request, HttpSer
         CaisseResponseDTO dto = new CaisseResponseDTO();
         dto.setId(caisse.getId());
         dto.setMontantInitial(caisse.getMontantInitial());
-        dto.setMontantCourant(caisse.getMontantCourant());
+
+        // 💰 Recalculer le montant courant à partir des mouvements de caisse
+        Double montantCourant = calculerMontantCourantTheorique(caisse);
+        dto.setMontantCourant(montantCourant);
+
+        // 💳 Calculer le montant total encore en dette (ventes à crédit non totalement remboursées) pour cette caisse
+        Double montantDette = calculerMontantDetteCaisse(caisse);
+        dto.setMontantDette(montantDette);
+
         dto.setMontantEnMain(caisse.getMontantEnMain());
         dto.setEcart(caisse.getEcart());
         dto.setStatut(caisse.getStatut().name());
@@ -368,6 +379,60 @@ public FermerCaisseResponseDTO fermerCaisse(FermerCaisseRequest request, HttpSer
         dto.setBoutiqueId(caisse.getBoutique().getId());
         dto.setNomBoutique(caisse.getBoutique().getNomBoutique());
         return dto;
+    }
+
+    /**
+     * Calcule le montant théorique de la caisse à partir :
+     * montantInitial
+     * + ventes + ajouts
+     * - retraits - remboursements
+     */
+    private Double calculerMontantCourantTheorique(Caisse caisse) {
+        double montant = caisse.getMontantInitial() != null ? caisse.getMontantInitial() : 0.0;
+
+        Long caisseId = caisse.getId();
+
+        // VENTES
+        List<MouvementCaisse> ventes = mouvementCaisseRepository.findByCaisseIdAndTypeMouvement(
+                caisseId, TypeMouvementCaisse.VENTE);
+        montant += ventes.stream().mapToDouble(MouvementCaisse::getMontant).sum();
+
+        // AJOUTS
+        List<MouvementCaisse> ajouts = mouvementCaisseRepository.findByCaisseIdAndTypeMouvement(
+                caisseId, TypeMouvementCaisse.AJOUT);
+        montant += ajouts.stream().mapToDouble(MouvementCaisse::getMontant).sum();
+
+        // RETRAITS
+        List<MouvementCaisse> retraits = mouvementCaisseRepository.findByCaisseIdAndTypeMouvement(
+                caisseId, TypeMouvementCaisse.RETRAIT);
+        montant -= retraits.stream().mapToDouble(MouvementCaisse::getMontant).sum();
+
+        // REMBOURSEMENTS
+        List<MouvementCaisse> remboursements = mouvementCaisseRepository.findByCaisseIdAndTypeMouvement(
+                caisseId, TypeMouvementCaisse.REMBOURSEMENT);
+        montant -= remboursements.stream().mapToDouble(MouvementCaisse::getMontant).sum();
+
+        return montant;
+    }
+
+    /**
+     * Montant de dette lié aux ventes à crédit de cette caisse:
+     * somme(max(0, montantTotal - montantTotalRembourse)) pour les ventes CREDIT de cette caisse.
+     */
+    private Double calculerMontantDetteCaisse(Caisse caisse) {
+        // Récupérer toutes les ventes de cette caisse
+        List<com.xpertcash.entity.VENTE.Vente> ventes = venteRepository.findByBoutiqueId(caisse.getBoutique().getId());
+
+        return ventes.stream()
+                .filter(v -> v.getCaisse() != null && v.getCaisse().getId().equals(caisse.getId()))
+                .filter(v -> v.getModePaiement() == com.xpertcash.entity.ModePaiement.CREDIT)
+                .mapToDouble(v -> {
+                    double total = v.getMontantTotal() != null ? v.getMontantTotal() : 0.0;
+                    double rembourse = v.getMontantTotalRembourse() != null ? v.getMontantTotalRembourse() : 0.0;
+                    double restant = total - rembourse;
+                    return Math.max(restant, 0.0);
+                })
+                .sum();
     }
 
 

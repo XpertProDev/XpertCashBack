@@ -9,6 +9,7 @@ public class CaisseResponseDTO {
     private Long id;
     private Double montantInitial;
     private Double montantCourant;
+    private Double montantDette;
     private Double montantEnMain; // Montant réel saisi lors de la fermeture
     private Double ecart; // Différence entre montantCourant et montantEnMain
     private String statut;
