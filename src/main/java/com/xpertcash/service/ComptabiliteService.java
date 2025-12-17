@@ -168,9 +168,11 @@ public class ComptabiliteService {
 
         String type = request.getType();
 
-        // Pour l'instant, on gère seulement les ventes à crédit
+        // Gestion des différents types de dettes payables depuis la comptabilité
         if ("VENTE_CREDIT".equals(type)) {
             payerVenteCreditDepuisComptabilite(request, user);
+        } else if ("ENTREE_DETTE".equals(type)) {
+            payerEntreeDetteDepuisComptabilite(request, user);
         } else {
             throw new RuntimeException("Type de dette non supporté pour le paiement depuis la comptabilité : " + type);
         }
@@ -271,6 +273,89 @@ public class ComptabiliteService {
                 + user.getNomComplet() + " via " + request.getModePaiement());
         historique.setMontant(montantPaiement);
         venteHistoriqueRepository.save(historique);
+    }
+
+    /**
+     * Encaisse une dette créée via EntreeGenerale avec source = DETTE.
+     * - Réduit le montant restant de l'entrée DETTE
+     * - Crée une nouvelle EntreeGenerale réelle (CAISSE/BANQUE/MOBILE_MONEY) pour l'encaissement
+     */
+    private void payerEntreeDetteDepuisComptabilite(PayerDetteRequest request, User user) {
+        EntreeGenerale entreeDette = entreeGeneraleRepository.findById(request.getId())
+                .orElseThrow(() -> new RuntimeException("Entrée de dette introuvable"));
+
+        if (entreeDette.getEntreprise() == null || !entreeDette.getEntreprise().getId().equals(user.getEntreprise().getId())) {
+            throw new RuntimeException("Accès interdit : cette dette n'appartient pas à votre entreprise.");
+        }
+
+        if (entreeDette.getSource() != SourceDepense.DETTE) {
+            throw new RuntimeException("Cette entrée n'est pas une dette (source différente de DETTE).");
+        }
+
+        double montantInitial = entreeDette.getMontant() != null ? entreeDette.getMontant() : 0.0;
+        if (montantInitial <= 0) {
+            throw new RuntimeException("Cette dette est déjà totalement encaissée.");
+        }
+
+        double montantPaiement = request.getMontant();
+        if (montantPaiement > montantInitial) {
+            throw new RuntimeException("Le montant du paiement (" + montantPaiement +
+                    ") dépasse le montant restant dû (" + montantInitial + ").");
+        }
+
+        // Déterminer la source réelle (CAISSE / BANQUE / MOBILE_MONEY) en fonction du mode de paiement
+        ModePaiement mode;
+        try {
+            mode = ModePaiement.valueOf(request.getModePaiement().trim().toUpperCase());
+        } catch (IllegalArgumentException e) {
+            throw new RuntimeException("Mode de paiement invalide : " + request.getModePaiement());
+        }
+
+        SourceDepense sourceReelle;
+        switch (mode) {
+            case ESPECES:
+                sourceReelle = SourceDepense.CAISSE;
+                break;
+            case VIREMENT:
+            case CHEQUE:
+            case CARTE:
+                sourceReelle = SourceDepense.BANQUE;
+                break;
+            case MOBILE_MONEY:
+                sourceReelle = SourceDepense.MOBILE_MONEY;
+                break;
+            default:
+                sourceReelle = SourceDepense.CAISSE;
+                break;
+        }
+
+        // 1️⃣ Créer l'entrée réelle encaissée
+        EntreeGenerale encaissement = new EntreeGenerale();
+        encaissement.setNumero(genererNumeroEntree(user.getEntreprise().getId()));
+        encaissement.setDesignation(
+                (entreeDette.getDesignation() != null ? entreeDette.getDesignation() : "Encaissement dette")
+                        + " (paiement)");
+        encaissement.setCategorie(entreeDette.getCategorie());
+        encaissement.setPrixUnitaire(montantPaiement);
+        encaissement.setQuantite(1);
+        encaissement.setMontant(montantPaiement);
+        encaissement.setSource(sourceReelle);
+        encaissement.setModeEntree(mode);
+        encaissement.setNumeroModeEntree(null);
+        encaissement.setPieceJointe(null);
+        encaissement.setEntreprise(user.getEntreprise());
+        encaissement.setCreePar(user);
+        encaissement.setResponsable(entreeDette.getResponsable() != null ? entreeDette.getResponsable() : user);
+        entreeGeneraleRepository.save(encaissement);
+
+        // 2️⃣ Réduire ou clôturer la dette initiale
+        double restant = montantInitial - montantPaiement;
+        entreeDette.setMontant(restant);
+        if (restant <= 0) {
+            // On peut marquer la dette comme encaissée en changeant la source
+            entreeDette.setSource(sourceReelle);
+        }
+        entreeGeneraleRepository.save(entreeDette);
     }
 
     /**
