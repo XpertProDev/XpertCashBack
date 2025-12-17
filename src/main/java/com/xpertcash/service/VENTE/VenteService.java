@@ -293,10 +293,35 @@ public VenteResponse enregistrerVente(VenteRequest request, HttpServletRequest h
         }
 
         vente.setModePaiement(modePaiement);
-        // La vente est une dette : rien n'est encaissé pour l'instant
-        vente.setMontantPaye(0.0);
-        vente.setStatus(VenteStatus.EN_COURS);
-        // ⚠️ Pas de mouvement de caisse pour une vente à crédit
+
+        Double montantVerse = request.getMontantVerse();
+        if (montantVerse != null && montantVerse > 0) {
+            if (montantVerse > montantTotal) {
+                throw new RuntimeException("Le montant versé (" + montantVerse + ") ne peut pas dépasser le montant total de la vente (" + montantTotal + ").");
+            }
+
+            // 💰 Partie payée immédiatement (en espèces)
+            vente.setMontantPaye(montantVerse);
+            vente.setMontantTotalRembourse(montantVerse);
+            vente.setDateDernierRemboursement(java.time.LocalDateTime.now());
+            vente.setNombreRemboursements(1);
+            vente.setStatus(VenteStatus.EN_COURS); // Il reste une partie en crédit
+
+            // Encaissement partiel en caisse (toujours ESPECES comme demandé)
+            caisseService.ajouterMouvement(
+                    caisse,
+                    TypeMouvementCaisse.VENTE,
+                    montantVerse,
+                    "Encaissement partiel vente crédit ID " + vente.getId(),
+                    vente,
+                    ModePaiement.ESPECES,
+                    montantVerse
+            );
+        } else {
+            // Vente 100% à crédit : rien encaissé au moment de la vente
+            vente.setMontantPaye(0.0);
+            vente.setStatus(VenteStatus.EN_COURS);
+        }
     } else {
         vente.setModePaiement(modePaiement);
         vente.setMontantPaye(montantTotal);

@@ -63,19 +63,36 @@ private FactureVenteResponseDTO toResponse(FactureVente facture) {
     // Calculer le statut de remboursement
     String statutRemboursement = calculerStatutRemboursement(vente);
 
-    return new FactureVenteResponseDTO(
-            facture.getId(),
-            facture.getNumeroFacture(),
-            facture.getDateEmission(),
-            facture.getMontantTotal(),
-            vente.getClientNom(),
-            vente.getClientNumero(),
-            vente.getBoutique().getNomBoutique(),
-            produits,
-            statutRemboursement,
-            vente.getCaisse() != null ? vente.getCaisse().getId() : null,
-            vente.getVendeur() != null ? vente.getVendeur().getNomComplet() : null
-    );
+    // Calculer le montant en dette (pour les ventes à crédit)
+    Double montantDette = 0.0;
+    Double montantPaye = 0.0;
+    if (vente.getModePaiement() != null && vente.getModePaiement().name().equals("CREDIT")) {
+        Double montantTotal = vente.getMontantTotal() != null ? vente.getMontantTotal() : 0.0;
+        Double montantRembourse = vente.getMontantTotalRembourse() != null ? vente.getMontantTotalRembourse() : 0.0;
+        montantDette = Math.max(0.0, montantTotal - montantRembourse);
+        montantPaye = montantRembourse; // Pour les ventes à crédit, montantPaye = montantTotalRembourse
+    } else {
+        // Pour les ventes normales, montantPaye = montantPaye de la vente ou montantTotal si payé
+        montantPaye = vente.getMontantPaye() != null ? vente.getMontantPaye() : 
+                     (vente.getMontantTotal() != null ? vente.getMontantTotal() : 0.0);
+    }
+
+    FactureVenteResponseDTO dto = new FactureVenteResponseDTO();
+    dto.setId(facture.getId());
+    dto.setNumeroFacture(facture.getNumeroFacture());
+    dto.setDateEmission(facture.getDateEmission());
+    dto.setMontantTotal(facture.getMontantTotal());
+    dto.setClientNom(vente.getClientNom());
+    dto.setClientNumero(vente.getClientNumero());
+    dto.setBoutiqueNom(vente.getBoutique().getNomBoutique());
+    dto.setProduits(produits);
+    dto.setStatutRemboursement(statutRemboursement);
+    dto.setCaisseId(vente.getCaisse() != null ? vente.getCaisse().getId() : null);
+    dto.setVendeur(vente.getVendeur() != null ? vente.getVendeur().getNomComplet() : null);
+    dto.setMontantDette(montantDette);
+    dto.setMontantPaye(montantPaye);
+    
+    return dto;
 }
 
 
@@ -184,17 +201,29 @@ public String genererNumeroFactureCompact(Vente vente) {
 
 /**
  * Calcule le statut de remboursement d'une vente
+ * Distingue les remboursements réels (retour de produits) des paiements partiels de crédit
  */
 private String calculerStatutRemboursement(Vente vente) {
-    if (vente.getMontantTotalRembourse() == null || vente.getMontantTotalRembourse() == 0.0) {
-        return "NORMAL";
+    // Vérifier s'il y a des lignes remboursées (retour de produits)
+    boolean hasRemboursement = false;
+    if (vente.getProduits() != null) {
+        hasRemboursement = vente.getProduits().stream()
+            .anyMatch(ligne -> (ligne.getQuantiteRemboursee() != null && ligne.getQuantiteRemboursee() > 0) 
+                            || ligne.isEstRemboursee());
     }
     
-    if (vente.getMontantTotalRembourse().equals(vente.getMontantTotal())) {
-        return "ENTIEREMENT_REMBOURSEE";
+    // Si c'est un remboursement réel (retour de produits)
+    if (hasRemboursement) {
+        if (vente.getMontantTotalRembourse() != null && 
+            vente.getMontantTotalRembourse().equals(vente.getMontantTotal())) {
+            return "ENTIEREMENT_REMBOURSEE";
+        }
+        return "PARTIELLEMENT_REMBOURSEE";
     }
     
-    return "PARTIELLEMENT_REMBOURSEE";
+    // Si montantTotalRembourse > 0 mais pas de remboursement de produits,
+    // c'est un paiement partiel de crédit → reste "NORMAL"
+    return "NORMAL";
 }
 
 /**

@@ -21,4 +21,5 @@ public class VenteRequest {
     private Long entrepriseClientId;
     
     private Double remiseGlobale = 0.0;
+    private Double montantVerse;
 }

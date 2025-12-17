@@ -16,6 +16,8 @@ public class FactureVenteResponseDTO {
     private String numeroFacture;
     private LocalDateTime dateEmission;
     private Double montantTotal;
+    private Double montantDette;
+    private Double montantPaye; // Montant déjà payé (pour les ventes à crédit: montantTotalRembourse, sinon montantPaye)
     private String clientNom;
     private String clientNumero;
     private String boutiqueNom;
