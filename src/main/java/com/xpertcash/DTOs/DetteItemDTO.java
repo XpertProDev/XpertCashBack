@@ -19,8 +19,13 @@ public class DetteItemDTO {
     private LocalDateTime date;
     private String description;
     private String numero;
+    // Pour FACTURE_IMPAYEE et VENTE_CREDIT : client / contact correspondent au client
+    // Pour DEPENSE_DETTE : client / contact correspondent au fournisseur
     private String client;
     private String contact;
+    // Pour ENTREE_DETTE : responsable et son contact
+    private String responsable;
+    private String responsableContact;
 }
 
 

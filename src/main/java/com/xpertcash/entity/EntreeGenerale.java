@@ -40,6 +40,9 @@ public class EntreeGenerale {
     @Column(nullable = false)
     private Double montant;
 
+    @Column(name = "montant_reste")
+    private Double montantReste;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private SourceDepense source;
@@ -79,6 +82,10 @@ public class EntreeGenerale {
         }
         if (montant == null && prixUnitaire != null && quantite != null) {
             montant = prixUnitaire * quantite;
+        }
+        // Initialiser montantReste pour les dettes
+        if (source == SourceDepense.DETTE && montant != null && montantReste == null) {
+            montantReste = montant;
         }
     }
 

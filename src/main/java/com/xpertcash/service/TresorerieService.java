@@ -187,16 +187,19 @@ public class TresorerieService {
             DetteItemDTO dto = new DetteItemDTO();
             dto.setId(entree.getId());
             dto.setType("ENTREE_DETTE");
-            Double montant = getValeurDouble(entree.getMontant());
-            dto.setMontantInitial(montant);
-            dto.setMontantRestant(montant);
+            Double montantInitial = getValeurDouble(entree.getMontant());
+            Double montantRestant = entree.getMontantReste() != null
+                    ? getValeurDouble(entree.getMontantReste())
+                    : montantInitial;
+            dto.setMontantInitial(montantInitial);
+            dto.setMontantRestant(montantRestant);
             dto.setDate(entree.getDateCreation());
             dto.setDescription(entree.getDesignation());
             dto.setNumero(entree.getNumero());
 
             if (entree.getResponsable() != null) {
-                dto.setClient(entree.getResponsable().getNomComplet());
-                dto.setContact(entree.getResponsable().getPhone());
+                dto.setResponsable(entree.getResponsable().getNomComplet());
+                dto.setResponsableContact(entree.getResponsable().getPhone());
             }
 
             items.add(dto);
@@ -669,7 +672,10 @@ public class TresorerieService {
                 .collect(Collectors.toList());
 
         double montantEntreesDette = entreesDette.stream()
-                .mapToDouble(e -> getValeurDouble(e.getMontant()))
+                .mapToDouble(e -> {
+                    Double reste = e.getMontantReste() != null ? e.getMontantReste() : e.getMontant();
+                    return getValeurDouble(reste);
+                })
                 .sum();
 
         // 💳 Dettes issues des ventes à crédit (CREDIT) pour cette entreprise
