@@ -2095,7 +2095,12 @@ public class ComptabiliteService {
             dto.setResponsableEmail(entree.getResponsable().getEmail());
         }
         dto.setDateCreation(entree.getDateCreation());
-        dto.setTypeTransaction("ENTREE");
+        // Si la source est DETTE, ce n'est pas encore une entrée encaissée mais une créance
+        if (entree.getSource() == SourceDepense.DETTE) {
+            dto.setTypeTransaction("DETTE");
+        } else {
+            dto.setTypeTransaction("ENTREE");
+        }
         dto.setOrigine("COMPTABILITE"); // Les entrées générales viennent de la comptabilité
         return dto;
     }

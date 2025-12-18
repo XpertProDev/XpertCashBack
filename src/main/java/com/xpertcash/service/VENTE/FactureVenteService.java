@@ -216,7 +216,7 @@ private String calculerStatutRemboursement(Vente vente) {
     if (hasRemboursement) {
         if (vente.getMontantTotalRembourse() != null && 
             vente.getMontantTotalRembourse().equals(vente.getMontantTotal())) {
-            return "ENTIEREMENT_REMBOURSEE";
+        return "ENTIEREMENT_REMBOURSEE";
         }
         return "PARTIELLEMENT_REMBOURSEE";
     }

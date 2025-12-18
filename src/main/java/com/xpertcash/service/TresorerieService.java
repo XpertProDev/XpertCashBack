@@ -133,7 +133,8 @@ public class TresorerieService {
                 DetteItemDTO dto = new DetteItemDTO();
                 dto.setId(facture.getId());
                 dto.setType("FACTURE_IMPAYEE");
-                // dto.setSource("FACTURE");
+                // Montant de départ = total facture
+                dto.setMontantInitial(facture.getTotalFacture());
                 dto.setMontantRestant(montantRestant);
                 dto.setDate(facture.getDateCreationPro() != null
                         ? facture.getDateCreationPro()
@@ -162,8 +163,9 @@ public class TresorerieService {
             DetteItemDTO dto = new DetteItemDTO();
             dto.setId(depense.getId());
             dto.setType("DEPENSE_DETTE");
-            // dto.setSource("DEPENSE");
-            dto.setMontantRestant(getValeurDouble(depense.getMontant()));
+            Double montant = getValeurDouble(depense.getMontant());
+            dto.setMontantInitial(montant);
+            dto.setMontantRestant(montant);
             dto.setDate(depense.getDateCreation());
             dto.setDescription(depense.getDesignation());
             dto.setNumero(depense.getNumero());
@@ -185,7 +187,9 @@ public class TresorerieService {
             DetteItemDTO dto = new DetteItemDTO();
             dto.setId(entree.getId());
             dto.setType("ENTREE_DETTE");
-            dto.setMontantRestant(getValeurDouble(entree.getMontant()));
+            Double montant = getValeurDouble(entree.getMontant());
+            dto.setMontantInitial(montant);
+            dto.setMontantRestant(montant);
             dto.setDate(entree.getDateCreation());
             dto.setDescription(entree.getDesignation());
             dto.setNumero(entree.getNumero());
@@ -211,7 +215,7 @@ public class TresorerieService {
             DetteItemDTO dto = new DetteItemDTO();
             dto.setId(v.getId());
             dto.setType("VENTE_CREDIT");
-            // dto.setSource("POS");
+            dto.setMontantInitial(total);
             dto.setMontantRestant(restant);
             dto.setDate(v.getDateVente());
             dto.setDescription(v.getDescription());
