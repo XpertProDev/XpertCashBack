@@ -26,6 +26,7 @@ import com.xpertcash.entity.VENTE.*;
 import com.xpertcash.repository.*;
 import com.xpertcash.repository.VENTE.*;
 import com.xpertcash.DTOs.PayerDetteRequest;
+import com.xpertcash.configuration.CentralAccess;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -142,17 +143,17 @@ public class ComptabiliteService {
     }
 
     /**
-     * Payer une dette depuis la comptabilité (actuellement supporte VENTE_CREDIT).
-     * Réduit la dette et met à jour le statut de la vente.
+     * Payer une dette depuis la comptabilité (actuellement supporte VENTE_CREDIT et ENTREE_DETTE).
+     * Réduit la dette et met à jour le statut de la vente ou de l'entrée.
+     * 
+     * 🔐 Sécurité : Vérifie l'authentification, l'appartenance à l'entreprise et les permissions.
      */
     @Transactional
     public void payerDette(PayerDetteRequest request, HttpServletRequest httpRequest) {
-        User user = authHelper.getAuthenticatedUserWithFallback(httpRequest);
+        // 🔐 Vérification de l'authentification et des permissions
+        User user = validateComptabilitePermission(httpRequest);
 
-        if (user.getEntreprise() == null) {
-            throw new RuntimeException("Vous n'êtes associé à aucune entreprise.");
-        }
-
+        // Validation des paramètres de la requête
         if (request.getId() == null) {
             throw new RuntimeException("L'id de la dette est obligatoire.");
         }
@@ -179,15 +180,20 @@ public class ComptabiliteService {
     }
 
     private void payerVenteCreditDepuisComptabilite(PayerDetteRequest request, User user) {
+        // 🔐 Récupération de la vente avec vérification d'existence
         Vente vente = venteRepository.findById(request.getId())
                 .orElseThrow(() -> new RuntimeException("Vente introuvable"));
 
+        // 🔐 Vérification de l'appartenance à l'entreprise
         if (vente.getBoutique() == null || vente.getBoutique().getEntreprise() == null) {
             throw new RuntimeException("La vente n'est pas rattachée à une entreprise.");
         }
 
-        if (!vente.getBoutique().getEntreprise().getId().equals(user.getEntreprise().getId())) {
-            throw new RuntimeException("Accès interdit : cette vente n'appartient pas à votre entreprise.");
+        Entreprise entrepriseVente = vente.getBoutique().getEntreprise();
+        Entreprise entrepriseUser = user.getEntreprise();
+
+        if (!entrepriseVente.getId().equals(entrepriseUser.getId())) {
+            throw new RuntimeException("Accès refusé : cette vente n'appartient pas à votre entreprise.");
         }
 
         if (vente.getModePaiement() != ModePaiement.CREDIT) {
@@ -279,13 +285,24 @@ public class ComptabiliteService {
      * Encaisse une dette créée via EntreeGenerale avec source = DETTE.
      * - Réduit le montant restant de l'entrée DETTE
      * - Crée une nouvelle EntreeGenerale réelle (CAISSE/BANQUE/MOBILE_MONEY) pour l'encaissement
+     * 
+     * 🔐 Sécurité : Vérifie l'appartenance à l'entreprise de l'utilisateur
      */
     private void payerEntreeDetteDepuisComptabilite(PayerDetteRequest request, User user) {
+        // 🔐 Récupération de l'entrée de dette avec vérification d'existence
         EntreeGenerale entreeDette = entreeGeneraleRepository.findById(request.getId())
                 .orElseThrow(() -> new RuntimeException("Entrée de dette introuvable"));
 
-        if (entreeDette.getEntreprise() == null || !entreeDette.getEntreprise().getId().equals(user.getEntreprise().getId())) {
-            throw new RuntimeException("Accès interdit : cette dette n'appartient pas à votre entreprise.");
+        // 🔐 Vérification de l'appartenance à l'entreprise
+        if (entreeDette.getEntreprise() == null) {
+            throw new RuntimeException("Cette entrée de dette n'est pas rattachée à une entreprise.");
+        }
+
+        Entreprise entrepriseEntree = entreeDette.getEntreprise();
+        Entreprise entrepriseUser = user.getEntreprise();
+
+        if (!entrepriseEntree.getId().equals(entrepriseUser.getId())) {
+            throw new RuntimeException("Accès refusé : cette dette n'appartient pas à votre entreprise.");
         }
 
         if (entreeDette.getSource() != SourceDepense.DETTE) {
@@ -1556,6 +1573,7 @@ public class ComptabiliteService {
 
     /**
      * Valide que l'utilisateur a la permission COMPTABILITE
+     * Vérifie aussi les admins et managers de l'entreprise
      */
     private User validateComptabilitePermission(HttpServletRequest httpRequest) {
         User user = authHelper.getAuthenticatedUserWithFallback(httpRequest);
@@ -1564,11 +1582,15 @@ public class ComptabiliteService {
             throw new RuntimeException("Vous n'êtes associé à aucune entreprise.");
         }
 
+        Long entrepriseId = user.getEntreprise().getId();
+        
+        // Vérifier si l'utilisateur est admin ou manager de l'entreprise
+        boolean isAdminOrManager = CentralAccess.isAdminOrManagerOfEntreprise(user, entrepriseId);
         boolean isComptable = user.getRole() != null && user.getRole().getName() == RoleType.COMPTABLE;
         boolean hasPermission = user.getRole() != null && user.getRole().hasPermission(PermissionType.COMPTABILITE);
 
-        if (!isComptable && !hasPermission) {
-            throw new RuntimeException("Seul un comptable ou un utilisateur disposant de la permission COMPTABILITE peut effectuer cette opération.");
+        if (!isAdminOrManager && !isComptable && !hasPermission) {
+            throw new RuntimeException("Accès refusé : vous n'avez pas les droits nécessaires pour effectuer cette opération de comptabilité.");
         }
         
         return user;
@@ -1928,9 +1950,18 @@ public class ComptabiliteService {
         return mapEntreeGeneraleToResponse(entree);
     }
 
+    /**
+     * Liste toutes les entrées générales de l'entreprise de l'utilisateur connecté.
+     * 
+     * 🔐 Sécurité : Vérifie l'authentification, l'appartenance à l'entreprise et les permissions.
+     * Filtre automatiquement les données par entreprise.
+     */
     @Transactional(readOnly = true)
     public List<EntreeGeneraleResponseDTO> listerEntreesGenerales(HttpServletRequest httpRequest) {
+        // 🔐 Vérification de l'authentification et des permissions
         User user = validateComptabilitePermission(httpRequest);
+        
+        // 🔐 Filtrage par entreprise pour garantir l'isolation des données
         List<EntreeGenerale> entrees = entreeGeneraleRepository.findByEntrepriseIdOrderByDateCreationDesc(user.getEntreprise().getId());
         return entrees.stream()
                 .map(this::mapEntreeGeneraleToResponse)
@@ -2170,6 +2201,13 @@ public class ComptabiliteService {
         return result;
     }
 
+    /**
+     * Récupère toutes les données comptables paginées de l'entreprise de l'utilisateur connecté.
+     * 
+     * 🔐 Sécurité : Vérifie l'authentification, l'appartenance à l'entreprise et les permissions.
+     * Toutes les requêtes filtrent automatiquement les données par entreprise pour garantir l'isolation.
+
+     */
     @Transactional(readOnly = true)
     public ComptabiliteCompletePaginatedDTO getComptabiliteCompletePaginated(HttpServletRequest httpRequest, int page, int size) {
         // Validation des paramètres de pagination
@@ -2177,17 +2215,21 @@ public class ComptabiliteService {
         if (size <= 0) size = 20;
         if (size > 100) size = 100; 
 
+        // 🔐 Vérification de l'authentification et des permissions
         User user = validateComptabilitePermission(httpRequest);
+        
+        // 🔐 Récupération de l'ID de l'entreprise pour filtrer toutes les données
         Long entrepriseId = user.getEntreprise().getId();
 
         // Charger les catégories et le résumé (petites données, pas besoin de pagination)
+        // 🔐 Toutes ces méthodes appellent validateComptabilitePermission et filtrent par entreprise
         List<CategorieDepenseDTO> categoriesDepense = listerCategoriesDepense(httpRequest);
         List<CategorieResponseDTO> categoriesEntree = categorieService.getAllCategoriesWithProduitCount(httpRequest);
         TransactionSummaryDTO transactionSummary = transactionSummaryService.getTransactionSummary(httpRequest);
        
         int limitParType = Math.max((page + 1) * size, 1000);
 
-        // Charger les transactions avec limite
+        // 🔐 Charger les transactions avec limite (toutes filtrées par entreprise)
         List<DepenseGeneraleResponseDTO> depensesGenerales = listerDepensesGenerales(httpRequest).stream()
                 .sorted((a, b) -> {
                     LocalDateTime dateA = a.getDateCreation();
@@ -2212,7 +2254,7 @@ public class ComptabiliteService {
                 .limit(limitParType)
                 .collect(Collectors.toList());
 
-        // Récupérer toutes les ventes des caisses fermées
+        // 🔐 Récupérer toutes les ventes des caisses fermées (filtrées par entreprise)
         List<Vente> toutesVentesCaissesFermees = venteRepository.findByEntrepriseIdAndCaisseFermee(entrepriseId);
         
         // Grouper les ventes par caisse fermée
@@ -2220,7 +2262,7 @@ public class ComptabiliteService {
                 .filter(v -> v.getCaisse() != null)
                 .collect(Collectors.groupingBy(v -> v.getCaisse().getId()));
         
-        // Récupérer toutes les caisses fermées
+        // 🔐 Récupérer toutes les caisses fermées (filtrées par entreprise)
         List<Caisse> caissesFermees = caisseRepository.findByEntrepriseIdAndStatut(entrepriseId, StatutCaisse.FERMEE);
         
         // Créer les DTOs de fermeture de caisse avec leurs ventes
@@ -2241,6 +2283,7 @@ public class ComptabiliteService {
                 })
                 .collect(Collectors.toList());
 
+        // 🔐 Récupérer les paiements (filtrés par entreprise)
         List<Paiement> paiements = paiementRepository.findByEntrepriseId(entrepriseId).stream()
                 .sorted((a, b) -> {
                     LocalDateTime dateA = a.getDatePaiement();

@@ -7,6 +7,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface EntreeGeneraleRepository extends JpaRepository<EntreeGenerale, Long> {
@@ -21,5 +22,14 @@ public interface EntreeGeneraleRepository extends JpaRepository<EntreeGenerale, 
             @Param("entrepriseId") Long entrepriseId,
             @Param("month") int month,
             @Param("year") int year);
+    
+    /**
+     * Trouve une EntreeGenerale par son ID et l'ID de l'entreprise (sécurité)
+     * Retourne Optional.empty() si l'entrée n'existe pas ou n'appartient pas à l'entreprise
+     */
+    @Query("SELECT e FROM EntreeGenerale e WHERE e.id = :id AND e.entreprise.id = :entrepriseId")
+    Optional<EntreeGenerale> findByIdAndEntrepriseId(
+            @Param("id") Long id,
+            @Param("entrepriseId") Long entrepriseId);
 }
 

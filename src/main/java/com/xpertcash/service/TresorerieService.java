@@ -3,8 +3,11 @@ package com.xpertcash.service;
 import com.xpertcash.DTOs.DetteItemDTO;
 import com.xpertcash.DTOs.PaginatedResponseDTO;
 import com.xpertcash.DTOs.TresorerieDTO;
+import com.xpertcash.configuration.CentralAccess;
 import com.xpertcash.entity.*;
+import com.xpertcash.entity.Enum.RoleType;
 import com.xpertcash.entity.Enum.SourceDepense;
+import com.xpertcash.entity.PermissionType;
 import com.xpertcash.entity.VENTE.*;
 import com.xpertcash.exceptions.BusinessException;
 import com.xpertcash.repository.*;
@@ -58,15 +61,30 @@ public class TresorerieService {
     @Autowired
     private FactureVenteRepository factureVenteRepository;
 
+    /**
+     * Calcule la trésorerie complète de l'entreprise de l'utilisateur connecté.
+     * 
+     * 🔐 Sécurité : Vérifie l'authentification, l'appartenance à l'entreprise et les permissions.
+     * Toutes les données sont filtrées par entreprise pour garantir l'isolation.
+     */
     @Transactional(readOnly = true)
     public TresorerieDTO calculerTresorerie(HttpServletRequest request) {
-        Long entrepriseId = validerEntreprise(request);
+        Long entrepriseId = validerEntrepriseEtPermissions(request);
         return calculerTresorerieParEntrepriseId(entrepriseId);
     }
 
+    /**
+     * Calcule la trésorerie pour une entreprise donnée.
+     * 
+     * ⚠️ Cette méthode est privée et ne doit être appelée que depuis calculerTresorerie()
+     * qui valide déjà les permissions. L'entrepriseId est garanti d'appartenir à l'utilisateur authentifié.
+     * 
+     * 🔐 Sécurité : Toutes les données sont chargées via chargerDonnees() qui filtre par entrepriseId.
+     */
     @Transactional(readOnly = true)
     public TresorerieDTO calculerTresorerieParEntrepriseId(Long entrepriseId) {
         try {
+            // 🔐 Toutes les données chargées sont filtrées par entrepriseId
             TresorerieData data = chargerDonnees(entrepriseId);
             TresorerieDTO tresorerie = new TresorerieDTO();
 
@@ -115,16 +133,22 @@ public class TresorerieService {
     /**
      * Récupère la liste paginée des dettes (factures impayées, ventes à crédit, dépenses en DETTE)
      * pour l'entreprise de l'utilisateur connecté.
+     * 
+     * 🔐 Sécurité : Vérifie l'authentification, l'appartenance à l'entreprise et les permissions.
+     * Toutes les données sont filtrées par entreprise pour garantir l'isolation.
      */
     @Transactional(readOnly = true)
     public PaginatedResponseDTO<DetteItemDTO> getDettesDetaillees(HttpServletRequest request, int page, int size) {
-        Long entrepriseId = validerEntreprise(request);
+        // 🔐 Vérification de l'authentification et des permissions
+        Long entrepriseId = validerEntrepriseEtPermissions(request);
+        
+        // 🔐 Chargement des données filtrées par entrepriseId
         TresorerieData data = chargerDonnees(entrepriseId);
 
         // Construire la liste complète des dettes
         java.util.List<DetteItemDTO> items = new java.util.ArrayList<>();
 
-        // 1️⃣ Factures réelles impayées
+        // 1️⃣ Factures réelles impayées (filtrées par entreprise via chargerDonnees)
         for (FactureReelle facture : data.factures) {
             BigDecimal totalPaye = data.paiementsParFacture.getOrDefault(facture.getId(), BigDecimal.ZERO);
             double montantRestant = facture.getTotalFacture() - totalPaye.doubleValue();
@@ -154,7 +178,7 @@ public class TresorerieService {
             }
         }
 
-        // 2️⃣ Dépenses générales avec source DETTE
+        // 2️⃣ Dépenses générales avec source DETTE (filtrées par entreprise via chargerDonnees)
         java.util.List<DepenseGenerale> depensesDette = data.depensesGenerales.stream()
                 .filter(d -> d.getSource() == SourceDepense.DETTE)
                 .collect(Collectors.toList());
@@ -178,7 +202,7 @@ public class TresorerieService {
             items.add(dto);
         }
 
-        // 3️⃣ Entrées générales avec source DETTE (dettes à encaisser)
+        // 3️⃣ Entrées générales avec source DETTE (dettes à encaisser, filtrées par entreprise via chargerDonnees)
         java.util.List<EntreeGenerale> entreesDette = data.entreesGenerales.stream()
                 .filter(e -> e.getSource() == SourceDepense.DETTE)
                 .collect(Collectors.toList());
@@ -206,6 +230,7 @@ public class TresorerieService {
         }
 
         // 4️⃣ Ventes à crédit (CREDIT)
+        // 🔐 Requête filtrée par entrepriseId pour garantir l'isolation des données
         java.util.List<Vente> ventesCredit = venteRepository.findByBoutique_Entreprise_IdAndModePaiement(entrepriseId, ModePaiement.CREDIT);
         for (Vente v : ventesCredit) {
             double total = getValeurDouble(v.getMontantTotal());
@@ -271,12 +296,35 @@ public class TresorerieService {
         return response;
     }
 
-    private Long validerEntreprise(HttpServletRequest request) {
+    /**
+     * Valide l'authentification, l'appartenance à une entreprise et les permissions pour accéder à la trésorerie.
+     * 
+     * 🔐 Sécurité : 
+     * - Vérifie le token JWT (via authHelper.getAuthenticatedUserWithFallback)
+     * - Vérifie que l'utilisateur est associé à une entreprise
+     * - Vérifie les permissions/rôles : ADMIN, MANAGER, COMPTABLE, ou permission COMPTABILITE
+     */
+    private Long validerEntrepriseEtPermissions(HttpServletRequest request) {
+        // 🔐 Vérification de l'authentification (token JWT)
         User user = authHelper.getAuthenticatedUserWithFallback(request);
+        
+        // 🔐 Vérification de l'appartenance à une entreprise
         if (user.getEntreprise() == null) {
             throw new BusinessException("Vous n'êtes associé à aucune entreprise.");
         }
-        return user.getEntreprise().getId();
+
+        Long entrepriseId = user.getEntreprise().getId();
+        
+        // 🔐 Vérification des permissions/rôles
+        boolean isAdminOrManager = CentralAccess.isAdminOrManagerOfEntreprise(user, entrepriseId);
+        boolean isComptable = user.getRole() != null && user.getRole().getName() == RoleType.COMPTABLE;
+        boolean hasPermission = user.getRole() != null && user.getRole().hasPermission(PermissionType.COMPTABILITE);
+
+        if (!isAdminOrManager && !isComptable && !hasPermission) {
+            throw new BusinessException("Accès refusé : vous n'avez pas les droits nécessaires pour accéder à la trésorerie.");
+        }
+        
+        return entrepriseId;
     }
 
     private static class TresorerieData {
@@ -309,7 +357,13 @@ public class TresorerieService {
         }
     }
 
+    /**
+     * Charge toutes les données nécessaires pour le calcul de la trésorerie.
+     * 
+     * 🔐 Sécurité : Toutes les requêtes filtrent par entrepriseId pour garantir l'isolation des données.
+     */
     private TresorerieData chargerDonnees(Long entrepriseId) {
+        // 🔐 Toutes les requêtes suivantes filtrent par entrepriseId
         List<Boutique> boutiques = boutiqueRepository.findByEntrepriseId(entrepriseId);
         List<Long> boutiqueIds = boutiques.stream()
                 .map(Boutique::getId)
