@@ -34,5 +34,10 @@ public class EntreeGeneraleResponseDTO {
     private LocalDateTime dateCreation;
     private String typeTransaction;
     private String origine; // COMPTABILITE, FACTURE, BOUTIQUE (nom de la boutique)
+    
+    // 🔗 Champs pour identifier un paiement de dette
+    private Long detteId; // ID de la dette payée (vente_id pour VENTE_CREDIT, entree_generale_id pour ENTREE_DETTE)
+    private String detteType; // Type de dette: VENTE_CREDIT ou ENTREE_DETTE
+    private String detteNumero; // Numéro de référence de la dette (numéro facture ou numéro entrée)
 }
 

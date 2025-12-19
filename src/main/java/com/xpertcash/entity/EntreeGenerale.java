@@ -75,6 +75,16 @@ public class EntreeGenerale {
     @Column(nullable = false)
     private LocalDateTime dateCreation;
 
+    // 🔗 Champs pour lier les entrées de paiement aux dettes
+    @Column(name = "dette_id")
+    private Long detteId; // ID de la dette payée (vente_id pour VENTE_CREDIT, entree_generale_id pour ENTREE_DETTE)
+
+    @Column(name = "dette_type", length = 50)
+    private String detteType; // Type de dette: VENTE_CREDIT ou ENTREE_DETTE
+
+    @Column(name = "dette_numero")
+    private String detteNumero; // Numéro de référence de la dette (numéro facture ou numéro entrée)
+
     @PrePersist
     protected void onCreate() {
         if (dateCreation == null) {
