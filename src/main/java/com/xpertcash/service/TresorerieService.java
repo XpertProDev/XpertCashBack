@@ -176,7 +176,29 @@ public class TresorerieService {
             items.add(dto);
         }
 
-        // 3️⃣ Ventes à crédit (CREDIT)
+        // 3️⃣ Entrées générales avec source DETTE (dettes à encaisser)
+        java.util.List<EntreeGenerale> entreesDette = data.entreesGenerales.stream()
+                .filter(e -> e.getSource() == SourceDepense.DETTE)
+                .collect(Collectors.toList());
+
+        for (EntreeGenerale entree : entreesDette) {
+            DetteItemDTO dto = new DetteItemDTO();
+            dto.setId(entree.getId());
+            dto.setType("ENTREE_DETTE");
+            dto.setMontantRestant(getValeurDouble(entree.getMontant()));
+            dto.setDate(entree.getDateCreation());
+            dto.setDescription(entree.getDesignation());
+            dto.setNumero(entree.getNumero());
+
+            if (entree.getResponsable() != null) {
+                dto.setClient(entree.getResponsable().getNomComplet());
+                dto.setContact(entree.getResponsable().getPhone());
+            }
+
+            items.add(dto);
+        }
+
+        // 4️⃣ Ventes à crédit (CREDIT)
         java.util.List<Vente> ventesCredit = venteRepository.findByBoutique_Entreprise_IdAndModePaiement(entrepriseId, ModePaiement.CREDIT);
         for (Vente v : ventesCredit) {
             double total = getValeurDouble(v.getMontantTotal());
@@ -637,6 +659,15 @@ public class TresorerieService {
                 .mapToDouble(d -> getValeurDouble(d.getMontant()))
                 .sum();
 
+        // 💰 Dettes issues des entrées générales marquées comme DETTE (créances à encaisser)
+        List<EntreeGenerale> entreesDette = data.entreesGenerales.stream()
+                .filter(e -> e.getSource() == SourceDepense.DETTE)
+                .collect(Collectors.toList());
+
+        double montantEntreesDette = entreesDette.stream()
+                .mapToDouble(e -> getValeurDouble(e.getMontant()))
+                .sum();
+
         // 💳 Dettes issues des ventes à crédit (CREDIT) pour cette entreprise
         List<Vente> ventesCredit = venteRepository.findByBoutique_Entreprise_IdAndModePaiement(entrepriseId, ModePaiement.CREDIT);
         logger.info("Ventes à crédit trouvées pour l'entreprise {} : {}", entrepriseId, ventesCredit.size());
@@ -663,9 +694,10 @@ public class TresorerieService {
         TresorerieDTO.DetteDetail detail = new TresorerieDTO.DetteDetail();
         detail.setFacturesImpayees(totalFacturesEtCredits);
         detail.setNombreFacturesImpayees(totalNombreFacturesEtCredits);
-        detail.setDepensesDette(montantDepensesDette);
-        detail.setNombreDepensesDette(depensesDette.size());
-        detail.setTotal(totalFacturesEtCredits + montantDepensesDette);
+        // On agrège ici les "dettes" provenant des dépenses en DETTE et des entrées en DETTE
+        detail.setDepensesDette(montantDepensesDette + montantEntreesDette);
+        detail.setNombreDepensesDette(depensesDette.size() + entreesDette.size());
+        detail.setTotal(totalFacturesEtCredits + montantDepensesDette + montantEntreesDette);
         return detail;
     }
 
