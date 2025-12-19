@@ -11,6 +11,7 @@ import com.xpertcash.DTOs.USER.UserRequest;
 import com.xpertcash.DTOs.UserOptimalDTO;
 import com.xpertcash.configuration.CentralAccess;
 import com.xpertcash.configuration.JwtConfig;
+import com.xpertcash.configuration.JwtUtil;
 
 import com.xpertcash.configuration.PasswordGenerator;
 import com.xpertcash.configuration.QRCodeGenerator;
@@ -30,6 +31,7 @@ import com.xpertcash.repository.Module.ModuleRepository;
 import com.xpertcash.service.IMAGES.ImageStorageService;
 import com.xpertcash.service.Module.ModuleActivationService;
 
+import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import jakarta.mail.MessagingException;
@@ -44,6 +46,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Date;
@@ -117,6 +120,10 @@ public class UsersService {
     private BCryptPasswordEncoder passwordEncoder;
 
     private final JwtConfig jwtConfig;
+
+
+    @Autowired
+    private JwtUtil jwtUtil;
     @Autowired
     private BoutiqueRepository boutiqueRepository;
 
@@ -140,6 +147,40 @@ public class UsersService {
         this.usersRepository = usersRepository;
         this.jwtConfig = jwtConfig;
         this.passwordEncoder = passwordEncoder;
+    }
+
+    /**
+     * Logout : invalide tous les tokens de l'utilisateur en mettant à jour lastActivity
+     * Approche optimale : pas de blacklist, invalidation immédiate de tous les tokens précédents
+     */
+    @Transactional
+    public void logout(HttpServletRequest request) {
+        String authHeader = request.getHeader("Authorization");
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            throw new RuntimeException("Token JWT manquant ou mal formaté");
+        }
+
+        String token = authHeader.substring(7);
+
+        // Extraire l'UUID de l'utilisateur depuis le token
+        Claims claims = jwtUtil.extractAllClaimsSafe(token);
+        if (claims == null) {
+            throw new RuntimeException("Token invalide ou expiré");
+        }
+
+        String userUuid = claims.getSubject();
+        if (userUuid == null) {
+            throw new RuntimeException("UUID utilisateur non trouvé dans le token");
+        }
+
+        // Récupérer l'utilisateur
+        User user = usersRepository.findByUuid(userUuid)
+                .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
+
+        // Mettre à jour lastActivity pour invalider tous les tokens précédents
+        // Tous les tokens émis avant ce moment seront invalides car leur lastActivity ne correspondra plus
+        user.setLastActivity(LocalDateTime.now());
+        usersRepository.save(user);
     }
 
 
@@ -375,12 +416,18 @@ public class UsersService {
             boolean adminActivated = (admin != null) ? admin.isEnabledLien() : true;
             boolean userActivationPossible = isAdminRole ? (user.isActivatedLien() || within24Hours) : true;
 
+            // Inclure lastActivity dans le token pour invalider les anciens tokens lors du logout
+            long lastActivityTimestamp = user.getLastActivity() != null 
+                    ? user.getLastActivity().atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+                    : now.getTime();
+
             return Jwts.builder()
                     .setSubject(user.getUuid())
                     .claim("role", user.getRole().getName())
                     .claim("userActivated", userActivated)
                     .claim("adminActivated", adminActivated)
                     .claim("userActivationPossible", userActivationPossible)
+                    .claim("lastActivity", lastActivityTimestamp) // Version du token basée sur lastActivity
                     .setIssuedAt(now)
                     .setExpiration(expirationDate)
                     .signWith(SignatureAlgorithm.HS256, jwtConfig.getSecretKey())

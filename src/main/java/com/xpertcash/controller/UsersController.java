@@ -90,6 +90,20 @@ public ResponseEntity<RegisterResponse> register(@RequestBody RegistrationReques
         }
     }
 
+    // Logout : déconnexion et invalidation du token courant
+    @PostMapping("/logout")
+    public ResponseEntity<Map<String, String>> logout(HttpServletRequest request) {
+        Map<String, String> response = new HashMap<>();
+        try {
+            usersService.logout(request);
+            response.put("message", "Déconnexion réussie. Le token a été invalidé.");
+            return ResponseEntity.ok(response);
+        } catch (RuntimeException e) {
+            response.put("error", e.getMessage());
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+        }
+    }
+
 
    
     // Endpoint pour renvoyer l'email d'activation
