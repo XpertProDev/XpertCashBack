@@ -252,6 +252,14 @@ public class ComptabiliteService {
         entree.setEntreprise(user.getEntreprise());
         entree.setCreePar(user);
         entree.setResponsable(user);
+        
+        // 🔗 Lier l'entrée à la dette payée
+        entree.setDetteId(vente.getId());
+        entree.setDetteType("VENTE_CREDIT");
+        // Récupérer le numéro de facture si disponible
+        factureVenteRepository.findByVenteId(vente.getId())
+                .ifPresent(facture -> entree.setDetteNumero(facture.getNumeroFacture()));
+        
         entreeGeneraleRepository.save(entree);
 
         // Mise à jour de la vente (dette)
@@ -368,6 +376,12 @@ public class ComptabiliteService {
         encaissement.setEntreprise(user.getEntreprise());
         encaissement.setCreePar(user);
         encaissement.setResponsable(entreeDette.getResponsable() != null ? entreeDette.getResponsable() : user);
+        
+        // 🔗 Lier l'entrée à la dette payée
+        encaissement.setDetteId(entreeDette.getId());
+        encaissement.setDetteType("ENTREE_DETTE");
+        encaissement.setDetteNumero(entreeDette.getNumero());
+        
         entreeGeneraleRepository.save(encaissement);
 
         // 2️⃣ Réduire ou clôturer la dette initiale (on joue uniquement sur montantReste)
@@ -2095,6 +2109,10 @@ public class ComptabiliteService {
         // Si c'est une entrée en DETTE, on initialise le montant restant à encaisser
         if (source == SourceDepense.DETTE) {
             entree.setMontantReste(entree.getMontant());
+            // 🔗 Cette entrée EST la dette, on ne remplit donc pas detteId/detteNumero ici.
+            // numero = numéro de la dette elle-même
+            // Les champs detteId / detteNumero ne sont utilisés que sur les PAIEMENTS de dette.
+            entree.setDetteType("ENTREE_DETTE");
         }
         
         return entree;
@@ -2138,10 +2156,22 @@ public class ComptabiliteService {
         // Si la source est DETTE, ce n'est pas encore une entrée encaissée mais une créance
         if (entree.getSource() == SourceDepense.DETTE) {
             dto.setTypeTransaction("DETTE");
+            dto.setOrigine("COMPTABILITE"); // Dette non encore encaissée
         } else {
             dto.setTypeTransaction("ENTREE");
+            // Si c'est un paiement de dette, l'origine est "PAIEMENT_DETTE" pour faciliter l'identification
+            if (entree.getDetteId() != null && entree.getDetteType() != null) {
+                dto.setOrigine("PAIEMENT_DETTE");
+            } else {
+                dto.setOrigine("COMPTABILITE"); // Entrée classique
+            }
         }
-        dto.setOrigine("COMPTABILITE"); // Les entrées générales viennent de la comptabilité
+        
+        // 🔗 Mapper les champs de liaison avec la dette (si c'est un paiement de dette)
+        dto.setDetteId(entree.getDetteId());
+        dto.setDetteType(entree.getDetteType());
+        dto.setDetteNumero(entree.getDetteNumero());
+        
         return dto;
     }
 
