@@ -292,7 +292,7 @@ public VenteResponse enregistrerVente(VenteRequest request, HttpServletRequest h
             throw new RuntimeException("Pour une vente à crédit, vous devez sélectionner un client ou une entreprise cliente.");
         }
 
-        vente.setModePaiement(modePaiement);
+    vente.setModePaiement(modePaiement);
 
         Double montantVerse = request.getMontantVerse();
         if (montantVerse != null && montantVerse > 0) {
@@ -327,16 +327,16 @@ public VenteResponse enregistrerVente(VenteRequest request, HttpServletRequest h
         vente.setMontantPaye(montantTotal);
         vente.setStatus(VenteStatus.PAYEE);
 
-        // ✅ Encaissement : ajouter le montant de la vente à la caisse
-        caisseService.ajouterMouvement(
-            caisse,
-            TypeMouvementCaisse.VENTE,
-            montantTotal,
-            "Encaissement vente ID " + vente.getId(),
-            vente,
-            modePaiement,
-            montantTotal
-        );
+    // ✅ Encaissement : ajouter le montant de la vente à la caisse
+    caisseService.ajouterMouvement(
+        caisse,
+        TypeMouvementCaisse.VENTE,
+        montantTotal,
+        "Encaissement vente ID " + vente.getId(),
+        vente,
+        modePaiement,
+        montantTotal
+    );
     }
 
     // ✅ Réponse finale

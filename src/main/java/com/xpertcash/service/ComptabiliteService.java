@@ -293,14 +293,19 @@ public class ComptabiliteService {
         }
 
         double montantInitial = entreeDette.getMontant() != null ? entreeDette.getMontant() : 0.0;
-        if (montantInitial <= 0) {
+        // Montant restant actuel (si null, on considère tout le montant initial comme restant)
+        double montantRestantActuel = entreeDette.getMontantReste() != null
+                ? entreeDette.getMontantReste()
+                : montantInitial;
+
+        if (montantRestantActuel <= 0) {
             throw new RuntimeException("Cette dette est déjà totalement encaissée.");
         }
 
         double montantPaiement = request.getMontant();
-        if (montantPaiement > montantInitial) {
+        if (montantPaiement > montantRestantActuel) {
             throw new RuntimeException("Le montant du paiement (" + montantPaiement +
-                    ") dépasse le montant restant dû (" + montantInitial + ").");
+                    ") dépasse le montant restant dû (" + montantRestantActuel + ").");
         }
 
         // Déterminer la source réelle (CAISSE / BANQUE / MOBILE_MONEY) en fonction du mode de paiement
@@ -348,9 +353,9 @@ public class ComptabiliteService {
         encaissement.setResponsable(entreeDette.getResponsable() != null ? entreeDette.getResponsable() : user);
         entreeGeneraleRepository.save(encaissement);
 
-        // 2️⃣ Réduire ou clôturer la dette initiale
-        double restant = montantInitial - montantPaiement;
-        entreeDette.setMontant(restant);
+        // 2️⃣ Réduire ou clôturer la dette initiale (on joue uniquement sur montantReste)
+        double restant = montantRestantActuel - montantPaiement;
+        entreeDette.setMontantReste(restant);
         if (restant <= 0) {
             // On peut marquer la dette comme encaissée en changeant la source
             entreeDette.setSource(sourceReelle);
@@ -2056,6 +2061,10 @@ public class ComptabiliteService {
         entree.setEntreprise(user.getEntreprise());
         entree.setCreePar(user);
         entree.setResponsable(responsable);
+        // Si c'est une entrée en DETTE, on initialise le montant restant à encaisser
+        if (source == SourceDepense.DETTE) {
+            entree.setMontantReste(entree.getMontant());
+        }
         
         return entree;
     }
@@ -2095,7 +2104,12 @@ public class ComptabiliteService {
             dto.setResponsableEmail(entree.getResponsable().getEmail());
         }
         dto.setDateCreation(entree.getDateCreation());
-        dto.setTypeTransaction("ENTREE");
+        // Si la source est DETTE, ce n'est pas encore une entrée encaissée mais une créance
+        if (entree.getSource() == SourceDepense.DETTE) {
+            dto.setTypeTransaction("DETTE");
+        } else {
+            dto.setTypeTransaction("ENTREE");
+        }
         dto.setOrigine("COMPTABILITE"); // Les entrées générales viennent de la comptabilité
         return dto;
     }

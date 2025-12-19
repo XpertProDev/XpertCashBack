@@ -291,29 +291,29 @@ public FermerCaisseResponseDTO fermerCaisse(FermerCaisseRequest request, HttpSer
 
     // Le vendeur get sa derniere caisse a lui
     public Optional<CaisseResponseDTO> getDerniereCaisseVendeur(Long boutiqueId, HttpServletRequest request) {
-    User user = getUserFromRequest(request);
+        User user = getUserFromRequest(request);
 
-    Boutique boutique = boutiqueRepository.findById(boutiqueId)
-            .orElseThrow(() -> new RuntimeException("Boutique introuvable"));
+        Boutique boutique = boutiqueRepository.findById(boutiqueId)
+                .orElseThrow(() -> new RuntimeException("Boutique introuvable"));
 
-    // Sécurité : rôle ou permission
-    RoleType role = user.getRole().getName();
-    boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
-    boolean hasPermission = user.getRole().hasPermission(PermissionType.VENDRE_PRODUITS);
-    if (!isAdminOrManager && !hasPermission) {
-        throw new RuntimeException("Vous n'avez pas les droits nécessaires pour consulter la caisse !");
-    }
+        // Sécurité : rôle ou permission
+        RoleType role = user.getRole().getName();
+        boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
+        boolean hasPermission = user.getRole().hasPermission(PermissionType.VENDRE_PRODUITS);
+        if (!isAdminOrManager && !hasPermission) {
+            throw new RuntimeException("Vous n'avez pas les droits nécessaires pour consulter la caisse !");
+        }
 
-    // Vérification d'appartenance à l'entreprise
-    if (!boutique.getEntreprise().getId().equals(user.getEntreprise().getId())) {
-        throw new RuntimeException("Accès interdit : cette boutique n'appartient pas à votre entreprise.");
-    }
+        // Vérification d'appartenance à l'entreprise
+        if (!boutique.getEntreprise().getId().equals(user.getEntreprise().getId())) {
+            throw new RuntimeException("Accès interdit : cette boutique n'appartient pas à votre entreprise.");
+        }
 
-    // Requête pour la dernière caisse (ouverte ou fermée)
-    Optional<Caisse> caisseOpt = caisseRepository.findTopByBoutiqueIdAndVendeurIdOrderByDateOuvertureDesc(
-            boutiqueId,
-            user.getId()
-    );
+        // Requête pour la dernière caisse (ouverte ou fermée)
+        Optional<Caisse> caisseOpt = caisseRepository.findTopByBoutiqueIdAndVendeurIdOrderByDateOuvertureDesc(
+                boutiqueId,
+                user.getId()
+        );
 
     return caisseOpt.map(caisse -> {
         CaisseResponseDTO dto = new CaisseResponseDTO();
@@ -329,7 +329,7 @@ public FermerCaisseResponseDTO fermerCaisse(FermerCaisseRequest request, HttpSer
         dto.setNomBoutique(caisse.getBoutique().getNomBoutique());
         return dto;
     });
-}
+    }
 
     // Suivre la "fluidité d’argent" en cours d’activité.
     public CaisseResponseDTO getEtatActuelCaisse(Long boutiqueId, HttpServletRequest request) {
