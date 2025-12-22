@@ -19,6 +19,7 @@ public class SuperAdminEntrepriseListDTO {
     private LocalDateTime createdAt; // date de création
     private String pays;             // pays
     private String secteur;          // secteur
+    private String adminId;         // id de ladmin
     private String adminNom;         // nom complet de l'admin
     private String adminPhone;       // téléphone de l'admin
     private String adminEmail;       // email de l'admin

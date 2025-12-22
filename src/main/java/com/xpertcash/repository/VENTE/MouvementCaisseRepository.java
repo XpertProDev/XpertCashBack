@@ -29,4 +29,7 @@ public interface MouvementCaisseRepository extends JpaRepository<MouvementCaisse
     // Récupère les mouvements pour plusieurs caisses sans filtre de date
     List<MouvementCaisse> findByCaisseIdInAndTypeMouvement(
         List<Long> caisseIds, TypeMouvementCaisse typeMouvement);
+    
+    // Récupère tous les mouvements d'une caisse (tous types confondus)
+    List<MouvementCaisse> findByCaisseId(Long caisseId);
 }
