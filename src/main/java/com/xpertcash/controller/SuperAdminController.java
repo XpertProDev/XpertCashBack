@@ -5,6 +5,7 @@ import java.util.Map;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -141,6 +142,39 @@ public class SuperAdminController {
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(Map.of("error", "Erreur interne : " + e.getMessage()));
+        }
+    }
+
+    /**
+     * Supprime un Admin et TOUTES les données associées à son entreprise.
+     * ATTENTION : Cette opération est irréversible et supprime toutes les données de l'entreprise.
+     * 
+     * Peut être appelée par :
+     * - SUPER_ADMIN (peut supprimer n'importe quel admin)
+     * - L'admin lui-même (peut supprimer uniquement son propre compte)
+     * 
+     * @param adminId L'ID de l'admin à supprimer
+     * @param request La requête HTTP pour récupérer l'utilisateur connecté
+     * @return Réponse indiquant le succès ou l'échec de l'opération
+     */
+    @DeleteMapping("/deleteAdminAndEntreprise/{adminId}")
+    public ResponseEntity<?> deleteAdminAndEntreprise(@PathVariable Long adminId, HttpServletRequest request) {
+        try {
+            User user = authHelper.getAuthenticatedUserWithFallback(request);
+            superAdminService.deleteAdminAndEntreprise(user, adminId);
+            return ResponseEntity.ok(Map.of("message", "Admin et toutes les données de son entreprise ont été supprimés avec succès."));
+        } catch (RuntimeException e) {
+            // Si c'est une erreur d'accès, retourner 403, sinon 500
+            if (e.getMessage() != null && e.getMessage().contains("Accès refusé")) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                        .body(Map.of("error", e.getMessage()));
+            } else {
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                        .body(Map.of("error", "Erreur lors de la suppression : " + e.getMessage()));
+            }
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Erreur lors de la suppression : " + e.getMessage()));
         }
     }
 }
