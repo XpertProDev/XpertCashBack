@@ -18,6 +18,9 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.xpertcash.service.IMAGES.ImageStorageService;
+import org.springframework.web.multipart.MultipartFile;
 
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
@@ -46,6 +49,27 @@ public class TransfertFondsService {
     @Autowired
     private TresorerieService tresorerieService;
 
+    @Autowired
+    private ImageStorageService imageStorageService;
+
+    @Autowired
+    private ObjectMapper objectMapper;
+
+    /**
+     * Gère un transfert à partir d'un formulaire multipart (JSON + fichier).
+     * Cette méthode encapsule le parsing JSON et la sauvegarde de la pièce jointe
+     * pour garder le contrôleur le plus léger possible.
+     */
+    @Transactional
+    public TransfertFondsResponseDTO effectuerTransfertMultipart(String transfertJson,
+                                                                 MultipartFile pieceJointeFile,
+                                                                 HttpServletRequest httpRequest) {
+        TransfertFondsRequestDTO request = parseTransfertJson(transfertJson);
+        String pieceJointeUrl = saveTransfertPieceJointe(pieceJointeFile);
+        request.setPieceJointe(pieceJointeUrl);
+        return effectuerTransfert(request, httpRequest);
+    }
+
     @Transactional
     public TransfertFondsResponseDTO effectuerTransfert(TransfertFondsRequestDTO request, HttpServletRequest httpRequest) {
         User user = validerUtilisateur(httpRequest);
@@ -65,12 +89,54 @@ public class TransfertFondsService {
         TransfertFonds transfert = creerTransfert(request, user, source, destination);
         transfert = transfertFondsRepository.save(transfert);
 
-        enregistrerMouvements(user.getEntreprise().getId(), source, destination, request.getMontant(), request.getMotif(), user);
+        enregistrerMouvements(
+                user.getEntreprise().getId(),
+                source,
+                destination,
+                request.getMontant(),
+                request.getMotif(),
+                request.getPieceJointe(),
+                user
+        );
 
         logger.info("Transfert de fonds effectué : {} {} -> {} {} par utilisateur {}", 
                 request.getMontant(), source, destination, request.getMontant(), user.getId());
 
         return mapperVersResponseDTO(transfert);
+    }
+
+    private TransfertFondsRequestDTO parseTransfertJson(String transfertJson) {
+        try {
+            String cleanedJson = cleanJson(transfertJson);
+            return objectMapper.readValue(cleanedJson, TransfertFondsRequestDTO.class);
+        } catch (Exception e) {
+            throw new BusinessException("Format JSON invalide : " + e.getMessage());
+        }
+    }
+
+    private String cleanJson(String json) {
+        if (json == null || json.trim().isEmpty()) {
+            throw new BusinessException("Le JSON de transfert est vide");
+        }
+
+        String cleaned = json.trim();
+
+        if (!cleaned.startsWith("{")) {
+            cleaned = "{" + cleaned;
+        }
+
+        if (!cleaned.endsWith("}")) {
+            cleaned = cleaned + "}";
+        }
+
+        return cleaned;
+    }
+
+    private String saveTransfertPieceJointe(MultipartFile pieceJointeFile) {
+        if (pieceJointeFile != null && !pieceJointeFile.isEmpty()) {
+            return imageStorageService.saveTransfertPieceJointe(pieceJointeFile);
+        }
+        return null;
     }
 
     @Transactional(readOnly = true)
@@ -179,16 +245,21 @@ public class TransfertFondsService {
         return transfert;
     }
 
-    private void enregistrerMouvements(Long entrepriseId, SourceTresorerie source, SourceTresorerie destination,
-                                      Double montant, String motif, User user) {
+    private void enregistrerMouvements(Long entrepriseId,
+                                       SourceTresorerie source,
+                                       SourceTresorerie destination,
+                                       Double montant,
+                                       String motif,
+                                       String pieceJointe,
+                                       User user) {
         String descriptionSortie = "Transfert vers " + destination.name() + " - " + motif;
         String descriptionEntree = "Transfert depuis " + source.name() + " - " + motif;
 
         SourceDepense sourceDepenseSortie = convertirVersSourceDepense(source);
         SourceDepense sourceDepenseEntree = convertirVersSourceDepense(destination);
 
-        DepenseGenerale depenseSortie = creerDepenseGenerale(entrepriseId, montant, sourceDepenseSortie, descriptionSortie, user);
-        DepenseGenerale depenseEntree = creerDepenseGenerale(entrepriseId, -montant, sourceDepenseEntree, descriptionEntree, user);
+        DepenseGenerale depenseSortie = creerDepenseGenerale(entrepriseId, montant, sourceDepenseSortie, descriptionSortie, pieceJointe, user);
+        DepenseGenerale depenseEntree = creerDepenseGenerale(entrepriseId, -montant, sourceDepenseEntree, descriptionEntree, pieceJointe, user);
 
         depenseGeneraleRepository.save(depenseSortie);
         depenseGeneraleRepository.save(depenseEntree);
@@ -214,8 +285,12 @@ public class TransfertFondsService {
         }
     }
 
-    private DepenseGenerale creerDepenseGenerale(Long entrepriseId, Double montant, SourceDepense source,
-                                                 String description, User user) {
+    private DepenseGenerale creerDepenseGenerale(Long entrepriseId,
+                                                 Double montant,
+                                                 SourceDepense source,
+                                                 String description,
+                                                 String pieceJointe,
+                                                 User user) {
         DepenseGenerale depense = new DepenseGenerale();
         depense.setDesignation(description);
         depense.setPrixUnitaire(Math.abs(montant));
@@ -226,6 +301,7 @@ public class TransfertFondsService {
         depense.setTypeCharge(TypeCharge.CHARGE_FIXE);
         depense.setEntreprise(user.getEntreprise());
         depense.setCreePar(user);
+        depense.setPieceJointe(pieceJointe);
         depense.setNumero(null);
         return depense;
     }
