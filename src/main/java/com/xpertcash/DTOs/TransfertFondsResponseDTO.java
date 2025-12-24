@@ -23,5 +23,6 @@ public class TransfertFondsResponseDTO {
     private String typeTransaction; // SORTIE ou ENTREE pour les transferts
     private String sensTransfert; // "SORTIE" ou "ENTREE" pour indiquer le sens du transfert
     private String origine; // Source ou destination selon le sens
+    private String pieceJointe; // URL ou chemin du fichier (facultatif)
 }
 

@@ -9,15 +9,18 @@ import com.xpertcash.entity.Enum.RoleType;
 import com.xpertcash.entity.Enum.SourceDepense;
 import com.xpertcash.entity.Enum.SourceTresorerie;
 import com.xpertcash.entity.Enum.TypeCharge;
-import com.xpertcash.entity.VENTE.*;
+import com.xpertcash.entity.EntreeGenerale;
+import com.xpertcash.entity.ModePaiement;
 import com.xpertcash.exceptions.BusinessException;
 import com.xpertcash.repository.*;
-import com.xpertcash.repository.VENTE.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.xpertcash.service.IMAGES.ImageStorageService;
+import org.springframework.web.multipart.MultipartFile;
 
 import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
@@ -38,13 +41,31 @@ public class TransfertFondsService {
     private DepenseGeneraleRepository depenseGeneraleRepository;
 
     @Autowired
-    private CaisseRepository caisseRepository;
-
-    @Autowired
-    private MouvementCaisseRepository mouvementCaisseRepository;
+    private EntreeGeneraleRepository entreeGeneraleRepository;
 
     @Autowired
     private TresorerieService tresorerieService;
+
+    @Autowired
+    private ImageStorageService imageStorageService;
+
+    @Autowired
+    private ObjectMapper objectMapper;
+
+    /**
+     * Gère un transfert à partir d'un formulaire multipart (JSON + fichier).
+     * Cette méthode encapsule le parsing JSON et la sauvegarde de la pièce jointe
+     * pour garder le contrôleur le plus léger possible.
+     */
+    @Transactional
+    public TransfertFondsResponseDTO effectuerTransfertMultipart(String transfertJson,
+                                                                 MultipartFile pieceJointeFile,
+                                                                 HttpServletRequest httpRequest) {
+        TransfertFondsRequestDTO request = parseTransfertJson(transfertJson);
+        String pieceJointeUrl = saveTransfertPieceJointe(pieceJointeFile);
+        request.setPieceJointe(pieceJointeUrl);
+        return effectuerTransfert(request, httpRequest);
+    }
 
     @Transactional
     public TransfertFondsResponseDTO effectuerTransfert(TransfertFondsRequestDTO request, HttpServletRequest httpRequest) {
@@ -59,18 +80,62 @@ public class TransfertFondsService {
             throw new BusinessException("La source et la destination doivent être différentes.");
         }
 
-        validerCaissesFermees(user.getEntreprise().getId(), source, destination);
+        // ⚠️ IMPORTANT : On ne valide plus les caisses fermées car les transferts
+        // ne modifient plus les caisses de boutiques. Ils passent uniquement
+        // par la comptabilité centralisée (DepenseGenerale/EntreeGenerale)
         validerMontantDisponible(user.getEntreprise().getId(), source, request.getMontant());
 
         TransfertFonds transfert = creerTransfert(request, user, source, destination);
         transfert = transfertFondsRepository.save(transfert);
 
-        enregistrerMouvements(user.getEntreprise().getId(), source, destination, request.getMontant(), request.getMotif(), user);
+        enregistrerMouvements(
+                user.getEntreprise().getId(),
+                source,
+                destination,
+                request.getMontant(),
+                request.getMotif(),
+                request.getPieceJointe(),
+                user
+        );
 
         logger.info("Transfert de fonds effectué : {} {} -> {} {} par utilisateur {}", 
                 request.getMontant(), source, destination, request.getMontant(), user.getId());
 
         return mapperVersResponseDTO(transfert);
+    }
+
+    private TransfertFondsRequestDTO parseTransfertJson(String transfertJson) {
+        try {
+            String cleanedJson = cleanJson(transfertJson);
+            return objectMapper.readValue(cleanedJson, TransfertFondsRequestDTO.class);
+        } catch (Exception e) {
+            throw new BusinessException("Format JSON invalide : " + e.getMessage());
+        }
+    }
+
+    private String cleanJson(String json) {
+        if (json == null || json.trim().isEmpty()) {
+            throw new BusinessException("Le JSON de transfert est vide");
+        }
+
+        String cleaned = json.trim();
+
+        if (!cleaned.startsWith("{")) {
+            cleaned = "{" + cleaned;
+        }
+
+        if (!cleaned.endsWith("}")) {
+            cleaned = cleaned + "}";
+        }
+
+        return cleaned;
+    }
+
+    private String saveTransfertPieceJointe(MultipartFile pieceJointeFile) {
+        if (pieceJointeFile != null && !pieceJointeFile.isEmpty()) {
+            return imageStorageService.saveTransfertPieceJointe(pieceJointeFile);
+        }
+        return null;
     }
 
     @Transactional(readOnly = true)
@@ -134,17 +199,6 @@ public class TransfertFondsService {
         }
     }
 
-    private void validerCaissesFermees(Long entrepriseId, SourceTresorerie source, SourceTresorerie destination) {
-        if (source != SourceTresorerie.CAISSE && destination != SourceTresorerie.CAISSE) {
-            return;
-        }
-
-        List<Caisse> caissesFermees = caisseRepository.findByEntrepriseIdAndStatut(entrepriseId, StatutCaisse.FERMEE);
-
-        if (caissesFermees.isEmpty()) {
-            throw new BusinessException("Aucune caisse fermée trouvée. Les transferts depuis/vers la caisse ne peuvent être effectués qu'avec des caisses fermées.");
-        }
-    }
 
     private void validerMontantDisponible(Long entrepriseId, SourceTresorerie source, Double montant) {
         TresorerieDTO tresorerie = tresorerieService.calculerTresorerieParEntrepriseId(entrepriseId);
@@ -174,31 +228,50 @@ public class TransfertFondsService {
         transfert.setDestination(destination);
         transfert.setMotif(request.getMotif().trim());
         transfert.setPersonneALivrer(request.getPersonneALivrer().trim());
+        transfert.setPieceJointe(request.getPieceJointe());
         transfert.setEntreprise(user.getEntreprise());
         transfert.setCreePar(user);
         return transfert;
     }
 
-    private void enregistrerMouvements(Long entrepriseId, SourceTresorerie source, SourceTresorerie destination,
-                                      Double montant, String motif, User user) {
+    /**
+     * Enregistre les mouvements comptables pour un transfert de fonds.
+     * 
+     * 🏗️ Architecture : Les transferts ne modifient PAS les caisses de boutiques.
+     * Ils créent uniquement des écritures comptables (DepenseGenerale/EntreeGenerale)
+     * qui alimentent la "Grande Caisse" virtuelle calculée par TresorerieService.
+     * 
+     * Cette approche garantit :
+     * - Séparation entre caisses opérationnelles (boutiques) et trésorerie centralisée (comptabilité)
+     * - Cohérence avec les paiements de factures qui ne modifient pas non plus les caisses
+     * - Traçabilité complète via la comptabilité
+     */
+    private void enregistrerMouvements(Long entrepriseId,
+                                       SourceTresorerie source,
+                                       SourceTresorerie destination,
+                                       Double montant,
+                                       String motif,
+                                       String pieceJointe,
+                                       User user) {
         String descriptionSortie = "Transfert vers " + destination.name() + " - " + motif;
         String descriptionEntree = "Transfert depuis " + source.name() + " - " + motif;
 
         SourceDepense sourceDepenseSortie = convertirVersSourceDepense(source);
         SourceDepense sourceDepenseEntree = convertirVersSourceDepense(destination);
 
-        DepenseGenerale depenseSortie = creerDepenseGenerale(entrepriseId, montant, sourceDepenseSortie, descriptionSortie, user);
-        DepenseGenerale depenseEntree = creerDepenseGenerale(entrepriseId, -montant, sourceDepenseEntree, descriptionEntree, user);
-
+        // Créer les écritures comptables (sortie depuis la source)
+        DepenseGenerale depenseSortie = creerDepenseGenerale(entrepriseId, montant, sourceDepenseSortie, descriptionSortie, pieceJointe, user);
         depenseGeneraleRepository.save(depenseSortie);
-        depenseGeneraleRepository.save(depenseEntree);
 
-        if (source == SourceTresorerie.CAISSE) {
-            enregistrerMouvementCaisse(entrepriseId, TypeMouvementCaisse.RETRAIT, montant, descriptionSortie);
-        }
-        if (destination == SourceTresorerie.CAISSE) {
-            enregistrerMouvementCaisse(entrepriseId, TypeMouvementCaisse.AJOUT, montant, descriptionEntree);
-        }
+        // Créer les écritures comptables (entrée vers la destination)
+        // Utiliser EntreeGenerale pour les entrées (plus cohérent que DepenseGenerale avec montant négatif)
+        EntreeGenerale entreeDestination = creerEntreeGenerale(entrepriseId, montant, sourceDepenseEntree, descriptionEntree, pieceJointe, user);
+        entreeGeneraleRepository.save(entreeDestination);
+
+        // ⚠️ IMPORTANT : On ne modifie plus les caisses de boutiques
+        // Les transferts passent uniquement par la comptabilité centralisée
+        // La "Grande Caisse" est calculée virtuellement par TresorerieService
+        // qui agrège : caisses fermées + entrées générales + paiements - dépenses générales
     }
 
     private SourceDepense convertirVersSourceDepense(SourceTresorerie source) {
@@ -214,8 +287,15 @@ public class TransfertFondsService {
         }
     }
 
-    private DepenseGenerale creerDepenseGenerale(Long entrepriseId, Double montant, SourceDepense source,
-                                                 String description, User user) {
+    /**
+     * Crée une dépense générale pour enregistrer une sortie de trésorerie.
+     */
+    private DepenseGenerale creerDepenseGenerale(Long entrepriseId,
+                                                 Double montant,
+                                                 SourceDepense source,
+                                                 String description,
+                                                 String pieceJointe,
+                                                 User user) {
         DepenseGenerale depense = new DepenseGenerale();
         depense.setDesignation(description);
         depense.setPrixUnitaire(Math.abs(montant));
@@ -226,33 +306,41 @@ public class TransfertFondsService {
         depense.setTypeCharge(TypeCharge.CHARGE_FIXE);
         depense.setEntreprise(user.getEntreprise());
         depense.setCreePar(user);
+        depense.setPieceJointe(pieceJointe);
         depense.setNumero(null);
         return depense;
     }
 
-    private void enregistrerMouvementCaisse(Long entrepriseId, TypeMouvementCaisse type, Double montant, String description) {
-        List<Caisse> caissesFermees = caisseRepository.findByEntrepriseIdAndStatutOrderByDateFermetureDesc(
-                entrepriseId, StatutCaisse.FERMEE);
-
-        if (!caissesFermees.isEmpty()) {
-            Caisse caisse = caissesFermees.get(0);
-            MouvementCaisse mouvement = new MouvementCaisse();
-            mouvement.setCaisse(caisse);
-            mouvement.setTypeMouvement(type);
-            mouvement.setMontant(montant);
-            mouvement.setDateMouvement(java.time.LocalDateTime.now());
-            mouvement.setDescription(description);
-            mouvement.setModePaiement(ModePaiement.ESPECES);
-
-            if (type == TypeMouvementCaisse.AJOUT) {
-                caisse.setMontantCourant(caisse.getMontantCourant() + montant);
-            } else if (type == TypeMouvementCaisse.RETRAIT) {
-                caisse.setMontantCourant(caisse.getMontantCourant() - montant);
-            }
-
-            mouvementCaisseRepository.save(mouvement);
-            caisseRepository.save(caisse);
+    /**
+     * Crée une entrée générale pour enregistrer une entrée de trésorerie.
+     * Utilisé pour les transferts vers une source (CAISSE, BANQUE, MOBILE_MONEY).
+     */
+    private EntreeGenerale creerEntreeGenerale(Long entrepriseId,
+                                               Double montant,
+                                               SourceDepense source,
+                                               String description,
+                                               String pieceJointe,
+                                               User user) {
+        EntreeGenerale entree = new EntreeGenerale();
+        entree.setDesignation(description);
+        entree.setPrixUnitaire(montant);
+        entree.setQuantite(1);
+        entree.setMontant(montant);
+        entree.setSource(source);
+        entree.setEntreprise(user.getEntreprise());
+        entree.setCreePar(user);
+        entree.setResponsable(user); // Le responsable est l'utilisateur qui effectue le transfert
+        entree.setPieceJointe(pieceJointe);
+        entree.setNumero(null);
+        // Mode d'entrée selon la source
+        if (source == SourceDepense.BANQUE) {
+            entree.setModeEntree(ModePaiement.VIREMENT);
+        } else if (source == SourceDepense.MOBILE_MONEY) {
+            entree.setModeEntree(ModePaiement.MOBILE_MONEY);
+        } else {
+            entree.setModeEntree(ModePaiement.ESPECES);
         }
+        return entree;
     }
 
     private TransfertFondsResponseDTO mapperVersResponseDTO(TransfertFonds transfert) {
@@ -265,6 +353,7 @@ public class TransfertFondsService {
         dto.setVers(transfert.getDestination().name());
         dto.setMontant(transfert.getMontant());
         dto.setPersonneALivrer(transfert.getPersonneALivrer());
+        dto.setPieceJointe(transfert.getPieceJointe()); // Mapper la pièce jointe
         dto.setEntrepriseId(transfert.getEntreprise().getId());
         dto.setEntrepriseNom(transfert.getEntreprise().getNomEntreprise());
         dto.setTypeTransaction("TRANSFERT");

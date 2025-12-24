@@ -9,5 +9,6 @@ public class TransfertFondsRequestDTO {
     private String destination;
     private String motif;
     private String personneALivrer;
+    private String pieceJointe;
 }
 

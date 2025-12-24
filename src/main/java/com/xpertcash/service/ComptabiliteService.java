@@ -2159,9 +2159,15 @@ public class ComptabiliteService {
             dto.setOrigine("COMPTABILITE"); // Dette non encore encaissée
         } else {
             dto.setTypeTransaction("ENTREE");
-            // Si c'est un paiement de dette, l'origine est "PAIEMENT_DETTE" pour faciliter l'identification
+            // Déterminer l'origine selon le type de dette
             if (entree.getDetteId() != null && entree.getDetteType() != null) {
-                dto.setOrigine("PAIEMENT_DETTE");
+                if ("PAIEMENT_FACTURE".equals(entree.getDetteType())) {
+                    dto.setOrigine("FACTURE"); // Paiement de facture
+                } else if ("VENTE_CREDIT".equals(entree.getDetteType()) || "ENTREE_DETTE".equals(entree.getDetteType())) {
+                    dto.setOrigine("PAIEMENT_DETTE"); // Paiement de dette
+                } else {
+                    dto.setOrigine("COMPTABILITE");
+                }
             } else {
                 dto.setOrigine("COMPTABILITE"); // Entrée classique
             }
@@ -2260,7 +2266,10 @@ public class ComptabiliteService {
         int limitParType = Math.max((page + 1) * size, 1000);
 
         // 🔐 Charger les transactions avec limite (toutes filtrées par entreprise)
+        // ⚠️ IMPORTANT : Filtrer les dépenses/entrées générales créées par les transferts de fonds
+        // pour éviter la duplication (les transferts sont déjà affichés via TransfertFondsResponseDTO)
         List<DepenseGeneraleResponseDTO> depensesGenerales = listerDepensesGenerales(httpRequest).stream()
+                .filter(d -> !estDepenseDeTransfert(d.getDesignation())) // Exclure les dépenses de transferts
                 .sorted((a, b) -> {
                     LocalDateTime dateA = a.getDateCreation();
                     LocalDateTime dateB = b.getDateCreation();
@@ -2273,6 +2282,8 @@ public class ComptabiliteService {
                 .collect(Collectors.toList());
 
         List<EntreeGeneraleResponseDTO> entreesGenerales = listerEntreesGenerales(httpRequest).stream()
+                .filter(e -> !estEntreeDeTransfert(e.getDesignation())) // Exclure les entrées de transferts
+                .filter(e -> !estEntreeDePaiementFacture(e.getDetteType())) // Exclure les entrées créées par les paiements de factures
                 .sorted((a, b) -> {
                     LocalDateTime dateA = a.getDateCreation();
                     LocalDateTime dateB = b.getDateCreation();
@@ -2611,6 +2622,7 @@ public class ComptabiliteService {
         transaction.setTypeTransaction(sens); // SORTIE ou ENTREE
         transaction.setSensTransfert(sens); // SORTIE ou ENTREE
         transaction.setOrigine(origine); // Source ou destination selon le sens
+        transaction.setPieceJointe(transfert.getPieceJointe()); // Préserver la pièce jointe
         
         // Créer une description explicite selon le sens
         String description;
@@ -2622,6 +2634,37 @@ public class ComptabiliteService {
         transaction.setDescription(description);
         
         return transaction;
+    }
+
+    /**
+     * Vérifie si une dépense générale provient d'un transfert de fonds.
+     * Les transferts créent des dépenses avec la description "Transfert vers ..."
+     */
+    private boolean estDepenseDeTransfert(String designation) {
+        if (designation == null || designation.trim().isEmpty()) {
+            return false;
+        }
+        return designation.trim().startsWith("Transfert vers") || designation.trim().startsWith("Transfert depuis");
+    }
+
+    /**
+     * Vérifie si une entrée générale provient d'un transfert de fonds.
+     * Les transferts créent des entrées avec la description "Transfert depuis ..."
+     */
+    private boolean estEntreeDeTransfert(String designation) {
+        if (designation == null || designation.trim().isEmpty()) {
+            return false;
+        }
+        return designation.trim().startsWith("Transfert vers") || designation.trim().startsWith("Transfert depuis");
+    }
+
+    /**
+     * Vérifie si une entrée générale provient d'un paiement de facture.
+     * Les paiements de factures créent des entrées avec detteType = "PAIEMENT_FACTURE"
+     * pour éviter la duplication avec les PaiementDTO.
+     */
+    private boolean estEntreeDePaiementFacture(String detteType) {
+        return "PAIEMENT_FACTURE".equals(detteType);
     }
 }
 

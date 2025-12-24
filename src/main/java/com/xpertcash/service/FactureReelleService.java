@@ -29,15 +29,19 @@ import com.xpertcash.DTOs.CLIENT.ClientDTO;
 import com.xpertcash.configuration.CentralAccess;
 
 import com.xpertcash.entity.Entreprise;
+import com.xpertcash.entity.EntreeGenerale;
 import com.xpertcash.entity.FactureProForma;
 import com.xpertcash.entity.FactureReelle;
 import com.xpertcash.entity.LigneFactureReelle;
+import com.xpertcash.entity.ModePaiement;
 import com.xpertcash.entity.Paiement;
 import com.xpertcash.entity.PermissionType;
+import com.xpertcash.entity.Enum.SourceDepense;
 import com.xpertcash.entity.User;
 import com.xpertcash.entity.Enum.RoleType;
 import com.xpertcash.entity.Enum.StatutFactureProForma;
 import com.xpertcash.entity.Enum.StatutPaiementFacture;
+import com.xpertcash.repository.EntreeGeneraleRepository;
 import com.xpertcash.repository.FactureProformaRepository;
 import com.xpertcash.repository.FactureReelleRepository;
 import com.xpertcash.repository.LigneFactureReelleRepository;
@@ -65,6 +69,9 @@ public class FactureReelleService {
 
     @Autowired
     private PaiementRepository paiementRepository;
+
+    @Autowired
+    private EntreeGeneraleRepository entreeGeneraleRepository;
 
      @Autowired
     private FactProHistoriqueService factProHistoriqueService;
@@ -421,10 +428,15 @@ public void supprimerFactureReelleLiee(FactureProForma proforma) {
     paiement.setMontant(montant);
     paiement.setDatePaiement(LocalDateTime.now());
     paiement.setFactureReelle(facture);
-    paiement.setModePaiement(normaliserModePaiementPourStockage(modePaiement));
+    String modePaiementNormalise = normaliserModePaiementPourStockage(modePaiement);
+    paiement.setModePaiement(modePaiementNormalise);
     paiement.setEncaissePar(utilisateur);
 
     paiementRepository.save(paiement);
+
+    // 💰 Créer une entrée générale pour enregistrer l'encaissement dans la comptabilité
+    // Cela alimente la "Grande Caisse" virtuelle calculée par TresorerieService
+    creerEntreeGeneralePourPaiement(paiement, facture, utilisateur);
 
     // 🔁 Mise à jour du statut de la facture
     BigDecimal totalPaye = paiementRepository.sumMontantsByFactureReelle(factureId);
@@ -746,6 +758,125 @@ public List<FactureReelleDTO> getFacturesParPeriode(Long userIdRequete, HttpServ
             default:
                 return normalise;
         }
+    }
+
+    /**
+     * Crée une entrée générale pour enregistrer un paiement de facture dans la comptabilité.
+     * 
+     * 🏗️ Architecture : Les paiements de factures alimentent la "Grande Caisse" virtuelle
+     * via des EntreeGenerale selon le mode de paiement :
+     * - ESPECES → source = CAISSE
+     * - VIREMENT/CHEQUE/CARTE → source = BANQUE
+     * - MOBILE_MONEY → source = MOBILE_MONEY
+     * 
+     * Cela garantit la cohérence avec l'architecture centralisée de la comptabilité.
+     */
+    private void creerEntreeGeneralePourPaiement(Paiement paiement, FactureReelle facture, User utilisateur) {
+        if (paiement.getModePaiement() == null || paiement.getModePaiement().trim().isEmpty()) {
+            return; // Pas de mode de paiement, on ne crée pas d'entrée
+        }
+
+        try {
+            ModePaiement mode = ModePaiement.valueOf(paiement.getModePaiement().trim().toUpperCase());
+            SourceDepense source = convertirModePaiementVersSource(mode);
+            
+            // Construire la description
+            String description = "Paiement facture " + facture.getNumeroFacture();
+            if (facture.getDescription() != null && !facture.getDescription().trim().isEmpty()) {
+                description += " - " + facture.getDescription();
+            }
+
+            // Créer l'entrée générale
+            EntreeGenerale entree = new EntreeGenerale();
+            entree.setNumero(genererNumeroEntreePourPaiement(utilisateur.getEntreprise().getId()));
+            entree.setDesignation(description);
+            entree.setCategorie(null); // Pas de catégorie pour les paiements de factures
+            entree.setPrixUnitaire(paiement.getMontant().doubleValue());
+            entree.setQuantite(1);
+            entree.setMontant(paiement.getMontant().doubleValue());
+            entree.setSource(source);
+            entree.setModeEntree(mode);
+            entree.setNumeroModeEntree(null);
+            entree.setPieceJointe(null);
+            entree.setEntreprise(utilisateur.getEntreprise());
+            entree.setCreePar(utilisateur);
+            entree.setResponsable(utilisateur);
+            
+            // 🔗 Lier l'entrée au paiement pour la traçabilité
+            entree.setDetteId(paiement.getId());
+            entree.setDetteType("PAIEMENT_FACTURE");
+            entree.setDetteNumero(facture.getNumeroFacture());
+
+            entreeGeneraleRepository.save(entree);
+        } catch (IllegalArgumentException e) {
+            // Mode de paiement invalide, on ne crée pas d'entrée
+            // Log l'erreur mais ne bloque pas le paiement
+            System.err.println("Mode de paiement invalide pour créer l'entrée générale : " + paiement.getModePaiement());
+        }
+    }
+
+    /**
+     * Convertit un ModePaiement en SourceDepense pour déterminer où va l'argent
+     */
+    private SourceDepense convertirModePaiementVersSource(ModePaiement mode) {
+        switch (mode) {
+            case ESPECES:
+                return SourceDepense.CAISSE;
+            case VIREMENT:
+            case CHEQUE:
+            case CARTE:
+                return SourceDepense.BANQUE;
+            case MOBILE_MONEY:
+                return SourceDepense.MOBILE_MONEY;
+            default:
+                return SourceDepense.CAISSE; // Par défaut, on considère comme espèces
+        }
+    }
+
+    /**
+     * Génère un numéro unique pour une entrée générale créée à partir d'un paiement
+     */
+    private String genererNumeroEntreePourPaiement(Long entrepriseId) {
+        LocalDate currentDate = LocalDate.now();
+        int month = currentDate.getMonthValue();
+        int year = currentDate.getYear();
+        
+        List<EntreeGenerale> entreesDuMois = entreeGeneraleRepository
+                .findByEntrepriseIdAndMonthAndYear(entrepriseId, month, year);
+        
+        long newIndex = 1;
+        
+        if (!entreesDuMois.isEmpty()) {
+            String lastNumero = entreesDuMois.get(0).getNumero();
+            
+            if (lastNumero != null && !lastNumero.isEmpty()) {
+                Pattern pattern = Pattern.compile("EN:\\s*(\\d+)-");
+                Matcher matcher = pattern.matcher(lastNumero);
+                
+                if (matcher.find()) {
+                    try {
+                        newIndex = Long.parseLong(matcher.group(1)) + 1;
+                    } catch (NumberFormatException e) {
+                        // En cas d'erreur, on continue avec newIndex = 1
+                    }
+                } else {
+                    Pattern fallbackPattern = Pattern.compile("(\\d+)");
+                    Matcher fallbackMatcher = fallbackPattern.matcher(lastNumero);
+                    if (fallbackMatcher.find()) {
+                        try {
+                            newIndex = Long.parseLong(fallbackMatcher.group(1)) + 1;
+                        } catch (NumberFormatException e) {
+                            newIndex = 1;
+                        }
+                    }
+                }
+            }
+        }
+        
+        String indexFormate = String.format("%03d", newIndex);
+        String formattedDate = currentDate.format(DateTimeFormatter.ofPattern("MM-yyyy"));
+        
+        return "EN: " + indexFormate + "-" + formattedDate;
     }
 
 }

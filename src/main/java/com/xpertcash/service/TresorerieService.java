@@ -203,8 +203,11 @@ public class TresorerieService {
         }
 
         // 3️⃣ Entrées générales avec source DETTE (dettes à encaisser, filtrées par entreprise via chargerDonnees)
+        // ⚠️ IMPORTANT : Exclure les entrées créées par les paiements de factures (detteType = "PAIEMENT_FACTURE")
+        // car elles ont source = CAISSE/BANQUE/MOBILE_MONEY et ne sont pas des dettes
         java.util.List<EntreeGenerale> entreesDette = data.entreesGenerales.stream()
                 .filter(e -> e.getSource() == SourceDepense.DETTE)
+                .filter(e -> e.getDetteType() == null || !"PAIEMENT_FACTURE".equals(e.getDetteType()))
                 .collect(Collectors.toList());
 
         for (EntreeGenerale entree : entreesDette) {
@@ -721,8 +724,11 @@ public class TresorerieService {
                 .sum();
 
         // 💰 Dettes issues des entrées générales marquées comme DETTE (créances à encaisser)
+        // ⚠️ IMPORTANT : Exclure les entrées créées par les paiements de factures (detteType = "PAIEMENT_FACTURE")
+        // car elles ont source = CAISSE/BANQUE/MOBILE_MONEY et ne sont pas des dettes
         List<EntreeGenerale> entreesDette = data.entreesGenerales.stream()
                 .filter(e -> e.getSource() == SourceDepense.DETTE)
+                .filter(e -> e.getDetteType() == null || !"PAIEMENT_FACTURE".equals(e.getDetteType()))
                 .collect(Collectors.toList());
 
         double montantEntreesDette = entreesDette.stream()

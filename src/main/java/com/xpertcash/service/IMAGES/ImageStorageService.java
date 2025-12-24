@@ -278,5 +278,30 @@ public class ImageStorageService {
         }
     }
 
+    // Gestion pièce jointe pour les transferts de fonds
+    public String saveTransfertPieceJointe(MultipartFile pieceJointeFile) {
+        if (pieceJointeFile == null || pieceJointeFile.isEmpty()) {
+            throw new NotFoundException("Le fichier pièce jointe est vide ou invalide.");
+        }
+        try {
+            Path transfertRootLocation = Paths.get("src/main/resources/static/transfertUpload");
+            // Vérifie si le dossier existe, sinon le crée
+            if (!Files.exists(transfertRootLocation)) {
+                Files.createDirectories(transfertRootLocation);
+            }
+
+            String fileName = UUID.randomUUID().toString() + "_" + pieceJointeFile.getOriginalFilename();
+            Path filePath = transfertRootLocation.resolve(fileName);
+            Files.copy(pieceJointeFile.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
+
+            String fileUrl = "/transfertUpload/" + fileName;
+            System.out.println("✅ Pièce jointe transfert sauvegardée : " + fileUrl);
+            return fileUrl;
+        } catch (IOException e) {
+            System.out.println("❌ ERREUR lors de l'enregistrement de la pièce jointe transfert : " + e.getMessage());
+            throw new NotFoundException("Erreur lors de l'enregistrement de la pièce jointe transfert : " + e.getMessage());
+        }
+    }
+
 }
 

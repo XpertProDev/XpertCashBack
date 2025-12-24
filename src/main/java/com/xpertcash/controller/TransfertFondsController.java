@@ -1,11 +1,12 @@
 package com.xpertcash.controller;
 
-import com.xpertcash.DTOs.TransfertFondsRequestDTO;
 import com.xpertcash.service.TransfertFondsService;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -18,9 +19,14 @@ public class TransfertFondsController {
     @Autowired
     private TransfertFondsService transfertFondsService;
 
-    @PostMapping("/transfert-fonds")
-    public ResponseEntity<?> effectuerTransfert(@RequestBody TransfertFondsRequestDTO request, HttpServletRequest httpRequest) {
-        return handleRequest(() -> transfertFondsService.effectuerTransfert(request, httpRequest));
+    @PostMapping(value = "/transfert-fonds", consumes = { MediaType.MULTIPART_FORM_DATA_VALUE })
+    public ResponseEntity<?> effectuerTransfert(
+            @RequestParam("transfert") String transfertJson,
+            @RequestParam(value = "pieceJointe", required = false) MultipartFile pieceJointeFile,
+            HttpServletRequest httpRequest) {
+        return handleRequest(() ->
+                transfertFondsService.effectuerTransfertMultipart(transfertJson, pieceJointeFile, httpRequest)
+        );
     }
 
     @GetMapping("/transfert-fonds")
