@@ -9,10 +9,10 @@ import com.xpertcash.entity.Enum.RoleType;
 import com.xpertcash.entity.Enum.SourceDepense;
 import com.xpertcash.entity.Enum.SourceTresorerie;
 import com.xpertcash.entity.Enum.TypeCharge;
-import com.xpertcash.entity.VENTE.*;
+import com.xpertcash.entity.EntreeGenerale;
+import com.xpertcash.entity.ModePaiement;
 import com.xpertcash.exceptions.BusinessException;
 import com.xpertcash.repository.*;
-import com.xpertcash.repository.VENTE.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -41,10 +41,7 @@ public class TransfertFondsService {
     private DepenseGeneraleRepository depenseGeneraleRepository;
 
     @Autowired
-    private CaisseRepository caisseRepository;
-
-    @Autowired
-    private MouvementCaisseRepository mouvementCaisseRepository;
+    private EntreeGeneraleRepository entreeGeneraleRepository;
 
     @Autowired
     private TresorerieService tresorerieService;
@@ -83,7 +80,9 @@ public class TransfertFondsService {
             throw new BusinessException("La source et la destination doivent être différentes.");
         }
 
-        validerCaissesFermees(user.getEntreprise().getId(), source, destination);
+        // ⚠️ IMPORTANT : On ne valide plus les caisses fermées car les transferts
+        // ne modifient plus les caisses de boutiques. Ils passent uniquement
+        // par la comptabilité centralisée (DepenseGenerale/EntreeGenerale)
         validerMontantDisponible(user.getEntreprise().getId(), source, request.getMontant());
 
         TransfertFonds transfert = creerTransfert(request, user, source, destination);
@@ -200,17 +199,6 @@ public class TransfertFondsService {
         }
     }
 
-    private void validerCaissesFermees(Long entrepriseId, SourceTresorerie source, SourceTresorerie destination) {
-        if (source != SourceTresorerie.CAISSE && destination != SourceTresorerie.CAISSE) {
-            return;
-        }
-
-        List<Caisse> caissesFermees = caisseRepository.findByEntrepriseIdAndStatut(entrepriseId, StatutCaisse.FERMEE);
-
-        if (caissesFermees.isEmpty()) {
-            throw new BusinessException("Aucune caisse fermée trouvée. Les transferts depuis/vers la caisse ne peuvent être effectués qu'avec des caisses fermées.");
-        }
-    }
 
     private void validerMontantDisponible(Long entrepriseId, SourceTresorerie source, Double montant) {
         TresorerieDTO tresorerie = tresorerieService.calculerTresorerieParEntrepriseId(entrepriseId);
@@ -240,11 +228,24 @@ public class TransfertFondsService {
         transfert.setDestination(destination);
         transfert.setMotif(request.getMotif().trim());
         transfert.setPersonneALivrer(request.getPersonneALivrer().trim());
+        transfert.setPieceJointe(request.getPieceJointe());
         transfert.setEntreprise(user.getEntreprise());
         transfert.setCreePar(user);
         return transfert;
     }
 
+    /**
+     * Enregistre les mouvements comptables pour un transfert de fonds.
+     * 
+     * 🏗️ Architecture : Les transferts ne modifient PAS les caisses de boutiques.
+     * Ils créent uniquement des écritures comptables (DepenseGenerale/EntreeGenerale)
+     * qui alimentent la "Grande Caisse" virtuelle calculée par TresorerieService.
+     * 
+     * Cette approche garantit :
+     * - Séparation entre caisses opérationnelles (boutiques) et trésorerie centralisée (comptabilité)
+     * - Cohérence avec les paiements de factures qui ne modifient pas non plus les caisses
+     * - Traçabilité complète via la comptabilité
+     */
     private void enregistrerMouvements(Long entrepriseId,
                                        SourceTresorerie source,
                                        SourceTresorerie destination,
@@ -258,18 +259,19 @@ public class TransfertFondsService {
         SourceDepense sourceDepenseSortie = convertirVersSourceDepense(source);
         SourceDepense sourceDepenseEntree = convertirVersSourceDepense(destination);
 
+        // Créer les écritures comptables (sortie depuis la source)
         DepenseGenerale depenseSortie = creerDepenseGenerale(entrepriseId, montant, sourceDepenseSortie, descriptionSortie, pieceJointe, user);
-        DepenseGenerale depenseEntree = creerDepenseGenerale(entrepriseId, -montant, sourceDepenseEntree, descriptionEntree, pieceJointe, user);
-
         depenseGeneraleRepository.save(depenseSortie);
-        depenseGeneraleRepository.save(depenseEntree);
 
-        if (source == SourceTresorerie.CAISSE) {
-            enregistrerMouvementCaisse(entrepriseId, TypeMouvementCaisse.RETRAIT, montant, descriptionSortie);
-        }
-        if (destination == SourceTresorerie.CAISSE) {
-            enregistrerMouvementCaisse(entrepriseId, TypeMouvementCaisse.AJOUT, montant, descriptionEntree);
-        }
+        // Créer les écritures comptables (entrée vers la destination)
+        // Utiliser EntreeGenerale pour les entrées (plus cohérent que DepenseGenerale avec montant négatif)
+        EntreeGenerale entreeDestination = creerEntreeGenerale(entrepriseId, montant, sourceDepenseEntree, descriptionEntree, pieceJointe, user);
+        entreeGeneraleRepository.save(entreeDestination);
+
+        // ⚠️ IMPORTANT : On ne modifie plus les caisses de boutiques
+        // Les transferts passent uniquement par la comptabilité centralisée
+        // La "Grande Caisse" est calculée virtuellement par TresorerieService
+        // qui agrège : caisses fermées + entrées générales + paiements - dépenses générales
     }
 
     private SourceDepense convertirVersSourceDepense(SourceTresorerie source) {
@@ -285,6 +287,9 @@ public class TransfertFondsService {
         }
     }
 
+    /**
+     * Crée une dépense générale pour enregistrer une sortie de trésorerie.
+     */
     private DepenseGenerale creerDepenseGenerale(Long entrepriseId,
                                                  Double montant,
                                                  SourceDepense source,
@@ -306,29 +311,36 @@ public class TransfertFondsService {
         return depense;
     }
 
-    private void enregistrerMouvementCaisse(Long entrepriseId, TypeMouvementCaisse type, Double montant, String description) {
-        List<Caisse> caissesFermees = caisseRepository.findByEntrepriseIdAndStatutOrderByDateFermetureDesc(
-                entrepriseId, StatutCaisse.FERMEE);
-
-        if (!caissesFermees.isEmpty()) {
-            Caisse caisse = caissesFermees.get(0);
-            MouvementCaisse mouvement = new MouvementCaisse();
-            mouvement.setCaisse(caisse);
-            mouvement.setTypeMouvement(type);
-            mouvement.setMontant(montant);
-            mouvement.setDateMouvement(java.time.LocalDateTime.now());
-            mouvement.setDescription(description);
-            mouvement.setModePaiement(ModePaiement.ESPECES);
-
-            if (type == TypeMouvementCaisse.AJOUT) {
-                caisse.setMontantCourant(caisse.getMontantCourant() + montant);
-            } else if (type == TypeMouvementCaisse.RETRAIT) {
-                caisse.setMontantCourant(caisse.getMontantCourant() - montant);
-            }
-
-            mouvementCaisseRepository.save(mouvement);
-            caisseRepository.save(caisse);
+    /**
+     * Crée une entrée générale pour enregistrer une entrée de trésorerie.
+     * Utilisé pour les transferts vers une source (CAISSE, BANQUE, MOBILE_MONEY).
+     */
+    private EntreeGenerale creerEntreeGenerale(Long entrepriseId,
+                                               Double montant,
+                                               SourceDepense source,
+                                               String description,
+                                               String pieceJointe,
+                                               User user) {
+        EntreeGenerale entree = new EntreeGenerale();
+        entree.setDesignation(description);
+        entree.setPrixUnitaire(montant);
+        entree.setQuantite(1);
+        entree.setMontant(montant);
+        entree.setSource(source);
+        entree.setEntreprise(user.getEntreprise());
+        entree.setCreePar(user);
+        entree.setResponsable(user); // Le responsable est l'utilisateur qui effectue le transfert
+        entree.setPieceJointe(pieceJointe);
+        entree.setNumero(null);
+        // Mode d'entrée selon la source
+        if (source == SourceDepense.BANQUE) {
+            entree.setModeEntree(ModePaiement.VIREMENT);
+        } else if (source == SourceDepense.MOBILE_MONEY) {
+            entree.setModeEntree(ModePaiement.MOBILE_MONEY);
+        } else {
+            entree.setModeEntree(ModePaiement.ESPECES);
         }
+        return entree;
     }
 
     private TransfertFondsResponseDTO mapperVersResponseDTO(TransfertFonds transfert) {
@@ -341,6 +353,7 @@ public class TransfertFondsService {
         dto.setVers(transfert.getDestination().name());
         dto.setMontant(transfert.getMontant());
         dto.setPersonneALivrer(transfert.getPersonneALivrer());
+        dto.setPieceJointe(transfert.getPieceJointe()); // Mapper la pièce jointe
         dto.setEntrepriseId(transfert.getEntreprise().getId());
         dto.setEntrepriseNom(transfert.getEntreprise().getNomEntreprise());
         dto.setTypeTransaction("TRANSFERT");

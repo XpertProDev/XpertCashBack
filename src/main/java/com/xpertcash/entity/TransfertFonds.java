@@ -32,6 +32,9 @@ public class TransfertFonds {
     @Column(nullable = false, length = 500)
     private String personneALivrer;
 
+    @Column(name = "piece_jointe", length = 1000)
+    private String pieceJointe;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "entreprise_id", nullable = false)
     private Entreprise entreprise;
