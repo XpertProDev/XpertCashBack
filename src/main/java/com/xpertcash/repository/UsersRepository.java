@@ -6,10 +6,12 @@ import com.xpertcash.entity.Role;
 import com.xpertcash.entity.Enum.RoleType;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -73,8 +75,10 @@ Optional<User> findByIdWithEntrepriseAndRole(@Param("userId") Long userId);
        "WHERE u.uuid = :uuid")
 Optional<User> findByUuidWithEntrepriseAndRole(@Param("uuid") String uuid);
 
-
-
+    // Mettre à jour uniquement lastActivity sans verrouiller toute la ligne (évite les deadlocks)
+    @Modifying
+    @Query("UPDATE User u SET u.lastActivity = :lastActivity WHERE u.id = :userId")
+    void updateLastActivity(@Param("userId") Long userId, @Param("lastActivity") LocalDateTime lastActivity);
 
 }
 

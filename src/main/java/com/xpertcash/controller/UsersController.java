@@ -5,18 +5,14 @@ import com.xpertcash.DTOs.USER.ResendActivationRequest;
 import com.xpertcash.DTOs.USER.UserDTO;
 import com.xpertcash.DTOs.USER.UserRequest;
 import com.xpertcash.DTOs.UserOptimalDTO;
-import com.xpertcash.configuration.JwtConfig;
-import com.xpertcash.configuration.JwtUtil;
 import com.xpertcash.entity.PermissionType;
 import com.xpertcash.entity.User;
-import com.xpertcash.repository.UsersRepository;
 import com.xpertcash.DTOs.EntrepriseDTO;
 import com.xpertcash.DTOs.LoginRequest;
 import com.xpertcash.DTOs.RegistrationRequest;
 import com.xpertcash.service.UsersService;
 import com.xpertcash.service.AuthenticationHelper;
 
-import io.jsonwebtoken.Claims;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -27,7 +23,6 @@ import org.springframework.http.MediaType;
 import org.springframework.web.multipart.MultipartFile;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import java.time.LocalDateTime;
 import java.net.URI;
 import java.util.Collections;
 import java.util.HashMap;
@@ -41,14 +36,7 @@ public class UsersController {
     @Autowired
     private UsersService usersService;
     @Autowired
-    private JwtUtil jwtUtil;
-    @Autowired 
-    JwtConfig jwtConfig;
-    @Autowired
     private AuthenticationHelper authHelper;
-
-    @Autowired
-    private UsersRepository usersRepository;
 
     // Inscription
 @PostMapping("/register")
@@ -78,9 +66,20 @@ public ResponseEntity<RegisterResponse> register(@RequestBody RegistrationReques
 
     // Connexion
     @PostMapping("/login")
-    public ResponseEntity<Map<String, String>> login(@RequestBody LoginRequest request) {
+    public ResponseEntity<Map<String, String>> login(@RequestBody LoginRequest request, HttpServletRequest httpRequest) {
         try {
-            Map<String, String> tokens = usersService.login(request.getEmail(), request.getPassword());
+            // Extraire les informations de la requête HTTP pour la session
+            String ipAddress = getClientIpAddress(httpRequest);
+            String userAgent = httpRequest.getHeader("User-Agent");
+            
+            Map<String, String> tokens = usersService.login(
+                request.getEmail(), 
+                request.getPassword(),
+                request.getDeviceId(),      // deviceId optionnel
+                request.getDeviceName(),    // deviceName optionnel
+                ipAddress,                  // IP de connexion
+                userAgent                   // User-Agent
+            );
             tokens.put("message", "Connexion réussie");
             return ResponseEntity.ok(tokens);
         } catch (Exception e) {
@@ -88,6 +87,22 @@ public ResponseEntity<RegisterResponse> register(@RequestBody RegistrationReques
             errorResponse.put("error", e.getMessage() != null ? e.getMessage() : "Erreur inconnue");
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(errorResponse);
         }
+    }
+
+    // Méthode utilitaire pour extraire l'adresse IP réelle du client
+    private String getClientIpAddress(HttpServletRequest request) {
+        String xForwardedFor = request.getHeader("X-Forwarded-For");
+        if (xForwardedFor != null && !xForwardedFor.isEmpty() && !"unknown".equalsIgnoreCase(xForwardedFor)) {
+            // Prendre la première IP de la chaîne
+            return xForwardedFor.split(",")[0].trim();
+        }
+        
+        String xRealIp = request.getHeader("X-Real-IP");
+        if (xRealIp != null && !xRealIp.isEmpty() && !"unknown".equalsIgnoreCase(xRealIp)) {
+            return xRealIp;
+        }
+        
+        return request.getRemoteAddr();
     }
 
     // Logout : déconnexion et invalidation du token courant
@@ -117,47 +132,6 @@ public ResponseEntity<RegisterResponse> register(@RequestBody RegistrationReques
 
      return ResponseEntity.ok(response);
     }
-
-
-    @PostMapping("/refresh-token")
-    public ResponseEntity<Map<String, String>> refreshToken(@RequestBody Map<String, String> request) {
-        String refreshToken = request.get("refreshToken");
-        System.out.println("🔁 Refresh Token reçu : " + refreshToken);
-
-        if (refreshToken == null || refreshToken.isEmpty()) {
-            return ResponseEntity.badRequest().body(Map.of("error", "Le refresh token est manquant"));
-        }
-
-        try {
-            Claims claims = jwtUtil.extractAllClaimsSafe(refreshToken);
-            if (claims == null) {
-                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(
-                    Map.of("error", "Refresh token expiré ou invalide")
-                );
-            }
-
-            Long userId = Long.parseLong(claims.getSubject());
-
-            User user = usersRepository.findById(userId)
-                    .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
-
-            User admin = user.getEntreprise().getAdmin();
-            boolean within24Hours = LocalDateTime.now().isBefore(user.getCreatedAt().plusHours(24));
-
-            String newAccessToken = usersService.generateAccessToken(user, admin, within24Hours);
-
-            return ResponseEntity.ok(Map.of(
-                "accessToken", newAccessToken,
-                "message", "Nouveau token généré avec succès"
-            ));
-
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(
-                Map.of("error", "Erreur lors du traitement du refresh token")
-            );
-        }
-    }
-
 
 
     // Activation du compte via le lien d'activation (GET avec paramètres dans l'URL)
@@ -350,6 +324,47 @@ public ResponseEntity<UserDTO> assignPermissionsToUser(
                 Map<String, String> error = new HashMap<>();
                 error.put("error", "Erreur interne du serveur : " + e.getMessage());
                 return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(error);
+            }
+        }
+
+        // Endpoint pour lister toutes les sessions actives de l'utilisateur
+        @GetMapping("/sessions")
+        public ResponseEntity<List<com.xpertcash.DTOs.UserSessionDTO>> getActiveSessions(HttpServletRequest request) {
+            try {
+                List<com.xpertcash.DTOs.UserSessionDTO> sessions = usersService.getActiveSessions(request);
+                return ResponseEntity.ok(sessions);
+            } catch (RuntimeException e) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(List.of());
+            }
+        }
+
+        // Endpoint pour révoquer une session spécifique
+        @DeleteMapping("/sessions/{sessionId}")
+        public ResponseEntity<Map<String, String>> revokeSession(
+                @PathVariable Long sessionId,
+                HttpServletRequest request) {
+            Map<String, String> response = new HashMap<>();
+            try {
+                usersService.revokeSession(sessionId, request);
+                response.put("message", "Session révoquée avec succès.");
+                return ResponseEntity.ok(response);
+            } catch (RuntimeException e) {
+                response.put("error", e.getMessage());
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+            }
+        }
+
+        // Endpoint pour révoquer toutes les sessions sauf la session courante
+        @DeleteMapping("/sessions/others")
+        public ResponseEntity<Map<String, String>> revokeOtherSessions(HttpServletRequest request) {
+            Map<String, String> response = new HashMap<>();
+            try {
+                usersService.revokeOtherSessions(request);
+                response.put("message", "Toutes les autres sessions ont été révoquées avec succès.");
+                return ResponseEntity.ok(response);
+            } catch (RuntimeException e) {
+                response.put("error", e.getMessage());
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
             }
         }
  
