@@ -66,7 +66,7 @@ public ResponseEntity<RegisterResponse> register(@RequestBody RegistrationReques
 
     // Connexion
     @PostMapping("/login")
-    public ResponseEntity<Map<String, String>> login(@RequestBody LoginRequest request, HttpServletRequest httpRequest) {
+    public ResponseEntity<Map<String, Object>> login(@RequestBody LoginRequest request, HttpServletRequest httpRequest) {
         try {
             // Extraire les informations de la requête HTTP pour la session
             String ipAddress = getClientIpAddress(httpRequest);
@@ -81,9 +81,33 @@ public ResponseEntity<RegisterResponse> register(@RequestBody RegistrationReques
                 userAgent                   // User-Agent
             );
             tokens.put("message", "Connexion réussie");
-            return ResponseEntity.ok(tokens);
+            return ResponseEntity.ok(new HashMap<>(tokens));
+        } catch (RuntimeException e) {
+            // Cas spécial : l'utilisateur a atteint la limite de sessions
+            if ("SESSION_LIMIT_REACHED".equals(e.getMessage())) {
+                Map<String, Object> response = new HashMap<>();
+                response.put("error", "SESSION_LIMIT_REACHED");
+                response.put("message", "Vous avez déjà 2 sessions actives. Veuillez fermer une session avant de vous connecter.");
+                // Récupérer les sessions actives pour les afficher à l'utilisateur
+                // IMPORTANT : On vérifie d'abord le mot de passe pour des raisons de sécurité
+                try {
+                    User user = usersService.findUserByEmail(request.getEmail());
+                    if (user != null && usersService.verifyPassword(request.getPassword(), user.getPassword())) {
+                        // Le mot de passe est correct, on peut récupérer les sessions
+                        List<com.xpertcash.DTOs.UserSessionDTO> sessions = usersService.getActiveSessionsByUserUuid(user.getUuid());
+                        response.put("sessions", sessions);
+                    }
+                } catch (Exception ex) {
+                    // Si on ne peut pas récupérer les sessions, on continue quand même
+                }
+                return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
+            }
+            // Autres erreurs
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("error", e.getMessage() != null ? e.getMessage() : "Erreur inconnue");
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(errorResponse);
         } catch (Exception e) {
-            Map<String, String> errorResponse = new HashMap<>();
+            Map<String, Object> errorResponse = new HashMap<>();
             errorResponse.put("error", e.getMessage() != null ? e.getMessage() : "Erreur inconnue");
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(errorResponse);
         }
@@ -327,6 +351,34 @@ public ResponseEntity<UserDTO> assignPermissionsToUser(
             }
         }
 
+        // Endpoint pour fermer une session spécifique avant login (quand limite atteinte)
+        @PostMapping("/sessions/close-before-login")
+        public ResponseEntity<Map<String, String>> closeSessionBeforeLogin(
+                @RequestBody Map<String, String> request) {
+            try {
+                String email = request.get("email");
+                String password = request.get("password");
+                String sessionIdStr = request.get("sessionId");
+                
+                if (email == null || password == null || sessionIdStr == null) {
+                    Map<String, String> error = new HashMap<>();
+                    error.put("error", "Email, mot de passe et sessionId sont requis");
+                    return ResponseEntity.badRequest().body(error);
+                }
+                
+                Long sessionId = Long.parseLong(sessionIdStr);
+                usersService.closeSessionBeforeLogin(email, password, sessionId);
+                
+                Map<String, String> response = new HashMap<>();
+                response.put("message", "Session fermée avec succès. Vous pouvez maintenant vous connecter.");
+                return ResponseEntity.ok(response);
+            } catch (Exception e) {
+                Map<String, String> error = new HashMap<>();
+                error.put("error", e.getMessage() != null ? e.getMessage() : "Erreur lors de la fermeture de la session");
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error);
+            }
+        }
+        
         // Endpoint pour lister toutes les sessions actives de l'utilisateur
         @GetMapping("/sessions")
         public ResponseEntity<List<com.xpertcash.DTOs.UserSessionDTO>> getActiveSessions(HttpServletRequest request) {

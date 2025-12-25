@@ -75,6 +75,26 @@ public interface UserSessionRepository extends JpaRepository<UserSession, Long> 
     @Modifying
     @Query("UPDATE UserSession s SET s.sessionToken = :token WHERE s.id = :sessionId")
     void updateSessionToken(@Param("sessionId") Long sessionId, @Param("token") String token);
+    
+    // Supprimer la session la plus ancienne d'un utilisateur (optimisé pour SaaS)
+    // Utilise une requête native car MySQL ne supporte pas les sous-requêtes dans DELETE
+    @Modifying
+    @Query(value = "DELETE FROM user_sessions WHERE id = (" +
+           "SELECT id FROM (" +
+           "SELECT id FROM user_sessions " +
+           "WHERE user_uuid = :userUuid AND is_active = true " +
+           "ORDER BY COALESCE(last_activity, created_at) ASC " +
+           "LIMIT 1" +
+           ") AS temp)", nativeQuery = true)
+    void deleteOldestSession(@Param("userUuid") String userUuid);
+    
+    // Mettre à jour lastActivity, expiresAt et token en une seule requête (optimisé)
+    @Modifying
+    @Query("UPDATE UserSession s SET s.lastActivity = :lastActivity, s.expiresAt = :expiresAt, s.sessionToken = :token WHERE s.id = :sessionId")
+    void updateSessionActivityAndToken(@Param("sessionId") Long sessionId, 
+                                       @Param("lastActivity") LocalDateTime lastActivity,
+                                       @Param("expiresAt") LocalDateTime expiresAt,
+                                       @Param("token") String token);
 }
 
 

@@ -194,18 +194,11 @@ public class UsersService {
         if (session != null) {
             // Supprimer immédiatement la session de la base de données
             userSessionRepository.delete(session);
-            System.out.println("🗑️ Session supprimée pour l'utilisateur " + userUuid + 
-                             " (deviceId: " + session.getDeviceId() + ", sessionId: " + session.getId() + ")");
         } else {
-            // Fallback : si la session n'existe pas, on invalide toutes les sessions de l'utilisateur
-            // (compatibilité avec les anciens tokens qui n'ont pas de session)
-            userSessionRepository.revokeAllSessions(userUuid);
-            
-            // Mettre à jour lastActivity pour invalider les anciens tokens sans session
-        User user = usersRepository.findByUuid(userUuid)
-                .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
-        user.setLastActivity(LocalDateTime.now());
-        usersRepository.save(user);
+            // Si la session n'existe pas, c'est probablement un ancien token sans sessionId
+            // On ne fait RIEN pour éviter d'invalider toutes les sessions par erreur
+            // L'utilisateur devra simplement se reconnecter
+            // Ne pas appeler revokeAllSessions() car cela invaliderait toutes les sessions actives
         }
     }
 
@@ -428,20 +421,11 @@ public class UsersService {
             finalDeviceId = deviceId;
         }
 
-        // Vérifier si une session existe déjà pour ce deviceId avec verrou pessimiste
-        // Cela empêche deux requêtes simultanées de créer une session en même temps
-        com.xpertcash.entity.UserSession existingSession = null;
-        try {
-            existingSession = userSessionRepository
-                    .findByDeviceIdAndUserUuidAndIsActiveTrueWithLock(finalDeviceId, user.getUuid())
-                    .orElse(null);
-        } catch (Exception e) {
-            System.out.println("⚠️ Erreur lors de la recherche de session existante: " + e.getMessage());
-            // Fallback sans verrou si le verrou échoue
-            existingSession = userSessionRepository
-                    .findByDeviceIdAndUserUuidAndIsActiveTrue(finalDeviceId, user.getUuid())
-                    .orElse(null);
-        }
+        // Vérifier si une session existe déjà pour ce deviceId (sans verrou pour optimiser)
+        // Le verrou sera utilisé uniquement lors de la création pour éviter les race conditions
+        com.xpertcash.entity.UserSession existingSession = userSessionRepository
+                .findByDeviceIdAndUserUuidAndIsActiveTrue(finalDeviceId, user.getUuid())
+                .orElse(null);
 
         // Créer ou mettre à jour la session
         com.xpertcash.entity.UserSession session;
@@ -452,31 +436,14 @@ public class UsersService {
             session = existingSession;
             session.updateLastActivity();
             session.setExpiresAt(LocalDateTime.now().plusYears(1)); // 1 an
-            System.out.println("✅ Session existante trouvée pour deviceId: " + finalDeviceId);
         } else {
-            System.out.println("🆕 Création d'une nouvelle session pour deviceId: " + finalDeviceId);
             // Limite de sessions actives : 2 par utilisateur
             final int MAX_ACTIVE_SESSIONS = 2;
             long activeSessionsCount = userSessionRepository.countByUserUuidAndIsActiveTrue(user.getUuid());
             
             if (activeSessionsCount >= MAX_ACTIVE_SESSIONS) {
-                // Récupérer toutes les sessions actives et trier par date (plus ancienne en premier)
-                List<com.xpertcash.entity.UserSession> allSessions = userSessionRepository
-                        .findByUserUuidAndIsActiveTrue(user.getUuid());
-                
-                // Trier par lastActivity puis createdAt (plus anciennes en premier)
-                allSessions.sort((s1, s2) -> {
-                    LocalDateTime l1 = s1.getLastActivity() != null ? s1.getLastActivity() : s1.getCreatedAt();
-                    LocalDateTime l2 = s2.getLastActivity() != null ? s2.getLastActivity() : s2.getCreatedAt();
-                    return l1.compareTo(l2);
-                });
-                
-                // Supprimer la session la plus ancienne (première de la liste triée)
-                com.xpertcash.entity.UserSession oldestSession = allSessions.get(0);
-                userSessionRepository.delete(oldestSession);
-                
-                System.out.println("🗑️ Session la plus ancienne supprimée pour l'utilisateur " + user.getUuid() + 
-                                 " (deviceId: " + oldestSession.getDeviceId() + ")");
+                // L'utilisateur a déjà 2 sessions actives, on lui demande de choisir laquelle fermer
+                throw new RuntimeException("SESSION_LIMIT_REACHED");
             }
             
             // Créer une nouvelle session
@@ -494,8 +461,16 @@ public class UsersService {
         }
 
         // Charger l'admin et calculer within24Hours AVANT de sauvegarder
-        // (on en a besoin pour générer le token, mais on le fait après les vérifications de session)
-        User admin = user.getEntreprise().getAdmin();
+        // Optimisé : on charge l'admin seulement si nécessaire (évite de charger l'entreprise si pas besoin)
+        User admin = null;
+        try {
+            admin = user.getEntreprise().getAdmin();
+        } catch (Exception e) {
+            // Si l'entreprise n'est pas chargée, la charger explicitement
+            admin = usersRepository.findByUuid(user.getUuid())
+                    .map(u -> u.getEntreprise().getAdmin())
+                    .orElse(null);
+        }
         boolean within24Hours = LocalDateTime.now().isBefore(user.getCreatedAt().plusHours(24));
         
         // Sauvegarder la session et générer le token en une seule fois
@@ -511,16 +486,12 @@ public class UsersService {
             
             if (lastCheck.isPresent()) {
                 // Une session a été créée entre temps par une autre requête
-                System.out.println("⚠️ Session créée entre temps, utilisation de la session existante");
                 session = lastCheck.get();
-                session.updateLastActivity();
-                session.setExpiresAt(LocalDateTime.now().plusYears(1));
                 isExistingSession = true; // Traiter comme une session existante
             } else {
                 // Aucune session n'existe, on peut créer
                 try {
                     session = userSessionRepository.save(session);
-                    System.out.println("✅ Nouvelle session créée avec ID: " + session.getId());
                     // Maintenant qu'on a l'ID, générer le token
                     accessToken = generateAccessTokenWithSession(user, admin, within24Hours, session.getId());
                     // Mettre à jour le token avec une requête UPDATE directe (évite un deuxième save())
@@ -528,21 +499,12 @@ public class UsersService {
                     session.setSessionToken(accessToken); // Mettre à jour l'objet en mémoire aussi
                 } catch (org.springframework.dao.DataIntegrityViolationException e) {
                     // Si une session avec le même deviceId existe déjà (contrainte unique violée)
-                    System.out.println("⚠️ Violation de contrainte unique pour deviceId " + finalDeviceId + ", récupération...");
-                    
                     Optional<com.xpertcash.entity.UserSession> existingSessionOpt = userSessionRepository
                             .findByDeviceIdAndUserUuidAndIsActiveTrue(finalDeviceId, user.getUuid());
                     
                     if (existingSessionOpt.isPresent()) {
                         session = existingSessionOpt.get();
-                        session.updateLastActivity();
-                        session.setExpiresAt(LocalDateTime.now().plusYears(1));
-                        // Générer le token pour la session existante
-                        accessToken = generateAccessTokenWithSession(user, admin, within24Hours, session.getId());
-                        // Mettre à jour avec une seule sauvegarde (lastActivity, expiresAt et token)
-                        session.setSessionToken(accessToken);
-                        session = userSessionRepository.save(session);
-                        System.out.println("✅ Session existante récupérée et mise à jour");
+                        isExistingSession = true;
                     } else {
                         throw new RuntimeException("Erreur lors de la récupération de la session existante après violation de contrainte", e);
                     }
@@ -555,9 +517,14 @@ public class UsersService {
         if (isExistingSession && accessToken == null) {
             // Générer le token pour une session existante
             accessToken = generateAccessTokenWithSession(user, admin, within24Hours, session.getId());
+            LocalDateTime now = LocalDateTime.now();
+            LocalDateTime expiresAt = now.plusYears(1);
+            // Utiliser une requête UPDATE directe pour mettre à jour tout en une fois (optimisé)
+            userSessionRepository.updateSessionActivityAndToken(session.getId(), now, expiresAt, accessToken);
+            // Mettre à jour l'objet en mémoire pour la cohérence
             session.setSessionToken(accessToken);
-            // Une seule sauvegarde pour mettre à jour lastActivity, expiresAt et token
-            session = userSessionRepository.save(session);
+            session.setLastActivity(now);
+            session.setExpiresAt(expiresAt);
         }
         
         // S'assurer que le token a été généré (sécurité)
@@ -1610,6 +1577,60 @@ public class UsersService {
     /**
      * Récupère toutes les sessions actives de l'utilisateur connecté
      */
+    // Méthode pour récupérer les sessions actives par userUuid (sans authentification)
+    public List<com.xpertcash.DTOs.UserSessionDTO> getActiveSessionsByUserUuid(String userUuid) {
+        List<com.xpertcash.entity.UserSession> sessions = userSessionRepository.findByUserUuidAndIsActiveTrue(userUuid);
+        return sessions.stream()
+                .map(session -> {
+                    com.xpertcash.DTOs.UserSessionDTO dto = new com.xpertcash.DTOs.UserSessionDTO();
+                    dto.setId(session.getId());
+                    dto.setDeviceId(session.getDeviceId());
+                    dto.setDeviceName(session.getDeviceName());
+                    dto.setIpAddress(session.getIpAddress());
+                    dto.setUserAgent(session.getUserAgent());
+                    dto.setCreatedAt(session.getCreatedAt());
+                    dto.setLastActivity(session.getLastActivity());
+                    dto.setExpiresAt(session.getExpiresAt());
+                    dto.setActive(session.isActive());
+                    dto.setCurrentSession(false); // On ne peut pas déterminer la session courante sans token
+                    return dto;
+                })
+                .collect(java.util.stream.Collectors.toList());
+    }
+    
+    // Méthode pour trouver un utilisateur par email (pour récupérer les sessions avant login)
+    public User findUserByEmail(String email) {
+        return usersRepository.findByEmail(email).orElse(null);
+    }
+    
+    // Méthode pour vérifier le mot de passe (pour sécurité lors de la récupération des sessions)
+    public boolean verifyPassword(String rawPassword, String encodedPassword) {
+        return passwordEncoder.matches(rawPassword, encodedPassword);
+    }
+    
+    // Méthode pour fermer une session spécifique avant login (quand limite atteinte)
+    @Transactional
+    public void closeSessionBeforeLogin(String email, String password, Long sessionId) {
+        // Vérifier l'email et le mot de passe
+        User user = usersRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("Email ou mot de passe incorrect"));
+        
+        if (!passwordEncoder.matches(password, user.getPassword())) {
+            throw new RuntimeException("Email ou mot de passe incorrect");
+        }
+        
+        // Vérifier que la session appartient à cet utilisateur
+        com.xpertcash.entity.UserSession session = userSessionRepository.findById(sessionId)
+                .orElseThrow(() -> new RuntimeException("Session introuvable"));
+        
+        if (!session.getUserUuid().equals(user.getUuid())) {
+            throw new RuntimeException("Cette session ne vous appartient pas");
+        }
+        
+        // Supprimer la session
+        userSessionRepository.delete(session);
+    }
+    
     public List<com.xpertcash.DTOs.UserSessionDTO> getActiveSessions(HttpServletRequest request) {
         User user = authHelper.getAuthenticatedUserWithFallback(request);
         
