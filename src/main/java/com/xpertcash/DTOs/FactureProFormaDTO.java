@@ -46,6 +46,7 @@ public class FactureProFormaDTO {
     private List<LigneFactureDTO> lignesFacture;
     private String nomClient;
     private String nomEntrepriseClient;
+    private List<ApprobateurDTO> approbateurs;
 
 
     public FactureProFormaDTO(FactureProForma facture) {
@@ -112,6 +113,13 @@ public class FactureProFormaDTO {
 
     this.dateRelance = facture.getDateRelance();
     this.notifie = facture.isNotifie();
+
+    // Mapper les approbateurs avec UUID et nom
+    this.approbateurs = (facture.getApprobateurs() != null && !facture.getApprobateurs().isEmpty())
+            ? facture.getApprobateurs().stream()
+                    .map(user -> new ApprobateurDTO(user.getUuid(), user.getNomComplet()))
+                    .collect(Collectors.toList())
+            : null;
     }
 
 
@@ -314,6 +322,14 @@ public class FactureProFormaDTO {
 
     public void setNotifie(boolean notifie) {
         this.notifie = notifie;
+    }
+
+    public List<ApprobateurDTO> getApprobateurs() {
+        return approbateurs;
+    }
+
+    public void setApprobateurs(List<ApprobateurDTO> approbateurs) {
+        this.approbateurs = approbateurs;
     }
 }
 
