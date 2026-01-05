@@ -1050,7 +1050,8 @@ public class FactureProformaService {
     public FactureProForma getFactureProformaEntityById(Long id, HttpServletRequest request) {
         User utilisateur = authHelper.getAuthenticatedUserWithFallback(request);
 
-        FactureProForma facture = factureProformaRepository.findById(id)
+        // Utiliser la méthode optimisée avec FETCH JOIN pour charger toutes les relations en une seule requête
+        FactureProForma facture = factureProformaRepository.findByIdWithRelations(id)
             .orElseThrow(() -> new RuntimeException("Facture Proforma introuvable avec l'ID : " + id));
 
         Entreprise entrepriseUtilisateur = utilisateur.getEntreprise();

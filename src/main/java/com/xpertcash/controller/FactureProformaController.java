@@ -72,8 +72,11 @@ public class FactureProformaController {
             // Appel du serviceupdateFactureProforma pour ajouter la facture
             FactureProForma nouvelleFacture = factureProformaService.ajouterFacture(facture, remisePourcentage, appliquerTVA, request);
 
+            // Convertir l'entité en DTO pour éviter les problèmes de sérialisation avec les proxies Hibernate
+            FactureProFormaDTO factureDTO = new FactureProFormaDTO(nouvelleFacture);
+
             // Retourner la facture créée en réponse HTTP 201 (CREATED)
-            return ResponseEntity.status(HttpStatus.CREATED).body(nouvelleFacture);
+            return ResponseEntity.status(HttpStatus.CREATED).body(factureDTO);
         } catch (RuntimeException e) {
             Map<String,String> error = Collections.singletonMap("message", e.getMessage());
             return ResponseEntity

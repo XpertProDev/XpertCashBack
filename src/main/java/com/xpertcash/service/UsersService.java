@@ -143,6 +143,9 @@ public class UsersService {
     private FactureProformaRepository factureProformaRepository;
 
     @Autowired
+    private com.xpertcash.repository.UserSessionRepository userSessionRepository;
+
+    @Autowired
     public UsersService(UsersRepository usersRepository, JwtConfig jwtConfig, BCryptPasswordEncoder passwordEncoder) {
         this.usersRepository = usersRepository;
         this.jwtConfig = jwtConfig;
@@ -150,8 +153,8 @@ public class UsersService {
     }
 
     /**
-     * Logout : invalide tous les tokens de l'utilisateur en mettant à jour lastActivity
-     * Approche optimale : pas de blacklist, invalidation immédiate de tous les tokens précédents
+     * Logout : supprime immédiatement la session courante de la base de données
+     * Permet à l'utilisateur de rester connecté sur d'autres appareils
      */
     @Transactional
     public void logout(HttpServletRequest request) {
@@ -162,7 +165,7 @@ public class UsersService {
 
         String token = authHeader.substring(7);
 
-        // Extraire l'UUID de l'utilisateur depuis le token
+        // Extraire l'UUID de l'utilisateur et le sessionId depuis le token
         Claims claims = jwtUtil.extractAllClaimsSafe(token);
         if (claims == null) {
             throw new RuntimeException("Token invalide ou expiré");
@@ -173,14 +176,30 @@ public class UsersService {
             throw new RuntimeException("UUID utilisateur non trouvé dans le token");
         }
 
-        // Récupérer l'utilisateur
-        User user = usersRepository.findByUuid(userUuid)
-                .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
+        // Récupérer la session par sessionId dans le token (méthode principale)
+        com.xpertcash.entity.UserSession session = null;
+        Object sessionIdClaim = claims.get("sessionId");
+        
+        if (sessionIdClaim != null) {
+            // Méthode principale : chercher par sessionId (le plus fiable)
+            Long sessionId = ((Number) sessionIdClaim).longValue();
+            session = userSessionRepository.findById(sessionId).orElse(null);
+        }
+        
+        // Fallback : chercher par token si sessionId n'est pas présent (anciens tokens)
+        if (session == null) {
+            session = userSessionRepository.findBySessionToken(token).orElse(null);
+        }
 
-        // Mettre à jour lastActivity pour invalider tous les tokens précédents
-        // Tous les tokens émis avant ce moment seront invalides car leur lastActivity ne correspondra plus
-        user.setLastActivity(LocalDateTime.now());
-        usersRepository.save(user);
+        if (session != null) {
+            // Supprimer immédiatement la session de la base de données
+            userSessionRepository.delete(session);
+        } else {
+            // Si la session n'existe pas, c'est probablement un ancien token sans sessionId
+            // On ne fait RIEN pour éviter d'invalider toutes les sessions par erreur
+            // L'utilisateur devra simplement se reconnecter
+            // Ne pas appeler revokeAllSessions() car cela invaliderait toutes les sessions actives
+        }
     }
 
 
@@ -367,7 +386,10 @@ public class UsersService {
     }
 
     // Connexion : permet la connexion même si le compte n'est pas activé
-     public Map<String, String> login(String email, String password) {
+    // Supporte maintenant les sessions multiples par appareil
+    @Transactional(isolation = org.springframework.transaction.annotation.Isolation.READ_COMMITTED, 
+                   rollbackFor = Exception.class)
+    public Map<String, String> login(String email, String password, String deviceId, String deviceName, String ipAddress, String userAgent) {
     User user = usersRepository.findByEmail(email)
         .orElseThrow(() -> new RuntimeException("Email ou mot de passe incorrect"));
 
@@ -386,24 +408,152 @@ public class UsersService {
         throw new RuntimeException("Votre compte est verrouillé pour inactivité.");
     }
 
-    User admin = user.getEntreprise().getAdmin();
-    boolean isAdmin = user.getRole().getName().equals(RoleType.ADMIN);
-    boolean within24Hours = LocalDateTime.now().isBefore(user.getCreatedAt().plusHours(24));
+    // NE PAS charger l'entreprise/admin ici pour éviter les deadlocks
+    // On le chargera plus tard, après les opérations sur les sessions
+    // User admin = user.getEntreprise().getAdmin(); // DÉPLACÉ PLUS BAS
+    // boolean within24Hours = LocalDateTime.now().isBefore(user.getCreatedAt().plusHours(24)); // DÉPLACÉ PLUS BAS
 
-    user.setLastActivity(LocalDateTime.now());
-    usersRepository.save(user);
+        // Générer deviceId si non fourni (avant les opérations de session pour éviter les deadlocks)
+        final String finalDeviceId;
+        if (deviceId == null || deviceId.trim().isEmpty()) {
+            finalDeviceId = UUID.randomUUID().toString();
+        } else {
+            finalDeviceId = deviceId;
+        }
 
-    String accessToken = generateAccessToken(user, admin, within24Hours);
-    String refreshToken = generateRefreshToken(user);
+        // Vérifier si une session existe déjà pour ce deviceId (sans verrou pour optimiser)
+        // Le verrou sera utilisé uniquement lors de la création pour éviter les race conditions
+        com.xpertcash.entity.UserSession existingSession = userSessionRepository
+                .findByDeviceIdAndUserUuidAndIsActiveTrue(finalDeviceId, user.getUuid())
+                .orElse(null);
+
+        // Créer ou mettre à jour la session
+        com.xpertcash.entity.UserSession session;
+        boolean isExistingSession = (existingSession != null);
+        
+        if (isExistingSession) {
+            // Mettre à jour la session existante
+            session = existingSession;
+            session.updateLastActivity();
+            session.setExpiresAt(LocalDateTime.now().plusYears(1)); // 1 an
+        } else {
+            // Limite de sessions actives : 2 par utilisateur
+            final int MAX_ACTIVE_SESSIONS = 2;
+            long activeSessionsCount = userSessionRepository.countByUserUuidAndIsActiveTrue(user.getUuid());
+            
+            if (activeSessionsCount >= MAX_ACTIVE_SESSIONS) {
+                // L'utilisateur a déjà 2 sessions actives, on lui demande de choisir laquelle fermer
+                throw new RuntimeException("SESSION_LIMIT_REACHED");
+            }
+            
+            // Créer une nouvelle session
+            session = new com.xpertcash.entity.UserSession();
+            session.setUserUuid(user.getUuid());
+            session.setUser(user);
+            session.setDeviceId(finalDeviceId);
+            session.setDeviceName(deviceName);
+            session.setIpAddress(ipAddress);
+            session.setUserAgent(userAgent);
+            session.setCreatedAt(LocalDateTime.now());
+            session.setLastActivity(LocalDateTime.now());
+            session.setExpiresAt(LocalDateTime.now().plusYears(1)); // 1 an
+            session.setActive(true);
+        }
+
+        // Charger l'admin et calculer within24Hours AVANT de sauvegarder
+        // Optimisé : on charge l'admin seulement si nécessaire (évite de charger l'entreprise si pas besoin)
+        User admin = null;
+        try {
+            admin = user.getEntreprise().getAdmin();
+        } catch (Exception e) {
+            // Si l'entreprise n'est pas chargée, la charger explicitement
+            admin = usersRepository.findByUuid(user.getUuid())
+                    .map(u -> u.getEntreprise().getAdmin())
+                    .orElse(null);
+        }
+        boolean within24Hours = LocalDateTime.now().isBefore(user.getCreatedAt().plusHours(24));
+        
+        // Sauvegarder la session et générer le token en une seule fois
+        // Gérer le cas où une session avec le même deviceId existe déjà (race condition)
+        String accessToken = null;
+        
+        if (!isExistingSession) {
+            // Pour une nouvelle session, on doit d'abord la sauvegarder pour obtenir l'ID
+            // Vérifier une dernière fois avant de créer avec verrou pessimiste
+            // Cela garantit qu'aucune autre requête ne peut créer une session entre temps
+            Optional<com.xpertcash.entity.UserSession> lastCheck = userSessionRepository
+                    .findByDeviceIdAndUserUuidAndIsActiveTrueWithLock(finalDeviceId, user.getUuid());
+            
+            if (lastCheck.isPresent()) {
+                // Une session a été créée entre temps par une autre requête
+                session = lastCheck.get();
+                isExistingSession = true; // Traiter comme une session existante
+            } else {
+                // Aucune session n'existe, on peut créer
+                try {
+                    session = userSessionRepository.save(session);
+                    // Maintenant qu'on a l'ID, générer le token
+                    accessToken = generateAccessTokenWithSession(user, admin, within24Hours, session.getId());
+                    // Mettre à jour le token avec une requête UPDATE directe (évite un deuxième save())
+                    userSessionRepository.updateSessionToken(session.getId(), accessToken);
+                    session.setSessionToken(accessToken); // Mettre à jour l'objet en mémoire aussi
+                } catch (org.springframework.dao.DataIntegrityViolationException e) {
+                    // Si une session avec le même deviceId existe déjà (contrainte unique violée)
+                    Optional<com.xpertcash.entity.UserSession> existingSessionOpt = userSessionRepository
+                            .findByDeviceIdAndUserUuidAndIsActiveTrue(finalDeviceId, user.getUuid());
+                    
+                    if (existingSessionOpt.isPresent()) {
+                        session = existingSessionOpt.get();
+                        isExistingSession = true;
+                    } else {
+                        throw new RuntimeException("Erreur lors de la récupération de la session existante après violation de contrainte", e);
+                    }
+                }
+            }
+        }
+        
+        // Si c'est une session existante (soit trouvée au début, soit récupérée)
+        // et que le token n'a pas encore été généré
+        if (isExistingSession && accessToken == null) {
+            // Générer le token pour une session existante
+            accessToken = generateAccessTokenWithSession(user, admin, within24Hours, session.getId());
+            LocalDateTime now = LocalDateTime.now();
+            LocalDateTime expiresAt = now.plusYears(1);
+            // Utiliser une requête UPDATE directe pour mettre à jour tout en une fois (optimisé)
+            userSessionRepository.updateSessionActivityAndToken(session.getId(), now, expiresAt, accessToken);
+            // Mettre à jour l'objet en mémoire pour la cohérence
+            session.setSessionToken(accessToken);
+            session.setLastActivity(now);
+            session.setExpiresAt(expiresAt);
+        }
+        
+        // S'assurer que le token a été généré (sécurité)
+        if (accessToken == null) {
+            throw new RuntimeException("Erreur : le token n'a pas pu être généré");
+        }
+
+        // NOTE: On ne met PAS à jour user.lastActivity ici pour éviter les deadlocks
+        // La mise à jour de lastActivity est déjà gérée dans AuthenticationHelper lors des requêtes suivantes
+        // Cela évite les verrous sur la table user pendant le login
 
     Map<String, String> tokens = new HashMap<>();
     tokens.put("accessToken", accessToken);
-    tokens.put("refreshToken", refreshToken);
+        tokens.put("deviceId", finalDeviceId); // Retourner le deviceId pour le frontend
     return tokens;
 }
 
-            // Génération du token avec infos supplémentaires
+    // Méthode de compatibilité pour login sans paramètres de session
+    public Map<String, String> login(String email, String password) {
+        return login(email, password, null, null, null, null);
+    }
+
+            // Génération du token avec infos supplémentaires (sans sessionId - pour compatibilité)
             public String generateAccessToken(User user, User admin, boolean within24Hours) {
+                return generateAccessTokenWithSession(user, admin, within24Hours, null);
+            }
+
+            // Génération du token avec sessionId pour gestion des sessions multiples
+            public String generateAccessTokenWithSession(User user, User admin, boolean within24Hours, Long sessionId) {
             long expirationTime = 1000L * 60 * 60 * 24 * 365; // 1 an
             Date now = new Date();
             Date expirationDate = new Date(now.getTime() + expirationTime);
@@ -421,7 +571,7 @@ public class UsersService {
                     ? user.getLastActivity().atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
                     : now.getTime();
 
-            return Jwts.builder()
+                var tokenBuilder = Jwts.builder()
                     .setSubject(user.getUuid())
                     .claim("role", user.getRole().getName())
                     .claim("userActivated", userActivated)
@@ -429,24 +579,17 @@ public class UsersService {
                     .claim("userActivationPossible", userActivationPossible)
                     .claim("lastActivity", lastActivityTimestamp) // Version du token basée sur lastActivity
                     .setIssuedAt(now)
-                    .setExpiration(expirationDate)
+                        .setExpiration(expirationDate);
+
+                // Ajouter le sessionId si fourni (pour gestion des sessions multiples)
+                if (sessionId != null) {
+                    tokenBuilder.claim("sessionId", sessionId);
+                }
+
+                return tokenBuilder
                     .signWith(SignatureAlgorithm.HS256, jwtConfig.getSecretKey())
                     .compact();
         }
-            public String generateRefreshToken(User user) {
-            long refreshExpiration = 1000L * 60 * 60 * 24 * 2;
-            Date now = new Date();
-            Date expirationDate = new Date(now.getTime() + refreshExpiration);
-
-            return Jwts.builder()
-                    .setSubject(user.getUuid())
-                    .setIssuedAt(now)
-                    .setExpiration(expirationDate)
-                    .signWith(SignatureAlgorithm.HS256, jwtConfig.getSecretKey())
-                    .compact();
-        }
-
-
     //Resent Mail
     @Transactional
     public void resendActivationEmail(String email) {
@@ -1429,6 +1572,156 @@ public class UsersService {
 
     private String getPermissionDescription(PermissionType permissionType) {
         return PERMISSION_DESCRIPTIONS.getOrDefault(permissionType, "Permission non définie");
+    }
+
+    /**
+     * Récupère toutes les sessions actives de l'utilisateur connecté
+     */
+    // Méthode pour récupérer les sessions actives par userUuid (sans authentification)
+    public List<com.xpertcash.DTOs.UserSessionDTO> getActiveSessionsByUserUuid(String userUuid) {
+        List<com.xpertcash.entity.UserSession> sessions = userSessionRepository.findByUserUuidAndIsActiveTrue(userUuid);
+        return sessions.stream()
+                .map(session -> {
+                    com.xpertcash.DTOs.UserSessionDTO dto = new com.xpertcash.DTOs.UserSessionDTO();
+                    dto.setId(session.getId());
+                    dto.setDeviceId(session.getDeviceId());
+                    dto.setDeviceName(session.getDeviceName());
+                    dto.setIpAddress(session.getIpAddress());
+                    dto.setUserAgent(session.getUserAgent());
+                    dto.setCreatedAt(session.getCreatedAt());
+                    dto.setLastActivity(session.getLastActivity());
+                    dto.setExpiresAt(session.getExpiresAt());
+                    dto.setActive(session.isActive());
+                    dto.setCurrentSession(false); // On ne peut pas déterminer la session courante sans token
+                    return dto;
+                })
+                .collect(java.util.stream.Collectors.toList());
+    }
+    
+    // Méthode pour trouver un utilisateur par email (pour récupérer les sessions avant login)
+    public User findUserByEmail(String email) {
+        return usersRepository.findByEmail(email).orElse(null);
+    }
+    
+    // Méthode pour vérifier le mot de passe (pour sécurité lors de la récupération des sessions)
+    public boolean verifyPassword(String rawPassword, String encodedPassword) {
+        return passwordEncoder.matches(rawPassword, encodedPassword);
+    }
+    
+    // Méthode pour fermer une session spécifique avant login (quand limite atteinte)
+    @Transactional
+    public void closeSessionBeforeLogin(String email, String password, Long sessionId) {
+        // Vérifier l'email et le mot de passe
+        User user = usersRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("Email ou mot de passe incorrect"));
+        
+        if (!passwordEncoder.matches(password, user.getPassword())) {
+            throw new RuntimeException("Email ou mot de passe incorrect");
+        }
+        
+        // Vérifier que la session appartient à cet utilisateur
+        com.xpertcash.entity.UserSession session = userSessionRepository.findById(sessionId)
+                .orElseThrow(() -> new RuntimeException("Session introuvable"));
+        
+        if (!session.getUserUuid().equals(user.getUuid())) {
+            throw new RuntimeException("Cette session ne vous appartient pas");
+        }
+        
+        // Supprimer la session
+        userSessionRepository.delete(session);
+    }
+    
+    public List<com.xpertcash.DTOs.UserSessionDTO> getActiveSessions(HttpServletRequest request) {
+        User user = authHelper.getAuthenticatedUserWithFallback(request);
+        
+        // Récupérer toutes les sessions actives de l'utilisateur
+        List<com.xpertcash.entity.UserSession> sessions = userSessionRepository
+                .findByUserUuidAndIsActiveTrue(user.getUuid());
+        
+        // Extraire le sessionId du token courant pour identifier la session actuelle
+        String authHeader = request.getHeader("Authorization");
+        Long currentSessionId = null;
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            String token = authHeader.substring(7);
+            Claims claims = jwtUtil.extractAllClaimsSafe(token);
+            if (claims != null) {
+                Object sessionIdClaim = claims.get("sessionId");
+                if (sessionIdClaim != null) {
+                    currentSessionId = ((Number) sessionIdClaim).longValue();
+                }
+            }
+        }
+        
+        final Long finalCurrentSessionId = currentSessionId;
+        
+        // Convertir en DTO
+        return sessions.stream()
+                .map(session -> {
+                    com.xpertcash.DTOs.UserSessionDTO dto = new com.xpertcash.DTOs.UserSessionDTO();
+                    dto.setId(session.getId());
+                    dto.setDeviceId(session.getDeviceId());
+                    dto.setDeviceName(session.getDeviceName());
+                    dto.setIpAddress(session.getIpAddress());
+                    dto.setUserAgent(session.getUserAgent());
+                    dto.setCreatedAt(session.getCreatedAt());
+                    dto.setLastActivity(session.getLastActivity());
+                    dto.setExpiresAt(session.getExpiresAt());
+                    dto.setActive(session.isActive());
+                    dto.setCurrentSession(finalCurrentSessionId != null && 
+                                         finalCurrentSessionId.equals(session.getId()));
+                    return dto;
+                })
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Révoque une session spécifique
+     */
+    @Transactional
+    public void revokeSession(Long sessionId, HttpServletRequest request) {
+        User user = authHelper.getAuthenticatedUserWithFallback(request);
+        
+        // Vérifier que la session appartient à l'utilisateur
+        com.xpertcash.entity.UserSession session = userSessionRepository.findById(sessionId)
+                .orElseThrow(() -> new RuntimeException("Session introuvable"));
+        
+        if (!session.getUserUuid().equals(user.getUuid())) {
+            throw new RuntimeException("Vous ne pouvez révoquer que vos propres sessions.");
+        }
+        
+        // Révoquer la session
+        session.setActive(false);
+        userSessionRepository.save(session);
+    }
+
+    /**
+     * Révoque toutes les sessions sauf la session courante
+     */
+    @Transactional
+    public void revokeOtherSessions(HttpServletRequest request) {
+        User user = authHelper.getAuthenticatedUserWithFallback(request);
+        
+        // Extraire le sessionId du token courant
+        String authHeader = request.getHeader("Authorization");
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            throw new RuntimeException("Token JWT manquant ou mal formaté");
+        }
+        
+        String token = authHeader.substring(7);
+        Claims claims = jwtUtil.extractAllClaimsSafe(token);
+        if (claims == null) {
+            throw new RuntimeException("Token invalide ou expiré");
+        }
+        
+        Object sessionIdClaim = claims.get("sessionId");
+        if (sessionIdClaim == null) {
+            throw new RuntimeException("Session ID non trouvé dans le token");
+        }
+        
+        Long currentSessionId = ((Number) sessionIdClaim).longValue();
+        
+        // Révoquer toutes les sessions sauf la session courante
+        userSessionRepository.revokeAllSessionsExcept(user.getUuid(), currentSessionId);
     }
 
 }

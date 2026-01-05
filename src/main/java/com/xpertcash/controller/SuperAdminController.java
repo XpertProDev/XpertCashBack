@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -175,6 +176,33 @@ public class SuperAdminController {
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(Map.of("error", "Erreur lors de la suppression : " + e.getMessage()));
+        }
+    }
+
+    /**
+     * Déconnecte tous les utilisateurs du système (réservé au SUPER_ADMIN).
+     * 
+     * Cette opération :
+     * - Supprime toutes les sessions actives de la base de données
+     * - Invalide tous les tokens JWT existants en mettant à jour lastActivity
+     * 
+     * Utile lors des mises à jour système pour forcer tous les utilisateurs à se reconnecter.
+     * 
+     *request La requête HTTP pour récupérer l'utilisateur connecté
+     *Réponse indiquant le succès de l'opération
+     */
+    @PostMapping("/deconnecter-tous")
+    public ResponseEntity<?> deconnecterTousLesUtilisateurs(HttpServletRequest request) {
+        try {
+            User user = authHelper.getAuthenticatedUserWithFallback(request);
+            superAdminService.deconnecterTousLesUtilisateurs(user);
+            return ResponseEntity.ok(Map.of("message", "Tous les utilisateurs ont été déconnectés avec succès. Ils devront se reconnecter."));
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Erreur lors de la déconnexion : " + e.getMessage()));
         }
     }
 }

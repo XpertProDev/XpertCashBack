@@ -65,6 +65,7 @@ import com.xpertcash.repository.StockRepository;
 import com.xpertcash.repository.StockHistoryRepository;
 import com.xpertcash.repository.StockProduitFournisseurRepository;
 import com.xpertcash.repository.UsersRepository;
+import com.xpertcash.repository.UserSessionRepository;
 import com.xpertcash.repository.VENTE.CaisseRepository;
 import com.xpertcash.repository.VENTE.VenteRepository;
 import com.xpertcash.repository.VENTE.VersementComptableRepository;
@@ -88,6 +89,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.io.IOException;
+import java.time.LocalDateTime;
 import java.util.List;
 
 /**
@@ -119,6 +121,9 @@ public class SuperAdminService {
 
     @Autowired
     private StockProduitFournisseurRepository stockProduitFournisseurRepository;
+
+    @Autowired
+    private UserSessionRepository userSessionRepository;
 
     @Autowired
     private ClientRepository clientRepository;
@@ -1026,6 +1031,47 @@ public class SuperAdminService {
         } else {
         }
 
+    }
+
+    /**
+     * Déconnecte tous les utilisateurs du système (réservé SUPER_ADMIN).
+     * 
+     * Cette méthode :
+     * 1. Supprime toutes les sessions actives de la base de données (si elles existent)
+     * 2. Met à jour le lastActivity de tous les utilisateurs pour invalider leurs tokens JWT existants
+     * 
+     * Utile lors des mises à jour système pour forcer tous les utilisateurs à se reconnecter.
+     * Fonctionne même si les utilisateurs n'ont pas de session (anciens tokens sans session).
+     * 
+     * @param superAdmin L'utilisateur SUPER_ADMIN qui effectue l'opération
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public void deconnecterTousLesUtilisateurs(User superAdmin) {
+        ensureSuperAdmin(superAdmin);
+
+        // 1. Supprimer toutes les sessions actives de la base de données (si elles existent)
+        // Cela déconnecte les utilisateurs qui ont des sessions dans le nouveau système
+        List<com.xpertcash.entity.UserSession> allSessions = userSessionRepository.findAll();
+        if (!allSessions.isEmpty()) {
+            userSessionRepository.deleteAll(allSessions);
+            entityManager.flush();
+        }
+
+        // 2. Mettre à jour le lastActivity de tous les utilisateurs pour invalider leurs tokens JWT
+        // Cela force TOUS les tokens existants (avec ou sans session) à être considérés comme révoqués
+        // Lors de la prochaine requête, le système vérifie si userLastActivity > tokenLastActivity
+        // et rejette le token si c'est le cas
+        List<User> allUsers = usersRepository.findAll();
+        LocalDateTime now = LocalDateTime.now();
+        for (User user : allUsers) {
+            user.setLastActivity(now);
+            usersRepository.save(user);
+        }
+        entityManager.flush();
+
+        // Résultat : Tous les utilisateurs devront se reconnecter car :
+        // - Leurs sessions sont supprimées (s'ils en avaient)
+        // - Leurs tokens JWT sont invalidés (userLastActivity > tokenLastActivity)
     }
 }
 

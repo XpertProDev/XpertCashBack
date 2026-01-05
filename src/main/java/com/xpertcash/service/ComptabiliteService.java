@@ -2162,9 +2162,13 @@ public class ComptabiliteService {
             // Déterminer l'origine selon le type de dette
             if (entree.getDetteId() != null && entree.getDetteType() != null) {
                 if ("PAIEMENT_FACTURE".equals(entree.getDetteType())) {
-                    dto.setOrigine("FACTURE"); // Paiement de facture
-                } else if ("VENTE_CREDIT".equals(entree.getDetteType()) || "ENTREE_DETTE".equals(entree.getDetteType())) {
-                    dto.setOrigine("PAIEMENT_DETTE"); // Paiement de dette
+                    dto.setOrigine("Facturation"); // Paiement de facture
+                } else if ("VENTE_CREDIT".equals(entree.getDetteType())) {
+                    // Pour les paiements de vente à crédit, récupérer le nom de la boutique
+                    String nomBoutique = recupererNomBoutiquePourVente(entree.getDetteId());
+                    dto.setOrigine(nomBoutique != null ? nomBoutique : "PAIEMENT_DETTE");
+                } else if ("ENTREE_DETTE".equals(entree.getDetteType())) {
+                    dto.setOrigine("PAIEMENT_DETTE"); // Paiement de dette (entrée générale)
                 } else {
                     dto.setOrigine("COMPTABILITE");
                 }
@@ -2179,6 +2183,26 @@ public class ComptabiliteService {
         dto.setDetteNumero(entree.getDetteNumero());
         
         return dto;
+    }
+
+    /**
+     * Récupère le nom de la boutique pour une vente donnée.
+     * Utilisé pour déterminer l'origine d'un paiement de vente à crédit.
+     */
+    private String recupererNomBoutiquePourVente(Long venteId) {
+        if (venteId == null) {
+            return null;
+        }
+        try {
+            Vente vente = venteRepository.findById(venteId).orElse(null);
+            if (vente != null && vente.getBoutique() != null) {
+                return vente.getBoutique().getNomBoutique();
+            }
+        } catch (Exception e) {
+            // En cas d'erreur, on retourne null et on utilisera la valeur par défaut
+            System.err.println("Erreur lors de la récupération de la boutique pour la vente " + venteId + " : " + e.getMessage());
+        }
+        return null;
     }
 
     /**
@@ -2388,13 +2412,13 @@ public class ComptabiliteService {
                         
                         dto.setDescription(description);
                         dto.setStatut(statutFacture);
-                        dto.setOrigine("FACTURE"); // Les paiements viennent des factures réelles
+                        dto.setOrigine("FACTURATION"); // Les paiements viennent des factures réelles
                     } else {
                         dto.setDescription("Paiement sans facture associée");
                         dto.setObjet(null);
                         dto.setNumeroFacture(null);
                         dto.setStatut("INCONNU");
-                        dto.setOrigine("FACTURE"); // Par défaut même sans facture associée
+                        dto.setOrigine("FACTURATION"); // Par défaut même sans facture associée
                         dto.setLignesFacture(new ArrayList<>());
                     }
                     

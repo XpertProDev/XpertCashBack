@@ -22,6 +22,21 @@ public interface FactureProformaRepository extends JpaRepository<FactureProForma
     @Query("SELECT f FROM FactureProForma f LEFT JOIN FETCH f.client WHERE f.id = :id")
     Optional<FactureProForma> findByIdWithClient(@Param("id") Long id);
 
+    // Méthode optimisée pour charger une facture avec toutes les relations nécessaires incluant les approbateurs
+    // Note: On évite de FETCH plusieurs collections en même temps pour éviter le produit cartésien
+    // Les lignesFacture seront chargées via la relation EAGER ou séparément si nécessaire
+    @Query("SELECT DISTINCT f FROM FactureProForma f " +
+           "LEFT JOIN FETCH f.approbateurs " +
+           "LEFT JOIN FETCH f.utilisateurCreateur " +
+           "LEFT JOIN FETCH f.utilisateurModificateur " +
+           "LEFT JOIN FETCH f.utilisateurValidateur " +
+           "LEFT JOIN FETCH f.utilisateurApprobateur " +
+           "LEFT JOIN FETCH f.client " +
+           "LEFT JOIN FETCH f.entrepriseClient " +
+           "LEFT JOIN FETCH f.entreprise " +
+           "WHERE f.id = :id")
+    Optional<FactureProForma> findByIdWithRelations(@Param("id") Long id);
+
     @Query("SELECT f FROM FactureProForma f " +
            "WHERE f.statut = :statut " +
            "AND (:clientId IS NULL OR f.client.id = :clientId) " +

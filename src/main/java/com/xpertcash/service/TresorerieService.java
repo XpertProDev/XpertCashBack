@@ -781,15 +781,23 @@ public class TresorerieService {
     }
 
     private double calculerEntreesGeneralesCaisse(TresorerieData data) {
+        // ⚠️ IMPORTANT : Exclure les entrées créées par les paiements de factures (detteType = "PAIEMENT_FACTURE")
+        // car elles sont déjà comptées via calculerEntreesPaiementsFactures()
+        // Sinon on aurait une double comptabilisation
         return data.entreesGenerales.stream()
                 .filter(e -> e.getSource() == SourceDepense.CAISSE)
+                .filter(e -> e.getDetteType() == null || !"PAIEMENT_FACTURE".equals(e.getDetteType()))
                 .mapToDouble(e -> getValeurDouble(e.getMontant()))
                 .sum();
     }
 
     private double calculerEntreesGeneralesParSource(TresorerieData data, SourceDepense sourceDepense) {
+        // ⚠️ IMPORTANT : Exclure les entrées créées par les paiements de factures (detteType = "PAIEMENT_FACTURE")
+        // car elles sont déjà comptées via calculerEntreesPaiementsFactures()
+        // Sinon on aurait une double comptabilisation
         return data.entreesGenerales.stream()
                 .filter(e -> e.getSource() == sourceDepense)
+                .filter(e -> e.getDetteType() == null || !"PAIEMENT_FACTURE".equals(e.getDetteType()))
                 .mapToDouble(e -> getValeurDouble(e.getMontant()))
                 .sum();
     }
