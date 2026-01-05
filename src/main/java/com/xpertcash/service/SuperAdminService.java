@@ -718,6 +718,15 @@ public class SuperAdminService {
             }
         }
 
+        // 5.12. Supprimer toutes les sessions des utilisateurs de cette entreprise AVANT de supprimer les utilisateurs
+        // Cela évite les erreurs de contrainte de clé étrangère sur user_sessions.user_id
+        entityManager.createNativeQuery(
+                "DELETE us FROM user_sessions us " +
+                "INNER JOIN user u ON us.user_id = u.id " +
+                "WHERE u.entreprise_id = :entrepriseId"
+        ).setParameter("entrepriseId", entrepriseId).executeUpdate();
+        entityManager.flush();
+
         // 6. Supprimer tous les utilisateurs de l'entreprise (avec leurs fichiers)
         List<User> users = usersRepository.findByEntrepriseId(entrepriseId);
         for (User utilisateur : users) {

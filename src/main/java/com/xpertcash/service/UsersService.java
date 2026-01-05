@@ -146,6 +146,9 @@ public class UsersService {
     private com.xpertcash.repository.UserSessionRepository userSessionRepository;
 
     @Autowired
+    private DeviceDetectionService deviceDetectionService;
+
+    @Autowired
     public UsersService(UsersRepository usersRepository, JwtConfig jwtConfig, BCryptPasswordEncoder passwordEncoder) {
         this.usersRepository = usersRepository;
         this.jwtConfig = jwtConfig;
@@ -210,13 +213,13 @@ public class UsersService {
 
         // Vérification des données déjà existantes
         if (usersRepository.findByEmail(email).isPresent()) {
-            throw new RuntimeException("Cet email est déjà utilisé. L'utilisateur existe déjà.");
+            throw new RuntimeException("Cet email est déjà utilisé.");
         }
         if (usersRepository.findByPhone(phone).isPresent()) {
-            throw new RuntimeException("Ce numéro de téléphone est déjà utilisé. L'utilisateur existe déjà.");
+            throw new RuntimeException("Ce numéro de téléphone est déjà utilisé.");
         }
         if (entrepriseRepository.findByNomEntreprise(nomEntreprise).isPresent()) {
-            throw new RuntimeException("Le nom de l'entreprise est déjà utilisé. L'entreprise existe déjà.");
+            throw new RuntimeException("Le nom de l'entreprise est déjà utilisé.");
         }
     
         // Génération du mot de passe haché
@@ -451,7 +454,9 @@ public class UsersService {
             session.setUserUuid(user.getUuid());
             session.setUser(user);
             session.setDeviceId(finalDeviceId);
-            session.setDeviceName(deviceName);
+            // Détecter et améliorer le nom de l'appareil avec le modèle spécifique
+            String enhancedDeviceName = deviceDetectionService.detectDeviceName(userAgent, deviceName);
+            session.setDeviceName(enhancedDeviceName);
             session.setIpAddress(ipAddress);
             session.setUserAgent(userAgent);
             session.setCreatedAt(LocalDateTime.now());
