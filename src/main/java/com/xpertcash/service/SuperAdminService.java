@@ -1763,14 +1763,15 @@ public class SuperAdminService {
             }
         }
 
-        // 22.5. Vider la relation ManyToMany avec AppModule avant de supprimer l'entreprise
-        entreprise = entrepriseRepository.findById(entrepriseId).orElse(null);
-        if (entreprise != null) {
-            if (entreprise.getModulesActifs() != null && !entreprise.getModulesActifs().isEmpty()) {
-                entreprise.getModulesActifs().clear();
-                entrepriseRepository.save(entreprise);
-            }
-        }
+        // 22.5. CONSERVER les modules actifs, les essais de modules et les abonnements
+        // On ne vide PAS les modules pour préserver les essais et abonnements
+        // entreprise = entrepriseRepository.findById(entrepriseId).orElse(null);
+        // if (entreprise != null) {
+        //     if (entreprise.getModulesActifs() != null && !entreprise.getModulesActifs().isEmpty()) {
+        //         entreprise.getModulesActifs().clear();
+        //         entrepriseRepository.save(entreprise);
+        //     }
+        // }
 
         // 22.6. Forcer un flush et clear la session Hibernate
         entityManager.flush();
@@ -1779,7 +1780,7 @@ public class SuperAdminService {
         // 23. Remettre la référence admin sur l'entreprise (car on l'avait retirée au début)
         entreprise = entrepriseRepository.findById(entrepriseId).orElse(null);
         if (entreprise != null) {
-            // S'assurer que toutes les collections sont vides
+            // S'assurer que toutes les collections sont vides (SAUF les modules actifs pour conserver les essais)
             if (entreprise.getUtilisateurs() != null) {
                 entreprise.getUtilisateurs().clear();
             }
@@ -1789,9 +1790,10 @@ public class SuperAdminService {
             if (entreprise.getFacturesProforma() != null) {
                 entreprise.getFacturesProforma().clear();
             }
-            if (entreprise.getModulesActifs() != null) {
-                entreprise.getModulesActifs().clear();
-            }
+            // CONSERVER les modules actifs pour préserver les essais et abonnements
+            // if (entreprise.getModulesActifs() != null) {
+            //     entreprise.getModulesActifs().clear();
+            // }
             
             // Remettre l'admin sur l'entreprise
             entreprise.setAdmin(admin);

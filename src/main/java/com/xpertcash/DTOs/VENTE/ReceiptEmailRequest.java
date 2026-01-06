@@ -3,6 +3,7 @@ package com.xpertcash.DTOs.VENTE;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -23,4 +24,6 @@ public class ReceiptEmailRequest {
     private String nomVendeur;
     private String nomBoutique;
     private List<VenteLigneResponse> lignes;
+    private Double remiseGlobale;
+    private Map<Long, Double> remisesProduits;
 }

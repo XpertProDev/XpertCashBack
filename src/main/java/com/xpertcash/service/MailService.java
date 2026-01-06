@@ -5,6 +5,7 @@ import jakarta.mail.util.ByteArrayDataSource;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.UnsupportedEncodingException;
 import java.math.BigDecimal;
 import java.text.DecimalFormat;
 import java.text.NumberFormat;
@@ -89,7 +90,11 @@ public class MailService {
     MimeMessage message = mailSender.createMimeMessage();
     MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
 
-    helper.setFrom(from);
+    try {
+        helper.setFrom(from, "Tchakeda");
+    } catch (UnsupportedEncodingException e) {
+        throw new MessagingException("Erreur lors de la configuration de l'expéditeur", e);
+    }
     helper.setTo(toEmail);
     helper.setSubject(subject);
     helper.setText(htmlContent, true);
@@ -361,7 +366,11 @@ public class MailService {
     MimeMessage message = mailSender.createMimeMessage();
     MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
 
-    helper.setFrom(from);
+    try {
+        helper.setFrom(from, "Tchakeda");
+    } catch (UnsupportedEncodingException e) {
+        throw new MessagingException("Erreur lors de la configuration de l'expéditeur", e);
+    }
     helper.setTo(toEmail.split(","));
     if (ccEmail != null && !ccEmail.isBlank()) {
         helper.setCc(ccEmail.split(","));
@@ -534,6 +543,14 @@ public class MailService {
         sendEmail(request.getEmail(), subject, htmlContent);
     }
 
+    // Méthode pour envoyer une facture de vente par email avec pièces jointes (PDF)
+    public void sendReceiptEmailWithAttachments(ReceiptEmailRequest request, List<MultipartFile> attachments) 
+            throws MessagingException, IOException {
+        String subject = "Facture de vente - " + request.getNumeroFacture();
+        String htmlContent = generateReceiptEmail(request);
+        sendEmailWithAttachments(request.getEmail(), null, subject, htmlContent, attachments);
+    }
+
     // Génération du contenu HTML pour l'email de facture
     private String generateReceiptEmail(ReceiptEmailRequest request) {
         // Fonction pour formater les montants
@@ -550,25 +567,142 @@ public class MailService {
         String montantPayeFormate = formatMontant.apply(request.getMontantPaye());
         String changeDueFormate = formatMontant.apply(request.getChangeDue());
 
+        // Vérifier s'il y a des remises à afficher
+        boolean hasRemiseGlobale = request.getRemiseGlobale() != null && request.getRemiseGlobale() > 0;
+        boolean hasRemisesProduits = request.getRemisesProduits() != null && !request.getRemisesProduits().isEmpty();
+        // Vérifier si des lignes ont réellement des remises (pour afficher la colonne)
+        boolean hasLignesAvecRemise = false;
+        if (request.getLignes() != null) {
+            for (VenteLigneResponse ligne : request.getLignes()) {
+                if (ligne.getRemise() != null && ligne.getRemise() > 0) {
+                    hasLignesAvecRemise = true;
+                    break;
+                }
+            }
+        }
+
+        // Calculer le montant total avant remise
+        BigDecimal montantAvantRemise;
+        if (hasRemiseGlobale) {
+            // Si remise globale, calculer à rebours depuis le montant total
+            BigDecimal montantTotal = request.getMontantTotal();
+            BigDecimal tauxRemise = BigDecimal.valueOf(request.getRemiseGlobale()).divide(BigDecimal.valueOf(100));
+            montantAvantRemise = montantTotal.divide(BigDecimal.ONE.subtract(tauxRemise), 2, java.math.RoundingMode.HALF_UP);
+        } else {
+            // Sinon, calculer depuis les prix unitaires et quantités
+            montantAvantRemise = BigDecimal.ZERO;
+            for (VenteLigneResponse ligne : request.getLignes()) {
+                BigDecimal prixUnitaire = BigDecimal.valueOf(ligne.getPrixUnitaire());
+                BigDecimal quantite = BigDecimal.valueOf(ligne.getQuantite());
+                BigDecimal montantLigneAvantRemise = prixUnitaire.multiply(quantite);
+                montantAvantRemise = montantAvantRemise.add(montantLigneAvantRemise);
+            }
+        }
+
         // Génération des lignes de produits
         StringBuilder lignesHtml = new StringBuilder();
         for (VenteLigneResponse ligne : request.getLignes()) {
             String prixUnitaireFormate = formatMontant.apply(BigDecimal.valueOf(ligne.getPrixUnitaire()));
             String montantLigneFormate = formatMontant.apply(BigDecimal.valueOf(ligne.getMontantLigne()));
             
-            lignesHtml.append(String.format("""
-                <tr>
-                    <td style="border: 1px solid #ddd; padding: 4px; font-size: 9px">%s</td>
-                    <td style="border: 1px solid #ddd; padding: 4px; text-align: center; font-size: 9px">%d</td>
-                    <td style="border: 1px solid #ddd; padding: 4px; text-align: right; font-size: 9px">%s</td>
-                    <td style="border: 1px solid #ddd; padding: 4px; text-align: right; font-size: 9px">%s</td>
-                </tr>
-                """, 
-                ligne.getNomProduit(), 
-                ligne.getQuantite(), 
-                prixUnitaireFormate, 
-                montantLigneFormate
+            // Vérifier si cette ligne a une remise
+            Double remiseLigne = ligne.getRemise() != null ? ligne.getRemise() : 0.0;
+            boolean ligneHasRemise = remiseLigne > 0;
+            
+            if (hasLignesAvecRemise) {
+                // Afficher avec colonne remise (vide si pas de remise pour cette ligne)
+                String remiseCell = ligneHasRemise ? 
+                    String.format("<td style=\"border: 1px solid #ddd; padding: 4px; text-align: right; font-size: 9px; color: #d32f2f;\">-%s</td>", 
+                        String.format("%.1f%%", remiseLigne)) :
+                    "<td style=\"border: 1px solid #ddd; padding: 4px; text-align: right; font-size: 9px;\">-</td>";
+                
+                lignesHtml.append(String.format("""
+                    <tr>
+                        <td style="border: 1px solid #ddd; padding: 4px; font-size: 9px">%s</td>
+                        <td style="border: 1px solid #ddd; padding: 4px; text-align: center; font-size: 9px">%d</td>
+                        <td style="border: 1px solid #ddd; padding: 4px; text-align: right; font-size: 9px">%s</td>
+                        %s
+                        <td style="border: 1px solid #ddd; padding: 4px; text-align: right; font-size: 9px">%s</td>
+                    </tr>
+                    """, 
+                    ligne.getNomProduit(), 
+                    ligne.getQuantite(), 
+                    prixUnitaireFormate,
+                    remiseCell,
+                    montantLigneFormate
+                ));
+            } else {
+                // Afficher sans colonne remise
+                lignesHtml.append(String.format("""
+                    <tr>
+                        <td style="border: 1px solid #ddd; padding: 4px; font-size: 9px">%s</td>
+                        <td style="border: 1px solid #ddd; padding: 4px; text-align: center; font-size: 9px">%d</td>
+                        <td style="border: 1px solid #ddd; padding: 4px; text-align: right; font-size: 9px">%s</td>
+                        <td style="border: 1px solid #ddd; padding: 4px; text-align: right; font-size: 9px">%s</td>
+                    </tr>
+                    """, 
+                    ligne.getNomProduit(), 
+                    ligne.getQuantite(), 
+                    prixUnitaireFormate, 
+                    montantLigneFormate
+                ));
+            }
+        }
+
+        // Construire l'en-tête de la colonne remise si nécessaire
+        String colonneRemiseHeader = hasLignesAvecRemise ? 
+            "<th style=\"border: 1px solid #ddd; padding: 4px; text-align: right;\">Remise</th>" : "";
+
+        // Construire la section des remises dans les totaux
+        StringBuilder remisesSection = new StringBuilder();
+        if (hasRemiseGlobale) {
+            BigDecimal montantRemiseGlobale = montantAvantRemise.multiply(
+                BigDecimal.valueOf(request.getRemiseGlobale()).divide(BigDecimal.valueOf(100))
+            );
+            String remiseGlobaleFormate = formatMontant.apply(montantRemiseGlobale);
+            String remiseGlobalePct = String.format("%.1f%%", request.getRemiseGlobale());
+            remisesSection.append(String.format("""
+                <div style="display: flex; justify-content: space-between; margin-bottom: 3px;">
+                    <span>Sous-total:&nbsp;</span>
+                    <span> %s FCFA</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; margin-bottom: 3px; color: #d32f2f;">
+                    <span>Remise globale (%s):&nbsp;</span>
+                    <span> -%s FCFA</span>
+                </div>
+                """,
+                formatMontant.apply(montantAvantRemise),
+                remiseGlobalePct,
+                remiseGlobaleFormate
             ));
+        } else if (hasRemisesProduits) {
+            // Calculer le total des remises par produit
+            BigDecimal totalRemisesProduits = BigDecimal.ZERO;
+            for (VenteLigneResponse ligne : request.getLignes()) {
+                if (ligne.getRemise() != null && ligne.getRemise() > 0) {
+                    BigDecimal montantLigneAvantRemise = BigDecimal.valueOf(ligne.getPrixUnitaire())
+                            .multiply(BigDecimal.valueOf(ligne.getQuantite()));
+                    BigDecimal remiseLigne = montantLigneAvantRemise.multiply(
+                        BigDecimal.valueOf(ligne.getRemise()).divide(BigDecimal.valueOf(100))
+                    );
+                    totalRemisesProduits = totalRemisesProduits.add(remiseLigne);
+                }
+            }
+            if (totalRemisesProduits.compareTo(BigDecimal.ZERO) > 0) {
+                remisesSection.append(String.format("""
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 3px;">
+                        <span>Sous-total:&nbsp;</span>
+                        <span> %s FCFA</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 3px; color: #d32f2f;">
+                        <span>Remises produits:&nbsp;</span>
+                        <span> -%s FCFA</span>
+                    </div>
+                    """,
+                    formatMontant.apply(montantAvantRemise),
+                    formatMontant.apply(totalRemisesProduits)
+                ));
+            }
         }
 
         return String.format("""
@@ -600,6 +734,7 @@ public class MailService {
                                     <th style="border: 1px solid #ddd; padding: 4px; text-align: left;">Produit</th>
                                     <th style="border: 1px solid #ddd; padding: 4px; text-align: center;">Qté</th>
                                     <th style="border: 1px solid #ddd; padding: 4px; text-align: right;">Prix</th>
+                                    %s
                                     <th style="border: 1px solid #ddd; padding: 4px; text-align: right;">Total</th>
                                 </tr>
                                 %s
@@ -611,16 +746,17 @@ public class MailService {
 
                         <!-- Totaux -->
                         <div style="font-size: 10px; margin-bottom: 10px;">
+                            %s
                             <div style="display: flex; justify-content: space-between; margin-bottom: 3px;">
-                                <span>Total: </span>
+                                <span>Total:&nbsp;</span>
                                 <span><strong> %s FCFA</strong></span>
                             </div>
                             <div style="display: flex; justify-content: space-between; margin-bottom: 3px;">
-                                <span>%s: </span>
+                                <span>%s:&nbsp;</span>
                                 <span> %s FCFA</span>
                             </div>
                             <div style="display: flex; justify-content: space-between;">
-                                <span>Monnaie:</span>
+                                <span>Monnaie:&nbsp;</span>
                                 <span> %s FCFA</span>
                             </div>
                         </div>
@@ -640,7 +776,9 @@ public class MailService {
             formatDateForDisplay(request.getDateVente()),
             request.getNomVendeur(),
             request.getNomBoutique(),
+            colonneRemiseHeader,
             lignesHtml.toString(),
+            remisesSection.toString(),
             montantTotalFormate,
             request.getModePaiement().toUpperCase(),
             montantPayeFormate,

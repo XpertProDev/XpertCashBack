@@ -4,7 +4,9 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Random;
 import java.util.stream.Collectors;
@@ -240,14 +242,24 @@ public ReceiptEmailRequest getFactureDataForEmail(String venteId, String email) 
     FactureVente facture = factureOpt.get();
     Vente vente = facture.getVente();
     
-    // Convertir les lignes de vente en VenteLigneResponse
+    // Convertir les lignes de vente en VenteLigneResponse et construire la map des remises
+    Map<Long, Double> remisesProduits = new HashMap<>();
     List<VenteLigneResponse> lignes = vente.getProduits().stream()
         .map(ligne -> {
             VenteLigneResponse ligneResponse = new VenteLigneResponse();
+            ligneResponse.setProduitId(ligne.getProduit().getId());
             ligneResponse.setNomProduit(ligne.getProduit().getNom());
             ligneResponse.setQuantite(ligne.getQuantite());
             ligneResponse.setPrixUnitaire(ligne.getPrixUnitaire());
             ligneResponse.setMontantLigne(ligne.getMontantLigne());
+            double remise = ligne.getRemise();
+            ligneResponse.setRemise(remise);
+            
+            // Ajouter la remise à la map si elle existe
+            if (remise > 0) {
+                remisesProduits.put(ligne.getProduit().getId(), remise);
+            }
+            
             return ligneResponse;
         })
         .collect(Collectors.toList());
@@ -269,6 +281,10 @@ public ReceiptEmailRequest getFactureDataForEmail(String venteId, String email) 
     request.setNomVendeur(vente.getVendeur() != null ? vente.getVendeur().getNomComplet() : "Non spécifié");
     request.setNomBoutique(vente.getBoutique().getNomBoutique());
     request.setLignes(lignes);
+    
+    // Ajouter les remises
+    request.setRemiseGlobale(vente.getRemiseGlobale() != null ? vente.getRemiseGlobale() : 0.0);
+    request.setRemisesProduits(remisesProduits.isEmpty() ? null : remisesProduits);
     
     return request;
 }
