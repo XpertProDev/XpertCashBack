@@ -6,6 +6,7 @@ import jakarta.mail.util.ByteArrayDataSource;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UnsupportedEncodingException;
+import java.util.Base64;
 import java.math.BigDecimal;
 import java.text.DecimalFormat;
 import java.text.NumberFormat;
@@ -15,14 +16,13 @@ import java.time.format.DateTimeFormatter;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
-import java.util.Objects;
 import java.util.function.Function;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import com.xpertcash.DTOs.VENTE.ReceiptEmailRequest;
 import com.xpertcash.DTOs.VENTE.VenteLigneResponse;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.core.io.ByteArrayResource;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
@@ -34,9 +34,66 @@ public class MailService {
 
     @Autowired
     private JavaMailSender mailSender;
+
+    @Autowired
+    @Qualifier("factureMailSender")
+    private JavaMailSender factureMailSender;
  
     @Value("${spring.mail.username}")
     private String from; 
+
+    @Value("${spring.mail.facture.username}")
+    private String factureFrom;
+
+    /**
+     * Convertit le logo en base64 et le retourne comme data URI
+     * @return String base64 data URI du logo
+     */
+    private String getLogoAsBase64() throws IOException {
+        InputStream logoStream = getClass().getClassLoader().getResourceAsStream("assets/tchakeda.png");
+        if (logoStream == null) {
+            throw new IOException("Logo image not found in resources.");
+        }
+        try {
+            byte[] logoBytes = logoStream.readAllBytes();
+            String base64Logo = Base64.getEncoder().encodeToString(logoBytes);
+            System.out.println("✅ Logo converti en base64, taille: " + base64Logo.length() + " caractères");
+            return "data:image/png;base64," + base64Logo;
+        } finally {
+            logoStream.close();
+        }
+    }
+
+    /**
+     * Remplace toutes les occurrences de cid:logo par le logo en base64 dans le HTML
+     */
+    private String replaceLogoWithBase64(String htmlContent) {
+        try {
+            String base64Logo = getLogoAsBase64();
+            
+            // Remplacer toutes les occurrences de src="cid:logo" ou src='cid:logo'
+            String result = htmlContent.replaceAll("src\\s*=\\s*[\"']cid:logo[\"']", "src=\"" + base64Logo + "\"");
+            
+            // Fallback pour les cas où il n'y a pas de guillemets ou autres formats
+            result = result.replace("\"cid:logo\"", "\"" + base64Logo + "\"");
+            result = result.replace("'cid:logo'", "\"" + base64Logo + "\"");
+            result = result.replace("cid:logo", base64Logo);
+            
+            // Vérifier si le remplacement a fonctionné
+            if (result.contains(base64Logo)) {
+                System.out.println("✅ Logo base64 intégré dans le HTML (taille base64: " + base64Logo.length() + " caractères)");
+            } else {
+                System.err.println("⚠️ Logo base64 non trouvé dans le HTML après remplacement");
+                System.err.println("HTML original contient cid:logo: " + htmlContent.contains("cid:logo"));
+            }
+            
+            return result;
+        } catch (IOException e) {
+            System.err.println("❌ Erreur lors du chargement du logo: " + e.getMessage());
+            e.printStackTrace();
+            return htmlContent; // Retourner le HTML original si le logo ne peut pas être chargé
+        }
+    }
 
     public void sendActivationLinkEmail(String to, String code, String personalCode) throws MessagingException {
         String baseUrl = "https://xpertcash.tchakeda.com/api/v1";
@@ -63,7 +120,7 @@ public class MailService {
         SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm");
         String formattedDate = sdf.format(relanceDate);
         String message = generateFactureRelanceMessage(factureNumero, clientName, formattedDate, estEntreprise);
-        sendEmail(to, subject, message);
+        sendFactureEmail(to, subject, message);
     }
     
 
@@ -97,21 +154,79 @@ public class MailService {
     }
     helper.setTo(toEmail);
     helper.setSubject(subject);
-    helper.setText(htmlContent, true);
-
-    try {
-        InputStream logoStream = getClass().getClassLoader().getResourceAsStream("assets/tchakeda.png");
-        if (logoStream == null) {
-            throw new MessagingException("Logo image not found in resources.");
-        }
-
-        ByteArrayDataSource logoDataSource = new ByteArrayDataSource(logoStream, "image/png");
-        helper.addInline("logo", logoDataSource);
-    } catch (IOException e) {
-        throw new MessagingException("Error loading logo image", e);
-    }
+    
+    // Remplacer cid:logo par le logo en base64 directement dans le HTML
+    String htmlWithBase64Logo = replaceLogoWithBase64(htmlContent);
+    helper.setText(htmlWithBase64Logo, true);
 
     mailSender.send(message);
+}
+
+    // Méthode pour envoyer des emails de facture avec le compte facture@tchakeda.com
+    public void sendFactureEmail(String toEmail, String subject, String htmlContent) throws MessagingException {
+    MimeMessage message = factureMailSender.createMimeMessage();
+    MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+
+    try {
+        helper.setFrom(factureFrom, "Tchakeda");
+    } catch (UnsupportedEncodingException e) {
+        throw new MessagingException("Erreur lors de la configuration de l'expéditeur", e);
+    }
+    helper.setTo(toEmail);
+    helper.setSubject(subject);
+    
+    // Remplacer cid:logo par le logo en base64 directement dans le HTML
+    String htmlWithBase64Logo = replaceLogoWithBase64(htmlContent);
+    helper.setText(htmlWithBase64Logo, true);
+
+    factureMailSender.send(message);
+}
+
+    // Méthode pour envoyer des emails de facture avec pièces jointes
+    public void sendFactureEmailWithAttachments(
+        String toEmail,
+        String ccEmail,
+        String subject,
+        String htmlContent,
+        List<MultipartFile> attachments
+) throws MessagingException, IOException {
+    MimeMessage message = factureMailSender.createMimeMessage();
+    MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+
+    try {
+        helper.setFrom(factureFrom, "Tchakeda");
+    } catch (UnsupportedEncodingException e) {
+        throw new MessagingException("Erreur lors de la configuration de l'expéditeur", e);
+    }
+    helper.setTo(toEmail.split(","));
+    if (ccEmail != null && !ccEmail.isBlank()) {
+        helper.setCc(ccEmail.split(","));
+    }
+    helper.setSubject(subject);
+    
+    // Remplacer cid:logo par le logo en base64 directement dans le HTML
+    String htmlWithBase64Logo = replaceLogoWithBase64(htmlContent);
+    helper.setText(htmlWithBase64Logo, true);
+    
+    // Ajouter les pièces jointes
+    for (MultipartFile file : attachments) {
+        if (!file.isEmpty()) {
+            String contentType = file.getContentType();
+            if (contentType == null) {
+                contentType = "application/octet-stream";
+            }
+            String filename = file.getOriginalFilename();
+            if (filename == null || filename.isEmpty()) {
+                filename = "attachment";
+            }
+            helper.addAttachment(
+                filename,
+                new ByteArrayDataSource(file.getBytes(), contentType)
+            );
+        }
+    }
+
+    factureMailSender.send(message);
 }
 
 
@@ -255,7 +370,7 @@ public class MailService {
         System.out.println("📧 Envoi d'un email d'approbation à : " + to);
         String subject = "Demande d'approbation - Facture " + factureNumero;
         String htmlContent = generateDemandeApprobationMessage(fullName, factureNumero, createurNom, montantTotal, objetFacture);
-        sendEmail(to, subject, htmlContent);
+        sendFactureEmail(to, subject, htmlContent);
     }
 
     // Génération du message HTML pour la demande d'approbation
@@ -291,7 +406,7 @@ public class MailService {
         System.out.println("📧 Envoi d'un email d'approbation confirmée à : " + to);
         String subject = "Facture approuvée - " + factureNumero;
         String htmlContent = generateFactureApprouveeMessage(fullName, factureNumero, approbateurNom, montantTotal, objetFacture);
-        sendEmail(to, subject, htmlContent);
+        sendFactureEmail(to, subject, htmlContent);
     }
 
     // Génération du message HTML pour la notification d'approbation
@@ -326,7 +441,7 @@ public class MailService {
         System.out.println("📧 Envoi d'un email de modification de facture à : " + to);
         String subject = "Facture modifiée - " + factureNumero;
         String htmlContent = generateFactureModifieeMessage(fullName, factureNumero, modificateurNom, montantTotal, objetFacture);
-        sendEmail(to, subject, htmlContent);
+        sendFactureEmail(to, subject, htmlContent);
     }
 
     // Génération du message HTML pour la notification de modification
@@ -376,26 +491,25 @@ public class MailService {
         helper.setCc(ccEmail.split(","));
     }
     helper.setSubject(subject);
-    helper.setText(htmlContent, true);
-
-    InputStream logoStream = getClass().getClassLoader().getResourceAsStream("assets/tchakeda.png");
-    if (logoStream != null) {
-        ByteArrayDataSource logoDataSource = new ByteArrayDataSource(logoStream, "image/png");
-        helper.addInline("logo", logoDataSource);
-    } else {
-        throw new MessagingException("Logo introuvable dans les resources.");
-    }
-
+    
+    // Remplacer cid:logo par le logo en base64 directement dans le HTML
+    String htmlWithBase64Logo = replaceLogoWithBase64(htmlContent);
+    helper.setText(htmlWithBase64Logo, true);
+    
+    // Ajouter les pièces jointes
     for (MultipartFile file : attachments) {
         if (!file.isEmpty()) {
             String contentType = file.getContentType();
             if (contentType == null) {
                 contentType = "application/octet-stream";
             }
+            String filename = file.getOriginalFilename();
+            if (filename == null || filename.isEmpty()) {
+                filename = "attachment";
+            }
             helper.addAttachment(
-                Objects.requireNonNull(file.getOriginalFilename()),
-                new ByteArrayResource(file.getBytes()),
-                contentType
+                filename,
+                new ByteArrayDataSource(file.getBytes(), contentType)
             );
         }
     }
@@ -540,7 +654,7 @@ public class MailService {
     public void sendReceiptEmail(ReceiptEmailRequest request) throws MessagingException {
         String subject = "Facture de vente - " + request.getNumeroFacture();
         String htmlContent = generateReceiptEmail(request);
-        sendEmail(request.getEmail(), subject, htmlContent);
+        sendFactureEmail(request.getEmail(), subject, htmlContent);
     }
 
     // Méthode pour envoyer une facture de vente par email avec pièces jointes (PDF)
@@ -548,7 +662,7 @@ public class MailService {
             throws MessagingException, IOException {
         String subject = "Facture de vente - " + request.getNumeroFacture();
         String htmlContent = generateReceiptEmail(request);
-        sendEmailWithAttachments(request.getEmail(), null, subject, htmlContent, attachments);
+        sendFactureEmailWithAttachments(request.getEmail(), null, subject, htmlContent, attachments);
     }
 
     // Génération du contenu HTML pour l'email de facture

@@ -158,8 +158,8 @@ public class FactureProformaController {
                 return ResponseEntity.badRequest().body("Statut/Méthode invalide");
             }
 
-            // Envoi de l'email
-            mailService.sendEmailWithAttachments(to,cc, subject, body,
+            // Envoi de l'email avec le compte facture
+            mailService.sendFactureEmailWithAttachments(to,cc, subject, body,
                     attachments != null ? Arrays.asList(attachments) : Collections.emptyList());
 
             logger.info("Email envoyé avec succès");
