@@ -18,6 +18,8 @@ import java.util.Locale;
 import java.util.Objects;
 import java.util.function.Function;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import com.xpertcash.DTOs.VENTE.ReceiptEmailRequest;
@@ -33,6 +35,8 @@ import org.springframework.web.multipart.MultipartFile;
 @Service
 public class MailService {
 
+    private static final Logger logger = LoggerFactory.getLogger(MailService.class);
+
     @Autowired
     private JavaMailSender mailSender;
 
@@ -44,7 +48,13 @@ public class MailService {
     private String from; 
 
     @Value("${spring.mail.facture.username}")
-    private String factureFrom; 
+    private String factureFrom;
+
+    @Value("${spring.mail.host}")
+    private String mailHost;
+
+    @Value("${spring.mail.port}")
+    private int mailPort;
 
     public void sendActivationLinkEmail(String to, String code, String personalCode) throws MessagingException {
         String baseUrl = "https://xpertcash.tchakeda.com/api/v1";
@@ -95,14 +105,20 @@ public class MailService {
     
     //ici
     public void sendEmail(String toEmail, String subject, String htmlContent) throws MessagingException {
+    logger.info("📧 Tentative d'envoi d'email - Destinataire: {}, Sujet: {}, Expéditeur: {}, Host: {}, Port: {}", 
+        toEmail, subject, from, mailHost, mailPort);
+    
+    try {
     MimeMessage message = mailSender.createMimeMessage();
     MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
 
-    try {
-        helper.setFrom(from, "Tchakeda");
-    } catch (UnsupportedEncodingException e) {
-        throw new MessagingException("Erreur lors de la configuration de l'expéditeur", e);
-    }
+        try {
+            helper.setFrom(from, "Tchakeda");
+            logger.debug("Expéditeur configuré: {}", from);
+        } catch (UnsupportedEncodingException e) {
+            logger.error("❌ Erreur lors de la configuration de l'expéditeur: {}", e.getMessage(), e);
+            throw new MessagingException("Erreur lors de la configuration de l'expéditeur", e);
+        }
     helper.setTo(toEmail);
     helper.setSubject(subject);
     helper.setText(htmlContent, true);
@@ -110,45 +126,83 @@ public class MailService {
     try {
         InputStream logoStream = getClass().getClassLoader().getResourceAsStream("assets/tchakeda.png");
         if (logoStream == null) {
+                logger.warn("⚠️ Logo image not found in resources");
             throw new MessagingException("Logo image not found in resources.");
         }
 
         ByteArrayDataSource logoDataSource = new ByteArrayDataSource(logoStream, "image/png");
         helper.addInline("logo", logoDataSource);
+            logger.debug("Logo ajouté au message");
     } catch (IOException e) {
+            logger.error("❌ Erreur lors du chargement du logo: {}", e.getMessage(), e);
         throw new MessagingException("Error loading logo image", e);
     }
 
+        logger.info("Envoi du message email en cours...");
     mailSender.send(message);
+        logger.info("✅ Email envoyé avec succès à {}", toEmail);
+    } catch (jakarta.mail.AuthenticationFailedException e) {
+        logger.error("❌ ÉCHEC D'AUTHENTIFICATION EMAIL - Host: {}, Port: {}, User: {}, Erreur: {}", 
+            mailHost, mailPort, from, e.getMessage(), e);
+        throw new MessagingException("Échec d'authentification email: " + e.getMessage(), e);
+    } catch (MessagingException e) {
+        logger.error("❌ Erreur lors de l'envoi de l'email à {} - Erreur: {}", toEmail, e.getMessage(), e);
+        throw e;
+    } catch (Exception e) {
+        logger.error("❌ Erreur inattendue lors de l'envoi de l'email à {} - Erreur: {}", toEmail, e.getMessage(), e);
+        throw new MessagingException("Erreur inattendue lors de l'envoi de l'email", e);
+    }
 }
 
     // Méthode pour envoyer des emails de facture avec le compte facture@tchakeda.com
     public void sendFactureEmail(String toEmail, String subject, String htmlContent) throws MessagingException {
-    MimeMessage message = factureMailSender.createMimeMessage();
-    MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
-
+    logger.info("📧 Tentative d'envoi d'email FACTURE - Destinataire: {}, Sujet: {}, Expéditeur: {}", 
+        toEmail, subject, factureFrom);
+    
     try {
-        helper.setFrom(factureFrom, "Tchakeda");
-    } catch (UnsupportedEncodingException e) {
-        throw new MessagingException("Erreur lors de la configuration de l'expéditeur", e);
-    }
-    helper.setTo(toEmail);
-    helper.setSubject(subject);
-    helper.setText(htmlContent, true);
+        MimeMessage message = factureMailSender.createMimeMessage();
+        MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
 
-    try {
-        InputStream logoStream = getClass().getClassLoader().getResourceAsStream("assets/tchakeda.png");
-        if (logoStream == null) {
-            throw new MessagingException("Logo image not found in resources.");
+        try {
+            helper.setFrom(factureFrom, "Tchakeda");
+            logger.debug("Expéditeur facture configuré: {}", factureFrom);
+        } catch (UnsupportedEncodingException e) {
+            logger.error("❌ Erreur lors de la configuration de l'expéditeur facture: {}", e.getMessage(), e);
+            throw new MessagingException("Erreur lors de la configuration de l'expéditeur", e);
+        }
+        helper.setTo(toEmail);
+        helper.setSubject(subject);
+        helper.setText(htmlContent, true);
+
+        try {
+            InputStream logoStream = getClass().getClassLoader().getResourceAsStream("assets/tchakeda.png");
+            if (logoStream == null) {
+                logger.warn("⚠️ Logo image not found in resources");
+                throw new MessagingException("Logo image not found in resources.");
+            }
+
+            ByteArrayDataSource logoDataSource = new ByteArrayDataSource(logoStream, "image/png");
+            helper.addInline("logo", logoDataSource);
+            logger.debug("Logo ajouté au message facture");
+        } catch (IOException e) {
+            logger.error("❌ Erreur lors du chargement du logo: {}", e.getMessage(), e);
+            throw new MessagingException("Error loading logo image", e);
         }
 
-        ByteArrayDataSource logoDataSource = new ByteArrayDataSource(logoStream, "image/png");
-        helper.addInline("logo", logoDataSource);
-    } catch (IOException e) {
-        throw new MessagingException("Error loading logo image", e);
+        logger.info("Envoi du message email facture en cours...");
+        factureMailSender.send(message);
+        logger.info("✅ Email facture envoyé avec succès à {}", toEmail);
+    } catch (jakarta.mail.AuthenticationFailedException e) {
+        logger.error("❌ ÉCHEC D'AUTHENTIFICATION EMAIL FACTURE - User: {}, Erreur: {}", 
+            factureFrom, e.getMessage(), e);
+        throw new MessagingException("Échec d'authentification email facture: " + e.getMessage(), e);
+    } catch (MessagingException e) {
+        logger.error("❌ Erreur lors de l'envoi de l'email facture à {} - Erreur: {}", toEmail, e.getMessage(), e);
+        throw e;
+    } catch (Exception e) {
+        logger.error("❌ Erreur inattendue lors de l'envoi de l'email facture à {} - Erreur: {}", toEmail, e.getMessage(), e);
+        throw new MessagingException("Erreur inattendue lors de l'envoi de l'email", e);
     }
-
-    factureMailSender.send(message);
 }
 
     // Méthode pour envoyer des emails de facture avec pièces jointes
