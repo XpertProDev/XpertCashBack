@@ -11,6 +11,12 @@ import java.util.Properties;
 @Configuration
 public class MailConfig {
 
+    @Value("${spring.mail.host}")
+    private String host;
+
+    @Value("${spring.mail.port}")
+    private int port;
+
     @Value("${spring.mail.username}")
     private String username;
 
@@ -20,14 +26,23 @@ public class MailConfig {
     @Bean
     public JavaMailSender javaMailSender() {
         JavaMailSenderImpl mailSender = new JavaMailSenderImpl();
-        mailSender.setHost("smtp.gmail.com");
-        mailSender.setPort(587);
+        mailSender.setHost(host);
+        mailSender.setPort(port);
         mailSender.setUsername(username);
         mailSender.setPassword(password);
 
         Properties props = mailSender.getJavaMailProperties();
         props.put("mail.smtp.auth", "true");
-        props.put("mail.smtp.starttls.enable", "true");
+        
+        // Configuration SSL pour le port 465
+        if (port == 465) {
+            props.put("mail.smtp.ssl.enable", "true");
+            props.put("mail.smtp.starttls.enable", "false");
+            props.put("mail.smtp.ssl.trust", host);
+        } else {
+            // Configuration STARTTLS pour les autres ports (587, etc.)
+            props.put("mail.smtp.starttls.enable", "true");
+        }
 
         return mailSender;
     }

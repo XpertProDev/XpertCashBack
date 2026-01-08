@@ -180,6 +180,40 @@ public class SuperAdminController {
     }
 
     /**
+     * Supprime toutes les données de l'entreprise mais garde l'admin et l'entreprise.
+     * 
+     * Cette opération :
+     * - Supprime tous les utilisateurs SAUF l'admin
+     * - Supprime toutes les données métier (ventes, produits, clients, factures, etc.)
+     * - Supprime tous les fichiers/images associés
+     * - Garde l'admin et l'entreprise pour permettre une réinitialisation complète
+     * 
+     * Réservé à l'admin lui-même (utilise l'ID depuis le token JWT).
+     * 
+     *  request La requête HTTP pour récupérer l'utilisateur connecté
+     *  Réponse indiquant le succès de l'opération
+     */
+    @DeleteMapping("/vider-entreprise")
+    public ResponseEntity<?> viderEntrepriseButKeepAdmin(HttpServletRequest request) {
+        try {
+            User user = authHelper.getAuthenticatedUserWithFallback(request);
+            superAdminService.deleteEntrepriseDataButKeepAdmin(user);
+            return ResponseEntity.ok(Map.of("message", "Toutes les données de l'entreprise ont été supprimées. L'admin et l'entreprise ont été conservés."));
+        } catch (RuntimeException e) {
+            // Différencier les erreurs d'accès (403) des autres erreurs (500)
+            if (e.getMessage() != null && e.getMessage().contains("Accès refusé")) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                        .body(Map.of("error", e.getMessage()));
+            }
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Erreur lors de la suppression : " + e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Erreur lors de la suppression : " + e.getMessage()));
+        }
+    }
+
+    /**
      * Déconnecte tous les utilisateurs du système (réservé au SUPER_ADMIN).
      * 
      * Cette opération :

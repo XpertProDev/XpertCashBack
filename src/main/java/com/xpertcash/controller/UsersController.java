@@ -57,7 +57,7 @@ public ResponseEntity<RegisterResponse> register(@RequestBody RegistrationReques
     } catch (RuntimeException e) {
         // Erreurs métier (email, téléphone, entreprise déjà existants, rôle manquant, etc.)
         response.setSuccess(false);
-        response.setMessage("L'inscription a échoué. Cause: " + e.getMessage());
+        response.setMessage(e.getMessage());
         response.setUser(null);
         return ResponseEntity.badRequest().body(response);
     }
