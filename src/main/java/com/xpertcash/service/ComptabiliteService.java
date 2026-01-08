@@ -1492,10 +1492,19 @@ public class ComptabiliteService {
         SourceDepense source = parseEnum(SourceDepense.class, request.getSource(), "Source");
         Ordonnateur ordonnateur = parseEnum(Ordonnateur.class, request.getOrdonnateur(), "Ordonnateur");
         TypeCharge typeCharge = parseEnum(TypeCharge.class, request.getTypeCharge(), "TypeCharge");
-        Produit produit = validateProduit(request.getProduitId(), user);
+        
+        // Pour la catégorie liée : accepter soit categorieLieeId, soit produitId (pour compatibilité avec le frontend)
+        Categorie categorieLiee = null;
+        Long categorieLieeId = request.getCategorieLieeId() != null ? request.getCategorieLieeId() : request.getProduitId();
+        if (categorieLieeId != null) {
+            categorieLiee = categorieRepository.findByIdAndEntrepriseId(categorieLieeId, user.getEntreprise().getId())
+                    .orElseThrow(() -> new RuntimeException("Catégorie liée non trouvée. Vérifiez que la catégorie existe et appartient à votre entreprise."));
+        }
+        
+        Produit produit = validateProduit(null, user); // Ne plus utiliser produitId pour les catégories liées
         Fournisseur fournisseur = validateFournisseur(request.getFournisseurId(), user);
         
-        DepenseGenerale depense = createDepenseGenerale(request, user, categorie, source, ordonnateur, typeCharge, produit, fournisseur);
+        DepenseGenerale depense = createDepenseGenerale(request, user, categorie, source, ordonnateur, typeCharge, produit, fournisseur, categorieLiee);
         depense = depenseGeneraleRepository.save(depense);
         
         return mapDepenseGeneraleToResponse(depense);
@@ -1632,6 +1641,13 @@ public class ComptabiliteService {
         if (request.getTypeCharge() == null || request.getTypeCharge().trim().isEmpty()) {
             throw new RuntimeException("Le type de charge est obligatoire.");
         }
+        // Pour CHARGE_VARIABLE, la catégorie liée est obligatoire
+        if ("CHARGE_VARIABLE".equals(request.getTypeCharge())) {
+            Long categorieLieeId = request.getCategorieLieeId() != null ? request.getCategorieLieeId() : request.getProduitId();
+            if (categorieLieeId == null) {
+                throw new RuntimeException("La catégorie liée est obligatoire pour une charge variable.");
+            }
+        }
     }
 
     /**
@@ -1655,12 +1671,41 @@ public class ComptabiliteService {
     }
 
     /**
-     * Récupère ou crée une catégorie de dépense
+     * Récupère ou crée une catégorie de dépense (CategorieDepense)
+     * Accepte maintenant aussi les catégories PRODUIT (Categorie) pour la catégorie principale
      */
     private CategorieDepense getOrCreateCategorie(DepenseGeneraleRequestDTO request, User user) {
         if (request.getCategorieId() != null) {
-            return categorieDepenseRepository.findByIdAndEntrepriseId(request.getCategorieId(), user.getEntreprise().getId())
-                    .orElseThrow(() -> new RuntimeException("Catégorie de dépense non trouvée."));
+            // Essayer d'abord comme CategorieDepense
+            CategorieDepense categorieDepense = categorieDepenseRepository.findByIdAndEntrepriseId(request.getCategorieId(), user.getEntreprise().getId())
+                    .orElse(null);
+            
+            if (categorieDepense != null) {
+                return categorieDepense;
+            }
+            
+            // Si pas trouvé comme CategorieDepense, essayer comme Categorie (PRODUIT ou COMPTABILITE)
+            Categorie categorie = categorieRepository.findByIdAndEntrepriseId(request.getCategorieId(), user.getEntreprise().getId())
+                    .orElse(null);
+            
+            if (categorie != null) {
+                // Convertir la Categorie en CategorieDepense (créer une nouvelle si elle n'existe pas)
+                CategorieDepense categorieDepenseExistante = categorieDepenseRepository.findByNomAndEntrepriseId(categorie.getNom(), user.getEntreprise().getId())
+                        .orElse(null);
+                
+                if (categorieDepenseExistante == null) {
+                    // Créer une nouvelle CategorieDepense avec le même nom
+                    CategorieDepense nouvelleCategorieDepense = new CategorieDepense();
+                    nouvelleCategorieDepense.setNom(categorie.getNom());
+                    nouvelleCategorieDepense.setEntreprise(user.getEntreprise());
+                    nouvelleCategorieDepense = categorieDepenseRepository.save(nouvelleCategorieDepense);
+                    return nouvelleCategorieDepense;
+                } else {
+                    return categorieDepenseExistante;
+                }
+            }
+            
+            throw new RuntimeException("Catégorie non trouvée. Vérifiez que la catégorie existe et appartient à votre entreprise.");
         }
         
         if (request.getNouvelleCategorieNom() != null && !request.getNouvelleCategorieNom().trim().isEmpty()) {
@@ -1830,7 +1875,8 @@ public class ComptabiliteService {
             Ordonnateur ordonnateur,
             TypeCharge typeCharge,
             Produit produit,
-            Fournisseur fournisseur) {
+            Fournisseur fournisseur,
+            Categorie categorieLiee) {
         
         DepenseGenerale depense = new DepenseGenerale();
         
@@ -1840,6 +1886,7 @@ public class ComptabiliteService {
         
         depense.setDesignation(request.getDesignation().trim());
         depense.setCategorie(categorie);
+        depense.setCategorieLiee(categorieLiee); // Catégorie liée (Categorie) pour CHARGE_VARIABLE
         depense.setPrixUnitaire(request.getPrixUnitaire());
         depense.setQuantite(request.getQuantite());
         depense.setMontant(request.getPrixUnitaire() * request.getQuantite());
@@ -1878,6 +1925,12 @@ public class ComptabiliteService {
         if (depense.getProduit() != null) {
             dto.setProduitId(depense.getProduit().getId());
             dto.setProduitNom(depense.getProduit().getNom());
+        }
+        if (depense.getCategorieLiee() != null) {
+            dto.setCategorieLieeId(depense.getCategorieLiee().getId());
+            dto.setCategorieLieeNom(depense.getCategorieLiee().getNom());
+            dto.setCategorieLieeOrigine(depense.getCategorieLiee().getOrigineCreation() != null 
+                    ? depense.getCategorieLiee().getOrigineCreation() : "PRODUIT");
         }
         if (depense.getFournisseur() != null) {
             dto.setFournisseurId(depense.getFournisseur().getId());

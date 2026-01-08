@@ -24,6 +24,9 @@ public class DepenseGeneraleResponseDTO {
     private String typeCharge;
     private Long produitId;
     private String produitNom;
+    private Long categorieLieeId; // Catégorie liée (Categorie) pour CHARGE_VARIABLE
+    private String categorieLieeNom; // Nom de la catégorie liée
+    private String categorieLieeOrigine; // Origine de la catégorie liée (PRODUIT ou COMPTABILITE)
     private Long fournisseurId;
     private String fournisseurNom;
     private String pieceJointe;

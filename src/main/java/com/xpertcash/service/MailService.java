@@ -6,7 +6,6 @@ import jakarta.mail.util.ByteArrayDataSource;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UnsupportedEncodingException;
-import java.util.Base64;
 import java.math.BigDecimal;
 import java.text.DecimalFormat;
 import java.text.NumberFormat;
@@ -16,6 +15,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.function.Function;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -23,6 +23,7 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import com.xpertcash.DTOs.VENTE.ReceiptEmailRequest;
 import com.xpertcash.DTOs.VENTE.VenteLigneResponse;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.ByteArrayResource;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
@@ -43,57 +44,7 @@ public class MailService {
     private String from; 
 
     @Value("${spring.mail.facture.username}")
-    private String factureFrom;
-
-    /**
-     * Convertit le logo en base64 et le retourne comme data URI
-     * @return String base64 data URI du logo
-     */
-    private String getLogoAsBase64() throws IOException {
-        InputStream logoStream = getClass().getClassLoader().getResourceAsStream("assets/tchakeda.png");
-        if (logoStream == null) {
-            throw new IOException("Logo image not found in resources.");
-        }
-        try {
-            byte[] logoBytes = logoStream.readAllBytes();
-            String base64Logo = Base64.getEncoder().encodeToString(logoBytes);
-            System.out.println("✅ Logo converti en base64, taille: " + base64Logo.length() + " caractères");
-            return "data:image/png;base64," + base64Logo;
-        } finally {
-            logoStream.close();
-        }
-    }
-
-    /**
-     * Remplace toutes les occurrences de cid:logo par le logo en base64 dans le HTML
-     */
-    private String replaceLogoWithBase64(String htmlContent) {
-        try {
-            String base64Logo = getLogoAsBase64();
-            
-            // Remplacer toutes les occurrences de src="cid:logo" ou src='cid:logo'
-            String result = htmlContent.replaceAll("src\\s*=\\s*[\"']cid:logo[\"']", "src=\"" + base64Logo + "\"");
-            
-            // Fallback pour les cas où il n'y a pas de guillemets ou autres formats
-            result = result.replace("\"cid:logo\"", "\"" + base64Logo + "\"");
-            result = result.replace("'cid:logo'", "\"" + base64Logo + "\"");
-            result = result.replace("cid:logo", base64Logo);
-            
-            // Vérifier si le remplacement a fonctionné
-            if (result.contains(base64Logo)) {
-                System.out.println("✅ Logo base64 intégré dans le HTML (taille base64: " + base64Logo.length() + " caractères)");
-            } else {
-                System.err.println("⚠️ Logo base64 non trouvé dans le HTML après remplacement");
-                System.err.println("HTML original contient cid:logo: " + htmlContent.contains("cid:logo"));
-            }
-            
-            return result;
-        } catch (IOException e) {
-            System.err.println("❌ Erreur lors du chargement du logo: " + e.getMessage());
-            e.printStackTrace();
-            return htmlContent; // Retourner le HTML original si le logo ne peut pas être chargé
-        }
-    }
+    private String factureFrom; 
 
     public void sendActivationLinkEmail(String to, String code, String personalCode) throws MessagingException {
         String baseUrl = "https://xpertcash.tchakeda.com/api/v1";
@@ -154,10 +105,19 @@ public class MailService {
     }
     helper.setTo(toEmail);
     helper.setSubject(subject);
-    
-    // Remplacer cid:logo par le logo en base64 directement dans le HTML
-    String htmlWithBase64Logo = replaceLogoWithBase64(htmlContent);
-    helper.setText(htmlWithBase64Logo, true);
+    helper.setText(htmlContent, true);
+
+    try {
+        InputStream logoStream = getClass().getClassLoader().getResourceAsStream("assets/tchakeda.png");
+        if (logoStream == null) {
+            throw new MessagingException("Logo image not found in resources.");
+        }
+
+        ByteArrayDataSource logoDataSource = new ByteArrayDataSource(logoStream, "image/png");
+        helper.addInline("logo", logoDataSource);
+    } catch (IOException e) {
+        throw new MessagingException("Error loading logo image", e);
+    }
 
     mailSender.send(message);
 }
@@ -174,10 +134,19 @@ public class MailService {
     }
     helper.setTo(toEmail);
     helper.setSubject(subject);
-    
-    // Remplacer cid:logo par le logo en base64 directement dans le HTML
-    String htmlWithBase64Logo = replaceLogoWithBase64(htmlContent);
-    helper.setText(htmlWithBase64Logo, true);
+    helper.setText(htmlContent, true);
+
+    try {
+        InputStream logoStream = getClass().getClassLoader().getResourceAsStream("assets/tchakeda.png");
+        if (logoStream == null) {
+            throw new MessagingException("Logo image not found in resources.");
+        }
+
+        ByteArrayDataSource logoDataSource = new ByteArrayDataSource(logoStream, "image/png");
+        helper.addInline("logo", logoDataSource);
+    } catch (IOException e) {
+        throw new MessagingException("Error loading logo image", e);
+    }
 
     factureMailSender.send(message);
 }
@@ -203,25 +172,26 @@ public class MailService {
         helper.setCc(ccEmail.split(","));
     }
     helper.setSubject(subject);
-    
-    // Remplacer cid:logo par le logo en base64 directement dans le HTML
-    String htmlWithBase64Logo = replaceLogoWithBase64(htmlContent);
-    helper.setText(htmlWithBase64Logo, true);
-    
-    // Ajouter les pièces jointes
+    helper.setText(htmlContent, true);
+
+    InputStream logoStream = getClass().getClassLoader().getResourceAsStream("assets/tchakeda.png");
+    if (logoStream != null) {
+        ByteArrayDataSource logoDataSource = new ByteArrayDataSource(logoStream, "image/png");
+        helper.addInline("logo", logoDataSource);
+    } else {
+        throw new MessagingException("Logo introuvable dans les resources.");
+    }
+
     for (MultipartFile file : attachments) {
         if (!file.isEmpty()) {
             String contentType = file.getContentType();
             if (contentType == null) {
                 contentType = "application/octet-stream";
             }
-            String filename = file.getOriginalFilename();
-            if (filename == null || filename.isEmpty()) {
-                filename = "attachment";
-            }
             helper.addAttachment(
-                filename,
-                new ByteArrayDataSource(file.getBytes(), contentType)
+                Objects.requireNonNull(file.getOriginalFilename()),
+                new ByteArrayResource(file.getBytes()),
+                contentType
             );
         }
     }
@@ -491,25 +461,26 @@ public class MailService {
         helper.setCc(ccEmail.split(","));
     }
     helper.setSubject(subject);
-    
-    // Remplacer cid:logo par le logo en base64 directement dans le HTML
-    String htmlWithBase64Logo = replaceLogoWithBase64(htmlContent);
-    helper.setText(htmlWithBase64Logo, true);
-    
-    // Ajouter les pièces jointes
+    helper.setText(htmlContent, true);
+
+    InputStream logoStream = getClass().getClassLoader().getResourceAsStream("assets/tchakeda.png");
+    if (logoStream != null) {
+        ByteArrayDataSource logoDataSource = new ByteArrayDataSource(logoStream, "image/png");
+        helper.addInline("logo", logoDataSource);
+    } else {
+        throw new MessagingException("Logo introuvable dans les resources.");
+    }
+
     for (MultipartFile file : attachments) {
         if (!file.isEmpty()) {
             String contentType = file.getContentType();
             if (contentType == null) {
                 contentType = "application/octet-stream";
             }
-            String filename = file.getOriginalFilename();
-            if (filename == null || filename.isEmpty()) {
-                filename = "attachment";
-            }
             helper.addAttachment(
-                filename,
-                new ByteArrayDataSource(file.getBytes(), contentType)
+                Objects.requireNonNull(file.getOriginalFilename()),
+                new ByteArrayResource(file.getBytes()),
+                contentType
             );
         }
     }

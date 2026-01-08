@@ -33,6 +33,11 @@ public class DepenseGenerale {
     @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
     private CategorieDepense categorie;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "categorie_liee_id", nullable = true)
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
+    private Categorie categorieLiee; // Catégorie liée (Categorie) pour CHARGE_VARIABLE (peut être PRODUIT ou COMPTABILITE)
+
     @Column(nullable = false)
     private Double prixUnitaire;
 
