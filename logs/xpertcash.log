@@ -1226,3 +1226,232 @@ java.lang.ClassNotFoundException: java.text.ListFormat
 2026-01-09 11:21:06.888 [http-nio-8080-exec-7] DEBUG o.s.w.s.m.m.a.HttpEntityMethodProcessor - Using 'application/json', given [application/json, text/plain, */*] and supported [application/json, application/*+json, application/yaml]
 2026-01-09 11:21:06.888 [http-nio-8080-exec-7] DEBUG o.s.w.s.m.m.a.HttpEntityMethodProcessor - Writing [{message=Toutes les données de l'entreprise ont été supprimées. L'admin et l'entreprise ont été cons (truncated)...]
 2026-01-09 11:21:06.889 [http-nio-8080-exec-7] DEBUG o.s.web.servlet.DispatcherServlet - Completed 200 OK
+2026-01-09 12:18:21.069 [main] INFO  com.xpertcash.XpertcashApplication - Starting XpertcashApplication using Java 21.0.7 with PID 14753 (/Users/mac/Desktop/Tiak3da/XpertCashBack/target/classes started by mac in /Users/mac/Desktop/Tiak3da/XpertCashBack)
+2026-01-09 12:18:21.071 [main] DEBUG com.xpertcash.XpertcashApplication - Running with Spring Boot v3.4.2, Spring v6.2.2
+2026-01-09 12:18:21.072 [main] INFO  com.xpertcash.XpertcashApplication - The following 1 profile is active: "dev"
+2026-01-09 12:18:23.108 [main] DEBUG o.a.tomcat.util.compat.Jre22Compat - Class not found so assuming code is running on a pre-Java 22 JVM
+java.lang.ClassNotFoundException: java.text.ListFormat
+	at java.base/jdk.internal.loader.BuiltinClassLoader.loadClass(BuiltinClassLoader.java:641)
+	at java.base/jdk.internal.loader.ClassLoaders$AppClassLoader.loadClass(ClassLoaders.java:188)
+	at java.base/java.lang.ClassLoader.loadClass(ClassLoader.java:526)
+	at java.base/java.lang.Class.forName0(Native Method)
+	at java.base/java.lang.Class.forName(Class.java:421)
+	at java.base/java.lang.Class.forName(Class.java:412)
+	at org.apache.tomcat.util.compat.Jre22Compat.<clinit>(Jre22Compat.java:37)
+	at org.apache.tomcat.util.compat.JreCompat.<clinit>(JreCompat.java:60)
+	at org.apache.catalina.startup.Tomcat.<clinit>(Tomcat.java:1193)
+	at org.springframework.boot.web.embedded.tomcat.TomcatServletWebServerFactory.getWebServer(TomcatServletWebServerFactory.java:203)
+	at org.springframework.boot.web.servlet.context.ServletWebServerApplicationContext.createWebServer(ServletWebServerApplicationContext.java:188)
+	at org.springframework.boot.web.servlet.context.ServletWebServerApplicationContext.onRefresh(ServletWebServerApplicationContext.java:162)
+	at org.springframework.context.support.AbstractApplicationContext.refresh(AbstractApplicationContext.java:621)
+	at org.springframework.boot.web.servlet.context.ServletWebServerApplicationContext.refresh(ServletWebServerApplicationContext.java:146)
+	at org.springframework.boot.SpringApplication.refresh(SpringApplication.java:752)
+	at org.springframework.boot.SpringApplication.refreshContext(SpringApplication.java:439)
+	at org.springframework.boot.SpringApplication.run(SpringApplication.java:318)
+	at org.springframework.boot.SpringApplication.run(SpringApplication.java:1361)
+	at org.springframework.boot.SpringApplication.run(SpringApplication.java:1350)
+	at com.xpertcash.XpertcashApplication.main(XpertcashApplication.java:12)
+2026-01-09 12:18:31.851 [main] DEBUG o.s.w.s.m.m.a.RequestMappingHandlerMapping - 229 mappings in 'requestMappingHandlerMapping'
+2026-01-09 12:18:31.909 [main] DEBUG o.s.w.s.h.SimpleUrlHandlerMapping - Patterns [/webjars/**, /**, /swagger-ui*/*swagger-initializer.js, /swagger-ui*/**] in 'resourceHandlerMapping'
+2026-01-09 12:18:32.055 [main] DEBUG o.s.w.s.m.m.a.RequestMappingHandlerAdapter - ControllerAdvice beans: 0 @ModelAttribute, 0 @InitBinder, 1 RequestBodyAdvice, 1 ResponseBodyAdvice
+2026-01-09 12:18:32.121 [main] DEBUG o.s.w.s.m.m.a.ExceptionHandlerExceptionResolver - ControllerAdvice beans: 3 @ExceptionHandler, 1 ResponseBodyAdvice
+2026-01-09 12:18:32.421 [main] INFO  com.xpertcash.XpertcashApplication - Started XpertcashApplication in 11.868 seconds (process running for 12.312)
+2026-01-09 12:18:34.119 [main] INFO  com.xpertcash.XpertcashApplication - Starting XpertcashApplication using Java 21.0.7 with PID 15189 (/Users/mac/Desktop/Tiak3da/XpertCashBack/target/classes started by mac in /Users/mac/Desktop/Tiak3da/XpertCashBack)
+2026-01-09 12:18:34.121 [main] DEBUG com.xpertcash.XpertcashApplication - Running with Spring Boot v3.4.2, Spring v6.2.2
+2026-01-09 12:18:34.122 [main] INFO  com.xpertcash.XpertcashApplication - The following 1 profile is active: "dev"
+2026-01-09 12:18:35.975 [main] DEBUG o.a.tomcat.util.compat.Jre22Compat - Class not found so assuming code is running on a pre-Java 22 JVM
+java.lang.ClassNotFoundException: java.text.ListFormat
+	at java.base/jdk.internal.loader.BuiltinClassLoader.loadClass(BuiltinClassLoader.java:641)
+	at java.base/jdk.internal.loader.ClassLoaders$AppClassLoader.loadClass(ClassLoaders.java:188)
+	at java.base/java.lang.ClassLoader.loadClass(ClassLoader.java:526)
+	at java.base/java.lang.Class.forName0(Native Method)
+	at java.base/java.lang.Class.forName(Class.java:421)
+	at java.base/java.lang.Class.forName(Class.java:412)
+	at org.apache.tomcat.util.compat.Jre22Compat.<clinit>(Jre22Compat.java:37)
+	at org.apache.tomcat.util.compat.JreCompat.<clinit>(JreCompat.java:60)
+	at org.apache.catalina.startup.Tomcat.<clinit>(Tomcat.java:1193)
+	at org.springframework.boot.web.embedded.tomcat.TomcatServletWebServerFactory.getWebServer(TomcatServletWebServerFactory.java:203)
+	at org.springframework.boot.web.servlet.context.ServletWebServerApplicationContext.createWebServer(ServletWebServerApplicationContext.java:188)
+	at org.springframework.boot.web.servlet.context.ServletWebServerApplicationContext.onRefresh(ServletWebServerApplicationContext.java:162)
+	at org.springframework.context.support.AbstractApplicationContext.refresh(AbstractApplicationContext.java:621)
+	at org.springframework.boot.web.servlet.context.ServletWebServerApplicationContext.refresh(ServletWebServerApplicationContext.java:146)
+	at org.springframework.boot.SpringApplication.refresh(SpringApplication.java:752)
+	at org.springframework.boot.SpringApplication.refreshContext(SpringApplication.java:439)
+	at org.springframework.boot.SpringApplication.run(SpringApplication.java:318)
+	at org.springframework.boot.SpringApplication.run(SpringApplication.java:1361)
+	at org.springframework.boot.SpringApplication.run(SpringApplication.java:1350)
+	at com.xpertcash.XpertcashApplication.main(XpertcashApplication.java:12)
+2026-01-09 12:18:43.839 [main] DEBUG o.s.w.s.m.m.a.RequestMappingHandlerMapping - 229 mappings in 'requestMappingHandlerMapping'
+2026-01-09 12:18:43.891 [main] DEBUG o.s.w.s.h.SimpleUrlHandlerMapping - Patterns [/webjars/**, /**, /swagger-ui*/*swagger-initializer.js, /swagger-ui*/**] in 'resourceHandlerMapping'
+2026-01-09 12:18:44.065 [main] DEBUG o.s.w.s.m.m.a.RequestMappingHandlerAdapter - ControllerAdvice beans: 0 @ModelAttribute, 0 @InitBinder, 1 RequestBodyAdvice, 1 ResponseBodyAdvice
+2026-01-09 12:18:44.140 [main] DEBUG o.s.w.s.m.m.a.ExceptionHandlerExceptionResolver - ControllerAdvice beans: 3 @ExceptionHandler, 1 ResponseBodyAdvice
+2026-01-09 12:18:44.379 [main] INFO  com.xpertcash.XpertcashApplication - Started XpertcashApplication in 10.762 seconds (process running for 11.118)
+2026-01-09 12:18:56.400 [main] INFO  com.xpertcash.XpertcashApplication - Starting XpertcashApplication using Java 21.0.7 with PID 15710 (/Users/mac/Desktop/Tiak3da/XpertCashBack/target/classes started by mac in /Users/mac/Desktop/Tiak3da/XpertCashBack)
+2026-01-09 12:18:56.402 [main] DEBUG com.xpertcash.XpertcashApplication - Running with Spring Boot v3.4.2, Spring v6.2.2
+2026-01-09 12:18:56.403 [main] INFO  com.xpertcash.XpertcashApplication - The following 1 profile is active: "dev"
+2026-01-09 12:18:58.328 [main] DEBUG o.a.tomcat.util.compat.Jre22Compat - Class not found so assuming code is running on a pre-Java 22 JVM
+java.lang.ClassNotFoundException: java.text.ListFormat
+	at java.base/jdk.internal.loader.BuiltinClassLoader.loadClass(BuiltinClassLoader.java:641)
+	at java.base/jdk.internal.loader.ClassLoaders$AppClassLoader.loadClass(ClassLoaders.java:188)
+	at java.base/java.lang.ClassLoader.loadClass(ClassLoader.java:526)
+	at java.base/java.lang.Class.forName0(Native Method)
+	at java.base/java.lang.Class.forName(Class.java:421)
+	at java.base/java.lang.Class.forName(Class.java:412)
+	at org.apache.tomcat.util.compat.Jre22Compat.<clinit>(Jre22Compat.java:37)
+	at org.apache.tomcat.util.compat.JreCompat.<clinit>(JreCompat.java:60)
+	at org.apache.catalina.startup.Tomcat.<clinit>(Tomcat.java:1193)
+	at org.springframework.boot.web.embedded.tomcat.TomcatServletWebServerFactory.getWebServer(TomcatServletWebServerFactory.java:203)
+	at org.springframework.boot.web.servlet.context.ServletWebServerApplicationContext.createWebServer(ServletWebServerApplicationContext.java:188)
+	at org.springframework.boot.web.servlet.context.ServletWebServerApplicationContext.onRefresh(ServletWebServerApplicationContext.java:162)
+	at org.springframework.context.support.AbstractApplicationContext.refresh(AbstractApplicationContext.java:621)
+	at org.springframework.boot.web.servlet.context.ServletWebServerApplicationContext.refresh(ServletWebServerApplicationContext.java:146)
+	at org.springframework.boot.SpringApplication.refresh(SpringApplication.java:752)
+	at org.springframework.boot.SpringApplication.refreshContext(SpringApplication.java:439)
+	at org.springframework.boot.SpringApplication.run(SpringApplication.java:318)
+	at org.springframework.boot.SpringApplication.run(SpringApplication.java:1361)
+	at org.springframework.boot.SpringApplication.run(SpringApplication.java:1350)
+	at com.xpertcash.XpertcashApplication.main(XpertcashApplication.java:12)
+2026-01-09 12:19:05.208 [main] DEBUG o.s.w.s.m.m.a.RequestMappingHandlerMapping - 229 mappings in 'requestMappingHandlerMapping'
+2026-01-09 12:19:05.264 [main] DEBUG o.s.w.s.h.SimpleUrlHandlerMapping - Patterns [/webjars/**, /**, /swagger-ui*/*swagger-initializer.js, /swagger-ui*/**] in 'resourceHandlerMapping'
+2026-01-09 12:19:05.402 [main] DEBUG o.s.w.s.m.m.a.RequestMappingHandlerAdapter - ControllerAdvice beans: 0 @ModelAttribute, 0 @InitBinder, 1 RequestBodyAdvice, 1 ResponseBodyAdvice
+2026-01-09 12:19:05.449 [main] DEBUG o.s.w.s.m.m.a.ExceptionHandlerExceptionResolver - ControllerAdvice beans: 3 @ExceptionHandler, 1 ResponseBodyAdvice
+2026-01-09 12:19:05.669 [main] INFO  com.xpertcash.XpertcashApplication - Started XpertcashApplication in 9.749 seconds (process running for 10.053)
+2026-01-09 12:19:10.542 [http-nio-8080-exec-1] INFO  o.s.web.servlet.DispatcherServlet - Initializing Servlet 'dispatcherServlet'
+2026-01-09 12:19:10.543 [http-nio-8080-exec-1] DEBUG o.s.web.servlet.DispatcherServlet - Detected StandardServletMultipartResolver
+2026-01-09 12:19:10.543 [http-nio-8080-exec-1] DEBUG o.s.web.servlet.DispatcherServlet - Detected AcceptHeaderLocaleResolver
+2026-01-09 12:19:10.543 [http-nio-8080-exec-1] DEBUG o.s.web.servlet.DispatcherServlet - Detected FixedThemeResolver
+2026-01-09 12:19:10.547 [http-nio-8080-exec-1] DEBUG o.s.web.servlet.DispatcherServlet - Detected org.springframework.web.servlet.view.DefaultRequestToViewNameTranslator@ee92d4e
+2026-01-09 12:19:10.548 [http-nio-8080-exec-1] DEBUG o.s.web.servlet.DispatcherServlet - Detected org.springframework.web.servlet.support.SessionFlashMapManager@6ac301e
+2026-01-09 12:19:10.549 [http-nio-8080-exec-1] DEBUG o.s.web.servlet.DispatcherServlet - enableLoggingRequestDetails='false': request parameters and headers will be masked to prevent unsafe logging of potentially sensitive data
+2026-01-09 12:19:10.549 [http-nio-8080-exec-1] INFO  o.s.web.servlet.DispatcherServlet - Completed initialization in 6 ms
+2026-01-09 12:19:10.617 [http-nio-8080-exec-3] DEBUG o.s.web.servlet.DispatcherServlet - GET "/api/auth/entreprise/modules", parameters={}
+2026-01-09 12:19:10.617 [http-nio-8080-exec-7] DEBUG o.s.web.servlet.DispatcherServlet - GET "/api/auth/user/info", parameters={}
+2026-01-09 12:19:10.617 [http-nio-8080-exec-8] DEBUG o.s.web.servlet.DispatcherServlet - GET "/api/auth/stockhistorique", parameters={}
+2026-01-09 12:19:10.618 [http-nio-8080-exec-8] DEBUG o.s.w.s.m.m.a.RequestMappingHandlerMapping - Mapped to com.xpertcash.controller.ProduitController#getAllStockHistory(HttpServletRequest)
+2026-01-09 12:19:10.618 [http-nio-8080-exec-3] DEBUG o.s.w.s.m.m.a.RequestMappingHandlerMapping - Mapped to com.xpertcash.controller.Module.ModuleActivationController#getModulesEntreprise(HttpServletRequest)
+2026-01-09 12:19:10.618 [http-nio-8080-exec-7] DEBUG o.s.w.s.m.m.a.RequestMappingHandlerMapping - Mapped to com.xpertcash.controller.UsersController#getUserInfo(HttpServletRequest)
+2026-01-09 12:19:10.752 [http-nio-8080-exec-8] DEBUG o.s.w.s.m.m.a.HttpEntityMethodProcessor - Using 'application/json', given [application/json, text/plain, */*] and supported [application/json, application/*+json, application/yaml]
+2026-01-09 12:19:10.753 [http-nio-8080-exec-8] DEBUG o.s.w.s.m.m.a.HttpEntityMethodProcessor - Writing [[]]
+2026-01-09 12:19:10.766 [http-nio-8080-exec-8] DEBUG o.s.web.servlet.DispatcherServlet - Completed 200 OK
+2026-01-09 12:19:10.768 [http-nio-8080-exec-3] DEBUG o.s.w.s.m.m.a.HttpEntityMethodProcessor - Using 'application/json', given [application/json, text/plain, */*] and supported [application/json, application/*+json, application/yaml]
+2026-01-09 12:19:10.774 [http-nio-8080-exec-3] DEBUG o.s.w.s.m.m.a.HttpEntityMethodProcessor - Writing [[ModuleDTO(id=1, nom=Gestion des Ventes, code=VENTE, description=Le POS sert à vendre, payant=false, (truncated)...]
+2026-01-09 12:19:10.786 [http-nio-8080-exec-3] DEBUG o.s.web.servlet.DispatcherServlet - Completed 200 OK
+2026-01-09 12:19:10.789 [http-nio-8080-exec-9] DEBUG o.s.web.servlet.DispatcherServlet - GET "/api/auth/entreprise/modules", parameters={}
+2026-01-09 12:19:10.792 [http-nio-8080-exec-7] DEBUG o.s.w.s.m.m.a.HttpEntityMethodProcessor - Using 'application/json', given [application/json, text/plain, */*] and supported [application/json, application/*+json, application/yaml]
+2026-01-09 12:19:10.802 [http-nio-8080-exec-9] DEBUG o.s.w.s.m.m.a.RequestMappingHandlerMapping - Mapped to com.xpertcash.controller.Module.ModuleActivationController#getModulesEntreprise(HttpServletRequest)
+2026-01-09 12:19:10.817 [http-nio-8080-exec-7] DEBUG o.s.w.s.m.m.a.HttpEntityMethodProcessor - Writing [UserRequest(id=2, nomComplet=Hady, nomEntreprise=Fofana Building, siege=Ville, email=hadyfofana72@gm (truncated)...]
+2026-01-09 12:19:10.822 [http-nio-8080-exec-7] DEBUG o.s.web.servlet.DispatcherServlet - Completed 200 OK
+2026-01-09 12:19:10.826 [http-nio-8080-exec-7] DEBUG o.s.web.servlet.DispatcherServlet - GET "/api/auth/user/info", parameters={}
+2026-01-09 12:19:10.827 [http-nio-8080-exec-7] DEBUG o.s.w.s.m.m.a.RequestMappingHandlerMapping - Mapped to com.xpertcash.controller.UsersController#getUserInfo(HttpServletRequest)
+2026-01-09 12:19:10.842 [http-nio-8080-exec-9] DEBUG o.s.w.s.m.m.a.HttpEntityMethodProcessor - Using 'application/json', given [application/json, text/plain, */*] and supported [application/json, application/*+json, application/yaml]
+2026-01-09 12:19:10.842 [http-nio-8080-exec-9] DEBUG o.s.w.s.m.m.a.HttpEntityMethodProcessor - Writing [[ModuleDTO(id=1, nom=Gestion des Ventes, code=VENTE, description=Le POS sert à vendre, payant=false, (truncated)...]
+2026-01-09 12:19:10.844 [http-nio-8080-exec-9] DEBUG o.s.web.servlet.DispatcherServlet - Completed 200 OK
+2026-01-09 12:19:10.846 [http-nio-8080-exec-7] DEBUG o.s.w.s.m.m.a.HttpEntityMethodProcessor - Using 'application/json', given [application/json, text/plain, */*] and supported [application/json, application/*+json, application/yaml]
+2026-01-09 12:19:10.847 [http-nio-8080-exec-7] DEBUG o.s.w.s.m.m.a.HttpEntityMethodProcessor - Writing [UserRequest(id=2, nomComplet=Hady, nomEntreprise=Fofana Building, siege=Ville, email=hadyfofana72@gm (truncated)...]
+2026-01-09 12:19:10.850 [http-nio-8080-exec-7] DEBUG o.s.web.servlet.DispatcherServlet - Completed 200 OK
+2026-01-09 12:19:10.852 [http-nio-8080-exec-6] DEBUG o.s.web.servlet.DispatcherServlet - GET "/api/auth/user/info", parameters={}
+2026-01-09 12:19:10.853 [http-nio-8080-exec-6] DEBUG o.s.w.s.m.m.a.RequestMappingHandlerMapping - Mapped to com.xpertcash.controller.UsersController#getUserInfo(HttpServletRequest)
+2026-01-09 12:19:10.881 [http-nio-8080-exec-6] DEBUG o.s.w.s.m.m.a.HttpEntityMethodProcessor - Using 'application/json', given [application/json, text/plain, */*] and supported [application/json, application/*+json, application/yaml]
+2026-01-09 12:19:10.883 [http-nio-8080-exec-6] DEBUG o.s.w.s.m.m.a.HttpEntityMethodProcessor - Writing [UserRequest(id=2, nomComplet=Hady, nomEntreprise=Fofana Building, siege=Ville, email=hadyfofana72@gm (truncated)...]
+2026-01-09 12:19:10.884 [http-nio-8080-exec-6] DEBUG o.s.web.servlet.DispatcherServlet - Completed 200 OK
+2026-01-09 12:19:10.886 [http-nio-8080-exec-4] DEBUG o.s.web.servlet.DispatcherServlet - GET "/api/auth/user/info", parameters={}
+2026-01-09 12:19:10.887 [http-nio-8080-exec-4] DEBUG o.s.w.s.m.m.a.RequestMappingHandlerMapping - Mapped to com.xpertcash.controller.UsersController#getUserInfo(HttpServletRequest)
+2026-01-09 12:19:10.908 [http-nio-8080-exec-4] DEBUG o.s.w.s.m.m.a.HttpEntityMethodProcessor - Using 'application/json', given [application/json, text/plain, */*] and supported [application/json, application/*+json, application/yaml]
+2026-01-09 12:19:10.908 [http-nio-8080-exec-4] DEBUG o.s.w.s.m.m.a.HttpEntityMethodProcessor - Writing [UserRequest(id=2, nomComplet=Hady, nomEntreprise=Fofana Building, siege=Ville, email=hadyfofana72@gm (truncated)...]
+2026-01-09 12:19:10.909 [http-nio-8080-exec-4] DEBUG o.s.web.servlet.DispatcherServlet - Completed 200 OK
+2026-01-09 12:19:13.642 [http-nio-8080-exec-9] DEBUG o.s.web.servlet.DispatcherServlet - GET "/api/auth/statistiques/globales", parameters={}
+2026-01-09 12:19:13.647 [http-nio-8080-exec-9] DEBUG o.s.w.s.m.m.a.RequestMappingHandlerMapping - Mapped to com.xpertcash.controller.StatistiquesGlobalesController#getStatistiquesGlobales(HttpServletRequest)
+2026-01-09 12:19:13.642 [http-nio-8080-exec-3] DEBUG o.s.web.servlet.DispatcherServlet - GET "/api/auth/statistiques/activite-hebdo", parameters={}
+2026-01-09 12:19:13.650 [http-nio-8080-exec-3] DEBUG o.s.w.s.m.m.a.RequestMappingHandlerMapping - Mapped to com.xpertcash.controller.StatistiquesGlobalesController#getActiviteHebdomadaire(HttpServletRequest)
+2026-01-09 12:19:13.651 [http-nio-8080-exec-10] DEBUG o.s.web.servlet.DispatcherServlet - GET "/api/auth/user/info", parameters={}
+2026-01-09 12:19:13.652 [http-nio-8080-exec-10] DEBUG o.s.w.s.m.m.a.RequestMappingHandlerMapping - Mapped to com.xpertcash.controller.UsersController#getUserInfo(HttpServletRequest)
+2026-01-09 12:19:13.654 [http-nio-8080-exec-7] DEBUG o.s.web.servlet.DispatcherServlet - GET "/api/auth/vente/recentes?limit=10", parameters={masked}
+2026-01-09 12:19:13.654 [http-nio-8080-exec-1] DEBUG o.s.web.servlet.DispatcherServlet - GET "/api/auth/alertes/stock-faible", parameters={}
+2026-01-09 12:19:13.654 [http-nio-8080-exec-7] DEBUG o.s.w.s.m.m.a.RequestMappingHandlerMapping - Mapped to com.xpertcash.controller.VENTE.VenteController#getVentesRecentes(int, HttpServletRequest)
+2026-01-09 12:19:13.655 [http-nio-8080-exec-1] DEBUG o.s.w.s.m.m.a.RequestMappingHandlerMapping - Mapped to com.xpertcash.controller.AlertesController#getAlertesStockFaible(HttpServletRequest)
+2026-01-09 12:19:13.655 [http-nio-8080-exec-4] DEBUG o.s.web.servlet.DispatcherServlet - GET "/api/auth/factureProforma/en-attente?limit=10", parameters={masked}
+2026-01-09 12:19:13.657 [http-nio-8080-exec-4] DEBUG o.s.w.s.m.m.a.RequestMappingHandlerMapping - Mapped to com.xpertcash.controller.FactureProformaController#getFacturesProformaEnAttente(int, HttpServletRequest)
+2026-01-09 12:19:13.738 [http-nio-8080-exec-1] DEBUG o.s.w.s.m.m.a.HttpEntityMethodProcessor - Using 'application/json', given [application/json, text/plain, */*] and supported [application/json, application/*+json, application/yaml]
+2026-01-09 12:19:13.738 [http-nio-8080-exec-1] DEBUG o.s.w.s.m.m.a.HttpEntityMethodProcessor - Writing [[]]
+2026-01-09 12:19:13.740 [http-nio-8080-exec-1] DEBUG o.s.web.servlet.DispatcherServlet - Completed 200 OK
+2026-01-09 12:19:13.762 [http-nio-8080-exec-5] DEBUG o.s.web.servlet.DispatcherServlet - GET "/api/auth/factureReelle/recentes?limit=10", parameters={masked}
+2026-01-09 12:19:13.778 [http-nio-8080-exec-5] DEBUG o.s.w.s.m.m.a.RequestMappingHandlerMapping - Mapped to com.xpertcash.controller.FactureReelleController#getFacturesReellesRecentes(int, HttpServletRequest)
+2026-01-09 12:19:13.806 [http-nio-8080-exec-7] DEBUG o.s.w.s.m.m.a.HttpEntityMethodProcessor - Using 'application/json', given [application/json, text/plain, */*] and supported [application/json, application/*+json, application/yaml]
+2026-01-09 12:19:13.824 [http-nio-8080-exec-7] DEBUG o.s.w.s.m.m.a.HttpEntityMethodProcessor - Writing [[]]
+2026-01-09 12:19:13.825 [http-nio-8080-exec-7] DEBUG o.s.web.servlet.DispatcherServlet - Completed 200 OK
+2026-01-09 12:19:13.846 [http-nio-8080-exec-4] DEBUG o.s.w.s.m.m.a.HttpEntityMethodProcessor - Using 'application/json', given [application/json, text/plain, */*] and supported [application/json, application/*+json, application/yaml]
+2026-01-09 12:19:13.846 [http-nio-8080-exec-4] DEBUG o.s.w.s.m.m.a.HttpEntityMethodProcessor - Writing [[]]
+2026-01-09 12:19:13.847 [http-nio-8080-exec-4] DEBUG o.s.web.servlet.DispatcherServlet - Completed 200 OK
+2026-01-09 12:19:13.854 [http-nio-8080-exec-10] DEBUG o.s.w.s.m.m.a.HttpEntityMethodProcessor - Using 'application/json', given [application/json, text/plain, */*] and supported [application/json, application/*+json, application/yaml]
+2026-01-09 12:19:13.855 [http-nio-8080-exec-10] DEBUG o.s.w.s.m.m.a.HttpEntityMethodProcessor - Writing [UserRequest(id=2, nomComplet=Hady, nomEntreprise=Fofana Building, siege=Ville, email=hadyfofana72@gm (truncated)...]
+2026-01-09 12:19:13.858 [http-nio-8080-exec-10] DEBUG o.s.web.servlet.DispatcherServlet - Completed 200 OK
+2026-01-09 12:19:13.937 [http-nio-8080-exec-9] DEBUG o.s.w.s.m.m.a.HttpEntityMethodProcessor - Using 'application/json', given [application/json, text/plain, */*] and supported [application/json, application/*+json, application/yaml]
+2026-01-09 12:19:13.952 [http-nio-8080-exec-5] DEBUG o.s.w.s.m.m.a.HttpEntityMethodProcessor - Using 'application/json', given [application/json, text/plain, */*] and supported [application/json, application/*+json, application/yaml]
+2026-01-09 12:19:13.953 [http-nio-8080-exec-5] DEBUG o.s.w.s.m.m.a.HttpEntityMethodProcessor - Writing [[]]
+2026-01-09 12:19:13.953 [http-nio-8080-exec-9] DEBUG o.s.w.s.m.m.a.HttpEntityMethodProcessor - Writing [StatistiquesGlobalesDTO(produits=StatistiquesGlobalesDTO.ProduitsStats(total=0, enStock=0, horsStock (truncated)...]
+2026-01-09 12:19:13.954 [http-nio-8080-exec-5] DEBUG o.s.web.servlet.DispatcherServlet - Completed 200 OK
+2026-01-09 12:19:13.961 [http-nio-8080-exec-9] DEBUG o.s.web.servlet.DispatcherServlet - Completed 200 OK
+2026-01-09 12:19:14.000 [http-nio-8080-exec-3] DEBUG o.s.w.s.m.m.a.HttpEntityMethodProcessor - Using 'application/json', given [application/json, text/plain, */*] and supported [application/json, application/*+json, application/yaml]
+2026-01-09 12:19:14.000 [http-nio-8080-exec-3] DEBUG o.s.w.s.m.m.a.HttpEntityMethodProcessor - Writing [ActiviteHebdoDTO(dates=[03/01, 04/01, 05/01, 06/01, 07/01, 08/01, 09/01], ventes=[0.0, 0.0, 0.0, 0.0 (truncated)...]
+2026-01-09 12:19:14.005 [http-nio-8080-exec-3] DEBUG o.s.web.servlet.DispatcherServlet - Completed 200 OK
+2026-01-09 12:19:16.104 [http-nio-8080-exec-6] DEBUG o.s.web.servlet.DispatcherServlet - GET "/api/auth/user/info", parameters={}
+2026-01-09 12:19:16.105 [http-nio-8080-exec-6] DEBUG o.s.w.s.m.m.a.RequestMappingHandlerMapping - Mapped to com.xpertcash.controller.UsersController#getUserInfo(HttpServletRequest)
+2026-01-09 12:19:16.154 [http-nio-8080-exec-6] DEBUG o.s.w.s.m.m.a.HttpEntityMethodProcessor - Using 'application/json', given [application/json, text/plain, */*] and supported [application/json, application/*+json, application/yaml]
+2026-01-09 12:19:16.155 [http-nio-8080-exec-6] DEBUG o.s.w.s.m.m.a.HttpEntityMethodProcessor - Writing [UserRequest(id=2, nomComplet=Hady, nomEntreprise=Fofana Building, siege=Ville, email=hadyfofana72@gm (truncated)...]
+2026-01-09 12:19:16.156 [http-nio-8080-exec-6] DEBUG o.s.web.servlet.DispatcherServlet - Completed 200 OK
+2026-01-09 12:19:16.263 [http-nio-8080-exec-2] DEBUG o.s.web.servlet.DispatcherServlet - GET "/api/auth/compte/dashboard", parameters={}
+2026-01-09 12:19:16.264 [http-nio-8080-exec-2] DEBUG o.s.w.s.m.m.a.RequestMappingHandlerMapping - Mapped to com.xpertcash.controller.UsersController#getDashboard(HttpServletRequest)
+2026-01-09 12:19:16.305 [http-nio-8080-exec-2] DEBUG o.s.w.s.m.m.a.HttpEntityMethodProcessor - Using 'application/json', given [application/json, text/plain, */*] and supported [application/json, application/*+json, application/yaml]
+2026-01-09 12:19:16.309 [http-nio-8080-exec-2] DEBUG o.s.w.s.m.m.a.HttpEntityMethodProcessor - Writing [UserOptimalDTO(userInfo=UserOptimalDTO.UserInfoDTO(id=2, nomComplet=Hady, email=hadyfofana72@gmail.c (truncated)...]
+2026-01-09 12:19:16.338 [http-nio-8080-exec-2] DEBUG o.s.web.servlet.DispatcherServlet - Completed 200 OK
+2026-01-09 12:20:02.238 [http-nio-8080-exec-7] DEBUG o.s.web.servlet.DispatcherServlet - POST "/api/auth/addNewUsers", parameters={}
+2026-01-09 12:20:02.239 [http-nio-8080-exec-7] DEBUG o.s.w.s.m.m.a.RequestMappingHandlerMapping - Mapped to com.xpertcash.controller.UsersController#addUserToEntreprise(HttpServletRequest, UserRequest)
+2026-01-09 12:20:02.285 [http-nio-8080-exec-7] DEBUG o.s.w.s.m.m.a.RequestResponseBodyMethodProcessor - Read "application/json;charset=UTF-8" to [UserRequest(id=0, nomComplet=Alassane, nomEntreprise=null, siege=null, email=alassanesanogojumeau@gm (truncated)...]
+2026-01-09 12:20:13.468 [http-nio-8080-exec-7] DEBUG o.s.w.s.m.m.a.RequestResponseBodyMethodProcessor - Using 'application/json', given [application/json, text/plain, */*] and supported [application/json, application/*+json, application/yaml]
+2026-01-09 12:20:13.469 [http-nio-8080-exec-7] DEBUG o.s.w.s.m.m.a.RequestResponseBodyMethodProcessor - Writing [com.xpertcash.entity.User@7ca0e4c4]
+2026-01-09 12:20:13.479 [http-nio-8080-exec-7] DEBUG o.s.web.servlet.DispatcherServlet - Completed 200 OK
+2026-01-09 12:20:13.495 [http-nio-8080-exec-4] DEBUG o.s.web.servlet.DispatcherServlet - GET "/api/auth/user/info", parameters={}
+2026-01-09 12:20:13.496 [http-nio-8080-exec-4] DEBUG o.s.w.s.m.m.a.RequestMappingHandlerMapping - Mapped to com.xpertcash.controller.UsersController#getUserInfo(HttpServletRequest)
+2026-01-09 12:20:13.582 [http-nio-8080-exec-5] DEBUG o.s.web.servlet.DispatcherServlet - GET "/api/auth/entreprise/2/allusers", parameters={}
+2026-01-09 12:20:13.585 [http-nio-8080-exec-5] DEBUG o.s.w.s.m.m.a.RequestMappingHandlerMapping - Mapped to com.xpertcash.controller.UsersController#getAllUsersOfEntreprise(Long, HttpServletRequest)
+2026-01-09 12:20:13.646 [http-nio-8080-exec-4] DEBUG o.s.w.s.m.m.a.HttpEntityMethodProcessor - Using 'application/json', given [application/json, text/plain, */*] and supported [application/json, application/*+json, application/yaml]
+2026-01-09 12:20:13.646 [http-nio-8080-exec-4] DEBUG o.s.w.s.m.m.a.HttpEntityMethodProcessor - Writing [UserRequest(id=2, nomComplet=Hady, nomEntreprise=Fofana Building, siege=Ville, email=hadyfofana72@gm (truncated)...]
+2026-01-09 12:20:13.647 [http-nio-8080-exec-4] DEBUG o.s.web.servlet.DispatcherServlet - Completed 200 OK
+2026-01-09 12:20:13.650 [http-nio-8080-exec-9] DEBUG o.s.web.servlet.DispatcherServlet - GET "/api/auth/user/info", parameters={}
+2026-01-09 12:20:13.650 [http-nio-8080-exec-9] DEBUG o.s.w.s.m.m.a.RequestMappingHandlerMapping - Mapped to com.xpertcash.controller.UsersController#getUserInfo(HttpServletRequest)
+2026-01-09 12:20:13.652 [http-nio-8080-exec-5] DEBUG o.s.w.s.m.m.a.HttpEntityMethodProcessor - Using 'application/json', given [application/json, text/plain, */*] and supported [application/json, application/*+json, application/yaml]
+2026-01-09 12:20:13.656 [http-nio-8080-exec-5] DEBUG o.s.w.s.m.m.a.HttpEntityMethodProcessor - Writing [[UserDTO(id=2, uuid=4697291f-def6-46a1-9767-3ced75fc4c8c, personalCode=3929, nomComplet=Hady, email= (truncated)...]
+2026-01-09 12:20:13.662 [http-nio-8080-exec-5] DEBUG o.s.web.servlet.DispatcherServlet - Completed 200 OK
+2026-01-09 12:20:13.669 [http-nio-8080-exec-9] DEBUG o.s.w.s.m.m.a.HttpEntityMethodProcessor - Using 'application/json', given [application/json, text/plain, */*] and supported [application/json, application/*+json, application/yaml]
+2026-01-09 12:20:13.669 [http-nio-8080-exec-9] DEBUG o.s.w.s.m.m.a.HttpEntityMethodProcessor - Writing [UserRequest(id=2, nomComplet=Hady, nomEntreprise=Fofana Building, siege=Ville, email=hadyfofana72@gm (truncated)...]
+2026-01-09 12:20:13.670 [http-nio-8080-exec-9] DEBUG o.s.web.servlet.DispatcherServlet - Completed 200 OK
+2026-01-09 12:20:13.754 [http-nio-8080-exec-3] DEBUG o.s.web.servlet.DispatcherServlet - GET "/api/auth/entreprise/2/allusers", parameters={}
+2026-01-09 12:20:13.767 [http-nio-8080-exec-3] DEBUG o.s.w.s.m.m.a.RequestMappingHandlerMapping - Mapped to com.xpertcash.controller.UsersController#getAllUsersOfEntreprise(Long, HttpServletRequest)
+2026-01-09 12:20:13.781 [http-nio-8080-exec-6] DEBUG o.s.web.servlet.DispatcherServlet - GET "/api/auth/user/11", parameters={}
+2026-01-09 12:20:13.786 [http-nio-8080-exec-6] DEBUG o.s.w.s.m.m.a.RequestMappingHandlerMapping - Mapped to com.xpertcash.controller.UsersController#getUserById(Long, HttpServletRequest)
+2026-01-09 12:20:13.850 [http-nio-8080-exec-3] DEBUG o.s.w.s.m.m.a.HttpEntityMethodProcessor - Using 'application/json', given [application/json, text/plain, */*] and supported [application/json, application/*+json, application/yaml]
+2026-01-09 12:20:13.850 [http-nio-8080-exec-3] DEBUG o.s.w.s.m.m.a.HttpEntityMethodProcessor - Writing [[UserDTO(id=2, uuid=4697291f-def6-46a1-9767-3ced75fc4c8c, personalCode=3929, nomComplet=Hady, email= (truncated)...]
+2026-01-09 12:20:13.853 [http-nio-8080-exec-6] DEBUG o.s.w.s.m.m.a.HttpEntityMethodProcessor - Using 'application/json', given [application/json, text/plain, */*] and supported [application/json, application/*+json, application/yaml]
+2026-01-09 12:20:13.854 [http-nio-8080-exec-6] DEBUG o.s.w.s.m.m.a.HttpEntityMethodProcessor - Writing [UserDTO(id=11, uuid=5a3cd8b4-776b-4a55-b13a-404b60faf4cc, personalCode=5141, nomComplet=Alassane, em (truncated)...]
+2026-01-09 12:20:13.852 [http-nio-8080-exec-3] DEBUG o.s.web.servlet.DispatcherServlet - Completed 200 OK
+2026-01-09 12:20:13.857 [http-nio-8080-exec-6] DEBUG o.s.web.servlet.DispatcherServlet - Completed 200 OK
+2026-01-09 12:21:28.217 [http-nio-8080-exec-5] DEBUG o.s.web.servlet.DispatcherServlet - GET "/api/auth/user/info", parameters={}
+2026-01-09 12:21:28.218 [http-nio-8080-exec-5] DEBUG o.s.w.s.m.m.a.RequestMappingHandlerMapping - Mapped to com.xpertcash.controller.UsersController#getUserInfo(HttpServletRequest)
+2026-01-09 12:21:28.238 [http-nio-8080-exec-5] DEBUG o.s.w.s.m.m.a.HttpEntityMethodProcessor - Using 'application/json', given [application/json, text/plain, */*] and supported [application/json, application/*+json, application/yaml]
+2026-01-09 12:21:28.238 [http-nio-8080-exec-5] DEBUG o.s.w.s.m.m.a.HttpEntityMethodProcessor - Writing [UserRequest(id=2, nomComplet=Hady, nomEntreprise=Fofana Building, siege=Ville, email=hadyfofana72@gm (truncated)...]
+2026-01-09 12:21:28.241 [http-nio-8080-exec-5] DEBUG o.s.web.servlet.DispatcherServlet - Completed 200 OK
+2026-01-09 12:21:28.269 [http-nio-8080-exec-9] DEBUG o.s.web.servlet.DispatcherServlet - GET "/api/auth/compte/dashboard", parameters={}
+2026-01-09 12:21:28.282 [http-nio-8080-exec-9] DEBUG o.s.w.s.m.m.a.RequestMappingHandlerMapping - Mapped to com.xpertcash.controller.UsersController#getDashboard(HttpServletRequest)
+2026-01-09 12:21:28.310 [http-nio-8080-exec-9] DEBUG o.s.w.s.m.m.a.HttpEntityMethodProcessor - Using 'application/json', given [application/json, text/plain, */*] and supported [application/json, application/*+json, application/yaml]
+2026-01-09 12:21:28.311 [http-nio-8080-exec-9] DEBUG o.s.w.s.m.m.a.HttpEntityMethodProcessor - Writing [UserOptimalDTO(userInfo=UserOptimalDTO.UserInfoDTO(id=2, nomComplet=Hady, email=hadyfofana72@gmail.c (truncated)...]
+2026-01-09 12:21:28.313 [http-nio-8080-exec-9] DEBUG o.s.web.servlet.DispatcherServlet - Completed 200 OK
+2026-01-09 12:21:35.639 [http-nio-8080-exec-3] DEBUG o.s.web.servlet.DispatcherServlet - GET "/api/auth/user/info", parameters={}
+2026-01-09 12:21:35.640 [http-nio-8080-exec-3] DEBUG o.s.w.s.m.m.a.RequestMappingHandlerMapping - Mapped to com.xpertcash.controller.UsersController#getUserInfo(HttpServletRequest)
+2026-01-09 12:21:35.690 [http-nio-8080-exec-3] DEBUG o.s.w.s.m.m.a.HttpEntityMethodProcessor - Using 'application/json', given [application/json, text/plain, */*] and supported [application/json, application/*+json, application/yaml]
+2026-01-09 12:21:35.693 [http-nio-8080-exec-3] DEBUG o.s.w.s.m.m.a.HttpEntityMethodProcessor - Writing [UserRequest(id=2, nomComplet=Hady, nomEntreprise=Fofana Building, siege=Ville, email=hadyfofana72@gm (truncated)...]
+2026-01-09 12:21:35.696 [http-nio-8080-exec-3] DEBUG o.s.web.servlet.DispatcherServlet - Completed 200 OK
+2026-01-09 12:21:35.953 [http-nio-8080-exec-6] DEBUG o.s.web.servlet.DispatcherServlet - GET "/api/auth/user/11", parameters={}
+2026-01-09 12:21:35.955 [http-nio-8080-exec-6] DEBUG o.s.w.s.m.m.a.RequestMappingHandlerMapping - Mapped to com.xpertcash.controller.UsersController#getUserById(Long, HttpServletRequest)
+2026-01-09 12:21:35.977 [http-nio-8080-exec-6] DEBUG o.s.w.s.m.m.a.HttpEntityMethodProcessor - Using 'application/json', given [application/json, text/plain, */*] and supported [application/json, application/*+json, application/yaml]
+2026-01-09 12:21:35.977 [http-nio-8080-exec-6] DEBUG o.s.w.s.m.m.a.HttpEntityMethodProcessor - Writing [UserDTO(id=11, uuid=5a3cd8b4-776b-4a55-b13a-404b60faf4cc, personalCode=5141, nomComplet=Alassane, em (truncated)...]
+2026-01-09 12:21:35.978 [http-nio-8080-exec-6] DEBUG o.s.web.servlet.DispatcherServlet - Completed 200 OK

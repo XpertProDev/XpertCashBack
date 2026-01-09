@@ -43,7 +43,6 @@ public class MailTestController {
         
         Map<String, Object> response = new HashMap<>();
         
-        // Utiliser l'email de test fourni ou un email par défaut
         String recipientEmail = testEmail != null && !testEmail.isEmpty() 
             ? testEmail 
             : "carterhedy57@gmail.com";
@@ -62,7 +61,7 @@ public class MailTestController {
             props.put("mail.smtp.timeout", "5000");
             props.put("mail.smtp.writetimeout", "5000");
             
-            // Désactiver STARTTLS pour le port 465
+            // Désactivation de STARTTLS pour le port 465
             props.put("mail.smtp.starttls.enable", "false");
             
             logger.debug("Propriétés SMTP configurées: {}", props);
@@ -118,7 +117,6 @@ public class MailTestController {
                 host, port, username, e.getMessage()
             );
             
-            String suggestions = generateSuggestions(errorMsg, password, true);
             
             response.put("success", false);
             response.put("error", "AuthenticationFailedException");
@@ -131,7 +129,6 @@ public class MailTestController {
             response.put("errorDetails", e.getMessage());
             response.put("isPasswordIssue", !detectedIssue.isEmpty());
             response.put("detectedIssue", detectedIssue);
-            response.put("suggestions", suggestions);
             response.put("passwordLength", password != null ? password.length() : 0);
             response.put("passwordPreview", password != null ? password : "***");
             
@@ -150,7 +147,7 @@ public class MailTestController {
                 // Un timeout lors de la connexion peut indiquer un problème d'authentification
                 if (causeMsg.contains("timeout") || causeMsg.contains("read timed out") || 
                     causeMsg.contains("connection timed out") || causeMsg.contains("socket")) {
-                    isPasswordIssue = true; // Très probablement un problème de mot de passe
+                    isPasswordIssue = true; 
                 }
             }
             
@@ -171,8 +168,8 @@ public class MailTestController {
             );
             
             String suggestions = isPasswordIssue
-                ? "⚠️ PROBLÈME DE MOT DE PASSE DÉTECTÉ (timeout peut indiquer authentification échouée): 1) Vérifiez que le mot de passe dans application-prod.properties est EXACTEMENT correct, 2) Vérifiez qu'il n'y a pas d'espaces avant/après, 3) Les caractères spéciaux ($, @, *, ?, etc.) doivent être correctement configurés, 4) Un timeout 'Read timed out' lors de la connexion SMTP indique souvent un mauvais mot de passe, 5) Essayez de vous connecter manuellement avec ce mot de passe"
-                : "Vérifiez: 1) La connexion réseau au serveur SMTP, 2) Le serveur est accessible, 3) Le firewall n'bloque pas la connexion, 4) Les timeouts sont suffisants";
+                ? "⚠️ PROBLÈME DE MOT DE PASSE DÉTECTÉ (timeout peut indiquer authentification échouée): 1) "
+                : "))";
             
             response.put("success", false);
             response.put("error", "MessagingException");
@@ -188,7 +185,7 @@ public class MailTestController {
             response.put("passwordLength", password != null ? password.length() : 0);
             response.put("passwordPreview", password != null ? password : "***");
             
-            // Ajouter la cause si disponible
+            //   cause si disponible
             if (e.getCause() != null) {
                 response.put("cause", e.getCause().getClass().getName() + ": " + e.getCause().getMessage());
                 response.put("causeType", e.getCause().getClass().getSimpleName());
@@ -214,7 +211,7 @@ public class MailTestController {
             response.put("errorType", e.getClass().getName());
             response.put("errorDetails", e.getMessage());
             
-            // Ajouter la cause si disponible
+            //  si disponible
             if (e.getCause() != null) {
                 response.put("cause", e.getCause().getClass().getName() + ": " + e.getCause().getMessage());
             }
@@ -286,7 +283,6 @@ public class MailTestController {
                 host, port, factureUsername, e.getMessage()
             );
             
-            String suggestions = generateSuggestions(errorMsg, facturePassword, true);
             
             response.put("success", false);
             response.put("error", "AuthenticationFailedException");
@@ -299,7 +295,6 @@ public class MailTestController {
             response.put("errorDetails", e.getMessage());
             response.put("isPasswordIssue", !detectedIssue.isEmpty());
             response.put("detectedIssue", detectedIssue);
-            response.put("suggestions", suggestions);
             response.put("passwordLength", facturePassword != null ? facturePassword.length() : 0);
             response.put("passwordPreview", facturePassword != null ? facturePassword : "***");
             
@@ -324,7 +319,6 @@ public class MailTestController {
                 host, port, factureUsername, e.getMessage()
             );
             
-            String suggestions = generateSuggestions(combinedError, facturePassword, false);
             
             response.put("success", false);
             response.put("error", "MessagingException");
@@ -337,7 +331,6 @@ public class MailTestController {
             response.put("errorDetails", e.getMessage());
             response.put("isPasswordIssue", !detectedIssue.isEmpty());
             response.put("detectedIssue", detectedIssue);
-            response.put("suggestions", suggestions);
             response.put("passwordLength", facturePassword != null ? facturePassword.length() : 0);
             response.put("passwordPreview", facturePassword != null ? facturePassword : "***");
             
@@ -381,15 +374,12 @@ public class MailTestController {
         config.put("port", port);
         config.put("username", username);
         config.put("factureUsername", factureUsername);
-        // Ne pas exposer les mots de passe
         config.put("passwordLength", password != null ? password.length() : 0);
         config.put("facturePasswordLength", facturePassword != null ? facturePassword.length() : 0);
         return ResponseEntity.ok(config);
     }
 
-    /**
-     * Détecte automatiquement le type de problème de mot de passe
-     */
+   
     private String detectPasswordIssue(String errorMsg, String password) {
         if (errorMsg == null || errorMsg.isEmpty()) {
             return "";
@@ -433,48 +423,7 @@ public class MailTestController {
         return "";
     }
 
-    /**
-     * Génère des suggestions basées sur le type d'erreur détecté
-     */
-    private String generateSuggestions(String errorMsg, String password, boolean isAuthException) {
-        if (errorMsg == null) errorMsg = "";
-        String lowerError = errorMsg.toLowerCase();
-        
-        // Vérifier si le mot de passe est vide ou trop court
-        if (password == null || password.isEmpty()) {
-            return "❌ MOT DE PASSE MANQUANT: Le mot de passe n'est pas configuré dans application-prod.properties";
-        }
-        
-        if (password.length() < 4) {
-            return "❌ MOT DE PASSE TROP COURT: Le mot de passe doit contenir au moins 4 caractères";
-        }
-        
-        // Suggestions pour code SMTP 535
-        if (lowerError.contains("535")) {
-            return "❌ CODE SMTP 535 (Mauvais mot de passe): 1) Vérifiez que le mot de passe est EXACTEMENT correct, 2) Pas d'espaces avant/après, 3) Caractères spéciaux correctement configurés";
-        }
-        
-        // Suggestions pour timeout
-        if (lowerError.contains("timeout") || lowerError.contains("read timed out")) {
-            return "⏱️ TIMEOUT DÉTECTÉ: Un timeout lors de la connexion SMTP indique souvent un mauvais mot de passe. Le serveur ne répond pas car l'authentification échoue. Vérifiez: 1) Le mot de passe est correct, 2) Pas d'espaces, 3) Caractères spéciaux bien configurés";
-        }
-        
-        // Suggestions pour authentification échouée
-        if (lowerError.contains("authentication failed") || lowerError.contains("invalid credentials")) {
-            return "🔐 AUTHENTIFICATION ÉCHOUÉE: 1) Mot de passe incorrect, 2) Vérifiez les caractères spéciaux ($, @, *, ?, etc.), 3) Essayez de vous connecter manuellement";
-        }
-        
-        // Suggestions génériques pour problèmes de mot de passe
-        if (lowerError.contains("password") || lowerError.contains("auth")) {
-            return "🔑 PROBLÈME D'AUTHENTIFICATION: 1) Vérifiez le mot de passe dans application-prod.properties, 2) Vérifiez les caractères spéciaux, 3) Pas d'espaces";
-        }
-        
-        // Suggestions génériques pour autres erreurs
-        if (isAuthException) {
-            return "Vérifiez: 1) Le mot de passe est correct, 2) Le compte email est actif, 3) L'authentification SMTP est activée";
-        }
-        
-        return "Vérifiez: 1) La connexion réseau, 2) Le serveur est accessible, 3) Le firewall, 4) Les timeouts";
-    }
+   
+
 }
 
