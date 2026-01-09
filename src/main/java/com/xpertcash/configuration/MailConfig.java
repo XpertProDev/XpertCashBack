@@ -63,7 +63,6 @@ public class MailConfig {
             props.put("mail.smtp.starttls.enable", "false");
             props.put("mail.smtp.ssl.trust", host);
         } else {
-            // Configuration STARTTLS pour les autres ports (587, etc.)
         props.put("mail.smtp.starttls.enable", "true");
         }
 

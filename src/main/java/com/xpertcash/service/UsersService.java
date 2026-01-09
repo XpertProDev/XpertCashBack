@@ -1121,6 +1121,9 @@ public class UsersService {
         }
     }
    
+    // Supprimer les InitialPasswordToken de l'utilisateur AVANT de supprimer l'utilisateur
+    // Cela évite l'erreur de contrainte de clé étrangère
+    initialPasswordTokenRepository.deleteByUser(userToDelete);
 
     usersRepository.delete(userToDelete);
 }
