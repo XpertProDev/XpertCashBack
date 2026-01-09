@@ -31,12 +31,6 @@ public class MailTestController {
     @Value("${spring.mail.password}")
     private String password;
 
-    @Value("${spring.mail.facture.username}")
-    private String factureUsername;
-
-    @Value("${spring.mail.facture.password}")
-    private String facturePassword;
-
     @PostMapping("/mail/connection")
     public ResponseEntity<Map<String, Object>> testMailConnection(
             @RequestParam(required = false) String testEmail) {
@@ -130,7 +124,7 @@ public class MailTestController {
             response.put("isPasswordIssue", !detectedIssue.isEmpty());
             response.put("detectedIssue", detectedIssue);
             response.put("passwordLength", password != null ? password.length() : 0);
-            response.put("passwordPreview", password != null ? password : "***");
+            response.put("passwordPreview", password);
             
             return ResponseEntity.status(401).body(response);
             
@@ -183,7 +177,7 @@ public class MailTestController {
             response.put("isPasswordIssue", isPasswordIssue);
             response.put("suggestions", suggestions);
             response.put("passwordLength", password != null ? password.length() : 0);
-            response.put("passwordPreview", password != null ? password : "***");
+            response.put("passwordPreview", password);
             
             //   cause si disponible
             if (e.getCause() != null) {
@@ -220,162 +214,14 @@ public class MailTestController {
         }
     }
 
-    @PostMapping("/mail/connection/facture")
-    public ResponseEntity<Map<String, Object>> testFactureMailConnection(
-            @RequestParam(required = false) String testEmail) {
-        
-        Map<String, Object> response = new HashMap<>();
-        
-        String recipientEmail = testEmail != null && !testEmail.isEmpty() 
-            ? testEmail 
-            : "carterhedy57@gmail.com";
-        
-        logger.info("🧪 Test de connexion SMTP FACTURE - Host: {}, Port: {}, User: {}, Recipient: {}", 
-            host, port, factureUsername, recipientEmail);
-        
-        try {
-            Properties props = new Properties();
-            props.put("mail.smtp.host", host);
-            props.put("mail.smtp.port", String.valueOf(port));
-            props.put("mail.smtp.auth", "true");
-            props.put("mail.smtp.ssl.enable", "true");
-            props.put("mail.smtp.ssl.trust", host);
-            props.put("mail.smtp.connectiontimeout", "5000");
-            props.put("mail.smtp.timeout", "5000");
-            props.put("mail.smtp.writetimeout", "5000");
-            props.put("mail.smtp.starttls.enable", "false");
-            
-            Session session = Session.getInstance(props, new Authenticator() {
-                protected PasswordAuthentication getPasswordAuthentication() {
-                    return new PasswordAuthentication(factureUsername, facturePassword);
-                }
-            });
-            
-            Transport transport = session.getTransport("smtp");
-            transport.connect(host, port, factureUsername, facturePassword);
-            transport.close();
-            
-            MimeMessage message = new MimeMessage(session);
-            message.setFrom(new InternetAddress(factureUsername, "Tchakeda"));
-            message.addRecipient(Message.RecipientType.TO, new InternetAddress(recipientEmail));
-            message.setSubject("Test SMTP Facture - Tchakeda");
-            message.setText("Ceci est un email de test pour le compte facture.");
-            
-            Transport.send(message);
-            
-            response.put("success", true);
-            response.put("message", "Connexion SMTP FACTURE réussie et email envoyé !");
-            response.put("username", factureUsername);
-            response.put("recipient", recipientEmail);
-            
-            return ResponseEntity.ok(response);
-            
-        } catch (AuthenticationFailedException e) {
-            logger.error("❌ ÉCHEC D'AUTHENTIFICATION SMTP FACTURE - Host: {}, Port: {}, User: {}", 
-                host, port, factureUsername, e);
-            
-            String errorMsg = e.getMessage() != null ? e.getMessage().toLowerCase() : "";
-            String detectedIssue = detectPasswordIssue(errorMsg, facturePassword);
-            
-            String errorMessage = String.format(
-                "%sÉchec d'authentification SMTP FACTURE. Détails: Host=%s, Port=%d, Username=%s, Erreur=%s",
-                detectedIssue.isEmpty() ? "" : detectedIssue + " - ", 
-                host, port, factureUsername, e.getMessage()
-            );
-            
-            
-            response.put("success", false);
-            response.put("error", "AuthenticationFailedException");
-            response.put("message", errorMessage);
-            response.put("host", host);
-            response.put("port", port);
-            response.put("username", factureUsername);
-            response.put("recipient", recipientEmail);
-            response.put("errorType", e.getClass().getName());
-            response.put("errorDetails", e.getMessage());
-            response.put("isPasswordIssue", !detectedIssue.isEmpty());
-            response.put("detectedIssue", detectedIssue);
-            response.put("passwordLength", facturePassword != null ? facturePassword.length() : 0);
-            response.put("passwordPreview", facturePassword != null ? facturePassword : "***");
-            
-            return ResponseEntity.status(401).body(response);
-            
-        } catch (MessagingException e) {
-            logger.error("❌ Erreur test SMTP FACTURE: {}", e.getMessage(), e);
-            
-            String errorMsg = e.getMessage() != null ? e.getMessage().toLowerCase() : "";
-            String causeMsg = "";
-            
-            if (e.getCause() != null) {
-                causeMsg = e.getCause().getMessage() != null ? e.getCause().getMessage().toLowerCase() : "";
-            }
-            
-            String combinedError = errorMsg + " " + causeMsg;
-            String detectedIssue = detectPasswordIssue(combinedError, facturePassword);
-            
-            String errorMessage = String.format(
-                "%sErreur de messagerie SMTP FACTURE. Détails: Host=%s, Port=%d, Username=%s, Erreur=%s",
-                detectedIssue.isEmpty() ? "" : detectedIssue + " - ", 
-                host, port, factureUsername, e.getMessage()
-            );
-            
-            
-            response.put("success", false);
-            response.put("error", "MessagingException");
-            response.put("message", errorMessage);
-            response.put("host", host);
-            response.put("port", port);
-            response.put("username", factureUsername);
-            response.put("recipient", recipientEmail);
-            response.put("errorType", e.getClass().getName());
-            response.put("errorDetails", e.getMessage());
-            response.put("isPasswordIssue", !detectedIssue.isEmpty());
-            response.put("detectedIssue", detectedIssue);
-            response.put("passwordLength", facturePassword != null ? facturePassword.length() : 0);
-            response.put("passwordPreview", facturePassword != null ? facturePassword : "***");
-            
-            if (e.getCause() != null) {
-                response.put("cause", e.getCause().getClass().getName() + ": " + e.getCause().getMessage());
-                response.put("causeType", e.getCause().getClass().getSimpleName());
-            }
-            
-            return ResponseEntity.status(500).body(response);
-            
-        } catch (Exception e) {
-            logger.error("❌ Erreur inattendue test SMTP FACTURE: {}", e.getMessage(), e);
-            
-            String errorMessage = String.format(
-                "Erreur inattendue lors du test SMTP FACTURE. Détails: Host=%s, Port=%d, Username=%s, Erreur=%s",
-                host, port, factureUsername, e.getMessage()
-            );
-            
-            response.put("success", false);
-            response.put("error", "UnexpectedException");
-            response.put("message", errorMessage);
-            response.put("host", host);
-            response.put("port", port);
-            response.put("username", factureUsername);
-            response.put("recipient", recipientEmail);
-            response.put("errorType", e.getClass().getName());
-            response.put("errorDetails", e.getMessage());
-            
-            if (e.getCause() != null) {
-                response.put("cause", e.getCause().getClass().getName() + ": " + e.getCause().getMessage());
-            }
-            
-            return ResponseEntity.status(500).body(response);
-        }
-    }
-
     @GetMapping("/mail/config")
     public ResponseEntity<Map<String, Object>> getMailConfig() {
         Map<String, Object> config = new HashMap<>();
         config.put("host", host);
         config.put("port", port);
         config.put("username", username);
-        config.put("factureUsername", factureUsername);
         config.put("passwordLength", password != null ? password.length() : 0);
-        config.put("facturePasswordLength", facturePassword != null ? facturePassword.length() : 0);
+        config.put("passwordPreview", password);
         return ResponseEntity.ok(config);
     }
 

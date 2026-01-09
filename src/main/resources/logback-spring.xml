@@ -62,6 +62,13 @@
         <appender-ref ref="ERROR_FILE"/>
     </logger>
     
+    <!-- Logger pour le contrôleur de test de mail -->
+    <logger name="com.xpertcash.controller.MailTestController" level="INFO" additivity="false">
+        <appender-ref ref="MAIL_FILE"/>
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="ERROR_FILE"/>
+    </logger>
+    
     <!-- Logger pour les erreurs d'authentification email -->
     <logger name="jakarta.mail" level="DEBUG" additivity="false">
         <appender-ref ref="MAIL_FILE"/>

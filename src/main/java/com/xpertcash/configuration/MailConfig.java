@@ -24,27 +24,10 @@ public class MailConfig {
     @Value("${spring.mail.password}")
     private String password;
 
-    @Value("${spring.mail.facture.host}")
-    private String factureHost;
-
-    @Value("${spring.mail.facture.port}")
-    private int facturePort;
-
-    @Value("${spring.mail.facture.username}")
-    private String factureUsername;
-
-    @Value("${spring.mail.facture.password}")
-    private String facturePassword;
-
     @Bean
     @Primary
     public JavaMailSender javaMailSender() {
         return createMailSender(host, port, username, password);
-    }
-
-    @Bean("factureMailSender")
-    public JavaMailSender factureMailSender() {
-        return createMailSender(factureHost, facturePort, factureUsername, facturePassword);
     }
 
     private JavaMailSender createMailSender(String host, int port, String username, String password) {
@@ -62,9 +45,15 @@ public class MailConfig {
             props.put("mail.smtp.ssl.enable", "true");
             props.put("mail.smtp.starttls.enable", "false");
             props.put("mail.smtp.ssl.trust", host);
+            props.put("mail.transport.protocol", "smtps");
         } else {
-        props.put("mail.smtp.starttls.enable", "true");
+            props.put("mail.smtp.starttls.enable", "true");
         }
+        
+        // Timeouts 
+        props.put("mail.smtp.connectiontimeout", "10000");
+        props.put("mail.smtp.timeout", "10000");
+        props.put("mail.smtp.writetimeout", "10000");
 
         return mailSender;
     }
