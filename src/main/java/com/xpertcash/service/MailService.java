@@ -21,6 +21,7 @@ import java.util.function.Function;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import com.xpertcash.DTOs.VENTE.ReceiptEmailRequest;
 import com.xpertcash.DTOs.VENTE.VenteLigneResponse;
 import org.springframework.beans.factory.annotation.Value;
@@ -39,13 +40,20 @@ public class MailService {
     @Autowired
     private JavaMailSender mailSender;
  
-    @Value("${spring.mail.username}")
-    private String from;
+    @Autowired
+    @Qualifier("factureMailSender")
+    private JavaMailSender factureMailSender;
+ 
+    @Value("${spring.mail.contact.username}")
+    private String from; 
 
-    @Value("${spring.mail.host}")
+    @Value("${spring.mail.facture.username}")
+    private String factureFrom;
+
+    @Value("${spring.mail.contact.host}")
     private String mailHost;
 
-    @Value("${spring.mail.port}")
+    @Value("${spring.mail.contact.port}")
     private int mailPort;
 
     public void sendActivationLinkEmail(String to, String code, String personalCode) throws MessagingException {
@@ -73,7 +81,7 @@ public class MailService {
         SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm");
         String formattedDate = sdf.format(relanceDate);
         String message = generateFactureRelanceMessage(factureNumero, clientName, formattedDate, estEntreprise);
-        sendEmail(to, subject, message);
+        sendFactureEmail(to, subject, message);
     }
     
 
@@ -151,6 +159,109 @@ public class MailService {
         String htmlContent = generatePasswordResetEmail(otp);
     
         sendEmail(to, subject, htmlContent);
+    }
+
+    // Méthode pour envoyer des emails de facture avec le compte facture@tchakeda.com
+    public void sendFactureEmail(String toEmail, String subject, String htmlContent) throws MessagingException {
+        logger.info("📧 Tentative d'envoi d'email FACTURE - Destinataire: {}, Sujet: {}, Expéditeur: {}", 
+            toEmail, subject, factureFrom);
+    
+        try {
+            MimeMessage message = factureMailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+
+            try {
+                helper.setFrom(factureFrom, "Tchakeda");
+                logger.debug("Expéditeur facture configuré: {}", factureFrom);
+            } catch (UnsupportedEncodingException e) {
+                logger.error("❌ Erreur lors de la configuration de l'expéditeur facture: {}", e.getMessage(), e);
+                throw new MessagingException("Erreur lors de la configuration de l'expéditeur facture", e);
+            }
+            helper.setTo(toEmail);
+            helper.setSubject(subject);
+            helper.setText(htmlContent, true);
+
+            try {
+                InputStream logoStream = getClass().getClassLoader().getResourceAsStream("assets/tchakeda.png");
+                if (logoStream == null) {
+                    logger.warn("⚠️ Logo image not found in resources");
+                    throw new MessagingException("Logo image not found in resources.");
+                }
+
+                ByteArrayDataSource logoDataSource = new ByteArrayDataSource(logoStream, "image/png");
+                helper.addInline("logo", logoDataSource);
+                logger.debug("Logo ajouté au message facture");
+            } catch (IOException e) {
+                logger.error("❌ Erreur lors du chargement du logo: {}", e.getMessage(), e);
+                throw new MessagingException("Error loading logo image", e);
+            }
+
+            logger.info("Envoi du message email facture en cours...");
+            factureMailSender.send(message);
+            logger.info("✅ Email facture envoyé avec succès à {}", toEmail);
+        } catch (jakarta.mail.AuthenticationFailedException e) {
+            logger.error("❌ ÉCHEC D'AUTHENTIFICATION EMAIL FACTURE - User: {}, Erreur: {}", 
+                factureFrom, e.getMessage(), e);
+            throw new MessagingException("Échec d'authentification email facture: " + e.getMessage(), e);
+        } catch (MessagingException e) {
+            logger.error("❌ Erreur lors de l'envoi de l'email facture à {} - Erreur: {}", toEmail, e.getMessage(), e);
+            throw e;
+        } catch (Exception e) {
+            logger.error("❌ Erreur inattendue lors de l'envoi de l'email facture à {} - Erreur: {}", toEmail, e.getMessage(), e);
+            throw new MessagingException("Erreur inattendue lors de l'envoi de l'email facture", e);
+        }
+    }
+
+    // Méthode pour envoyer des emails de facture avec pièces jointes
+    public void sendFactureEmailWithAttachments(
+        String toEmail,
+        String ccEmail,
+        String subject,
+        String htmlContent,
+        List<MultipartFile> attachments
+    ) throws MessagingException, IOException {
+        logger.info("📧 Tentative d'envoi d'email FACTURE avec pièces jointes - Destinataire: {}, Sujet: {}, Expéditeur: {}", 
+            toEmail, subject, factureFrom);
+        
+        MimeMessage message = factureMailSender.createMimeMessage();
+        MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+
+        try {
+            helper.setFrom(factureFrom, "Tchakeda");
+        } catch (UnsupportedEncodingException e) {
+            throw new MessagingException("Erreur lors de la configuration de l'expéditeur facture", e);
+        }
+        helper.setTo(toEmail.split(","));
+        if (ccEmail != null && !ccEmail.isBlank()) {
+            helper.setCc(ccEmail.split(","));
+        }
+        helper.setSubject(subject);
+        helper.setText(htmlContent, true);
+
+        InputStream logoStream = getClass().getClassLoader().getResourceAsStream("assets/tchakeda.png");
+        if (logoStream != null) {
+            ByteArrayDataSource logoDataSource = new ByteArrayDataSource(logoStream, "image/png");
+            helper.addInline("logo", logoDataSource);
+        } else {
+            throw new MessagingException("Logo introuvable dans les resources.");
+        }
+
+        for (MultipartFile file : attachments) {
+            if (!file.isEmpty()) {
+                String contentType = file.getContentType();
+                if (contentType == null) {
+                    contentType = "application/octet-stream";
+                }
+                helper.addAttachment(
+                    Objects.requireNonNull(file.getOriginalFilename()),
+                    new ByteArrayResource(file.getBytes()),
+                    contentType
+                );
+            }
+        }
+
+        factureMailSender.send(message);
+        logger.info("✅ Email facture avec pièces jointes envoyé avec succès à {}", toEmail);
     }
 
     
@@ -286,7 +397,7 @@ public class MailService {
         System.out.println("📧 Envoi d'un email d'approbation à : " + to);
         String subject = "Demande d'approbation - Facture " + factureNumero;
         String htmlContent = generateDemandeApprobationMessage(fullName, factureNumero, createurNom, montantTotal, objetFacture);
-        sendEmail(to, subject, htmlContent);
+        sendFactureEmail(to, subject, htmlContent);
     }
 
     // Génération du message HTML pour la demande d'approbation
@@ -322,7 +433,7 @@ public class MailService {
         System.out.println("📧 Envoi d'un email d'approbation confirmée à : " + to);
         String subject = "Facture approuvée - " + factureNumero;
         String htmlContent = generateFactureApprouveeMessage(fullName, factureNumero, approbateurNom, montantTotal, objetFacture);
-        sendEmail(to, subject, htmlContent);
+        sendFactureEmail(to, subject, htmlContent);
     }
 
     // Génération du message HTML pour la notification d'approbation
@@ -357,7 +468,7 @@ public class MailService {
         System.out.println("📧 Envoi d'un email de modification de facture à : " + to);
         String subject = "Facture modifiée - " + factureNumero;
         String htmlContent = generateFactureModifieeMessage(fullName, factureNumero, modificateurNom, montantTotal, objetFacture);
-        sendEmail(to, subject, htmlContent);
+        sendFactureEmail(to, subject, htmlContent);
     }
 
     // Génération du message HTML pour la notification de modification
@@ -571,7 +682,7 @@ public class MailService {
     public void sendReceiptEmail(ReceiptEmailRequest request) throws MessagingException {
         String subject = "Facture de vente - " + request.getNumeroFacture();
         String htmlContent = generateReceiptEmail(request);
-        sendEmail(request.getEmail(), subject, htmlContent);
+        sendFactureEmail(request.getEmail(), subject, htmlContent);
     }
 
     // Méthode pour envoyer une facture de vente par email avec pièces jointes (PDF)
@@ -579,7 +690,7 @@ public class MailService {
             throws MessagingException, IOException {
         String subject = "Facture de vente - " + request.getNumeroFacture();
         String htmlContent = generateReceiptEmail(request);
-        sendEmailWithAttachments(request.getEmail(), null, subject, htmlContent, attachments);
+        sendFactureEmailWithAttachments(request.getEmail(), null, subject, htmlContent, attachments);
     }
 
     // Génération du contenu HTML pour l'email de facture
