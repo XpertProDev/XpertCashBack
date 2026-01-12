@@ -154,9 +154,9 @@ public class SuperAdminController {
      * - SUPER_ADMIN (peut supprimer n'importe quel admin)
      * - L'admin lui-même (peut supprimer uniquement son propre compte)
      * 
-     * @param adminId L'ID de l'admin à supprimer
-     * @param request La requête HTTP pour récupérer l'utilisateur connecté
-     * @return Réponse indiquant le succès ou l'échec de l'opération
+     *  adinId L'ID de l'admin à supprimer
+     *  request La requête HTTP pour récupérer l'utilisateur connecté
+     *  Réponse indiquant le succès ou l'échec de l'opération
      */
     @DeleteMapping("/deleteAdminAndEntreprise/{adminId}")
     public ResponseEntity<?> deleteAdminAndEntreprise(@PathVariable Long adminId, HttpServletRequest request) {

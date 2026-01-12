@@ -80,6 +80,7 @@ import com.xpertcash.repository.PROSPECT.InteractionRepository;
 import com.xpertcash.repository.PROSPECT.ProspectAchatRepository;
 import com.xpertcash.repository.FactProHistoriqueActionRepository;
 import com.xpertcash.repository.PASSWORD.PasswordResetTokenRepository;
+import com.xpertcash.repository.PASSWORD.InitialPasswordTokenRepository;
 import com.xpertcash.repository.Module.PaiementModuleRepository;
 import com.xpertcash.repository.Module.EntrepriseModuleEssaiRepository;
 import com.xpertcash.repository.Module.EntrepriseModuleAbonnementRepository;
@@ -217,6 +218,9 @@ public class SuperAdminService {
 
     @Autowired
     private PasswordResetTokenRepository passwordResetTokenRepository;
+
+    @Autowired
+    private InitialPasswordTokenRepository initialPasswordTokenRepository;
 
     @PersistenceContext
     private EntityManager entityManager;
@@ -513,6 +517,16 @@ public class SuperAdminService {
             totalPasswordTokens++;
         }
         if (totalPasswordTokens > 0) {
+            entityManager.flush();
+        }
+
+        // 5.9.5.5. Supprimer tous les InitialPasswordToken AVANT les utilisateurs (car ils référencent User)
+        int totalInitialPasswordTokens = 0;
+        for (User u : usersForNotifications) {
+            initialPasswordTokenRepository.deleteByUser(u);
+            totalInitialPasswordTokens++;
+        }
+        if (totalInitialPasswordTokens > 0) {
             entityManager.flush();
         }
 
@@ -906,10 +920,30 @@ public class SuperAdminService {
                 }
             }
         }
-        produitRepository.deleteAll(produits);
-        entityManager.flush();
+        if (!produits.isEmpty()) {
+            produitRepository.deleteAll(produits);
+            entityManager.flush();
+        }
+        
+        // 12.5.5. Vérification supplémentaire : supprimer tous les produits restants via requête native
+        // pour s'assurer qu'aucun produit ne reste avant de supprimer les catégories
+        Long countProduitsRestants = (Long) entityManager.createNativeQuery(
+            "SELECT COUNT(*) FROM produit p " +
+            "INNER JOIN boutique b ON p.boutique_id = b.id " +
+            "WHERE b.entreprise_id = :entrepriseId"
+        ).setParameter("entrepriseId", entrepriseId).getSingleResult();
+        
+        if (countProduitsRestants > 0) {
+            // Supprimer tous les produits restants via requête native
+            entityManager.createNativeQuery(
+                "DELETE p FROM produit p " +
+                "INNER JOIN boutique b ON p.boutique_id = b.id " +
+                "WHERE b.entreprise_id = :entrepriseId"
+            ).setParameter("entrepriseId", entrepriseId).executeUpdate();
+            entityManager.flush();
+        }
 
-        // 13. Supprimer toutes les catégories
+        // 13. Supprimer toutes les catégories (maintenant que tous les produits sont supprimés)
         List<Categorie> categories = categorieRepository.findByEntrepriseId(entrepriseId);
         categorieRepository.deleteAll(categories);
 
@@ -1081,10 +1115,14 @@ public class SuperAdminService {
         // 3.1. Identifier la première boutique à conserver (par ID le plus petit)
         List<Boutique> toutesBoutiques = boutiqueRepository.findByEntrepriseId(entrepriseId);
         Boutique premiereBoutique = null;
+        final Long finalPremiereBoutiqueId;
         if (!toutesBoutiques.isEmpty()) {
             premiereBoutique = toutesBoutiques.stream()
                     .min(Comparator.comparing(Boutique::getId))
                     .orElse(null);
+            finalPremiereBoutiqueId = (premiereBoutique != null) ? premiereBoutique.getId() : null;
+        } else {
+            finalPremiereBoutiqueId = null;
         }
 
         // 3. Retirer la référence admin de l'entreprise temporairement (pour éviter les erreurs)
@@ -1183,6 +1221,12 @@ public class SuperAdminService {
         // 5.9.5. Supprimer tous les PasswordResetToken AVANT les utilisateurs (car ils référencent User)
         for (User u : usersForNotifications) {
             passwordResetTokenRepository.deleteByUser(u);
+        }
+        entityManager.flush();
+
+        // 5.9.5.5. Supprimer tous les InitialPasswordToken AVANT les utilisateurs (car ils référencent User)
+        for (User u : usersForNotifications) {
+            initialPasswordTokenRepository.deleteByUser(u);
         }
         entityManager.flush();
 
@@ -1533,7 +1577,13 @@ public class SuperAdminService {
         }
 
         // 12.5. Supprimer les produits avec leurs photos AVANT les catégories (car ils référencent categorie_id)
+        // Exclure les produits de la première boutique (ils seront supprimés dans la section 12.5.5)
         List<Produit> produits = produitRepository.findByEntrepriseId(entrepriseId);
+        if (finalPremiereBoutiqueId != null) {
+            produits = produits.stream()
+                    .filter(p -> p.getBoutique() == null || !p.getBoutique().getId().equals(finalPremiereBoutiqueId))
+                    .collect(Collectors.toList());
+        }
         for (Produit produit : produits) {
             if (produit.getPhoto() != null && !produit.getPhoto().isBlank()) {
                 try {
@@ -1543,10 +1593,30 @@ public class SuperAdminService {
                 }
             }
         }
-        produitRepository.deleteAll(produits);
-        entityManager.flush();
+        if (!produits.isEmpty()) {
+            produitRepository.deleteAll(produits);
+            entityManager.flush();
+        }
 
-        // 13. Supprimer toutes les catégories
+        // 12.5.5. Supprimer les produits de la première boutique AVANT les catégories
+        if (premiereBoutique != null) {
+            List<Produit> produitsPremiereBoutique = produitRepository.findByBoutique(premiereBoutique);
+            for (Produit produit : produitsPremiereBoutique) {
+                if (produit.getPhoto() != null && !produit.getPhoto().isBlank()) {
+                    try {
+                        Path photoPath = Paths.get("src/main/resources/static" + produit.getPhoto());
+                        Files.deleteIfExists(photoPath);
+                    } catch (IOException e) {
+                    }
+                }
+            }
+            if (!produitsPremiereBoutique.isEmpty()) {
+                produitRepository.deleteAll(produitsPremiereBoutique);
+                entityManager.flush();
+            }
+        }
+
+        // 13. Supprimer toutes les catégories (maintenant que tous les produits sont supprimés)
         List<Categorie> categories = categorieRepository.findByEntrepriseId(entrepriseId);
         categorieRepository.deleteAll(categories);
 
@@ -1592,8 +1662,8 @@ public class SuperAdminService {
 
         // 21. Vider la première boutique et supprimer les autres
         List<Boutique> boutiques = boutiqueRepository.findByEntrepriseId(entrepriseId);
-        if (premiereBoutique != null && !boutiques.isEmpty()) {
-            Long premiereBoutiqueId = premiereBoutique.getId();
+        if (premiereBoutique != null && !boutiques.isEmpty() && finalPremiereBoutiqueId != null) {
+            Long premiereBoutiqueId = finalPremiereBoutiqueId;
             
             // 21.1. Vider le contenu de la première boutique
             
@@ -1675,21 +1745,8 @@ public class SuperAdminService {
                 entityManager.flush();
             }
             
-            // 21.1.11. Supprimer tous les produits de la première boutique avec leurs photos
-            List<Produit> produitsPremiereBoutique = produitRepository.findByBoutique(premiereBoutique);
-            for (Produit produit : produitsPremiereBoutique) {
-                if (produit.getPhoto() != null && !produit.getPhoto().isBlank()) {
-                    try {
-                        Path photoPath = Paths.get("src/main/resources/static" + produit.getPhoto());
-                        Files.deleteIfExists(photoPath);
-                    } catch (IOException e) {
-                    }
-                }
-            }
-            if (!produitsPremiereBoutique.isEmpty()) {
-                produitRepository.deleteAll(produitsPremiereBoutique);
-            }
-            entityManager.flush();
+            // 21.1.11. Les produits de la première boutique ont déjà été supprimés dans la section 12.5.5
+            // Pas besoin de les supprimer à nouveau ici
             
             // 21.1.12. Supprimer toutes les ventes de la première boutique
             List<Vente> ventesPremiereBoutique = venteRepository.findByBoutiqueId(premiereBoutiqueId);
@@ -1763,14 +1820,15 @@ public class SuperAdminService {
             }
         }
 
-        // 22.5. Vider la relation ManyToMany avec AppModule avant de supprimer l'entreprise
-        entreprise = entrepriseRepository.findById(entrepriseId).orElse(null);
-        if (entreprise != null) {
-            if (entreprise.getModulesActifs() != null && !entreprise.getModulesActifs().isEmpty()) {
-                entreprise.getModulesActifs().clear();
-                entrepriseRepository.save(entreprise);
-            }
-        }
+        // 22.5. CONSERVER les modules actifs, les essais de modules et les abonnements
+        // On ne vide PAS les modules pour préserver les essais et abonnements
+        // entreprise = entrepriseRepository.findById(entrepriseId).orElse(null);
+        // if (entreprise != null) {
+        //     if (entreprise.getModulesActifs() != null && !entreprise.getModulesActifs().isEmpty()) {
+        //         entreprise.getModulesActifs().clear();
+        //         entrepriseRepository.save(entreprise);
+        //     }
+        // }
 
         // 22.6. Forcer un flush et clear la session Hibernate
         entityManager.flush();
@@ -1779,7 +1837,7 @@ public class SuperAdminService {
         // 23. Remettre la référence admin sur l'entreprise (car on l'avait retirée au début)
         entreprise = entrepriseRepository.findById(entrepriseId).orElse(null);
         if (entreprise != null) {
-            // S'assurer que toutes les collections sont vides
+            // S'assurer que toutes les collections sont vides (SAUF les modules actifs pour conserver les essais)
             if (entreprise.getUtilisateurs() != null) {
                 entreprise.getUtilisateurs().clear();
             }
@@ -1789,9 +1847,10 @@ public class SuperAdminService {
             if (entreprise.getFacturesProforma() != null) {
                 entreprise.getFacturesProforma().clear();
             }
-            if (entreprise.getModulesActifs() != null) {
-                entreprise.getModulesActifs().clear();
-            }
+            // CONSERVER les modules actifs pour préserver les essais et abonnements
+            // if (entreprise.getModulesActifs() != null) {
+            //     entreprise.getModulesActifs().clear();
+            // }
             
             // Remettre l'admin sur l'entreprise
             entreprise.setAdmin(admin);

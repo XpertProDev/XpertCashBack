@@ -70,10 +70,13 @@ public class BoutiqueService {
 
         User admin = authHelper.getAuthenticatedUserWithFallback(request);
 
-        // Vérifier que l'admin est bien un Admin
-        if (admin.getRole() == null || !admin.getRole().getName().equals(RoleType.ADMIN)) {
-            throw new RuntimeException("Seul un admin peut ajouter une boutique !");
+        // Vérifier que l'admin est bien un Admin ou un Manager
+        RoleType role = admin.getRole().getName();
+        boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
+        if (!isAdminOrManager) {
+            throw new RuntimeException("Seul un admin ou un manager peut ajouter une boutique !");
         }
+        
 
         // Vérifier que l'admin possède une entreprise
         if (admin.getEntreprise() == null) {

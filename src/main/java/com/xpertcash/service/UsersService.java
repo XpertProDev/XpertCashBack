@@ -149,6 +149,9 @@ public class UsersService {
     private DeviceDetectionService deviceDetectionService;
 
     @Autowired
+    private com.xpertcash.repository.PASSWORD.InitialPasswordTokenRepository initialPasswordTokenRepository;
+
+    @Autowired
     public UsersService(UsersRepository usersRepository, JwtConfig jwtConfig, BCryptPasswordEncoder passwordEncoder) {
         this.usersRepository = usersRepository;
         this.jwtConfig = jwtConfig;
@@ -607,12 +610,46 @@ public class UsersService {
             throw new RuntimeException("Ce compte est déjà activé.");
         }
 
-        // Essayer d’envoyer l’email d’activation
+        // Essayer d'envoyer l'email d'activation
         try {
             mailService.sendActivationLinkEmail(user.getEmail(), user.getActivationCode(), user.getPersonalCode());
         } catch (MessagingException e) {
             System.err.println("Erreur lors du renvoi de l'email : " + e.getMessage());
-            throw new RuntimeException("Impossible d’envoyer l’email pour le moment.");
+            throw new RuntimeException("Impossible d'envoyer l'email pour le moment.");
+        }
+    }
+
+    // Renvoyer l'email d'employé avec les identifiants (utilise le token sécurisé)
+    @Transactional
+    public void resendEmployeEmail(String email) {
+        // Vérifier que l'utilisateur existe
+        User user = usersRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("Utilisateur introuvable avec cet email."));
+
+        // Récupérer le token du mot de passe initial
+        com.xpertcash.entity.PASSWORD.InitialPasswordToken token = initialPasswordTokenRepository
+                .findByUser(user)
+                .orElseThrow(() -> new RuntimeException("Impossible de renvoyer l'email : le token d'initialisation n'est plus disponible. L'utilisateur doit réinitialiser son mot de passe."));
+
+        // Vérifier que le token n'est pas expiré
+        if (token.getExpirationDate().isBefore(LocalDateTime.now())) {
+            throw new RuntimeException("Le token d'initialisation a expiré. L'utilisateur doit réinitialiser son mot de passe.");
+        }
+
+        // Essayer d'envoyer l'email avec les identifiants
+        try {
+            mailService.sendEmployeEmail(
+                user.getEmail(),
+                user.getNomComplet(),
+                user.getEntreprise().getNomEntreprise(),
+                user.getRole().getName().toString(),
+                user.getEmail(),
+                token.getGeneratedPassword(), // Utiliser le mot de passe depuis le token
+                user.getPersonalCode()
+            );
+        } catch (MessagingException e) {
+            System.err.println("Erreur lors du renvoi de l'email : " + e.getMessage());
+            throw new RuntimeException("Impossible d'envoyer l'email pour le moment.");
         }
     }
 
@@ -887,7 +924,17 @@ public class UsersService {
                 // Enregistrer l'utilisateur
                 User savedUser = usersRepository.save(newUser);
 
-                // Envoi de l'email avec les identifiants
+                // Créer un token pour le mot de passe initial (sécurisé)
+                String initialPasswordTokenValue = UUID.randomUUID().toString();
+                com.xpertcash.entity.PASSWORD.InitialPasswordToken initialPasswordToken = 
+                    new com.xpertcash.entity.PASSWORD.InitialPasswordToken();
+                initialPasswordToken.setToken(initialPasswordTokenValue);
+                initialPasswordToken.setUser(savedUser);
+                initialPasswordToken.setGeneratedPassword(generatedPassword);
+                initialPasswordToken.setExpirationDate(LocalDateTime.now().plusDays(30)); // Valide 30 jours
+                initialPasswordTokenRepository.save(initialPasswordToken);
+
+                // Essayer d'envoyer l'email, mais ne pas interrompre l'inscription si ça échoue
                 try {
                     mailService.sendEmployeEmail(
                         savedUser.getEmail(),
@@ -897,12 +944,10 @@ public class UsersService {
                         savedUser.getEmail(),
                         generatedPassword,
                         savedUser.getPersonalCode()
-
                     );
-                } catch (MessagingException e) {
-                    System.err.println("Erreur lors de l'envoi de l'email à " + savedUser.getEmail() + " : " + e.getMessage());
-                    e.printStackTrace();
-                    throw new RuntimeException("Utilisateur créé mais une erreur est survenue lors de l'envoi de l'email.", e);
+                } catch (Exception e) {
+                    System.err.println("⚠️ Erreur lors de l'envoi de l'email à " + savedUser.getEmail() + " : " + e.getMessage());
+                    // Ne pas lancer d'exception, l'utilisateur est créé et l'email pourra être renvoyé plus tard
                 }
                 return savedUser;
             }
@@ -1076,6 +1121,9 @@ public class UsersService {
         }
     }
    
+    // Supprimer les InitialPasswordToken de l'utilisateur AVANT de supprimer l'utilisateur
+    // Cela évite l'erreur de contrainte de clé étrangère
+    initialPasswordTokenRepository.deleteByUser(userToDelete);
 
     usersRepository.delete(userToDelete);
 }
@@ -1109,6 +1157,8 @@ public class UsersService {
                 throw new RuntimeException("Le nouveau mot de passe ne peut pas être identique à l'ancien.");
             }
             user.setPassword(passwordEncoder.encode(request.getNewPassword()));
+            // Supprimer le token d'initialisation après le premier changement de mot de passe
+            initialPasswordTokenRepository.deleteByUser(user);
         }
 
         // Vérification et mise à jour du téléphone

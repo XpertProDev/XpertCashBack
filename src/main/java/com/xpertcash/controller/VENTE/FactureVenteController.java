@@ -1,6 +1,11 @@
 package com.xpertcash.controller.VENTE;
 
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -8,6 +13,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 import com.xpertcash.DTOs.VENTE.FactureVentePaginatedDTO;
 import com.xpertcash.DTOs.VENTE.ReceiptEmailRequest;
@@ -42,7 +48,7 @@ public class FactureVenteController {
         return ResponseEntity.ok(factures);
     }
 
-    // Endpoint pour envoyer une facture de vente par email
+    // Endpoint pour envoyer une facture de vente par email (sans pièces jointes - pour compatibilité)
     @PostMapping("/factureVente/envoyer-email")
     public ResponseEntity<?> envoyerFactureVenteEmail(
             @RequestBody ReceiptEmailRequest request,
@@ -64,8 +70,51 @@ public class FactureVenteController {
                 request.getEmail()
             );
 
-            // Envoi de l'email
+            // Envoi de l'email sans pièces jointes
             mailService.sendReceiptEmail(factureData);
+            
+            return ResponseEntity.ok("Facture envoyée par email avec succès");
+            
+        } catch (MessagingException e) {
+            return ResponseEntity.internalServerError()
+                .body("Erreur lors de l'envoi de l'email : " + e.getMessage());
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError()
+                .body("Erreur interne du serveur : " + e.getMessage());
+        }
+    }
+
+    // Endpoint pour envoyer une facture de vente par email avec pièces jointes (PDF)
+    @PostMapping(value = "/factureVente/envoyer-email-avec-pieces-jointes", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<?> envoyerFactureVenteEmailAvecPiecesJointes(
+            @RequestParam("venteId") String venteId,
+            @RequestParam("email") String email,
+            @RequestParam(value = "attachments", required = false) MultipartFile[] attachments,
+            HttpServletRequest httpRequest) {
+        
+        try {
+            // Validation des données requises
+            if (email == null || email.trim().isEmpty()) {
+                return ResponseEntity.badRequest().body("L'adresse email est requise");
+            }
+            
+            if (venteId == null || venteId.trim().isEmpty()) {
+                return ResponseEntity.badRequest().body("L'ID de la vente est requis");
+            }
+
+            // Récupérer les données complètes de la facture
+            ReceiptEmailRequest factureData = factureVenteService.getFactureDataForEmail(
+                venteId, 
+                email
+            );
+
+            // Convertir les pièces jointes en liste
+            List<MultipartFile> attachmentsList = attachments != null 
+                ? Arrays.asList(attachments) 
+                : Collections.emptyList();
+
+            // Envoi de l'email avec pièces jointes
+            mailService.sendReceiptEmailWithAttachments(factureData, attachmentsList);
             
             return ResponseEntity.ok("Facture envoyée par email avec succès");
             

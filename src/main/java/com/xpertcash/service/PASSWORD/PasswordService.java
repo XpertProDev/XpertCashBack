@@ -31,6 +31,9 @@ public class PasswordService {
     @Autowired
     private PasswordEncoder passwordEncoder;
 
+    @Autowired
+    private com.xpertcash.repository.PASSWORD.InitialPasswordTokenRepository initialPasswordTokenRepository;
+
     // Générer un code OTP (6 chiffres)
     private String generateOTP() {
         return String.format("%06d", new Random().nextInt(1000000));
@@ -86,6 +89,8 @@ private void sendResetEmail(User user, String otp) {
     }
 
     user.setPassword(passwordEncoder.encode(newPassword));
+    // Supprimer le token d'initialisation après la réinitialisation
+    initialPasswordTokenRepository.deleteByUser(user);
     usersRepository.save(user);
 
     passwordResetTokenRepository.deleteByUser(user);

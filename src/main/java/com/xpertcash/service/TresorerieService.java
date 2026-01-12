@@ -454,22 +454,33 @@ public class TresorerieService {
         if (!caisseIdsFermees.isEmpty()) {
             List<MouvementCaisse> mouvementsVente = mouvementCaisseRepository.findByCaisseIdInAndTypeMouvement(
                 caisseIdsFermees, TypeMouvementCaisse.VENTE);
+            // 💰 Inclure ESPECES et MOBILE_MONEY (OrangeMoney) dans la caisse
             entreesMouvementsVente = mouvementsVente.stream()
-                    .filter(m -> m.getModePaiement() == ModePaiement.ESPECES)
+                    .filter(m -> m.getModePaiement() == ModePaiement.ESPECES 
+                            || m.getModePaiement() == ModePaiement.MOBILE_MONEY)
                     .mapToDouble(m -> getValeurDouble(m.getMontant()))
                     .sum();
             
             List<MouvementCaisse> mouvementsAjout = mouvementCaisseRepository.findByCaisseIdInAndTypeMouvement(
                 caisseIdsFermees, TypeMouvementCaisse.AJOUT);
+            // 💰 Inclure ESPECES et MOBILE_MONEY (OrangeMoney) dans la caisse
             entreesMouvementsAjout = mouvementsAjout.stream()
-                    .filter(m -> m.getModePaiement() == ModePaiement.ESPECES)
+                    .filter(m -> m.getModePaiement() == ModePaiement.ESPECES 
+                            || m.getModePaiement() == ModePaiement.MOBILE_MONEY)
                     .mapToDouble(m -> getValeurDouble(m.getMontant()))
                     .sum();
         }
         
+        // 💰 Seules les ventes MOBILE_MONEY (OrangeMoney) depuis VenteService vont dans la caisse (via MouvementCaisse)
+        // Les paiements de factures et entrées générales MOBILE_MONEY restent dans Mobile Money
         double entreesPaiementsEspeces = calculerEntreesPaiementsFactures(data, ModePaiement.ESPECES, null);
         double entreesGeneralesCaisse = calculerEntreesGeneralesCaisse(data);
-        double entrees = entreesMouvementsVente + entreesMouvementsAjout + entreesPaiementsEspeces + entreesGeneralesCaisse;
+        
+        // Note: entreesMouvementsVente inclut déjà les ventes MOBILE_MONEY via les MouvementCaisse créés lors de la vente dans VenteService
+        // Les paiements de factures MOBILE_MONEY ne sont PAS inclus ici (ils restent dans Mobile Money)
+        
+        double entrees = entreesMouvementsVente + entreesMouvementsAjout + entreesPaiementsEspeces 
+                + entreesGeneralesCaisse;
         
         double sorties = calculerSortiesCaisse(data);
 
@@ -505,7 +516,10 @@ public class TresorerieService {
         return totalVentes - totalRemboursements;
     }
 
+
     private double calculerSortiesCaisse(TresorerieData data) {
+        // 💰 Seules les ventes MOBILE_MONEY (OrangeMoney) depuis VenteService vont dans la caisse
+        // Les dépenses MOBILE_MONEY restent dans Mobile Money, donc on ne compte que ESPECES ici
         double depensesEspeces = data.mouvementsDepense.stream()
                 .filter(m -> m.getModePaiement() == ModePaiement.ESPECES)
                 .mapToDouble(m -> getValeurDouble(m.getMontant()))
@@ -556,13 +570,28 @@ public class TresorerieService {
     }
 
     private TresorerieDTO.MobileMoneyDetail calculerMobileMoney(TresorerieData data) {
-        TresorerieDTO.BanqueDetail detail = calculerDetailBanqueOuMobileMoney(data,
-                SourceDepense.MOBILE_MONEY, ModePaiement.MOBILE_MONEY, null);
+        // 💰 Seules les ventes MOBILE_MONEY (OrangeMoney) depuis VenteService vont dans la caisse
+        // Ici on compte : paiements de factures MOBILE_MONEY + entrées générales MOBILE_MONEY (pas les ventes)
+        double entreesPaiements = calculerEntreesPaiementsFactures(data, ModePaiement.MOBILE_MONEY, null);
+        double entreesGenerales = calculerEntreesGeneralesParSource(data, SourceDepense.MOBILE_MONEY);
+        double entrees = entreesPaiements + entreesGenerales;
+        
+        double sortiesDepenses = data.depensesGenerales.stream()
+                .filter(d -> d.getSource() == SourceDepense.MOBILE_MONEY)
+                .mapToDouble(d -> getValeurDouble(d.getMontant()))
+                .sum();
+
+        double sortiesMouvements = data.mouvementsDepense.stream()
+                .filter(m -> m.getModePaiement() == ModePaiement.MOBILE_MONEY)
+                .mapToDouble(m -> getValeurDouble(m.getMontant()))
+                .sum();
+
+        double sorties = sortiesDepenses + sortiesMouvements;
 
         TresorerieDTO.MobileMoneyDetail mobileMoneyDetail = new TresorerieDTO.MobileMoneyDetail();
-        mobileMoneyDetail.setEntrees(detail.getEntrees());
-        mobileMoneyDetail.setSorties(detail.getSorties());
-        mobileMoneyDetail.setSolde(detail.getSolde());
+        mobileMoneyDetail.setEntrees(entrees); // Paiements de factures + entrées générales (pas les ventes)
+        mobileMoneyDetail.setSorties(sorties);
+        mobileMoneyDetail.setSolde(entrees - sorties);
         return mobileMoneyDetail;
     }
 

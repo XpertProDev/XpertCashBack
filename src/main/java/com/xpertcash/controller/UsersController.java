@@ -151,7 +151,19 @@ public ResponseEntity<RegisterResponse> register(@RequestBody RegistrationReques
     usersService.resendActivationEmail(request.getEmail());
 
     Map<String, String> response = new HashMap<>();
-    response.put("message", "Email d’activation renvoyé avec succès.");
+    response.put("message", "Email d'activation renvoyé avec succès.");
+    response.put("email", request.getEmail());
+
+     return ResponseEntity.ok(response);
+    }
+
+    // Endpoint pour renvoyer l'email d'employé avec les identifiants
+    @PostMapping("/resend-employe-email")
+    public ResponseEntity<Map<String, String>> resendEmployeEmail(@RequestBody ResendActivationRequest request) {
+        usersService.resendEmployeEmail(request.getEmail());
+
+        Map<String, String> response = new HashMap<>();
+        response.put("message", "Email avec les identifiants renvoyé avec succès.");
     response.put("email", request.getEmail());
 
      return ResponseEntity.ok(response);
