@@ -281,6 +281,7 @@ public class MailService {
                             </a>
                             <p style="font-size: 12px; color: #555; margin-top: 30px;">Si vous n'avez pas effectué cette demande, veuillez ignorer cet e-mail.</p>
                             <p style="font-size: 10px; color: #777;">L'équipe Tchakeda</p>
+                            <p style="font-size: 6px; color: #666; margin-top: 5px;">Adresse : Faladiè Sema, Rue du Gouverneur, près de l'hôtel Fiesta /Bamako-Mali</p>
                         </div>
                     </body>
             </html>
@@ -309,6 +310,7 @@ public class MailService {
                     Se connecter
                 </a>
                 <p style="font-size: 10px; color: #777;">L'équipe Tchakeda</p>
+                <p style="font-size: 6px; color: #666; margin-top: 5px;">Adresse : Faladiè Sema, Rue du Gouverneur, près de l'hôtel Fiesta /Bamako-Mali</p>
             </div>
         </body>
         </html>
@@ -363,6 +365,7 @@ public class MailService {
                         <p>Ce code est valable pendant <strong>10 minutes</strong>.</p>
                         <p style="font-size: 12px; color: #555; margin-top: 30px;">Si vous n'avez pas effectué cette demande, veuillez ignorer cet e-mail.</p>
                        <p style="font-size: 10px; color: #777;">L'équipe Tchakeda</p>
+                        <p style="font-size: 6px; color: #666; margin-top: 5px;">Adresse : Faladiè Sema, Rue du Gouverneur, près de l'hôtel Fiesta /Bamako-Mali</p>
                     </div>
                 </body>
             </html>
@@ -386,6 +389,7 @@ public class MailService {
                     <p>Veuillez effectuer la relance.</p>
                     <p style="font-size: 12px; color: #555; margin-top: 30px;">Si vous n'avez pas effectué cette demande, veuillez ignorer cet e-mail.</p>
                     <p style="font-size: 10px; color: #777; margin-top: 30px;">L'équipe Tchakeda</p>
+                    <p style="font-size: 6px; color: #666; margin-top: 5px;">Adresse : Faladiè Sema, Rue du Gouverneur, près de l'hôtel Fiesta /Bamako-Mali</p>
                 </div>
             </body>
             </html>
@@ -422,6 +426,7 @@ public class MailService {
                     </p>
                     <p style="font-size: 12px; color: #555; margin-top: 30px;">Si vous n'avez pas effectué cette demande, veuillez ignorer cet e-mail.</p>
                     <p style="font-size: 10px; color: #777;">L'équipe Tchakeda</p>
+                    <p style="font-size: 6px; color: #666; margin-top: 5px;">Adresse : Faladiè Sema, Rue du Gouverneur, près de l'hôtel Fiesta /Bamako-Mali</p>
                 </div>
             </body>
             </html>
@@ -457,6 +462,7 @@ public class MailService {
                     </p>
                     <p style="font-size: 12px; color: #555; margin-top: 30px;">Si vous n'avez pas effectué cette demande, veuillez ignorer cet e-mail.</p>
                     <p style="font-size: 10px; color: #777;">L'équipe Tchakeda</p>
+                    <p style="font-size: 6px; color: #666; margin-top: 5px;">Adresse : Faladiè Sema, Rue du Gouverneur, près de l'hôtel Fiesta /Bamako-Mali</p>
                 </div>
             </body>
             </html>
@@ -492,6 +498,7 @@ public class MailService {
                     </p>
                     <p style="font-size: 12px; color: #555; margin-top: 30px;">Si vous n'avez pas effectué cette demande, veuillez ignorer cet e-mail.</p>
                     <p style="font-size: 10px; color: #777;">L'équipe Tchakeda</p>
+                    <p style="font-size: 6px; color: #666; margin-top: 5px;">Adresse : Faladiè Sema, Rue du Gouverneur, près de l'hôtel Fiesta /Bamako-Mali</p>
                 </div>
             </body>
             </html>
@@ -659,6 +666,7 @@ public class MailService {
                 <p style="font-size: 8px; color: #777;">
                     L'équipe Tchakeda
                 </p>
+                <p style="font-size: 6px; color: #666; margin-top: 5px;">Adresse : Faladiè Sema, Rue du Gouverneur, près de l'hôtel Fiesta /Bamako-Mali</p>
             </div>
         </body>
     </html>
@@ -908,7 +916,8 @@ public class MailService {
 
                         <!-- Footer -->
                         <div style="text-align: center; font-size: 8px; color: #999; margin-top: 15px;">
-                            Généré par Tchakeda
+                            <p style="margin: 5px 0;">Généré par Tchakeda</p>
+                            <p style="margin: 5px 0; font-size: 6px;">Adresse : Faladiè Sema, Rue du Gouverneur, près de l'hôtel Fiesta /Bamako-Mali</p>
                         </div>
                     </div>
                 </body>

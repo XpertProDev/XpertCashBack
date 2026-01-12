@@ -105,7 +105,7 @@ public class FactureProformaService {
     @Autowired
     private GlobalNotificationService globalNotificationService;
 //    private NotificationService notificationService;
-
+    
     @Autowired
     private MailService mailService;
     
@@ -793,7 +793,7 @@ public class FactureProformaService {
                 && modifications.getStatut() != StatutFactureProForma.BROUILLON
                 && modifications.getStatut() != StatutFactureProForma.ANNULE) {
             // Pour les autres statuts non gérés ci-dessus, on change le statut normalement
-            facture.setStatut(modifications.getStatut());
+                facture.setStatut(modifications.getStatut());
         }
 
         // 📝 Enregistrement de l'action "Modification" uniquement si le montant a changé
