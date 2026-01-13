@@ -37,28 +37,22 @@ public class FileController {
             HttpServletRequest request) {
         
         try {
-            // Authentifier l'utilisateur
             authHelper.getAuthenticatedUserWithFallback(request);
             
-            // Construire le chemin du fichier
             Path filePath = Paths.get(STATIC_BASE_PATH, folder, filename).normalize();
             
-            // Vérifier que le chemin est bien dans le dossier static (sécurité)
             Path staticPath = Paths.get(STATIC_BASE_PATH).normalize().toAbsolutePath();
             if (!filePath.toAbsolutePath().startsWith(staticPath)) {
                 return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
             }
             
-            // Vérifier que le fichier existe
             Resource resource = new FileSystemResource(filePath);
             if (!resource.exists() || !resource.isReadable()) {
                 return ResponseEntity.notFound().build();
             }
             
-            // Détecter le type MIME
             String contentType = detectContentType(filename, filePath);
             
-            // Construire la réponse avec les headers (CORS géré par SecurityConfig)
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.parseMediaType(contentType));
             headers.setContentDispositionFormData("inline", filename);

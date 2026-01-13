@@ -14,6 +14,7 @@ import com.xpertcash.entity.Categorie;
 public interface CategorieRepository extends JpaRepository<Categorie, Long>{
     Optional<Categorie> findByNom(String nom);
     boolean existsByNom(String nom);
+    boolean existsByNomAndEntrepriseId(String nom, Long entrepriseId);
 
     Categorie findByNomAndEntrepriseId(String nom, Long entrepriseId);
 

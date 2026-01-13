@@ -21,11 +21,7 @@ import com.xpertcash.DTOs.CategorieResponseDTO;
 import com.xpertcash.DTOs.CategoriePaginatedResponseDTO;
 import com.xpertcash.DTOs.ProduitPaginatedResponseDTO;
 import com.xpertcash.entity.Categorie;
-import com.xpertcash.entity.Entreprise;
-import com.xpertcash.entity.User;
-import com.xpertcash.repository.CategorieRepository;
 import com.xpertcash.service.CategorieService;
-import com.xpertcash.service.AuthenticationHelper;
 
 import jakarta.servlet.http.HttpServletRequest;
 
@@ -34,38 +30,20 @@ import jakarta.servlet.http.HttpServletRequest;
 public class CategorieController {
        @Autowired
     private CategorieService categorieService;
-    @Autowired
-    private CategorieRepository categorieRepository;
-    @Autowired
-    private AuthenticationHelper authHelper;
 
     // Ajouter une catégorie (seul ADMIN)
     @PostMapping("/createCategory")
     public ResponseEntity<Object> createCategorie(@RequestBody Map<String, String> payload, HttpServletRequest request) {
         try {
             String nom = payload.get("nom");
-            
-            User user = authHelper.getAuthenticatedUserWithFallback(request);
-
-            Entreprise entreprise = user.getEntreprise();
-            if (entreprise == null) {
-                throw new RuntimeException("Aucune entreprise associée à cet utilisateur");
-            }
 
             // Si le nom de la catégorie est vide
             if (nom == null || nom.isEmpty()) {
                 throw new RuntimeException("Catégorie ne peut pas être vide !");
             }
 
-            // Vérifier si la catégorie existe déjà
-            if (categorieRepository.existsByNom(nom)) {
-                Map<String, String> errorResponse = new HashMap<>();
-                errorResponse.put("error", "Cette catégorie existe déjà !");
-                return ResponseEntity.status(HttpStatus.CONFLICT).body(errorResponse);
-            }
-
-            // Créer la catégorie et l'associer à l'entreprise de l'utilisateur
-            Categorie savedCategorie = categorieService.createCategorie(nom, entreprise.getId());
+            // Créer la catégorie - la méthode du service récupère automatiquement l'entreprise de l'utilisateur connecté
+            Categorie savedCategorie = categorieService.createCategorie(nom, request);
 
             // Retourner un message de succès ou un objet simple
             Map<String, Object> response = new HashMap<>();
