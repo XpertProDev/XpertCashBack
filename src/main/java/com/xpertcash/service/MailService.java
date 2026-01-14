@@ -7,11 +7,13 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.UnsupportedEncodingException;
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.text.DecimalFormat;
 import java.text.NumberFormat;
 import java.text.SimpleDateFormat;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.Base64;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
@@ -55,6 +57,9 @@ public class MailService {
 
     @Value("${spring.mail.contact.port}")
     private int mailPort;
+
+    @Value("${app.frontend.url:https://fere.tchakeda.com}")
+    private String frontendUrl;
 
     public void sendActivationLinkEmail(String to, String code, String personalCode) throws MessagingException {
         String baseUrl = "https://xpertcash.tchakeda.com/api/v1";
@@ -397,16 +402,19 @@ public class MailService {
     }
 
     // Méthode d'envoi d'email pour demande d'approbation de facture
-    public void sendDemandeApprobationEmail(String to, String fullName, String factureNumero, String createurNom, String montantTotal, String objetFacture) throws MessagingException {
+    public void sendDemandeApprobationEmail(String to, String fullName, String factureNumero, String createurNom, String montantTotal, String objetFacture, Long factureId) throws MessagingException {
         System.out.println("📧 Envoi d'un email d'approbation à : " + to);
         String subject = "Demande d'approbation - Facture " + factureNumero;
-        String htmlContent = generateDemandeApprobationMessage(fullName, factureNumero, createurNom, montantTotal, objetFacture);
+        String htmlContent = generateDemandeApprobationMessage(fullName, factureNumero, createurNom, montantTotal, objetFacture, factureId);
         sendFactureEmail(to, subject, htmlContent);
     }
 
     // Génération du message HTML pour la demande d'approbation
-    private String generateDemandeApprobationMessage(String fullName, String factureNumero, String createurNom, String montantTotal, String objetFacture) {
+    private String generateDemandeApprobationMessage(String fullName, String factureNumero, String createurNom, String montantTotal, String objetFacture, Long factureId) {
         String objetDisplay = (objetFacture != null && !objetFacture.isBlank()) ? objetFacture : "Aucun objet spécifié";
+        // Encoder l'ID comme le frontend (t_ + base64)
+        String encodedId = encodeFactureId(factureId);
+        String factureUrl = frontendUrl + "/facture-proforma-details/" + encodedId;
         
         return """
             <html>
@@ -422,15 +430,18 @@ public class MailService {
                         <br><br>
                         <strong>Objet de la facture :</strong> %s
                         <br><br>
-                        Veuillez vous connecter à votre compte pour examiner les détails et approuver cette facture.
+                        Veuillez cliquer sur le bouton ci-dessous pour examiner les détails et approuver cette facture.
                     </p>
+                    <a href="%s" style="display: inline-block; padding: 12px 20px; background-color: #007bff; color: white; text-decoration: none; border-radius: 5px; font-weight: bold; margin-top: 10px;">
+                        Voir la facture
+                    </a>
                     <p style="font-size: 12px; color: #555; margin-top: 30px;">Si vous n'avez pas effectué cette demande, veuillez ignorer cet e-mail.</p>
                     <p style="font-size: 10px; color: #777;">L'équipe Tchakeda</p>
                     <p style="font-size: 6px; color: #666; margin-top: 5px;">Adresse : Faladiè Sema, Rue du Gouverneur, près de l'hôtel Fiesta /Bamako-Mali</p>
                 </div>
             </body>
             </html>
-        """.formatted(fullName, factureNumero, createurNom, montantTotal, objetDisplay);
+        """.formatted(fullName, factureNumero, createurNom, montantTotal, objetDisplay, factureUrl);
     }
 
     // Méthode d'envoi d'email pour notification d'approbation de facture
@@ -939,6 +950,17 @@ public class MailService {
     private String formatDateForDisplay(LocalDateTime dateTime) {
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
         return dateTime.format(formatter);
+    }
+
+    /**
+     * Encode l'ID de la facture comme le fait le frontend Angular
+     * Format: t_ + base64(encodeURIComponent(id))
+     * Pour un ID numérique simple, cela équivaut à: t_ + base64(id.toString())
+     */
+    private String encodeFactureId(Long factureId) {
+        String idString = String.valueOf(factureId);
+        String base64Encoded = Base64.getEncoder().encodeToString(idString.getBytes(StandardCharsets.UTF_8));
+        return "t_" + base64Encoded;
     }
 
 }

@@ -309,7 +309,8 @@ public class FactureProformaService {
     int year = currentDate.getYear();
     String formattedDate = currentDate.format(DateTimeFormatter.ofPattern("MM-yyyy"));
 
-    List<FactureProForma> facturesDeLAnnee = factureProformaRepository.findFacturesDeLAnnee(year);
+    // Filtrer par entreprise pour que chaque entreprise ait son propre compteur
+    List<FactureProForma> facturesDeLAnnee = factureProformaRepository.findFacturesDeLAnneeParEntreprise(entreprise.getId(), year);
 
     long newIndex = 1;
 
@@ -650,7 +651,8 @@ public class FactureProformaService {
                                 numero,
                                 createur,
                                 montantTotalFormate,
-                                objetFacture
+                                objetFacture,
+                                facture.getId()
                         );
                         log.info("✅ Email d'approbation envoyé à : {}", approbateur.getEmail());
                     } catch (Exception e) {
@@ -1066,8 +1068,13 @@ public class FactureProformaService {
         boolean hasPermission = utilisateur.getRole().hasPermission(PermissionType.GESTION_FACTURATION);
         boolean isCreateurFacture = facture.getUtilisateurCreateur() != null &&
                                     facture.getUtilisateurCreateur().getId().equals(utilisateur.getId());
+        
+        // Vérifier si l'utilisateur est un approbateur de la facture
+        boolean isApprobateur = facture.getApprobateurs() != null &&
+                               facture.getApprobateurs().stream()
+                                       .anyMatch(approbateur -> approbateur.getId().equals(utilisateur.getId()));
 
-        if (!(isAdmin || hasPermission || isCreateurFacture)) {
+        if (!(isAdmin || hasPermission || isCreateurFacture || isApprobateur)) {
             throw new RuntimeException("Accès refusé : vous n'avez pas les droits pour consulter cette facture.");
         }
 

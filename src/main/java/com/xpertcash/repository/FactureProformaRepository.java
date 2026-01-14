@@ -58,6 +58,9 @@ public interface FactureProformaRepository extends JpaRepository<FactureProForma
     @Query("SELECT f FROM FactureProForma f WHERE FUNCTION('YEAR', f.dateCreation) = :year ORDER BY f.numeroFacture DESC")
     List<FactureProForma> findFacturesDeLAnnee(@Param("year") int year);
 
+    @Query("SELECT f FROM FactureProForma f WHERE f.entreprise.id = :entrepriseId AND FUNCTION('YEAR', f.dateCreation) = :year ORDER BY f.numeroFacture DESC")
+    List<FactureProForma> findFacturesDeLAnneeParEntreprise(@Param("entrepriseId") Long entrepriseId, @Param("year") int year);
+
     @Query("SELECT f FROM FactureProForma f WHERE f.entreprise.id = :entrepriseId ORDER BY f.dateCreation DESC, f.id DESC")
     List<FactureProForma> findByEntrepriseId(@Param("entrepriseId") Long entrepriseId);
 
