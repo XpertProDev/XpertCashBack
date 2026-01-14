@@ -36,7 +36,6 @@ public class ImageStorageService {
 
             String imageUrl = "/uploads/" + imageName;
             System.out.println("✅ Image sauvegardée : " + imageUrl);
-            // Retourner l'URL de l'image
             return "/uploads/" + imageName;
 
 
