@@ -1179,10 +1179,10 @@ public class UsersService {
             user.setEmail(request.getEmail());
         }
 
-        // Mise à jour du nom complet
-//        if (request.getNomComplet() != null) {
-//            user.setNomComplet(request.getNomComplet());
-//        }
+        //Mise à jour du nom complet
+       if (request.getNomComplet() != null) {
+           user.setNomComplet(request.getNomComplet());
+       }
     }
 
     // Mise à jour de la photo si image présente

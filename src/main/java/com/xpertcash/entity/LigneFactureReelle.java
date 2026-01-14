@@ -21,7 +21,7 @@ public class LigneFactureReelle {
     private int quantite;
     private double prixUnitaire;
     @Lob
-    @Column(name = "ligne_description")
+    @Column(name = "ligne_description", columnDefinition = "TEXT")
     private String ligneDescription;
     private double montantTotal;
 
