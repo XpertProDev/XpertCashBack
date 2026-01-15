@@ -48,20 +48,28 @@ public class CategorieService {
     @Autowired EntrepriseRepository entrepriseRepository;
 
      // Ajouter une nouvelle catégorie (seul ADMIN peut le faire)
-  public Categorie createCategorie(String nom, Long entrepriseId) {
-    if (categorieRepository.existsByNom(nom)) {
-        throw new RuntimeException("Cette catégorie existe déjà !");
+  public Categorie createCategorie(String nom, HttpServletRequest request) {
+    // Récupérer l'utilisateur connecté depuis le token
+    String token = request.getHeader("Authorization");
+    if (token == null || !token.startsWith("Bearer ")) {
+        throw new RuntimeException("Token JWT manquant ou mal formaté");
+    }
+
+    User user = authHelper.getAuthenticatedUserWithFallback(request);
+    Entreprise entreprise = user.getEntreprise();
+    if (entreprise == null) {
+        throw new RuntimeException("Aucune entreprise associée à cet utilisateur");
+    }
+
+    // Vérifier l'unicité du nom de catégorie pour cette entreprise spécifique
+    if (categorieRepository.existsByNomAndEntrepriseId(nom, entreprise.getId())) {
+        throw new RuntimeException("Cette catégorie existe déjà pour votre entreprise !");
     }
 
     Categorie categorie = new Categorie();
     categorie.setNom(nom);
     categorie.setCreatedAt(LocalDateTime.now());
     categorie.setOrigineCreation("PRODUIT");
-    
-    // Récupérer l'entreprise par son ID et l'assigner à la catégorie
-    Entreprise entreprise = entrepriseRepository.findById(entrepriseId)
-            .orElseThrow(() -> new RuntimeException("Entreprise non trouvée"));
-
     categorie.setEntreprise(entreprise);
 
     return categorieRepository.save(categorie);
@@ -387,18 +395,31 @@ private ProduitDetailsResponseDTO toProduitDTO(Produit produit) {
     // Mettre à jour categorie
     public Categorie updateCategorie(HttpServletRequest request, Long categorieId, Categorie categorieDetails) {
         try {
-            Categorie categorie = categorieRepository.findById(categorieId)
-                    .orElseThrow(() -> new RuntimeException("Categorie non trouvée"));
+            // Récupérer l'utilisateur connecté depuis le token
+            String token = request.getHeader("Authorization");
+            if (token == null || !token.startsWith("Bearer ")) {
+                throw new RuntimeException("Token JWT manquant ou mal formaté");
+            }
 
-                    if (categorieRepository.existsByNom(categorieDetails.getNom())) {
-                        throw new RuntimeException("Le nom cette categorie existe déjà.");
-                    }
-            
-    
+            User user = authHelper.getAuthenticatedUserWithFallback(request);
+            Entreprise entreprise = user.getEntreprise();
+            if (entreprise == null) {
+                throw new RuntimeException("Aucune entreprise associée à cet utilisateur");
+            }
+
+            // Vérifier que la catégorie existe et appartient à l'entreprise de l'utilisateur
+            Categorie categorie = categorieRepository.findByIdAndEntrepriseId(categorieId, entreprise.getId())
+                    .orElseThrow(() -> new RuntimeException("Catégorie introuvable ou non autorisée"));
+
+            // Vérifier l'unicité du nom pour cette entreprise (en excluant la catégorie actuelle)
+            if (!categorie.getNom().equals(categorieDetails.getNom()) && 
+                categorieRepository.existsByNomAndEntrepriseId(categorieDetails.getNom(), entreprise.getId())) {
+                throw new RuntimeException("Le nom de cette catégorie existe déjà pour votre entreprise.");
+            }
             
             categorie.setNom(categorieDetails.getNom());
     
-            // Enregistrer l'unité mise à jour
+            // Enregistrer la catégorie mise à jour
             return categorieRepository.save(categorie);
         } catch (Exception e) {
             throw new RuntimeException("Erreur lors de la mise à jour du categorie : " + e.getMessage());

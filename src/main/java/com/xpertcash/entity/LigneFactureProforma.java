@@ -35,7 +35,7 @@ import lombok.Setter;
     private Double prixUnitaire;
     private Double montantTotal;
     @Lob
-    @Column(name = "ligne_description")
+    @Column(name = "ligne_description", columnDefinition = "TEXT")
     private String ligneDescription;
 
 

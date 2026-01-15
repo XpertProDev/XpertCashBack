@@ -19,21 +19,46 @@ public class MailTestController {
 
     private static final Logger logger = LoggerFactory.getLogger(MailTestController.class);
 
-    @Value("${spring.mail.host}")
-    private String host;
+    // Configuration pour le compte contact (inscriptions et autres)
+    @Value("${spring.mail.contact.host}")
+    private String contactHost;
 
-    @Value("${spring.mail.port}")
-    private int port;
+    @Value("${spring.mail.contact.port}")
+    private int contactPort;
 
-    @Value("${spring.mail.username}")
-    private String username;
+    @Value("${spring.mail.contact.username}")
+    private String contactUsername;
 
-    @Value("${spring.mail.password}")
-    private String password;
+    @Value("${spring.mail.contact.password}")
+    private String contactPassword;
+
+    // Configuration pour le compte facture
+    @Value("${spring.mail.facture.host}")
+    private String factureHost;
+
+    @Value("${spring.mail.facture.port}")
+    private int facturePort;
+
+    @Value("${spring.mail.facture.username}")
+    private String factureUsername;
+
+    @Value("${spring.mail.facture.password}")
+    private String facturePassword;
 
     @PostMapping("/mail/connection")
     public ResponseEntity<Map<String, Object>> testMailConnection(
             @RequestParam(required = false) String testEmail) {
+        return testMailConnectionInternal(contactHost, contactPort, contactUsername, contactPassword, testEmail, "contact");
+    }
+
+    @PostMapping("/mail/facture/connection")
+    public ResponseEntity<Map<String, Object>> testFactureMailConnection(
+            @RequestParam(required = false) String testEmail) {
+        return testMailConnectionInternal(factureHost, facturePort, factureUsername, facturePassword, testEmail, "facture");
+    }
+
+    private ResponseEntity<Map<String, Object>> testMailConnectionInternal(
+            String host, int port, String username, String password, String testEmail, String accountType) {
         
         Map<String, Object> response = new HashMap<>();
         
@@ -41,8 +66,8 @@ public class MailTestController {
             ? testEmail 
             : "carterhedy57@gmail.com";
         
-        logger.info("🧪 Test de connexion SMTP - Host: {}, Port: {}, User: {}, Recipient: {}", 
-            host, port, username, recipientEmail);
+        logger.info("🧪 Test de connexion SMTP [{}] - Host: {}, Port: {}, User: {}, Recipient: {}", 
+            accountType, host, port, username, recipientEmail);
         
         try {
             Properties props = new Properties();
@@ -81,8 +106,9 @@ public class MailTestController {
             MimeMessage message = new MimeMessage(session);
             message.setFrom(new InternetAddress(username, "Tchakeda"));
             message.addRecipient(Message.RecipientType.TO, new InternetAddress(recipientEmail));
-            message.setSubject("Test SMTP - Tchakeda");
+            message.setSubject("Test SMTP - Tchakeda [" + accountType + "]");
             message.setText("Ceci est un email de test pour vérifier la configuration SMTP.\n\n" +
+                          "Compte utilisé: " + accountType + "\n" +
                           "Si vous recevez cet email, la configuration est correcte !");
             
             Transport.send(message);
@@ -90,6 +116,7 @@ public class MailTestController {
             
             response.put("success", true);
             response.put("message", "Connexion SMTP réussie et email envoyé avec succès !");
+            response.put("accountType", accountType);
             response.put("host", host);
             response.put("port", port);
             response.put("username", username);
@@ -98,8 +125,8 @@ public class MailTestController {
             return ResponseEntity.ok(response);
             
         } catch (AuthenticationFailedException e) {
-            logger.error("❌ ÉCHEC D'AUTHENTIFICATION SMTP - Host: {}, Port: {}, User: {}", 
-                host, port, username, e);
+            logger.error("❌ ÉCHEC D'AUTHENTIFICATION SMTP [{}] - Host: {}, Port: {}, User: {}", 
+                accountType, host, port, username, e);
             
             // Détection automatique du type de problème
             String errorMsg = e.getMessage() != null ? e.getMessage().toLowerCase() : "";
@@ -115,6 +142,7 @@ public class MailTestController {
             response.put("success", false);
             response.put("error", "AuthenticationFailedException");
             response.put("message", errorMessage);
+            response.put("accountType", accountType);
             response.put("host", host);
             response.put("port", port);
             response.put("username", username);
@@ -129,7 +157,7 @@ public class MailTestController {
             return ResponseEntity.status(401).body(response);
             
         } catch (MessagingException e) {
-            logger.error("❌ Erreur lors du test SMTP: {}", e.getMessage(), e);
+            logger.error("❌ Erreur lors du test SMTP [{}]: {}", accountType, e.getMessage(), e);
             
             // Détecter si c'est un problème de mot de passe (timeout peut être causé par mauvais mot de passe)
             String errorMsg = e.getMessage() != null ? e.getMessage().toLowerCase() : "";
@@ -168,6 +196,7 @@ public class MailTestController {
             response.put("success", false);
             response.put("error", "MessagingException");
             response.put("message", errorMessage);
+            response.put("accountType", accountType);
             response.put("host", host);
             response.put("port", port);
             response.put("username", username);
@@ -188,7 +217,7 @@ public class MailTestController {
             return ResponseEntity.status(500).body(response);
             
         } catch (Exception e) {
-            logger.error("❌ Erreur inattendue lors du test SMTP: {}", e.getMessage(), e);
+            logger.error("❌ Erreur inattendue lors du test SMTP [{}]: {}", accountType, e.getMessage(), e);
             
             String errorMessage = String.format(
                 "Erreur inattendue lors du test SMTP. Détails: Host=%s, Port=%d, Username=%s, Erreur=%s",
@@ -198,6 +227,7 @@ public class MailTestController {
             response.put("success", false);
             response.put("error", "UnexpectedException");
             response.put("message", errorMessage);
+            response.put("accountType", accountType);
             response.put("host", host);
             response.put("port", port);
             response.put("username", username);
@@ -217,11 +247,26 @@ public class MailTestController {
     @GetMapping("/mail/config")
     public ResponseEntity<Map<String, Object>> getMailConfig() {
         Map<String, Object> config = new HashMap<>();
-        config.put("host", host);
-        config.put("port", port);
-        config.put("username", username);
-        config.put("passwordLength", password != null ? password.length() : 0);
-        config.put("passwordPreview", password);
+        
+        // Configuration contact
+        Map<String, Object> contactConfig = new HashMap<>();
+        contactConfig.put("host", contactHost);
+        contactConfig.put("port", contactPort);
+        contactConfig.put("username", contactUsername);
+        contactConfig.put("passwordLength", contactPassword != null ? contactPassword.length() : 0);
+        contactConfig.put("passwordPreview", contactPassword);
+        
+        // Configuration facture
+        Map<String, Object> factureConfig = new HashMap<>();
+        factureConfig.put("host", factureHost);
+        factureConfig.put("port", facturePort);
+        factureConfig.put("username", factureUsername);
+        factureConfig.put("passwordLength", facturePassword != null ? facturePassword.length() : 0);
+        factureConfig.put("passwordPreview", facturePassword);
+        
+        config.put("contact", contactConfig);
+        config.put("facture", factureConfig);
+        
         return ResponseEntity.ok(config);
     }
 
