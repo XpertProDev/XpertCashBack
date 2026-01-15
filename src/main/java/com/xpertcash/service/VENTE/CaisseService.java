@@ -247,7 +247,7 @@ public FermerCaisseResponseDTO fermerCaisse(FermerCaisseRequest request, HttpSer
         User user = getUserFromRequest(request);
         
         Boutique boutique = boutiqueRepository.findById(boutiqueId)
-                .orElseThrow(() -> new RuntimeException("Boutique introuvable"));
+                .orElseThrow(() -> new RuntimeException("Boutique inentrouvable"));
 
         // Vérification d'appartenance à l'entreprise
         if (!boutique.getEntreprise().getId().equals(user.getEntreprise().getId())) {
