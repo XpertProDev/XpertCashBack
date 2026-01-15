@@ -182,6 +182,7 @@ public FactureVentePaginatedDTO getAllFacturesWithPagination(
     return response;
 }
 
+
 public String genererNumeroFactureCompact(Vente vente) {
     // 1️⃣ Ticket ID modulo 1000 → 3 chiffres
     long ticketId = vente.getId() % 1000;

@@ -134,7 +134,8 @@ public class FactureReelleService {
         int year = currentDate.getYear();
         String formattedDate = currentDate.format(DateTimeFormatter.ofPattern("MM-yyyy"));
 
-        List<FactureReelle> facturesDeLAnnee = factureReelleRepository.findFacturesDeLAnnee(year);
+        // Filtrer par entreprise pour que chaque entreprise ait son propre compteur
+        List<FactureReelle> facturesDeLAnnee = factureReelleRepository.findFacturesDeLAnneeParEntreprise(entreprise.getId(), year);
         long newIndex = 1;
 
         if (!facturesDeLAnnee.isEmpty()) {
