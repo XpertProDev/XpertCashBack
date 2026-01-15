@@ -1,6 +1,5 @@
 package com.xpertcash.repository;
 
-import com.xpertcash.entity.Entreprise;
 import com.xpertcash.entity.User;
 import com.xpertcash.entity.Role;
 import com.xpertcash.entity.Enum.RoleType;
@@ -17,63 +16,135 @@ import java.util.Optional;
 
 @Repository
 public interface UsersRepository extends JpaRepository<User, Long> {
-    Optional<User> findById(Long id);
+    
+    // Méthodes de base (gardées pour compatibilité avec register/login)
     Optional<User> findByUuid(String uuid);
-    Optional<User> findByEmail(String email);
-    Optional<User> findByPhone(String phone);
+    Optional<User> findByEmail(String email); // Gardé pour register/login
+    Optional<User> findByPhone(String phone); // Gardé pour register/login
     
-    // Méthode pour trouver un utilisateur par email et entreprise
-    Optional<User> findByEmailAndEntreprise(String email, Entreprise entreprise);
+    // Méthodes isolées par entreprise (optimisées avec JOIN FETCH)
     
-    // Méthode pour trouver un utilisateur par téléphone et entreprise
-    Optional<User> findByPhoneAndEntreprise(String phone, Entreprise entreprise);
-    Optional<User> findByPhoneAndEntrepriseAndPays(String phone, Entreprise entreprise, String pays);
-    List<User> findByEntreprise(Entreprise entreprise);
-
-    // Méthode pour récupérer tous les utilisateurs d'une entreprise
-    List<User> findByEntrepriseId(Long entrepriseId);
-
-    // Compter tous les utilisateurs d'une entreprise
-    long countByEntrepriseId(Long entrepriseId);
-
-    // Méthode pour récupérer tous les utilisateurs d'une entreprise sauf l'ADMIN
-    List<User> findByEntrepriseIdAndIdNot(Long entrepriseId, Long adminId);
+    // Recherche par email et entreprise (pour isolation)
+    @Query("SELECT DISTINCT u FROM User u " +
+           "LEFT JOIN FETCH u.entreprise e " +
+           "LEFT JOIN FETCH u.role r " +
+           "WHERE u.email = :email AND e.id = :entrepriseId")
+    Optional<User> findByEmailAndEntrepriseId(
+            @Param("email") String email,
+            @Param("entrepriseId") Long entrepriseId);
     
+    // Recherche par téléphone et entreprise (pour isolation)
+    @Query("SELECT DISTINCT u FROM User u " +
+           "LEFT JOIN FETCH u.entreprise e " +
+           "LEFT JOIN FETCH u.role r " +
+           "WHERE u.phone = :phone AND e.id = :entrepriseId")
+    Optional<User> findByPhoneAndEntrepriseId(
+            @Param("phone") String phone,
+            @Param("entrepriseId") Long entrepriseId);
+    
+    // Recherche par téléphone, pays et entreprise (pour isolation)
+    @Query("SELECT DISTINCT u FROM User u " +
+           "LEFT JOIN FETCH u.entreprise e " +
+           "LEFT JOIN FETCH u.role r " +
+           "WHERE u.phone = :phone AND u.pays = :pays AND e.id = :entrepriseId")
+    Optional<User> findByPhoneAndPaysAndEntrepriseId(
+            @Param("phone") String phone,
+            @Param("pays") String pays,
+            @Param("entrepriseId") Long entrepriseId);
 
+    // Récupérer tous les utilisateurs d'une entreprise (optimisé avec JOIN FETCH)
+    @Query("SELECT DISTINCT u FROM User u " +
+           "LEFT JOIN FETCH u.entreprise e " +
+           "LEFT JOIN FETCH u.role r " +
+           "WHERE e.id = :entrepriseId")
+    List<User> findByEntrepriseId(@Param("entrepriseId") Long entrepriseId);
+
+    // Compter tous les utilisateurs d'une entreprise (optimisé)
+    @Query("SELECT COUNT(DISTINCT u) FROM User u " +
+           "INNER JOIN u.entreprise e " +
+           "WHERE e.id = :entrepriseId")
+    long countByEntrepriseId(@Param("entrepriseId") Long entrepriseId);
+
+    // Récupérer tous les utilisateurs d'une entreprise sauf l'ADMIN (optimisé avec JOIN FETCH)
+    @Query("SELECT DISTINCT u FROM User u " +
+           "LEFT JOIN FETCH u.entreprise e " +
+           "LEFT JOIN FETCH u.role r " +
+           "WHERE e.id = :entrepriseId AND u.id <> :adminId")
+    List<User> findByEntrepriseIdAndIdNot(
+            @Param("entrepriseId") Long entrepriseId,
+            @Param("adminId") Long adminId);
+
+    // Vérifier l'existence d'un code personnel (global - code PIN unique dans toute la base)
     boolean existsByPersonalCode(String personalCode);
     
-    // Utilisateurs partageant un même rôle
+    // Utilisateurs partageant un même rôle (global - utilisé pour réutilisation de rôles)
     List<User> findByRole(Role role);
     
-    // Utilisateurs d'un rôle spécifique ET d'une entreprise spécifique (pour isolation multi-entreprise)
-    @Query("SELECT u FROM User u WHERE u.role = :role AND u.entreprise.id = :entrepriseId")
-    List<User> findByRoleAndEntrepriseId(@Param("role") Role role, @Param("entrepriseId") Long entrepriseId);
-    //List<User> findByBoutiqueIdAndRole_Name(Long boutiqueId, RoleType roleName);
+    // Utilisateurs d'un rôle spécifique ET d'une entreprise spécifique (pour isolation)
+    @Query("SELECT DISTINCT u FROM User u " +
+           "LEFT JOIN FETCH u.entreprise e " +
+           "LEFT JOIN FETCH u.role r " +
+           "WHERE u.role = :role AND e.id = :entrepriseId")
+    List<User> findByRoleAndEntrepriseId(
+            @Param("role") Role role,
+            @Param("entrepriseId") Long entrepriseId);
 
-    Optional<User> findByEntrepriseIdAndRole_NameIn(Long entrepriseId, List<RoleType> roles);
+    // Recherche par entreprise et rôles (optimisé avec JOIN FETCH)
+    @Query("SELECT DISTINCT u FROM User u " +
+           "LEFT JOIN FETCH u.entreprise e " +
+           "LEFT JOIN FETCH u.role r " +
+           "WHERE e.id = :entrepriseId AND r.name IN :roles")
+    Optional<User> findByEntrepriseIdAndRole_NameIn(
+            @Param("entrepriseId") Long entrepriseId,
+            @Param("roles") List<RoleType> roles);
 
-   
-     @Query("SELECT COUNT(u) FROM User u WHERE u.entreprise.id = :entrepriseId AND u.role.name <> :excludedRole")
-    long countByEntrepriseIdExcludingRole(@Param("entrepriseId") Long entrepriseId,
-                                          @Param("excludedRole") RoleType excludedRole);
+    // Recherche par boutique et rôle (pour isolation)
+    @Query("SELECT DISTINCT u FROM User u " +
+           "INNER JOIN u.userBoutiques ub " +
+           "INNER JOIN ub.boutique b " +
+           "LEFT JOIN FETCH u.entreprise e " +
+           "LEFT JOIN FETCH u.role r " +
+           "WHERE b.id = :boutiqueId " +
+           "AND r.name = :roleName " +
+           "AND e.id = :entrepriseId")
+    List<User> findByBoutiqueIdAndRole_NameAndEntrepriseId(
+            @Param("boutiqueId") Long boutiqueId,
+            @Param("roleName") RoleType roleName,
+            @Param("entrepriseId") Long entrepriseId);
 
+    // Compter les utilisateurs d'une entreprise excluant un rôle (optimisé)
+    @Query("SELECT COUNT(DISTINCT u) FROM User u " +
+           "INNER JOIN u.entreprise e " +
+           "WHERE e.id = :entrepriseId AND u.role.name <> :excludedRole")
+    long countByEntrepriseIdExcludingRole(
+            @Param("entrepriseId") Long entrepriseId,
+            @Param("excludedRole") RoleType excludedRole);
 
+    // Récupérer l'utilisateur avec entreprise et role en une seule requête
+    @Query("SELECT DISTINCT u FROM User u " +
+           "JOIN FETCH u.entreprise e " +
+           "JOIN FETCH u.role r " +
+           "LEFT JOIN FETCH r.permissions p " +
+           "WHERE u.id = :userId")
+    Optional<User> findByIdWithEntrepriseAndRole(@Param("userId") Long userId);
 
-// Récupérer l'utilisateur avec entreprise et role en une seule requête
-@Query("SELECT u FROM User u " +
-       "JOIN FETCH u.entreprise e " +
-       "JOIN FETCH u.role r " +
-       "LEFT JOIN FETCH r.permissions p " +
-       "WHERE u.id = :userId")
-Optional<User> findByIdWithEntrepriseAndRole(@Param("userId") Long userId);
+    // Récupérer l'utilisateur par UUID avec entreprise et role en une seule requête
+    @Query("SELECT DISTINCT u FROM User u " +
+           "JOIN FETCH u.entreprise e " +
+           "JOIN FETCH u.role r " +
+           "LEFT JOIN FETCH r.permissions p " +
+           "WHERE u.uuid = :uuid")
+    Optional<User> findByUuidWithEntrepriseAndRole(@Param("uuid") String uuid);
 
-// Récupérer l'utilisateur par UUID avec entreprise et role en une seule requête
-@Query("SELECT u FROM User u " +
-       "JOIN FETCH u.entreprise e " +
-       "JOIN FETCH u.role r " +
-       "LEFT JOIN FETCH r.permissions p " +
-       "WHERE u.uuid = :uuid")
-Optional<User> findByUuidWithEntrepriseAndRole(@Param("uuid") String uuid);
+    // Récupérer l'utilisateur par ID et entreprise (pour isolation)
+    @Query("SELECT DISTINCT u FROM User u " +
+           "LEFT JOIN FETCH u.entreprise e " +
+           "LEFT JOIN FETCH u.role r " +
+           "LEFT JOIN FETCH r.permissions p " +
+           "WHERE u.id = :userId AND e.id = :entrepriseId")
+    Optional<User> findByIdAndEntrepriseId(
+            @Param("userId") Long userId,
+            @Param("entrepriseId") Long entrepriseId);
 
     // Mettre à jour uniquement lastActivity sans verrouiller toute la ligne (évite les deadlocks)
     @Modifying

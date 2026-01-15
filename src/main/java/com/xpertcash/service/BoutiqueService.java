@@ -587,7 +587,12 @@ public class BoutiqueService {
         throw new BusinessException("Cette boutique ne vous appartient pas.");
     }
 
-    List<User> vendeurs = usersRepository.findByBoutiqueIdAndRole_Name(boutiqueId, RoleType.VENDEUR);
+    Long entrepriseId = admin.getEntreprise() != null ? admin.getEntreprise().getId() : null;
+    if (entrepriseId == null) {
+        throw new BusinessException("L'admin n'a pas d'entreprise associée.");
+    }
+    List<User> vendeurs = usersRepository.findByBoutiqueIdAndRole_NameAndEntrepriseId(
+            boutiqueId, RoleType.VENDEUR, entrepriseId);
 
     if (vendeurs.isEmpty()) {
         throw new BusinessException("Aucun vendeur n'est assigné à cette boutique pour le moment.");
@@ -639,9 +644,10 @@ public class BoutiqueService {
                 throw new RuntimeException("Impossible de supprimer cette boutique : elle contient des produits en stock.");
             }
 
-            // Vérification si un produit est lié à une ligne de facture
+            // Vérification si un produit est lié à une ligne de facture (isolé par entreprise)
             boolean produitLieALigneFacture = produits.stream()
-                .anyMatch(produit -> ligneFactureProformaRepository.existsByProduitId(produit.getId()));
+                .anyMatch(produit -> ligneFactureProformaRepository.existsByProduitIdAndEntrepriseId(
+                        produit.getId(), entrepriseId));
 
             if (produitLieALigneFacture) {
                 throw new RuntimeException("Impossible de supprimer la boutique : certains produits sont liés à des factures.");

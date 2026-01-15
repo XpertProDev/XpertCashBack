@@ -26,7 +26,7 @@ public interface FactureReelleRepository extends JpaRepository<FactureReelle, Lo
     Optional<FactureReelle> findTopByDateCreationAndEntrepriseIdOrderByNumeroFactureDesc(
             @Param("dateCreation") LocalDate dateCreation,
             @Param("entrepriseId") Long entrepriseId);
-    
+
     @Query("SELECT DISTINCT f FROM FactureReelle f " +
            "LEFT JOIN FETCH f.entreprise e " +
            "WHERE e.id = :entrepriseId " +

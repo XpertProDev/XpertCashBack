@@ -617,11 +617,15 @@ public class SuperAdminService {
         List<FactureProForma> facturesProformaForNotes = factureProformaRepository.findByEntrepriseId(entrepriseId);
         int totalNotes = 0;
         for (FactureProForma facture : facturesProformaForNotes) {
-            // Supprimer les notes de cette facture
-            List<NoteFactureProForma> notes = noteFactureProFormaRepository.findByFacture(facture);
-            if (!notes.isEmpty()) {
-                totalNotes += notes.size();
-                noteFactureProFormaRepository.deleteAll(notes);
+            // Supprimer les notes de cette facture (isolé par entreprise)
+            Long factureEntrepriseId = facture.getEntreprise() != null ? facture.getEntreprise().getId() : null;
+            if (factureEntrepriseId != null) {
+                List<NoteFactureProForma> notes = noteFactureProFormaRepository.findByFactureProFormaIdAndEntrepriseId(
+                        facture.getId(), factureEntrepriseId);
+                if (!notes.isEmpty()) {
+                    totalNotes += notes.size();
+                    noteFactureProFormaRepository.deleteAll(notes);
+                }
             }
         }
         if (totalNotes > 0) {
@@ -845,8 +849,8 @@ public class SuperAdminService {
             entityManager.flush();
         }
 
-        // 12. Supprimer tous les fournisseurs avec leurs photos
-        List<Fournisseur> fournisseurs = fournisseurRepository.findByEntreprise(entreprise);
+        // 12. Supprimer tous les fournisseurs avec leurs photos (isolé par entreprise)
+        List<Fournisseur> fournisseurs = fournisseurRepository.findByEntrepriseId(entrepriseId);
         for (Fournisseur fournisseur : fournisseurs) {
             // Supprimer la photo du fournisseur
             if (fournisseur.getPhoto() != null && !fournisseur.getPhoto().isBlank()) {
@@ -1316,9 +1320,14 @@ public class SuperAdminService {
         // 5.9.9. Supprimer toutes les NoteFactureProForma AVANT les utilisateurs (car elles référencent User auteur)
         List<FactureProForma> facturesProformaForNotes = factureProformaRepository.findByEntrepriseId(entrepriseId);
         for (FactureProForma facture : facturesProformaForNotes) {
-            List<NoteFactureProForma> notes = noteFactureProFormaRepository.findByFacture(facture);
-            if (!notes.isEmpty()) {
-                noteFactureProFormaRepository.deleteAll(notes);
+            // Supprimer les notes de cette facture (isolé par entreprise)
+            Long factureEntrepriseId = facture.getEntreprise() != null ? facture.getEntreprise().getId() : null;
+            if (factureEntrepriseId != null) {
+                List<NoteFactureProForma> notes = noteFactureProFormaRepository.findByFactureProFormaIdAndEntrepriseId(
+                        facture.getId(), factureEntrepriseId);
+                if (!notes.isEmpty()) {
+                    noteFactureProFormaRepository.deleteAll(notes);
+                }
             }
         }
         entityManager.flush();
@@ -1532,8 +1541,8 @@ public class SuperAdminService {
             entityManager.flush();
         }
 
-        // 12. Supprimer tous les fournisseurs avec leurs photos
-        List<Fournisseur> fournisseurs = fournisseurRepository.findByEntreprise(entreprise);
+        // 12. Supprimer tous les fournisseurs avec leurs photos (isolé par entreprise)
+        List<Fournisseur> fournisseurs = fournisseurRepository.findByEntrepriseId(entrepriseId);
         for (Fournisseur fournisseur : fournisseurs) {
             if (fournisseur.getPhoto() != null && !fournisseur.getPhoto().isBlank()) {
                 try {

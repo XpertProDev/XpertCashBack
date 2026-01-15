@@ -672,7 +672,11 @@ public class UsersService {
 
         // Si c'est un ADMIN, activer tous ses employés
         if (user.getRole() != null && user.getRole().getName().equals(RoleType.ADMIN)) {
-            List<User> usersToActivate = usersRepository.findByEntreprise(user.getEntreprise());
+            Long entrepriseId = user.getEntreprise() != null ? user.getEntreprise().getId() : null;
+            if (entrepriseId == null) {
+                throw new RuntimeException("L'utilisateur n'a pas d'entreprise associée.");
+            }
+            List<User> usersToActivate = usersRepository.findByEntrepriseId(entrepriseId);
             usersToActivate.forEach(u -> u.setEnabledLien(true));
             usersRepository.saveAll(usersToActivate);
         }
@@ -743,16 +747,22 @@ public class UsersService {
                     throw new RuntimeException("Accès refusé : seuls les administrateurs, managers ou les utilisateurs autorisés peuvent ajouter un employé.");
                 }
 
-                // Vérifier si un utilisateur avec le même email ou téléphone existe déjà
-                if (usersRepository.findByEmailAndEntreprise(userRequest.getEmail(), admin.getEntreprise()).isPresent()) {
+                // Vérifier si un utilisateur avec le même email ou téléphone existe déjà (isolé par entreprise)
+                Long entrepriseId = admin.getEntreprise() != null ? admin.getEntreprise().getId() : null;
+                if (entrepriseId == null) {
+                    throw new BusinessException("L'admin n'a pas d'entreprise associée.");
+                }
+
+                if (usersRepository.findByEmailAndEntrepriseId(userRequest.getEmail(), entrepriseId).isPresent()) {
                     throw new BusinessException("Un utilisateur avec cet email existe déjà dans votre entreprise.");
                 }
 
-                if (usersRepository.findByPhoneAndEntreprise(userRequest.getPhone(), admin.getEntreprise()).isPresent()) {
+                if (usersRepository.findByPhoneAndEntrepriseId(userRequest.getPhone(), entrepriseId).isPresent()) {
                     throw new BusinessException("Un utilisateur avec ce numéro de téléphone existe déjà dans votre entreprise.");
                 } 
 
-                if (usersRepository.findByPhoneAndEntrepriseAndPays(userRequest.getPhone(), admin.getEntreprise(), userRequest.getPays()).isPresent()) {
+                if (userRequest.getPays() != null && 
+                    usersRepository.findByPhoneAndPaysAndEntrepriseId(userRequest.getPhone(), userRequest.getPays(), entrepriseId).isPresent()) {
                     throw new BusinessException("Un utilisateur avec ce numéro de téléphone existe déjà dans votre entreprise.");
                 }
 
@@ -767,7 +777,7 @@ public class UsersService {
                 }
                 
                 Role role;
-                Long entrepriseId = admin.getEntreprise().getId();
+                // entrepriseId déjà défini plus haut dans la méthode
                 
                 // Rôles avec permissions par défaut (ADMIN, MANAGER) : utiliser le template et cloner
                 boolean isRoleWithDefaultPermissions = userRequest.getRoleType() == RoleType.ADMIN 
@@ -1162,20 +1172,25 @@ public class UsersService {
             initialPasswordTokenRepository.deleteByUser(user);
         }
 
-        // Vérification et mise à jour du téléphone
+        // Vérification et mise à jour du téléphone (isolé par entreprise)
+        Long entrepriseId = user.getEntreprise() != null ? user.getEntreprise().getId() : null;
+        if (entrepriseId == null) {
+            throw new RuntimeException("L'utilisateur n'a pas d'entreprise associée.");
+        }
+
         if (request.getPhone() != null && !request.getPhone().equals(user.getPhone())) {
-            Optional<User> existingUserWithPhone = usersRepository.findByPhone(request.getPhone());
+            Optional<User> existingUserWithPhone = usersRepository.findByPhoneAndEntrepriseId(request.getPhone(), entrepriseId);
             if (existingUserWithPhone.isPresent() && !existingUserWithPhone.get().getId().equals(userId)) {
-                throw new RuntimeException("Ce numéro de téléphone est déjà utilisé par un autre utilisateur.");
+                throw new RuntimeException("Ce numéro de téléphone est déjà utilisé par un autre utilisateur dans votre entreprise.");
             }
             user.setPhone(request.getPhone());
         }
 
-        // Vérification et mise à jour de l'email
+        // Vérification et mise à jour de l'email (isolé par entreprise)
         if (request.getEmail() != null && !request.getEmail().equals(user.getEmail())) {
-            Optional<User> existingUserWithEmail = usersRepository.findByEmail(request.getEmail());
+            Optional<User> existingUserWithEmail = usersRepository.findByEmailAndEntrepriseId(request.getEmail(), entrepriseId);
             if (existingUserWithEmail.isPresent() && !existingUserWithEmail.get().getId().equals(userId)) {
-                throw new RuntimeException("Cet email est déjà utilisé par un autre utilisateur.");
+                throw new RuntimeException("Cet email est déjà utilisé par un autre utilisateur dans votre entreprise.");
             }
             user.setEmail(request.getEmail());
         }

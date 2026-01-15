@@ -300,10 +300,10 @@ public class ProduitService {
 
     stockRepository.save(stock);
 
-    // Charger le fournisseur seulement s'il est fourni
+    // Charger le fournisseur seulement s'il est fourni (isolé par entreprise)
     if (fournisseurId != null) {
-        fournisseurEntity = fournisseurRepository.findById(fournisseurId)
-            .orElseThrow(() -> new RuntimeException("Fournisseur non trouvé avec l'ID : " + fournisseurId));
+        fournisseurEntity = fournisseurRepository.findByIdAndEntrepriseId(fournisseurId, entrepriseId)
+            .orElseThrow(() -> new RuntimeException("Fournisseur non trouvé avec l'ID : " + fournisseurId + " ou n'appartient pas à votre entreprise"));
     }
 
     // 🔁 Enregistrer dans StockProduitFournisseur
@@ -521,19 +521,21 @@ public class ProduitService {
         facture.setCodeFournisseur(codeFournisseur);
     }
 
-    // Fournisseur requis seulement pour certaines opérations
+    // Fournisseur requis seulement pour certaines opérations (isolé par entreprise)
     if ("Ajout".equalsIgnoreCase(type) || "Approvisionnement".equalsIgnoreCase(type)) {
         if (fournisseur == null) {
             throw new RuntimeException("Le fournisseur est requis pour une facture de type '" + type + "'");
         }
 
-        Fournisseur fournisseurEntity = fournisseurRepository.findById(fournisseur.getId())
-            .orElseThrow(() -> new RuntimeException("Fournisseur introuvable"));
+        Fournisseur fournisseurEntity = fournisseurRepository.findByIdAndEntrepriseId(
+                fournisseur.getId(), entrepriseId)
+            .orElseThrow(() -> new RuntimeException("Fournisseur introuvable ou n'appartient pas à votre entreprise"));
         facture.setFournisseur(fournisseurEntity);
     } else if (fournisseur != null) {
-        // Cas facultatif : on le récupère s'il est présent, sinon on l'ignore
-        Fournisseur fournisseurEntity = fournisseurRepository.findById(fournisseur.getId())
-            .orElseThrow(() -> new RuntimeException("Fournisseur introuvable"));
+        // Cas facultatif : on le récupère s'il est présent, sinon on l'ignore (isolé par entreprise)
+        Fournisseur fournisseurEntity = fournisseurRepository.findByIdAndEntrepriseId(
+                fournisseur.getId(), entrepriseId)
+            .orElseThrow(() -> new RuntimeException("Fournisseur introuvable ou n'appartient pas à votre entreprise"));
         facture.setFournisseur(fournisseurEntity);
     }
 
@@ -888,9 +890,9 @@ public class ProduitService {
             throw new RuntimeException("⚠️ Impossible de supprimer le produit car il est encore en stock");
         }
 
-        // 🚫 7. Validation métier : lié à des factures ?
-        boolean produitUtilise = ligneFactureReelleRepository.existsByProduitId(produitId);
-        boolean produitUtiliseProforma = ligneFactureProformaRepository.existsByProduitId(produitId);
+        // 🚫 7. Validation métier : lié à des factures ? (isolé par entreprise)
+        boolean produitUtilise = ligneFactureReelleRepository.existsByProduitIdAndEntrepriseId(produitId, userEntrepriseId);
+        boolean produitUtiliseProforma = ligneFactureProformaRepository.existsByProduitIdAndEntrepriseId(produitId, userEntrepriseId);
         
         if (produitUtilise || produitUtiliseProforma) {
             throw new RuntimeException("⚠️ Impossible de supprimer le produit car il est lié à des factures");

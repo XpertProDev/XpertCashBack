@@ -261,7 +261,7 @@ public class ComptabiliteService {
                 ? vente.getBoutique().getEntreprise().getId() : null;
         if (venteEntrepriseId != null) {
             factureVenteRepository.findByVenteIdAndEntrepriseId(vente.getId(), venteEntrepriseId)
-                    .ifPresent(facture -> entree.setDetteNumero(facture.getNumeroFacture()));
+                .ifPresent(facture -> entree.setDetteNumero(facture.getNumeroFacture()));
         }
         
         entreeGeneraleRepository.save(entree);
@@ -1755,12 +1755,14 @@ public class ComptabiliteService {
             return null;
         }
         
-        Fournisseur fournisseur = fournisseurRepository.findById(fournisseurId)
-                .orElseThrow(() -> new RuntimeException("Fournisseur non trouvé."));
-        
-        if (fournisseur.getEntreprise() == null || !fournisseur.getEntreprise().getId().equals(user.getEntreprise().getId())) {
-            throw new RuntimeException("Le fournisseur n'appartient pas à votre entreprise.");
+        Long entrepriseId = user.getEntreprise() != null ? user.getEntreprise().getId() : null;
+        if (entrepriseId == null) {
+            throw new RuntimeException("L'utilisateur n'a pas d'entreprise associée.");
         }
+        
+        // Récupérer le fournisseur (isolé par entreprise)
+        Fournisseur fournisseur = fournisseurRepository.findByIdAndEntrepriseId(fournisseurId, entrepriseId)
+                .orElseThrow(() -> new RuntimeException("Fournisseur non trouvé ou n'appartient pas à votre entreprise."));
         
         return fournisseur;
     }
@@ -1773,12 +1775,14 @@ public class ComptabiliteService {
             throw new RuntimeException("Le responsable est obligatoire.");
         }
         
-        User responsable = usersRepository.findById(responsableId)
-                .orElseThrow(() -> new RuntimeException("Responsable non trouvé."));
-        
-        if (responsable.getEntreprise() == null || !responsable.getEntreprise().getId().equals(user.getEntreprise().getId())) {
-            throw new RuntimeException("Le responsable n'appartient pas à votre entreprise.");
+        Long entrepriseId = user.getEntreprise() != null ? user.getEntreprise().getId() : null;
+        if (entrepriseId == null) {
+            throw new RuntimeException("L'utilisateur n'a pas d'entreprise associée.");
         }
+
+        // Récupérer le responsable (isolé par entreprise)
+        User responsable = usersRepository.findByIdAndEntrepriseId(responsableId, entrepriseId)
+                .orElseThrow(() -> new RuntimeException("Responsable non trouvé ou n'appartient pas à votre entreprise."));
         
         return responsable;
     }

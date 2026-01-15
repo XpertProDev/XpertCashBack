@@ -84,15 +84,20 @@ public class FournisseurService {
     private void checkFournisseurExists(Fournisseur fournisseur) {
         String email = fournisseur.getEmail();
         String telephone = fournisseur.getTelephone();
+        Long entrepriseId = fournisseur.getEntreprise() != null ? fournisseur.getEntreprise().getId() : null;
+
+        if (entrepriseId == null) {
+            throw new RuntimeException("Le fournisseur doit être associé à une entreprise.");
+        }
 
         if (email != null && !email.isEmpty()) {
-            fournisseurRepository.findByEmail(email).ifPresent(existing -> {
+            fournisseurRepository.findByEmailAndEntrepriseId(email, entrepriseId).ifPresent(existing -> {
                 throw new RuntimeException("Un fournisseur avec cet email existe déjà !");
             });
         }
 
         if (telephone != null && !telephone.isEmpty()) {
-            fournisseurRepository.findByTelephone(telephone).ifPresent(existing -> {
+            fournisseurRepository.findByTelephoneAndEntrepriseId(telephone, entrepriseId).ifPresent(existing -> {
                 throw new RuntimeException("Un fournisseur avec ce numéro de téléphone existe déjà !");
             });
         }
@@ -109,8 +114,8 @@ public class FournisseurService {
         throw new RuntimeException("L'utilisateur n'a pas d'entreprise associée.");
     }
 
-    // Retourner tous les fournisseurs liés à cette entreprise
-    return fournisseurRepository.findByEntreprise(entreprise);
+    // Retourner tous les fournisseurs liés à cette entreprise (isolé par entreprise)
+    return fournisseurRepository.findByEntrepriseId(entreprise.getId());
 }
 
     // Get fournisseur by id
@@ -123,15 +128,10 @@ public class FournisseurService {
         throw new RuntimeException("L'utilisateur n'a pas d'entreprise associée.");
     }
 
-    // Récupérer le fournisseur
-    Fournisseur fournisseur = fournisseurRepository.findById(fournisseurId)
-            .orElseThrow(() -> new RuntimeException("Fournisseur introuvable !"));
-
-    // Vérifier que le fournisseur appartient à la même entreprise que l'utilisateur
-    if (fournisseur.getEntreprise() == null ||
-        !fournisseur.getEntreprise().getId().equals(entrepriseUtilisateur.getId())) {
-        throw new RuntimeException("Ce fournisseur n'appartient pas à votre entreprise.");
-    }
+    // Récupérer le fournisseur (isolé par entreprise)
+    Fournisseur fournisseur = fournisseurRepository.findByIdAndEntrepriseId(
+            fournisseurId, entrepriseUtilisateur.getId())
+            .orElseThrow(() -> new RuntimeException("Fournisseur introuvable ou n'appartient pas à votre entreprise !"));
 
     return fournisseur;
 }
@@ -150,14 +150,10 @@ private User getUserFromRequest(HttpServletRequest request) {
         throw new RuntimeException("L'utilisateur n'a pas d'entreprise associée.");
     }
 
-    // 3. Récupérer le fournisseur existant
-    Fournisseur existingFournisseur = fournisseurRepository.findById(id)
-            .orElseThrow(() -> new RuntimeException("Fournisseur introuvable !"));
-
-    if (existingFournisseur.getEntreprise() == null || 
-        !existingFournisseur.getEntreprise().getId().equals(entrepriseUtilisateur.getId())) {
-        throw new RuntimeException("Ce fournisseur n'appartient pas à votre entreprise.");
-    }
+    // 3. Récupérer le fournisseur existant (isolé par entreprise)
+    Fournisseur existingFournisseur = fournisseurRepository.findByIdAndEntrepriseId(
+            id, entrepriseUtilisateur.getId())
+            .orElseThrow(() -> new RuntimeException("Fournisseur introuvable ou n'appartient pas à votre entreprise !"));
 
 
     // 4. Vérifications des doublons
@@ -223,13 +219,10 @@ private User getUserFromRequest(HttpServletRequest request) {
     HttpServletRequest request) {
     User user = authHelper.getAuthenticatedUserWithFallback(request);
 
-    // 2. Vérifier que le fournisseur appartient à la même entreprise
-    Fournisseur fournisseur = fournisseurRepository.findById(fournisseurId)
-            .orElseThrow(() -> new RuntimeException("Fournisseur introuvable !"));
-
-    if (!fournisseur.getEntreprise().getId().equals(user.getEntreprise().getId())) {
-        throw new RuntimeException("Accès refusé : Ce fournisseur n'appartient pas à votre entreprise !");
-    }
+    // 2. Vérifier que le fournisseur appartient à la même entreprise (isolé par entreprise)
+    Fournisseur fournisseur = fournisseurRepository.findByIdAndEntrepriseId(
+            fournisseurId, user.getEntreprise().getId())
+            .orElseThrow(() -> new RuntimeException("Fournisseur introuvable ou n'appartient pas à votre entreprise !"));
 
 
         List<Object[]> rows = stockProduitFournisseurRepository.findNomProduitEtQuantiteAjoutee(fournisseurId);
@@ -257,15 +250,10 @@ private User getUserFromRequest(HttpServletRequest request) {
         throw new RuntimeException("Action non autorisée : permissions insuffisantes");
     }
 
-    // 🔍 Récupération fournisseur
-    Fournisseur fournisseur = fournisseurRepository.findById(fournisseurId)
-        .orElseThrow(() -> new RuntimeException("Fournisseur introuvable !"));
-
-    // 🏢 Vérification entreprise
-    if (fournisseur.getEntreprise() == null || 
-        !fournisseur.getEntreprise().getId().equals(user.getEntreprise().getId())) {
-        throw new RuntimeException("Ce fournisseur n'appartient pas à votre entreprise.");
-    }
+    // 🔍 Récupération fournisseur (isolé par entreprise)
+    Fournisseur fournisseur = fournisseurRepository.findByIdAndEntrepriseId(
+            fournisseurId, user.getEntreprise().getId())
+        .orElseThrow(() -> new RuntimeException("Fournisseur introuvable ou n'appartient pas à votre entreprise !"));
 
     // 📄 Vérification d'utilisation dans facture (isolé par entreprise)
     boolean fournisseurUtilise = factureRepository.existsByFournisseurIdAndEntrepriseId(

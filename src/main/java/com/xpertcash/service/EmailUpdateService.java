@@ -41,9 +41,13 @@ public class EmailUpdateService {
             throw new RuntimeException("Vous utilisez déjà cet email.");
         }
 
-        // Vérifier que le nouvel email n'est pas déjà utilisé par un autre utilisateur
-        if (usersRepository.findByEmail(request.getNewEmail()).isPresent()) {
-            throw new RuntimeException("Cet email est déjà utilisé par un autre utilisateur.");
+        // Vérifier que le nouvel email n'est pas déjà utilisé par un autre utilisateur (isolé par entreprise)
+        Long entrepriseId = user.getEntreprise() != null ? user.getEntreprise().getId() : null;
+        if (entrepriseId == null) {
+            throw new RuntimeException("L'utilisateur n'a pas d'entreprise associée.");
+        }
+        if (usersRepository.findByEmailAndEntrepriseId(request.getNewEmail(), entrepriseId).isPresent()) {
+            throw new RuntimeException("Cet email est déjà utilisé par un autre utilisateur dans votre entreprise.");
         }
 
         // Générer un code de vérification à 6 chiffres

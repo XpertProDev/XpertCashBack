@@ -223,8 +223,13 @@ public class FactureProformaController {
         }
 
 
-        // Récupération et simplification des notes
-        List<NoteFactureProForma> notes = noteFactureProFormaRepository.findByFacture(facture);
+        // Récupération et simplification des notes (isolé par entreprise)
+        Long entrepriseId = user.getEntreprise() != null ? user.getEntreprise().getId() : null;
+        if (entrepriseId == null) {
+            throw new RuntimeException("L'utilisateur n'a pas d'entreprise associée.");
+        }
+        List<NoteFactureProForma> notes = noteFactureProFormaRepository.findByFactureProFormaIdAndEntrepriseId(
+                facture.getId(), entrepriseId);
 
            if (notes.isEmpty()) {
                 Map<String, Object> response = new HashMap<>();

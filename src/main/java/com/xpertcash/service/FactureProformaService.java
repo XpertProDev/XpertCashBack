@@ -947,14 +947,19 @@ public class FactureProformaService {
             throw new RuntimeException("Accès refusé : vous n'avez pas les droits pour supprimer une facture.");
         }
 
-        // 🔥 Supprimer d'abord les lignes de facture
-        ligneFactureProformaRepository.deleteByFactureProForma(facture);
+        // 🔥 Supprimer d'abord les lignes de facture (isolé par entreprise)
+        Long entrepriseId = facture.getEntreprise() != null ? facture.getEntreprise().getId() : null;
+        if (entrepriseId != null) {
+            ligneFactureProformaRepository.deleteByFactureProFormaIdAndEntrepriseId(facture.getId(), entrepriseId);
+        }
 
         // 🔥 Supprimer les historiques liés à la facture
         factProHistoriqueActionRepository.deleteByFacture(facture);
 
-        // Suprimer les note
-        noteFactureProFormaRepository.deleteByFacture(facture);
+        // Supprimer les notes (isolé par entreprise)
+        if (entrepriseId != null) {
+            noteFactureProFormaRepository.deleteByFactureProFormaIdAndEntrepriseId(facture.getId(), entrepriseId);
+        }
 
         // ✅ Ensuite on peut supprimer la facture
         factureProformaRepository.delete(facture);
@@ -983,16 +988,15 @@ public class FactureProformaService {
         
         // --- 2. Récupération et validation de l'utilisateur ---
         User currentUser = authHelper.getAuthenticatedUserWithFallback(request);
-        User targetUser = usersRepository.findById(userIdRequete)
-                .orElseThrow(() -> new RuntimeException("Utilisateur cible non trouvé"));
-
         Entreprise entrepriseCourante = currentUser.getEntreprise();
-        Entreprise entrepriseCible = targetUser.getEntreprise();
-
-        if (entrepriseCourante == null || entrepriseCible == null
-            || !entrepriseCourante.getId().equals(entrepriseCible.getId())) {
-            throw new RuntimeException("Opération interdite : utilisateurs de différentes entreprises.");
+        if (entrepriseCourante == null) {
+            throw new RuntimeException("L'utilisateur connecté n'a pas d'entreprise associée.");
         }
+        Long entrepriseId = entrepriseCourante.getId();
+
+        // Vérifier que l'utilisateur cible appartient à la même entreprise (isolé par entreprise)
+        usersRepository.findByIdAndEntrepriseId(userIdRequete, entrepriseId)
+                .orElseThrow(() -> new RuntimeException("Utilisateur cible non trouvé ou n'appartient pas à votre entreprise."));
 
         // --- 3. Vérification des droits d'accès ---
         boolean isAdmin = currentUser.getRole().getName() == RoleType.ADMIN;
@@ -1126,9 +1130,15 @@ public FactureProFormaDTO getFactureProformaById(Long id, HttpServletRequest req
 
             User user = authHelper.getAuthenticatedUserWithFallback(request);
 
-            // Récupération de la note à modifier
-            NoteFactureProForma note = noteFactureProFormaRepository.findById(noteId)
-                    .orElseThrow(() -> new RuntimeException("Note introuvable avec l'ID : " + noteId));
+            // Vérification que l'utilisateur a accès à la facture
+            Long entrepriseId = user.getEntreprise() != null ? user.getEntreprise().getId() : null;
+            if (entrepriseId == null) {
+                throw new RuntimeException("L'utilisateur n'a pas d'entreprise associée.");
+            }
+
+            // Récupération de la note à modifier (isolé par entreprise)
+            NoteFactureProForma note = noteFactureProFormaRepository.findByIdAndEntrepriseId(noteId, entrepriseId)
+                    .orElseThrow(() -> new RuntimeException("Note introuvable avec l'ID : " + noteId + " ou n'appartient pas à votre entreprise"));
 
             // Vérification que la note appartient bien à la facture
             if (!note.getFacture().getId().equals(factureId)) {
@@ -1152,8 +1162,13 @@ public FactureProFormaDTO getFactureProformaById(Long id, HttpServletRequest req
 
     //Generate
     private String genererNumeroNotePourFacture(FactureProForma facture) {
+        Long entrepriseId = facture.getEntreprise() != null ? facture.getEntreprise().getId() : null;
+        if (entrepriseId == null) {
+            throw new RuntimeException("La facture n'a pas d'entreprise associée.");
+        }
+        
         int maxNumero = noteFactureProFormaRepository
-            .findByFacture(facture).stream()
+            .findByFactureProFormaIdAndEntrepriseId(facture.getId(), entrepriseId).stream()
             .map(NoteFactureProForma::getNumeroIdentifiant)
             .filter(Objects::nonNull)
             .map(numero -> {
@@ -1178,13 +1193,19 @@ public FactureProFormaDTO getFactureProformaById(Long id, HttpServletRequest req
 
         User user = authHelper.getAuthenticatedUserWithFallback(request);
 
+        // Vérification que l'utilisateur a accès à la facture
+        Long entrepriseId = user.getEntreprise() != null ? user.getEntreprise().getId() : null;
+        if (entrepriseId == null) {
+            throw new RuntimeException("L'utilisateur n'a pas d'entreprise associée.");
+        }
+
         // Détermination du rôle
         RoleType role = user.getRole().getName();
         boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
 
-        // Récupération de la note à supprimer
-        NoteFactureProForma note = noteFactureProFormaRepository.findById(noteId)
-                .orElseThrow(() -> new RuntimeException("Note introuvable avec l'ID : " + noteId));
+        // Récupération de la note à supprimer (isolé par entreprise)
+        NoteFactureProForma note = noteFactureProFormaRepository.findByIdAndEntrepriseId(noteId, entrepriseId)
+                .orElseThrow(() -> new RuntimeException("Note introuvable avec l'ID : " + noteId + " ou n'appartient pas à votre entreprise"));
 
         // Vérification que la note appartient bien à la facture
         if (!note.getFacture().getId().equals(factureId)) {
@@ -1222,12 +1243,13 @@ public FactureProFormaDTO getFactureProformaById(Long id, HttpServletRequest req
         FactureProForma facture = factureProformaRepository.findById(factureId)
                 .orElseThrow(() -> new RuntimeException("Facture non trouvée avec l'ID : " + factureId));
         // Vérification que l'utilisateur a accès à la facture
-        if (!facture.getEntreprise().getId().equals(user.getEntreprise().getId())) {
+        Long entrepriseId = user.getEntreprise() != null ? user.getEntreprise().getId() : null;
+        if (entrepriseId == null || !facture.getEntreprise().getId().equals(entrepriseId)) {
             throw new RuntimeException("Accès refusé : Cette facture ne vous appartient pas !");
         }
-        // Récupération de la note
-        NoteFactureProForma note = noteFactureProFormaRepository.findById(noteId)
-                .orElseThrow(() -> new RuntimeException("Note introuvable avec l'ID : " + noteId));
+        // Récupération de la note (isolé par entreprise)
+        NoteFactureProForma note = noteFactureProFormaRepository.findByIdAndEntrepriseId(noteId, entrepriseId)
+                .orElseThrow(() -> new RuntimeException("Note introuvable avec l'ID : " + noteId + " ou n'appartient pas à votre entreprise"));
         // Vérification que la note appartient à la facture
         if (!note.getFacture().getId().equals(factureId)) {
             throw new RuntimeException("Cette note n'appartient pas à la facture spécifiée !");
@@ -1257,16 +1279,15 @@ public FactureProFormaDTO getFactureProformaById(Long id, HttpServletRequest req
 public List<FactureProFormaDTO> getFacturesParPeriode(Long userIdRequete, HttpServletRequest request,
                                                       String typePeriode, LocalDate dateDebut, LocalDate dateFin) {
     User currentUser = authHelper.getAuthenticatedUserWithFallback(request);
-    User targetUser = usersRepository.findById(userIdRequete)
-            .orElseThrow(() -> new RuntimeException("Utilisateur cible non trouvé"));
-
     Entreprise entrepriseCourante = currentUser.getEntreprise();
-    Entreprise entrepriseCible = targetUser.getEntreprise();
-
-    if (entrepriseCourante == null || entrepriseCible == null
-        || !entrepriseCourante.getId().equals(entrepriseCible.getId())) {
-        throw new RuntimeException("Opération interdite : utilisateurs de différentes entreprises.");
+    if (entrepriseCourante == null) {
+        throw new RuntimeException("L'utilisateur connecté n'a pas d'entreprise associée.");
     }
+    Long entrepriseId = entrepriseCourante.getId();
+
+    // Vérifier que l'utilisateur cible appartient à la même entreprise (isolé par entreprise)
+    usersRepository.findByIdAndEntrepriseId(userIdRequete, entrepriseId)
+            .orElseThrow(() -> new RuntimeException("Utilisateur cible non trouvé ou n'appartient pas à votre entreprise."));
 
     boolean isAdmin = currentUser.getRole().getName() == RoleType.ADMIN;
     boolean isManager = currentUser.getRole().getName() == RoleType.MANAGER;
