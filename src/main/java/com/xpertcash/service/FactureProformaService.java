@@ -747,11 +747,31 @@ public class FactureProformaService {
                 Produit produit = produitRepository.findById(ligne.getProduit().getId())
                         .orElseThrow(() -> new RuntimeException("Produit introuvable !"));
 
-                if (produit.getPrixVente() == null) {
-                    throw new RuntimeException("Le prix de vente du produit avec l'ID " + produit.getId() + " est nul.");
+                // ✅ Traitement du prix unitaire comme dans ajouterFacture
+                if (ligne.getPrixUnitaire() != null) {
+                    // Si un prix unitaire est fourni, l'utiliser directement (prix modifié pour les services)
+                    ligne.setPrixUnitaire(ligne.getPrixUnitaire());
+                } else {
+                    // Sinon, utiliser le prix du produit
+                    Double prixVente = produit.getPrixVente();
+                    if (prixVente == null) {
+                        throw new RuntimeException("Le prix de vente du produit avec l'ID " + produit.getId() + " est nul.");
+                    }
+                    ligne.setPrixUnitaire(prixVente);
                 }
 
-                ligne.setPrixUnitaire(produit.getPrixVente());
+                // Pour les produits de type SERVICE, mettre à jour le prix global du produit si modifié
+                if ("SERVICE".equals(produit.getTypeProduit()) &&
+                        ligne.getPrixUnitaire() != null &&
+                        produit.getPrixVente() != null &&
+                        !ligne.getPrixUnitaire().equals(produit.getPrixVente())) {
+
+                    // Mettre à jour le prix du produit global
+                    produit.setPrixVente(ligne.getPrixUnitaire());
+                    produit.setLastUpdated(LocalDateTime.now());
+                    produitRepository.save(produit);
+                }
+
                 ligne.setMontantTotal(ligne.getQuantite() * ligne.getPrixUnitaire());
                 ligne.setFactureProForma(facture);
                 ligne.setProduit(produit);
