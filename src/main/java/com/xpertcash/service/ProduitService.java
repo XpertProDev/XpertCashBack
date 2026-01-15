@@ -1234,16 +1234,16 @@ public class ProduitService {
     // Liste pour stocker les infos des boutiques
     List<Map<String, Object>> boutiquesInfo = new ArrayList<>();
 
-    // Récupérer tous les produits ayant le même codeGenerique
-    List<Produit> produitsMemeCode = produitRepository.findByCodeGenerique(produit.getCodeGenerique());
+    // Récupérer tous les produits ayant le même codeGenerique pour cette entreprise
+    List<Produit> produitsMemeCode = produitRepository.findByCodeGeneriqueAndEntrepriseId(
+            produit.getCodeGenerique(), 
+            admin.getEntreprise().getId());
 
     int totalQuantite = 0;
 
-    // Boucle pour traiter chaque produit avec le même codeGenerique
+    // Boucle pour traiter chaque produit avec le même codeGenerique (déjà filtré par entreprise)
     for (Produit p : produitsMemeCode) {
-        if (p.getBoutique() != null
-                && p.getBoutique().isActif()
-                && p.getBoutique().getEntreprise().getId().equals(admin.getEntreprise().getId())) {
+        if (p.getBoutique() != null && p.getBoutique().isActif()) {
 
             Map<String, Object> boutiqueData = new HashMap<>();
             boutiqueData.put("id", p.getBoutique().getId());
@@ -1728,11 +1728,9 @@ public class ProduitService {
      * Vérifie si un code générique existe déjà dans une entreprise
      */
     private boolean codeExistsInEntreprise(String codeGenerique, Long entrepriseId) {
-        List<Produit> produits = produitRepository.findByCodeGenerique(codeGenerique);
-        return produits.stream()
-                .anyMatch(produit -> produit.getBoutique() != null 
-                        && produit.getBoutique().getEntreprise() != null
-                        && produit.getBoutique().getEntreprise().getId().equals(entrepriseId));
+        // Utiliser la méthode optimisée qui filtre directement par entreprise
+        List<Produit> produits = produitRepository.findByCodeGeneriqueAndEntrepriseId(codeGenerique, entrepriseId);
+        return !produits.isEmpty();
     }
 
     /**

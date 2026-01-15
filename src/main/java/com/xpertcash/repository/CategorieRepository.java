@@ -12,10 +12,9 @@ import com.xpertcash.entity.Categorie;
 
 @Repository
 public interface CategorieRepository extends JpaRepository<Categorie, Long>{
-    Optional<Categorie> findByNom(String nom);
-    boolean existsByNom(String nom);
+    
+    // Méthodes isolantes (filtrées par entreprise)
     boolean existsByNomAndEntrepriseId(String nom, Long entrepriseId);
-
     Categorie findByNomAndEntrepriseId(String nom, Long entrepriseId);
 
     // Méthode de pagination par entreprise

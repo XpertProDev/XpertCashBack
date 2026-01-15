@@ -93,8 +93,8 @@ public class ClientController {
     }
 
     @GetMapping("/clients-and-entreprises")
-    public List<Object> getAllClientsAndEntreprises() {
-        return clientService.getAllClientsAndEntreprises();
+    public List<Object> getAllClientsAndEntreprises(HttpServletRequest request) {
+        return clientService.getAllClientsAndEntreprises(request);
     }
 
     //Endpoint pour modifier un client 

@@ -449,8 +449,8 @@ private ProduitDetailsResponseDTO toProduitDTO(Produit produit) {
         // --- Récupérer toutes les catégories de l'entreprise ---
         List<Categorie> allCategories = categorieRepository.findByEntrepriseId(entreprise.getId());
 
-        // --- Récupérer le count groupé par catégorie (OPTIMISÉ avec filtre deleted) ---
-        Map<Long, Long> produitCountMap = produitRepository.countProduitsParCategorie(entreprise.getId())
+        // --- Récupérer le count groupé par catégorie (OPTIMISÉ avec filtre deleted et excluant SERVICE) ---
+        Map<Long, Long> produitCountMap = produitRepository.countProduitsParCategorieExcluantService(entreprise.getId())
                 .stream()
                 .collect(Collectors.toMap(
                         obj -> (Long) obj[0],

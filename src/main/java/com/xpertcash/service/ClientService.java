@@ -9,7 +9,6 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
-import java.util.stream.Collectors;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -21,7 +20,6 @@ import com.xpertcash.entity.Entreprise;
 import com.xpertcash.entity.EntrepriseClient;
 import com.xpertcash.entity.PermissionType;
 import com.xpertcash.entity.User;
-import com.xpertcash.entity.Enum.RoleType;
 import com.xpertcash.entity.PROSPECT.Interaction;
 import com.xpertcash.repository.ClientRepository;
 import com.xpertcash.repository.EntrepriseClientRepository;
@@ -96,6 +94,11 @@ public class ClientService {
         client.setCreatedAt(now);
 
         if (client.getEntrepriseClient() != null) {
+            // Assigner l'entreprise à l'EntrepriseClient avant de vérifier l'unicité
+            if (client.getEntrepriseClient().getEntreprise() == null) {
+                client.getEntrepriseClient().setEntreprise(entrepriseUtilisateur);
+            }
+            
             checkEntrepriseExists(client.getEntrepriseClient());
 
             if (client.getEntrepriseClient().getId() != null) {
@@ -109,6 +112,12 @@ public class ClientService {
     }
 
     private void checkClientExists(Client client) {
+        // Vérifier l'unicité uniquement dans l'entreprise du client
+        Long entrepriseId = client.getEntreprise() != null ? client.getEntreprise().getId() : null;
+        if (entrepriseId == null) {
+            throw new RuntimeException("Le client doit être associé à une entreprise pour vérifier l'unicité.");
+        }
+
         String email = client.getEmail();
         String telephone = client.getTelephone();
 
@@ -116,46 +125,53 @@ public class ClientService {
         Optional<Client> existingByTelephone = Optional.empty();
 
         if (email != null && !email.isEmpty()) {
-            existingByEmail = clientRepository.findByEmail(email);
+            existingByEmail = clientRepository.findByEmailAndEntrepriseId(email, entrepriseId);
         }
 
         if (telephone != null && !telephone.isEmpty()) {
-            existingByTelephone = clientRepository.findByTelephone(telephone);
+            existingByTelephone = clientRepository.findByTelephoneAndEntrepriseId(telephone, entrepriseId);
         }
 
         if (existingByEmail.isPresent() && existingByTelephone.isPresent()) {
-            throw new RuntimeException("Un client avec cet email et ce téléphone existe déjà !");
+            throw new RuntimeException("Un client avec cet email et ce téléphone existe déjà dans votre entreprise !");
         } else if (existingByEmail.isPresent()) {
-            throw new RuntimeException("Un client avec cet email existe déjà !");
+            throw new RuntimeException("Un client avec cet email existe déjà dans votre entreprise !");
         } else if (existingByTelephone.isPresent()) {
-            throw new RuntimeException("Un client avec ce téléphone existe déjà !");
+            throw new RuntimeException("Un client avec ce téléphone existe déjà dans votre entreprise !");
         }
     }
 
     private void checkEntrepriseExists(EntrepriseClient entrepriseClient) {
+        // Vérifier l'unicité uniquement dans l'entreprise de l'utilisateur connecté
+        Long entrepriseId = entrepriseClient.getEntreprise() != null ? entrepriseClient.getEntreprise().getId() : null;
+        
+        if (entrepriseId == null) {
+            throw new RuntimeException("L'entreprise cliente doit être associée à une entreprise pour vérifier l'unicité.");
+        }
+
         String email = entrepriseClient.getEmail();
         String telephone = entrepriseClient.getTelephone();
 
         Optional<EntrepriseClient> existingByEmail = Optional.empty();
         Optional<EntrepriseClient> existingByTelephone = Optional.empty();
 
-        // Vérifier si l'email est renseigné et existe déjà
+        // Vérifier si l'email est renseigné et existe déjà dans cette entreprise
         if (email != null && !email.isEmpty()) {
-            existingByEmail = entrepriseClientRepository.findByEmail(email);
+            existingByEmail = entrepriseClientRepository.findByEmailAndEntrepriseId(email, entrepriseId);
         }
 
-        // Vérifier si le téléphone est renseigné et existe déjà
+        // Vérifier si le téléphone est renseigné et existe déjà dans cette entreprise
         if (telephone != null && !telephone.isEmpty()) {
-            existingByTelephone = entrepriseClientRepository.findByTelephone(telephone);
+            existingByTelephone = entrepriseClientRepository.findByTelephoneAndEntrepriseId(telephone, entrepriseId);
         }
 
         // Construire un message d'erreur précis
         if (existingByEmail.isPresent() && existingByTelephone.isPresent()) {
-            throw new RuntimeException("Une entreprise avec cet email et ce téléphone existe déjà !");
+            throw new RuntimeException("Une entreprise cliente avec cet email et ce téléphone existe déjà dans votre entreprise !");
         } else if (existingByEmail.isPresent()) {
-            throw new RuntimeException("Une entreprise avec cet email existe déjà !");
+            throw new RuntimeException("Une entreprise cliente avec cet email existe déjà dans votre entreprise !");
         } else if (existingByTelephone.isPresent()) {
-            throw new RuntimeException("Une entreprise avec ce téléphone existe déjà !");
+            throw new RuntimeException("Une entreprise cliente avec ce téléphone existe déjà dans votre entreprise !");
         }
     }
 
@@ -237,18 +253,38 @@ public class ClientService {
         throw new RuntimeException("Accès refusé : vous ne pouvez pas accéder aux clients d'une autre entreprise.");
     }
 
-    // 4. Récupérer tous les clients
-    List<Client> allClients = clientRepository.findAll();
-
-    // 5. Filtrer les clients associés à l'entreprise de l'utilisateur
-    return allClients.stream()
-            .filter(c ->
-                (c.getEntreprise() != null && c.getEntreprise().getId().equals(entreprise.getId())) ||
-                (c.getEntrepriseClient() != null &&
-                 c.getEntrepriseClient().getEntreprise() != null &&
-                 c.getEntrepriseClient().getEntreprise().getId().equals(entreprise.getId()))
-            )
-            .collect(Collectors.toList());
+    // 4. Récupérer uniquement les clients de l'entreprise (optimisé avec requête SQL)
+    List<Client> clients = clientRepository.findClientsByEntrepriseOrEntrepriseClient(entreprise.getId());
+    
+    // Log pour déboguer
+    System.out.println("🔍 Entreprise ID: " + entreprise.getId());
+    System.out.println("📊 Nombre de clients trouvés: " + clients.size());
+    
+    // Si aucun client trouvé, vérifier s'il y a des clients sans entreprise
+    if (clients.isEmpty()) {
+        long totalClients = clientRepository.count();
+        long clientsDirect = clientRepository.countClientsDirectByEntrepriseId(entreprise.getId());
+        long clientsViaEntreprise = clientRepository.countClientsEntrepriseByEntrepriseId(entreprise.getId());
+        
+        System.out.println("⚠️ Aucun client trouvé pour l'entreprise " + entreprise.getId());
+        System.out.println("📈 Total clients dans la base: " + totalClients);
+        System.out.println("📈 Clients directs de l'entreprise: " + clientsDirect);
+        System.out.println("📈 Clients via EntrepriseClient: " + clientsViaEntreprise);
+        
+        // Vérifier s'il y a des clients sans entreprise (anciens clients avant l'isolation)
+        List<Client> clientsSansEntreprise = clientRepository.findAll().stream()
+                .filter(c -> c.getEntreprise() == null && 
+                           (c.getEntrepriseClient() == null || c.getEntrepriseClient().getEntreprise() == null))
+                .collect(java.util.stream.Collectors.toList());
+        
+        if (!clientsSansEntreprise.isEmpty()) {
+            System.out.println("⚠️ ATTENTION: " + clientsSansEntreprise.size() + 
+                             " clients sans entreprise détectés dans la base !");
+            System.out.println("💡 Ces clients doivent être associés à une entreprise pour être visibles.");
+        }
+    }
+    
+    return clients;
 }
 
     //Methode pour recuperer seulement les entreprise client
@@ -274,15 +310,22 @@ public class ClientService {
 
 
     // Méthode pour récupérer tous les clients (personnes) et entreprises sans leurs clients associés
-    public List<Object> getAllClientsAndEntreprises() {
+    public List<Object> getAllClientsAndEntreprises(HttpServletRequest request) {
+        User user = authHelper.getAuthenticatedUserWithFallback(request);
+
+        Entreprise entreprise = user.getEntreprise();
+        if (entreprise == null) {
+            throw new RuntimeException("Aucune entreprise associée à cet utilisateur");
+        }
+
         List<Object> clientsAndEntreprises = new ArrayList<>();
 
-        // 1. Récupérer tous les clients (personnes)
-        List<Client> clients = clientRepository.findAll();
+        // 1. Récupérer uniquement les clients (personnes) de cette entreprise
+        List<Client> clients = clientRepository.findClientsByEntrepriseOrEntrepriseClient(entreprise.getId());
         clientsAndEntreprises.addAll(clients);  // Ajouter les clients individuels
 
-        // 2. Récupérer toutes les entreprises (en tant que clients) mais sans leurs clients associés
-        List<EntrepriseClient> entreprises = entrepriseClientRepository.findAll();
+        // 2. Récupérer uniquement les entreprises clientes de cette entreprise
+        List<EntrepriseClient> entreprises = entrepriseClientRepository.findByEntrepriseId(entreprise.getId());
         clientsAndEntreprises.addAll(entreprises);  // Ajouter les entreprises comme clients sans leurs clients
 
         return clientsAndEntreprises;
@@ -329,21 +372,21 @@ public class ClientService {
         }
 
 
-        // Vérifier unicité de l'email (hors lui-même)
+        // Vérifier unicité de l'email (hors lui-même) uniquement dans cette entreprise
         String email = client.getEmail();
         if (email != null && !email.isEmpty()) {
-            Optional<Client> clientWithEmail = clientRepository.findByEmail(email);
+            Optional<Client> clientWithEmail = clientRepository.findByEmailAndEntrepriseId(email, entreprise.getId());
             if (clientWithEmail.isPresent() && !clientWithEmail.get().getId().equals(client.getId())) {
-                throw new RuntimeException("Un autre client utilise déjà cet email !");
+                throw new RuntimeException("Un autre client utilise déjà cet email dans votre entreprise !");
             }
         }
 
-        // Vérifier unicité du téléphone (hors lui-même)
+        // Vérifier unicité du téléphone (hors lui-même) uniquement dans cette entreprise
         String telephone = client.getTelephone();
         if (telephone != null && !telephone.isEmpty()) {
-            Optional<Client> clientWithTelephone = clientRepository.findByTelephone(telephone);
+            Optional<Client> clientWithTelephone = clientRepository.findByTelephoneAndEntrepriseId(telephone, entreprise.getId());
             if (clientWithTelephone.isPresent() && !clientWithTelephone.get().getId().equals(client.getId())) {
-                throw new RuntimeException("Un autre client utilise déjà ce téléphone !");
+                throw new RuntimeException("Un autre client utilise déjà ce téléphone dans votre entreprise !");
             }
         }
 
