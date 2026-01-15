@@ -24,7 +24,7 @@ public interface FactureReelleRepository extends JpaRepository<FactureReelle, Lo
 
     @Query("SELECT f FROM FactureReelle f WHERE FUNCTION('YEAR', f.dateCreation) = :year ORDER BY f.numeroFacture DESC")
     List<FactureReelle> findFacturesDeLAnnee(@Param("year") int year);
-
+    
     @Query("SELECT f FROM FactureReelle f WHERE f.entreprise.id = :entrepriseId AND FUNCTION('YEAR', f.dateCreation) = :year ORDER BY f.numeroFacture DESC")
     List<FactureReelle> findFacturesDeLAnneeParEntreprise(@Param("entrepriseId") Long entrepriseId, @Param("year") int year);
     

@@ -20,6 +20,8 @@ import java.util.Locale;
 import java.util.Objects;
 import java.util.function.Function;
 
+import jakarta.servlet.http.HttpServletRequest;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -402,19 +404,21 @@ public class MailService {
     }
 
     // Méthode d'envoi d'email pour demande d'approbation de facture
-    public void sendDemandeApprobationEmail(String to, String fullName, String factureNumero, String createurNom, String montantTotal, String objetFacture, Long factureId) throws MessagingException {
+    public void sendDemandeApprobationEmail(String to, String fullName, String factureNumero, String createurNom, String montantTotal, String objetFacture, Long factureId, HttpServletRequest request) throws MessagingException {
         System.out.println("📧 Envoi d'un email d'approbation à : " + to);
         String subject = "Demande d'approbation - Facture " + factureNumero;
-        String htmlContent = generateDemandeApprobationMessage(fullName, factureNumero, createurNom, montantTotal, objetFacture, factureId);
+        String htmlContent = generateDemandeApprobationMessage(fullName, factureNumero, createurNom, montantTotal, objetFacture, factureId, request);
         sendFactureEmail(to, subject, htmlContent);
     }
 
     // Génération du message HTML pour la demande d'approbation
-    private String generateDemandeApprobationMessage(String fullName, String factureNumero, String createurNom, String montantTotal, String objetFacture, Long factureId) {
+    private String generateDemandeApprobationMessage(String fullName, String factureNumero, String createurNom, String montantTotal, String objetFacture, Long factureId, HttpServletRequest request) {
         String objetDisplay = (objetFacture != null && !objetFacture.isBlank()) ? objetFacture : "Aucun objet spécifié";
         // Encoder l'ID comme le frontend (t_ + base64)
         String encodedId = encodeFactureId(factureId);
-        String factureUrl = frontendUrl + "/facture-proforma-details/" + encodedId;
+        // Détecter l'URL frontend selon l'origine de la requête
+        String detectedFrontendUrl = detectFrontendUrl(request);
+        String factureUrl = detectedFrontendUrl + "/facture-proforma-details/" + encodedId;
         
         return """
             <html>
@@ -961,6 +965,49 @@ public class MailService {
         String idString = String.valueOf(factureId);
         String base64Encoded = Base64.getEncoder().encodeToString(idString.getBytes(StandardCharsets.UTF_8));
         return "t_" + base64Encoded;
+    }
+
+    /**
+     * Détecte l'URL frontend appropriée selon l'origine de la requête
+
+     */
+    private String detectFrontendUrl(HttpServletRequest request) {
+        if (request == null) {
+            return frontendUrl;
+        }
+
+        String origin = request.getHeader("Origin");
+        if (origin == null || origin.isBlank()) {
+            String referer = request.getHeader("Referer");
+            if (referer != null && !referer.isBlank()) {
+                try {
+                    java.net.URI uri = new java.net.URI(referer);
+                    String scheme = uri.getScheme();
+                    String host = uri.getHost();
+                    int port = uri.getPort();
+                    if (scheme != null && host != null) {
+                        origin = scheme + "://" + host + (port != -1 ? ":" + port : "");
+                    }
+                } catch (Exception e) {
+                    logger.debug("Impossible de parser le Referer: {}", referer);
+                }
+            }
+        }
+
+        if (origin != null && !origin.isBlank()) {
+            if (origin.startsWith("https://fere.tchakeda.com") || origin.startsWith("https://www.fere.tchakeda.com")) {
+                if (origin.contains("www.")) {
+                    return "https://www.fere.tchakeda.com";
+                } else {
+                    return "https://fere.tchakeda.com";
+                }
+            } else if (origin.startsWith("https://xpertcash.tchakeda.com")) {
+                return "https://xpertcash.tchakeda.com";
+            } else if (origin.startsWith("http://192.168.1.11:4200") || origin.startsWith("http://localhost:4200")) {
+                return origin;
+            }
+        }
+        return frontendUrl;
     }
 
 }

@@ -652,7 +652,8 @@ public class FactureProformaService {
                                 createur,
                                 montantTotalFormate,
                                 objetFacture,
-                                facture.getId()
+                                facture.getId(),
+                                request
                         );
                         log.info("✅ Email d'approbation envoyé à : {}", approbateur.getEmail());
                     } catch (Exception e) {
@@ -1068,7 +1069,7 @@ public class FactureProformaService {
         boolean hasPermission = utilisateur.getRole().hasPermission(PermissionType.GESTION_FACTURATION);
         boolean isCreateurFacture = facture.getUtilisateurCreateur() != null &&
                                     facture.getUtilisateurCreateur().getId().equals(utilisateur.getId());
-        
+
         // Vérifier si l'utilisateur est un approbateur de la facture
         boolean isApprobateur = facture.getApprobateurs() != null &&
                                facture.getApprobateurs().stream()

@@ -446,14 +446,14 @@ public class ProduitService {
 
 
       // Génère un numéro unique de facture
-   private String generateNumeroFacture() {
+   private String generateNumeroFacture(Long entrepriseId) {
         int currentYear = LocalDate.now().getYear();
         int currentMonth = LocalDate.now().getMonthValue();
 
-        // Récupérer les factures de l’année en cours (à adapter si besoin)
-        List<Facture> facturesAnnee = factureRepository.findByYear(currentYear);
+        // Filtrer par entreprise pour que chaque entreprise ait son propre compteur
+        List<Facture> facturesAnnee = factureRepository.findByYearAndEntrepriseId(currentYear, entrepriseId);
 
-        // Trouver le plus grand numéro de facture pour cette année
+        // Trouver le plus grand numéro de facture pour cette année et cette entreprise
         int lastNumero = facturesAnnee.stream()
             .map(f -> extraireNumero(f.getNumeroFacture()))
             .max(Integer::compareTo)
@@ -478,7 +478,14 @@ public class ProduitService {
    public Facture enregistrerFacture(String type, List<Produit> produits, Map<Long, Integer> quantites,
                                   String description, String codeFournisseur, Fournisseur fournisseur, User user) {
     Facture facture = new Facture();
-    facture.setNumeroFacture(generateNumeroFacture());
+    Long entrepriseId = user.getEntreprise() != null ? user.getEntreprise().getId() : null;
+    if (entrepriseId == null && !produits.isEmpty() && produits.get(0).getBoutique() != null) {
+        entrepriseId = produits.get(0).getBoutique().getEntreprise().getId();
+    }
+    if (entrepriseId == null) {
+        throw new RuntimeException("Impossible de déterminer l'entreprise pour générer le numéro de facture.");
+    }
+    facture.setNumeroFacture(generateNumeroFacture(entrepriseId));
     facture.setType(type);
     facture.setDescription(description);
     facture.setDateFacture(LocalDateTime.now());
