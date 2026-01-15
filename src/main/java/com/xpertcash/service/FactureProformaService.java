@@ -158,8 +158,9 @@ public class FactureProformaService {
     Long clientId = (facture.getClient() != null) ? facture.getClient().getId() : null;
     Long entrepriseClientId = (facture.getEntrepriseClient() != null) ? facture.getEntrepriseClient().getId() : null;
 
-    // Vérifier si une facture similaire existe déjà
-    List<FactureProForma> facturesExistantes = factureProformaRepository.findExistingFactures(clientId, entrepriseClientId, StatutFactureProForma.BROUILLON);
+    // Vérifier si une facture similaire existe déjà (isolée par entreprise)
+    List<FactureProForma> facturesExistantes = factureProformaRepository.findExistingFacturesByEntrepriseId(
+            entrepriseUtilisateur.getId(), clientId, entrepriseClientId, StatutFactureProForma.BROUILLON);
 
     for (FactureProForma fExistante : facturesExistantes) {
         List<Long> produitsExistants = fExistante.getLignesFacture()
@@ -412,17 +413,23 @@ public class FactureProformaService {
             }
         }
 
-        // Si demande d’annulation
+        // Si demande d'annulation
         if (modifications.getStatut() == StatutFactureProForma.ANNULE) {
+            // Vérifier que la facture appartient à l'entreprise de l'utilisateur
+            Entreprise entreprise = facture.getEntreprise();
+            if (entreprise == null) {
+                throw new RuntimeException("La facture n'est associée à aucune entreprise.");
+            }
 
-                // si paiements existants
-            Optional<FactureReelle> factureReelleOpt = factureReelleRepository.findByFactureProForma(facture);
+            // si paiements existants (isolé par entreprise)
+            Optional<FactureReelle> factureReelleOpt = factureReelleRepository.findByFactureProFormaIdAndEntrepriseId(
+                    facture.getId(), entreprise.getId());
             if (factureReelleOpt.isPresent()) {
                 FactureReelle factureReelle = factureReelleOpt.get();
                 BigDecimal totalPaye = paiementRepository.sumMontantsByFactureReelle(factureReelle.getId());
 
                 if (totalPaye != null && totalPaye.compareTo(BigDecimal.ZERO) > 0) {
-                    throw new RuntimeException("Impossible d’annuler : des paiements ont déjà été effectués sur la facture.");
+                    throw new RuntimeException("Impossible d'annuler : des paiements ont déjà été effectués sur la facture.");
                 }
             }
 
@@ -434,10 +441,12 @@ public class FactureProformaService {
             facture.setDernierRappelEnvoye(null);
             facture.setNotifie(false);
 
-            factureReelleRepository.findByFactureProForma(facture).ifPresent(factureReelle -> {
-                factureReelleRepository.delete(factureReelle);
-                System.out.println("🗑️ Facture réelle supprimée.");
-            });
+            // Supprimer la facture réelle associée (isolé par entreprise)
+            factureReelleRepository.findByFactureProFormaIdAndEntrepriseId(facture.getId(), entreprise.getId())
+                    .ifPresent(factureReelle -> {
+                        factureReelleRepository.delete(factureReelle);
+                        System.out.println("🗑️ Facture réelle supprimée.");
+                    });
 
             factProHistoriqueService.enregistrerActionHistorique(
                     facture,
@@ -1207,14 +1216,21 @@ public FactureProFormaDTO getFactureProformaById(Long id, HttpServletRequest req
         return note;
     }
 
-    //Methode pour connaitre tout les facture lier a un client
-    public List<FactureProForma> getFacturesParClient(Long clientId, Long entrepriseClientId) {
-    if (clientId == null && entrepriseClientId == null) {
-        throw new RuntimeException("Veuillez spécifier un client ou une entreprise cliente.");
-    }
+    //Methode pour connaitre tout les facture lier a un client (isolée par entreprise)
+    public List<FactureProForma> getFacturesParClient(Long clientId, Long entrepriseClientId, HttpServletRequest request) {
+        if (clientId == null && entrepriseClientId == null) {
+            throw new RuntimeException("Veuillez spécifier un client ou une entreprise cliente.");
+        }
 
-    return factureProformaRepository.findByClientIdOrEntrepriseClientId(clientId, entrepriseClientId);
-}
+        User user = authHelper.getAuthenticatedUserWithFallback(request);
+        Entreprise entreprise = user.getEntreprise();
+        if (entreprise == null) {
+            throw new RuntimeException("L'utilisateur n'a pas d'entreprise associée.");
+        }
+
+        return factureProformaRepository.findByClientIdOrEntrepriseClientIdAndEntrepriseId(
+                entreprise.getId(), clientId, entrepriseClientId);
+    }
 
  
     //Trier

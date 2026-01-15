@@ -1,9 +1,11 @@
 package com.xpertcash.service;
 
 import java.util.List;
+import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.xpertcash.entity.Entreprise;
 import com.xpertcash.entity.Unite;
@@ -23,6 +25,7 @@ public class UniteService {
 
 
     // Ajouter une nouvelle unité
+    @Transactional
     public Unite createUnite(Unite unite, HttpServletRequest request) {
         try {
             // Récupérer l'utilisateur authentifié
@@ -88,6 +91,7 @@ public class UniteService {
 
 
     // Mettre à jour l'unité
+    @Transactional
     public Unite updateUnite(HttpServletRequest request, Long uniteId, Unite uniteDetails) {
         try {
             // Récupérer l'utilisateur authentifié
@@ -102,12 +106,11 @@ public class UniteService {
             Unite unite = uniteRepository.findByIdAndEntrepriseId(uniteId, entreprise.getId())
                     .orElseThrow(() -> new RuntimeException("Unité non trouvée ou n'appartient pas à votre entreprise"));
 
-            // Vérifier si le nom de l'unité est déjà utilisé par une autre unité de la même entreprise
-            if (uniteRepository.existsByNomAndEntrepriseId(uniteDetails.getNom(), entreprise.getId())) {
-                // Vérifier que ce n'est pas la même unité (on peut garder le même nom pour la même unité)
-                Unite uniteAvecMemeNom = uniteRepository.findByNomAndEntrepriseId(uniteDetails.getNom(), entreprise.getId())
-                        .orElse(null);
-                if (uniteAvecMemeNom != null && !uniteAvecMemeNom.getId().equals(uniteId)) {
+            // Vérifier si le nom a changé et si un autre nom existe déjà pour cette entreprise
+            if (!unite.getNom().equals(uniteDetails.getNom())) {
+                // Optimisation: utiliser directement findByNomAndEntrepriseId au lieu de exists puis find
+                Optional<Unite> uniteAvecMemeNom = uniteRepository.findByNomAndEntrepriseId(uniteDetails.getNom(), entreprise.getId());
+                if (uniteAvecMemeNom.isPresent() && !uniteAvecMemeNom.get().getId().equals(uniteId)) {
                     throw new RuntimeException("Le nom de l'unité existe déjà.");
                 }
             }

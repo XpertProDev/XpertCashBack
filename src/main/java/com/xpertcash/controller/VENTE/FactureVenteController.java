@@ -67,7 +67,8 @@ public class FactureVenteController {
             // Récupérer les données complètes de la facture
             ReceiptEmailRequest factureData = factureVenteService.getFactureDataForEmail(
                 request.getVenteId(), 
-                request.getEmail()
+                request.getEmail(),
+                httpRequest
             );
 
             // Envoi de l'email sans pièces jointes
@@ -105,7 +106,8 @@ public class FactureVenteController {
             // Récupérer les données complètes de la facture
             ReceiptEmailRequest factureData = factureVenteService.getFactureDataForEmail(
                 venteId, 
-                email
+                email,
+                httpRequest
             );
 
             // Convertir les pièces jointes en liste

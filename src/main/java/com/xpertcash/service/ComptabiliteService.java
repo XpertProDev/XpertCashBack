@@ -256,9 +256,13 @@ public class ComptabiliteService {
         // 🔗 Lier l'entrée à la dette payée
         entree.setDetteId(vente.getId());
         entree.setDetteType("VENTE_CREDIT");
-        // Récupérer le numéro de facture si disponible
-        factureVenteRepository.findByVenteId(vente.getId())
-                .ifPresent(facture -> entree.setDetteNumero(facture.getNumeroFacture()));
+        // Récupérer le numéro de facture si disponible (isolé par entreprise)
+        Long venteEntrepriseId = vente.getBoutique() != null && vente.getBoutique().getEntreprise() != null 
+                ? vente.getBoutique().getEntreprise().getId() : null;
+        if (venteEntrepriseId != null) {
+            factureVenteRepository.findByVenteIdAndEntrepriseId(vente.getId(), venteEntrepriseId)
+                    .ifPresent(facture -> entree.setDetteNumero(facture.getNumeroFacture()));
+        }
         
         entreeGeneraleRepository.save(entree);
 
@@ -2663,7 +2667,12 @@ public class ComptabiliteService {
         response.setRemiseGlobale(vente.getRemiseGlobale());
         response.setLignes(lignesDTO);
         
-        FactureVente facture = factureVenteRepository.findByVente(vente).orElse(null);
+        // Récupérer le numéro de facture (isolé par entreprise)
+        Long venteEntrepriseId = vente.getBoutique() != null && vente.getBoutique().getEntreprise() != null 
+                ? vente.getBoutique().getEntreprise().getId() : null;
+        FactureVente facture = venteEntrepriseId != null 
+                ? factureVenteRepository.findByVenteIdAndEntrepriseId(vente.getId(), venteEntrepriseId).orElse(null)
+                : null;
         if (facture != null) {
             response.setNumeroFacture(facture.getNumeroFacture());
         }

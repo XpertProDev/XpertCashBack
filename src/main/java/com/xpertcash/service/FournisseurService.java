@@ -267,8 +267,9 @@ private User getUserFromRequest(HttpServletRequest request) {
         throw new RuntimeException("Ce fournisseur n'appartient pas à votre entreprise.");
     }
 
-    // 📄 Vérification d'utilisation dans facture
-    boolean fournisseurUtilise = factureRepository.existsByFournisseur_Id(fournisseurId);
+    // 📄 Vérification d'utilisation dans facture (isolé par entreprise)
+    boolean fournisseurUtilise = factureRepository.existsByFournisseurIdAndEntrepriseId(
+            fournisseurId, user.getEntreprise().getId());
     if (fournisseurUtilise) {
         throw new RuntimeException("Impossible de supprimer ce fournisseur : il est lié à une ou plusieurs factures.");
     }

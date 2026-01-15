@@ -11,11 +11,30 @@ import com.xpertcash.entity.DepenseGenerale;
 
 @Repository
 public interface DepenseGeneraleRepository extends JpaRepository<DepenseGenerale, Long> {
-    List<DepenseGenerale> findByEntrepriseId(Long entrepriseId);
     
-    List<DepenseGenerale> findByEntrepriseIdOrderByDateCreationDesc(Long entrepriseId);
+    // Récupérer toutes les dépenses générales d'une entreprise (optimisé avec JOIN FETCH)
+    @Query("SELECT DISTINCT d FROM DepenseGenerale d " +
+           "LEFT JOIN FETCH d.entreprise e " +
+           "LEFT JOIN FETCH d.categorie " +
+           "LEFT JOIN FETCH d.categorieLiee " +
+           "WHERE e.id = :entrepriseId")
+    List<DepenseGenerale> findByEntrepriseId(@Param("entrepriseId") Long entrepriseId);
     
-    @Query("SELECT d FROM DepenseGenerale d WHERE d.entreprise.id = :entrepriseId " +
+    // Récupérer toutes les dépenses générales d'une entreprise triées par date (optimisé avec JOIN FETCH)
+    @Query("SELECT DISTINCT d FROM DepenseGenerale d " +
+           "LEFT JOIN FETCH d.entreprise e " +
+           "LEFT JOIN FETCH d.categorie " +
+           "LEFT JOIN FETCH d.categorieLiee " +
+           "WHERE e.id = :entrepriseId " +
+           "ORDER BY d.dateCreation DESC")
+    List<DepenseGenerale> findByEntrepriseIdOrderByDateCreationDesc(@Param("entrepriseId") Long entrepriseId);
+    
+    // Récupérer les dépenses générales par entreprise, mois et année (optimisé avec JOIN FETCH)
+    @Query("SELECT DISTINCT d FROM DepenseGenerale d " +
+           "LEFT JOIN FETCH d.entreprise e " +
+           "LEFT JOIN FETCH d.categorie " +
+           "LEFT JOIN FETCH d.categorieLiee " +
+           "WHERE e.id = :entrepriseId " +
            "AND MONTH(d.dateCreation) = :month " +
            "AND YEAR(d.dateCreation) = :year " +
            "ORDER BY d.numero DESC")

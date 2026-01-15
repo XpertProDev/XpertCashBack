@@ -113,8 +113,12 @@ public class FactureDepenseService {
                 item.setClientNumero(vente.getClientNumero());
                 item.setRemiseGlobale(vente.getRemiseGlobale());
                 
-                // Récupérer le numéro de facture de vente
-                Optional<FactureVente> factureVente = factureVenteRepository.findByVente(vente);
+                // Récupérer le numéro de facture de vente (isolé par entreprise)
+                Long venteEntrepriseId = vente.getBoutique() != null && vente.getBoutique().getEntreprise() != null 
+                        ? vente.getBoutique().getEntreprise().getId() : null;
+                Optional<FactureVente> factureVente = venteEntrepriseId != null 
+                        ? factureVenteRepository.findByVenteIdAndEntrepriseId(vente.getId(), venteEntrepriseId)
+                        : Optional.empty();
                 if (factureVente.isPresent()) {
                     item.setNumeroFactureVente(factureVente.get().getNumeroFacture());
                 }
@@ -387,8 +391,12 @@ public class FactureDepenseService {
                 item.setClientNumero(vente.getClientNumero());
                 item.setRemiseGlobale(vente.getRemiseGlobale());
                 
-                // Récupérer le numéro de facture de vente
-                Optional<FactureVente> factureVente = factureVenteRepository.findByVente(vente);
+                // Récupérer le numéro de facture de vente (isolé par entreprise)
+                Long venteEntrepriseId = vente.getBoutique() != null && vente.getBoutique().getEntreprise() != null 
+                        ? vente.getBoutique().getEntreprise().getId() : null;
+                Optional<FactureVente> factureVente = venteEntrepriseId != null 
+                        ? factureVenteRepository.findByVenteIdAndEntrepriseId(vente.getId(), venteEntrepriseId)
+                        : Optional.empty();
                 if (factureVente.isPresent()) {
                     item.setNumeroFactureVente(factureVente.get().getNumeroFacture());
                 }
@@ -541,8 +549,12 @@ public class FactureDepenseService {
                 item.setClientNumero(vente.getClientNumero());
                 item.setRemiseGlobale(vente.getRemiseGlobale());
                 
-                // Récupérer le numéro de facture de vente
-                Optional<FactureVente> factureVente = factureVenteRepository.findByVente(vente);
+                // Récupérer le numéro de facture de vente (isolé par entreprise)
+                Long venteEntrepriseId = vente.getBoutique() != null && vente.getBoutique().getEntreprise() != null 
+                        ? vente.getBoutique().getEntreprise().getId() : null;
+                Optional<FactureVente> factureVente = venteEntrepriseId != null 
+                        ? factureVenteRepository.findByVenteIdAndEntrepriseId(vente.getId(), venteEntrepriseId)
+                        : Optional.empty();
                 if (factureVente.isPresent()) {
                     item.setNumeroFactureVente(factureVente.get().getNumeroFacture());
                 }
@@ -737,8 +749,12 @@ public class FactureDepenseService {
             item.setClientNumero(vente.getClientNumero());
             item.setRemiseGlobale(vente.getRemiseGlobale());
             
-            // Récupérer le numéro de facture de vente
-            Optional<FactureVente> factureVente = factureVenteRepository.findByVente(vente);
+            // Récupérer le numéro de facture de vente (isolé par entreprise)
+            Long venteEntrepriseId = vente.getBoutique() != null && vente.getBoutique().getEntreprise() != null 
+                    ? vente.getBoutique().getEntreprise().getId() : null;
+            Optional<FactureVente> factureVente = venteEntrepriseId != null 
+                    ? factureVenteRepository.findByVenteIdAndEntrepriseId(vente.getId(), venteEntrepriseId)
+                    : Optional.empty();
             if (factureVente.isPresent()) {
                 item.setNumeroFactureVente(factureVente.get().getNumeroFacture());
             }
@@ -840,8 +856,12 @@ public class FactureDepenseService {
             item.setClientNumero(vente.getClientNumero());
             item.setRemiseGlobale(vente.getRemiseGlobale());
             
-            // Récupérer le numéro de facture de vente
-            Optional<FactureVente> factureVente = factureVenteRepository.findByVente(vente);
+            // Récupérer le numéro de facture de vente (isolé par entreprise)
+            Long venteEntrepriseId = vente.getBoutique() != null && vente.getBoutique().getEntreprise() != null 
+                    ? vente.getBoutique().getEntreprise().getId() : null;
+            Optional<FactureVente> factureVente = venteEntrepriseId != null 
+                    ? factureVenteRepository.findByVenteIdAndEntrepriseId(vente.getId(), venteEntrepriseId)
+                    : Optional.empty();
             if (factureVente.isPresent()) {
                 item.setNumeroFactureVente(factureVente.get().getNumeroFacture());
             }

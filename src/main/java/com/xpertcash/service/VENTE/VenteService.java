@@ -678,9 +678,12 @@ public List<VenteResponse> getVentesByVendeur(Long vendeurId, HttpServletRequest
         }
         response.setRemiseGlobale(vente.getRemiseGlobale());
         response.setLignes(lignesDTO);
-            // 🧾 Récupération du numéro de facture
-        FactureVente facture = factureVenteRepository.findByVente(vente)
-                .orElse(null);
+            // 🧾 Récupération du numéro de facture (isolé par entreprise)
+        Long entrepriseId = vente.getBoutique() != null && vente.getBoutique().getEntreprise() != null 
+                ? vente.getBoutique().getEntreprise().getId() : null;
+        FactureVente facture = entrepriseId != null 
+                ? factureVenteRepository.findByVenteIdAndEntrepriseId(vente.getId(), entrepriseId).orElse(null)
+                : null;
         if (facture != null) {
             response.setNumeroFacture(facture.getNumeroFacture());
         }
@@ -1124,7 +1127,12 @@ private VenteParClientResponse toVenteParClientResponse(Vente vente) {
     }
 
     dto.setRemiseGlobale(vente.getRemiseGlobale());
-    FactureVente facture = factureVenteRepository.findByVente(vente).orElse(null);
+    // Récupérer le numéro de facture (isolé par entreprise)
+    Long venteEntrepriseId = vente.getBoutique() != null && vente.getBoutique().getEntreprise() != null 
+            ? vente.getBoutique().getEntreprise().getId() : null;
+    FactureVente facture = venteEntrepriseId != null 
+            ? factureVenteRepository.findByVenteIdAndEntrepriseId(vente.getId(), venteEntrepriseId).orElse(null)
+            : null;
     dto.setNumeroFacture(facture != null ? facture.getNumeroFacture() : null);
 
     return dto;

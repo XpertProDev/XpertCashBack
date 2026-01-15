@@ -468,9 +468,9 @@ public class ClientService {
             throw new RuntimeException("Accès refusé : vous n'avez pas les permissions pour supprimer un client.");
         }
 
-        // ❌ Vérifier que le client n’a pas de commandes ou de factures
-        boolean hasFactures = factureProformaRepository.existsByClientId(clientId);
-        boolean hasFacturesReel = factureReelleRepository.existsByClientId(clientId);
+        // ❌ Vérifier que le client n'a pas de commandes ou de factures (isolé par entreprise)
+        boolean hasFactures = factureProformaRepository.existsByClientIdAndEntrepriseId(clientId, entreprise.getId());
+        boolean hasFacturesReel = factureReelleRepository.existsByClientIdAndEntrepriseId(clientId, entreprise.getId());
         boolean hasVentes = !venteRepository.findByClientId(clientId).isEmpty();
 
 

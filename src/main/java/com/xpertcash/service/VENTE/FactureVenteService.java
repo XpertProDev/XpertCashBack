@@ -232,9 +232,24 @@ private String calculerStatutRemboursement(Vente vente) {
 /**
  * Récupère les données d'une facture pour l'envoi par email
  */
-public ReceiptEmailRequest getFactureDataForEmail(String venteId, String email) {
-    // Récupérer la facture par l'ID de vente
-    Optional<FactureVente> factureOpt = factureVenteRepository.findByVenteId(Long.parseLong(venteId));
+public ReceiptEmailRequest getFactureDataForEmail(String venteId, String email, HttpServletRequest request) {
+    // Récupérer l'utilisateur et son entreprise pour l'isolation
+    String token = request.getHeader("Authorization");
+    if (token == null || !token.startsWith("Bearer ")) {
+        throw new RuntimeException("Token JWT manquant ou invalide");
+    }
+    String userUuid = jwtUtil.extractUserUuid(token.substring(7));
+    User user = usersRepository.findByUuid(userUuid)
+            .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+    Long entrepriseId = user.getEntreprise() != null ? user.getEntreprise().getId() : null;
+    
+    if (entrepriseId == null) {
+        throw new RuntimeException("Aucune entreprise associée à cet utilisateur");
+    }
+    
+    // Récupérer la facture par l'ID de vente (isolé par entreprise)
+    Optional<FactureVente> factureOpt = factureVenteRepository.findByVenteIdAndEntrepriseId(
+            Long.parseLong(venteId), entrepriseId);
     
     if (factureOpt.isEmpty()) {
         throw new RuntimeException("Facture non trouvée pour l'ID de vente : " + venteId);
@@ -266,28 +281,28 @@ public ReceiptEmailRequest getFactureDataForEmail(String venteId, String email) 
         .collect(Collectors.toList());
     
     // Créer le ReceiptEmailRequest
-    ReceiptEmailRequest request = new ReceiptEmailRequest();
-    request.setEmail(email);
-    request.setVenteId(venteId);
-    request.setNumeroFacture(facture.getNumeroFacture());
-    request.setDateVente(vente.getDateVente());
-    request.setMontantTotal(BigDecimal.valueOf(vente.getMontantTotal()));
-    request.setModePaiement(vente.getModePaiement() != null ? vente.getModePaiement().toString() : "Non spécifié");
-    request.setMontantPaye(BigDecimal.valueOf(vente.getMontantPaye() != null ? vente.getMontantPaye() : vente.getMontantTotal()));
+    ReceiptEmailRequest receiptRequest = new ReceiptEmailRequest();
+    receiptRequest.setEmail(email);
+    receiptRequest.setVenteId(venteId);
+    receiptRequest.setNumeroFacture(facture.getNumeroFacture());
+    receiptRequest.setDateVente(vente.getDateVente());
+    receiptRequest.setMontantTotal(BigDecimal.valueOf(vente.getMontantTotal()));
+    receiptRequest.setModePaiement(vente.getModePaiement() != null ? vente.getModePaiement().toString() : "Non spécifié");
+    receiptRequest.setMontantPaye(BigDecimal.valueOf(vente.getMontantPaye() != null ? vente.getMontantPaye() : vente.getMontantTotal()));
     
     // Calculer la monnaie rendue
-    BigDecimal changeDue = request.getMontantPaye().subtract(request.getMontantTotal());
-    request.setChangeDue(changeDue.max(BigDecimal.ZERO));
+    BigDecimal changeDue = receiptRequest.getMontantPaye().subtract(receiptRequest.getMontantTotal());
+    receiptRequest.setChangeDue(changeDue.max(BigDecimal.ZERO));
     
-    request.setNomVendeur(vente.getVendeur() != null ? vente.getVendeur().getNomComplet() : "Non spécifié");
-    request.setNomBoutique(vente.getBoutique().getNomBoutique());
-    request.setLignes(lignes);
+    receiptRequest.setNomVendeur(vente.getVendeur() != null ? vente.getVendeur().getNomComplet() : "Non spécifié");
+    receiptRequest.setNomBoutique(vente.getBoutique().getNomBoutique());
+    receiptRequest.setLignes(lignes);
     
     // Ajouter les remises
-    request.setRemiseGlobale(vente.getRemiseGlobale() != null ? vente.getRemiseGlobale() : 0.0);
-    request.setRemisesProduits(remisesProduits.isEmpty() ? null : remisesProduits);
+    receiptRequest.setRemiseGlobale(vente.getRemiseGlobale() != null ? vente.getRemiseGlobale() : 0.0);
+    receiptRequest.setRemisesProduits(remisesProduits.isEmpty() ? null : remisesProduits);
     
-    return request;
+    return receiptRequest;
 }
 
 }

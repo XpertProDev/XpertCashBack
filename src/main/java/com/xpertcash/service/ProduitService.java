@@ -1587,14 +1587,16 @@ public class ProduitService {
             // Colonne 6: Unité
             String uniteNom = getStringValue(row, 6, dataFormatter);
             if (uniteNom != null && !uniteNom.isEmpty()) {
-                Optional<Unite> uniteOpt = uniteRepository.findByNom(uniteNom);
+                // Rechercher l'unité par nom et entreprise (pour isolation)
+                Optional<Unite> uniteOpt = uniteRepository.findByNomAndEntrepriseId(uniteNom, entreprise.getId());
 
                 if (uniteOpt.isPresent()) {
                     request.setUniteId(uniteOpt.get().getId());
                 } else {
-                    // Créer l'unité si elle n'existe pas
+                    // Créer l'unité si elle n'existe pas pour cette entreprise
                     Unite newUnite = new Unite();
                     newUnite.setNom(uniteNom);
+                    newUnite.setEntreprise(entreprise);
                     Unite savedUnite = uniteRepository.save(newUnite);
                     request.setUniteId(savedUnite.getId());
                 }

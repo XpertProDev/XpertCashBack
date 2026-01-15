@@ -460,7 +460,8 @@ public class SuperAdminService {
         List<Boutique> boutiquesForFactureProduit = boutiqueRepository.findByEntrepriseId(entrepriseId);
         int totalFactureProduits = 0;
         for (Boutique boutique : boutiquesForFactureProduit) {
-            List<Facture> facturesBoutique = factureRepository.findByBoutiqueId(boutique.getId());
+            List<Facture> facturesBoutique = factureRepository.findByBoutiqueIdAndEntrepriseId(
+                    boutique.getId(), entrepriseId);
             for (Facture facture : facturesBoutique) {
                 // FactureProduit est supprimé en cascade avec Facture, mais on le fait explicitement pour être sûr
                 // Utiliser une requête native pour supprimer directement
@@ -666,11 +667,16 @@ public class SuperAdminService {
                 venteHistoriqueRepository.deleteAll(historiques);
             }
             
-            // Supprimer les factures de vente pour cette vente spécifique
-            factureVenteRepository.findByVenteId(vente.getId()).ifPresent(factureVente -> {
-                factureVenteRepository.delete(factureVente);
-                totalFacturesVente[0]++;
-            });
+            // Supprimer les factures de vente pour cette vente spécifique (isolé par entreprise)
+            Long venteEntrepriseId = vente.getBoutique() != null && vente.getBoutique().getEntreprise() != null 
+                    ? vente.getBoutique().getEntreprise().getId() : null;
+            if (venteEntrepriseId != null) {
+                factureVenteRepository.findByVenteIdAndEntrepriseId(vente.getId(), venteEntrepriseId)
+                        .ifPresent(factureVente -> {
+                            factureVenteRepository.delete(factureVente);
+                            totalFacturesVente[0]++;
+                        });
+            }
         }
         if (totalHistoriques > 0) {
         }
@@ -1172,7 +1178,8 @@ public class SuperAdminService {
         List<Boutique> boutiquesForFactureProduit = boutiqueRepository.findByEntrepriseId(entrepriseId);
         int totalFactureProduits = 0;
         for (Boutique boutique : boutiquesForFactureProduit) {
-            List<Facture> facturesBoutique = factureRepository.findByBoutiqueId(boutique.getId());
+            List<Facture> facturesBoutique = factureRepository.findByBoutiqueIdAndEntrepriseId(
+                    boutique.getId(), entrepriseId);
             for (Facture facture : facturesBoutique) {
                 int deleted = entityManager.createNativeQuery(
                     "DELETE FROM facture_produit WHERE facture_id = :factureId"
@@ -1348,10 +1355,16 @@ public class SuperAdminService {
                 venteHistoriqueRepository.deleteAll(historiques);
             }
             
-            factureVenteRepository.findByVenteId(vente.getId()).ifPresent(factureVente -> {
-                factureVenteRepository.delete(factureVente);
-                totalFacturesVente[0]++;
-            });
+            // Supprimer les factures de vente pour cette vente spécifique (isolé par entreprise)
+            Long venteEntrepriseId = vente.getBoutique() != null && vente.getBoutique().getEntreprise() != null 
+                    ? vente.getBoutique().getEntreprise().getId() : null;
+            if (venteEntrepriseId != null) {
+                factureVenteRepository.findByVenteIdAndEntrepriseId(vente.getId(), venteEntrepriseId)
+                        .ifPresent(factureVente -> {
+                            factureVenteRepository.delete(factureVente);
+                            totalFacturesVente[0]++;
+                        });
+            }
         }
         
         List<FactureVente> facturesVenteRestantes = factureVenteRepository.findAllByEntrepriseId(entrepriseId);
@@ -1668,7 +1681,8 @@ public class SuperAdminService {
             // 21.1. Vider le contenu de la première boutique
             
             // 21.1.1. Supprimer tous les FactureProduit de la première boutique
-            List<Facture> facturesPremiereBoutique = factureRepository.findByBoutiqueId(premiereBoutiqueId);
+            List<Facture> facturesPremiereBoutique = factureRepository.findByBoutiqueIdAndEntrepriseId(
+                    premiereBoutiqueId, entrepriseId);
             for (Facture facture : facturesPremiereBoutique) {
                 entityManager.createNativeQuery(
                     "DELETE FROM facture_produit WHERE facture_id = :factureId"
@@ -1757,8 +1771,13 @@ public class SuperAdminService {
                     venteHistoriqueRepository.deleteAll(historiques);
                 }
                 
-                // Supprimer les factures de vente
-                factureVenteRepository.findByVenteId(vente.getId()).ifPresent(factureVenteRepository::delete);
+                // Supprimer les factures de vente (isolé par entreprise)
+                Long venteEntrepriseId = vente.getBoutique() != null && vente.getBoutique().getEntreprise() != null 
+                        ? vente.getBoutique().getEntreprise().getId() : null;
+                if (venteEntrepriseId != null) {
+                    factureVenteRepository.findByVenteIdAndEntrepriseId(vente.getId(), venteEntrepriseId)
+                            .ifPresent(factureVenteRepository::delete);
+                }
             }
             entityManager.flush();
             

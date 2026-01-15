@@ -9,8 +9,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
+import com.xpertcash.entity.Entreprise;
 import com.xpertcash.entity.FactureProForma;
 import com.xpertcash.entity.User;
+import com.xpertcash.repository.EntrepriseRepository;
 import com.xpertcash.repository.FactureProformaRepository;
 
 import jakarta.transaction.Transactional;
@@ -24,6 +26,9 @@ public class NotificationService {
      @Autowired
     private FactureProformaRepository factureProformaRepository;
 
+     @Autowired
+    private EntrepriseRepository entrepriseRepository;
+
     // tâche planifiée : Vérifie tous les jours à 08h00 quelles factures doivent être relancées
     @Scheduled(cron = "0 0 8 * * ?")
     //@Scheduled(cron = "0 * * * * ?")  // Tâche planifiée toutes les minutes mode Dev
@@ -33,11 +38,16 @@ public class NotificationService {
     
         System.out.println("🔍 Vérification des factures à relancer à " + maintenant);
     
-        List<FactureProForma> facturesAEnvoyer = factureProformaRepository.findFacturesAEnvoyer(maintenant);
-    
-        System.out.println("📊 Nombre de factures à relancer : " + facturesAEnvoyer.size());
-    
-        for (FactureProForma facture : facturesAEnvoyer) {
+        // Itérer sur toutes les entreprises pour respecter l'isolation des données
+        List<Entreprise> entreprises = entrepriseRepository.findAll();
+        int totalFacturesAEnvoyer = 0;
+        
+        for (Entreprise entreprise : entreprises) {
+            List<FactureProForma> facturesAEnvoyer = factureProformaRepository.findFacturesAEnvoyerByEntrepriseId(
+                    entreprise.getId(), maintenant);
+            totalFacturesAEnvoyer += facturesAEnvoyer.size();
+            
+            for (FactureProForma facture : facturesAEnvoyer) {
             System.out.println("📢 Facture à relancer : " + facture.getNumeroFacture() +
                                ", Date Relance : " + facture.getDateRelance() +
                                ", Dernier Rappel Envoyé : " + facture.getDernierRappelEnvoye() +
@@ -72,10 +82,10 @@ public class NotificationService {
                             } catch (Exception e) {
                                 System.err.println("❌ Erreur lors de l'envoi de la notification pour la facture " + facture.getNumeroFacture() + " : " + e.getMessage());
                             }
-                            
                         }
-             
+        }
         
+        System.out.println("📊 Nombre total de factures à relancer : " + totalFacturesAEnvoyer);
     }
    
 

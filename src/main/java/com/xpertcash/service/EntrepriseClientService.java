@@ -70,12 +70,14 @@ public class EntrepriseClientService {
         Optional<EntrepriseClient> existingByEmail = Optional.empty();
         Optional<EntrepriseClient> existingByTelephone = Optional.empty();
 
+        Long entrepriseId = user.getEntreprise().getId();
+
         if (email != null && !email.isEmpty()) {
-            existingByEmail = entrepriseClientRepository.findByEmail(email);
+            existingByEmail = entrepriseClientRepository.findByEmailAndEntrepriseId(email, entrepriseId);
         }
 
         if (telephone != null && !telephone.isEmpty()) {
-            existingByTelephone = entrepriseClientRepository.findByTelephone(telephone);
+            existingByTelephone = entrepriseClientRepository.findByTelephoneAndEntrepriseId(telephone, entrepriseId);
         }
 
         if (existingByEmail.isPresent() && existingByTelephone.isPresent()) {
@@ -216,9 +218,9 @@ public void deleteEntrepriseClientIfNoOrdersOrInvoices(Long entrepriseClientId, 
         throw new RuntimeException("Accès refusé : vous n'avez pas les permissions pour supprimer un client entreprise.");
     }
 
-    // ❌ Vérifier qu’il n’a pas de commandes ni de factures
-    boolean hasFactures = factureProformaRepository.existsByEntrepriseClientId(entrepriseClientId);
-    boolean hasFacturesReel = factureReelleRepository.existsByEntrepriseClientId(entrepriseClientId);
+    // ❌ Vérifier qu'il n'a pas de commandes ni de factures (isolé par entreprise)
+    boolean hasFactures = factureProformaRepository.existsByEntrepriseClientIdAndEntrepriseId(entrepriseClientId, entreprise.getId());
+    boolean hasFacturesReel = factureReelleRepository.existsByEntrepriseClientIdAndEntrepriseId(entrepriseClientId, entreprise.getId());
 
     if (hasFactures || hasFacturesReel) {
         throw new RuntimeException("Ce client entreprise ne peut pas être supprimé car il a des factures.");

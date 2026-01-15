@@ -250,9 +250,13 @@ public class TresorerieService {
             dto.setMontantRestant(restant);
             dto.setDate(v.getDateVente());
             dto.setDescription(v.getDescription());
-            // Numéro de facture vente si disponible
-            factureVenteRepository.findByVenteId(v.getId())
-                    .ifPresent(f -> dto.setNumero(f.getNumeroFacture()));
+            // Numéro de facture vente si disponible (isolé par entreprise)
+            Long venteEntrepriseId = v.getBoutique() != null && v.getBoutique().getEntreprise() != null 
+                    ? v.getBoutique().getEntreprise().getId() : null;
+            if (venteEntrepriseId != null) {
+                factureVenteRepository.findByVenteIdAndEntrepriseId(v.getId(), venteEntrepriseId)
+                        .ifPresent(f -> dto.setNumero(f.getNumeroFacture()));
+            }
             // Client pouvant être un Client ou une EntrepriseClient, ou juste un nom/numéro libre
             if (v.getClient() != null) {
                 dto.setClient(v.getClient().getNomComplet());

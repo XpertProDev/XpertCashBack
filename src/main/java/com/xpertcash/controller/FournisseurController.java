@@ -248,7 +248,8 @@ public ResponseEntity<?> getFournisseurById(@PathVariable Long id, HttpServletRe
     }
 
          DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
-        List<Facture> factures = factureRepository.findByFournisseur_Id(fournisseurId);
+        List<Facture> factures = factureRepository.findByFournisseurIdAndEntrepriseId(
+                fournisseurId, user.getEntreprise().getId());
 
         List<Map<String, Object>> factureDTOs = factures.stream().map(facture -> {
             Map<String, Object> map = new HashMap<>();

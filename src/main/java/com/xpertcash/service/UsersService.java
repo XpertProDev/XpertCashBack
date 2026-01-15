@@ -1105,8 +1105,9 @@ public class UsersService {
         throw new RuntimeException("Vous ne pouvez supprimer que les utilisateurs de votre entreprise.");
     }
 
-    // Vérification des factures liées
-    List<FactureProForma> facturesLiees = factureProformaRepository.findByUtilisateurCreateur_Id(userId);
+    // Vérification des factures liées (isolée par entreprise)
+    List<FactureProForma> facturesLiees = factureProformaRepository.findByUtilisateurCreateurIdAndEntrepriseId(
+            userId, admin.getEntreprise().getId());
     if (!facturesLiees.isEmpty()) {
         throw new RuntimeException("Impossible de supprimer cet utilisateur : il est lié à des factures.");
     }

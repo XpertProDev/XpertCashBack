@@ -177,7 +177,15 @@ public class FactureReelleService {
 
    // Methode pour Supprimer facturer deja generer une fois annuler
 public void supprimerFactureReelleLiee(FactureProForma proforma) {
-    List<FactureReelle> facturesReelles = factureReelleRepository.findAllByFactureProForma(proforma);
+    // Vérifier que la facture proforma a une entreprise
+    Entreprise entreprise = proforma.getEntreprise();
+    if (entreprise == null) {
+        throw new RuntimeException("La facture proforma n'est associée à aucune entreprise.");
+    }
+    
+    // Récupérer les factures réelles associées (isolé par entreprise)
+    List<FactureReelle> facturesReelles = factureReelleRepository.findAllByFactureProFormaIdAndEntrepriseId(
+            proforma.getId(), entreprise.getId());
     if (facturesReelles.isEmpty()) {
         System.out.println("Aucune facture réelle associée à cette facture proforma.");
         return;
@@ -232,8 +240,9 @@ public void supprimerFactureReelleLiee(FactureProForma proforma) {
     Pageable pageable = PageRequest.of(page, size, 
         Sort.by("dateCreation").descending().and(Sort.by("id").descending()));
 
-    // --- 3. Récupération paginée des factures ---
-    Page<FactureReelle> facturesPage = factureReelleRepository.findByEntrepriseOrderByDateCreationDescPaginated(entreprise, pageable);
+    // --- 3. Récupération paginée des factures (isolé par entreprise) ---
+    Page<FactureReelle> facturesPage = factureReelleRepository.findByEntrepriseOrderByDateCreationDescPaginated(
+            entreprise.getId(), pageable);
 
     // --- 4. Optimisation N+1 : Récupérer tous les paiements d'un coup ---
     List<Long> factureIds = facturesPage.getContent().stream()

@@ -299,9 +299,10 @@ public class FactureProformaController {
    @GetMapping("/factures/client")
     public ResponseEntity<List<Map<String, Object>>> getFacturesClient(
             @RequestParam(required = false) Long clientId,
-            @RequestParam(required = false) Long entrepriseClientId) {
+            @RequestParam(required = false) Long entrepriseClientId,
+            HttpServletRequest request) {
         
-        List<FactureProForma> factures = factureProformaService.getFacturesParClient(clientId, entrepriseClientId);
+        List<FactureProForma> factures = factureProformaService.getFacturesParClient(clientId, entrepriseClientId, request);
 
         List<Map<String, Object>> result = factures.stream().map(f -> {
             Map<String, Object> map = new HashMap<>();

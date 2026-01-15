@@ -8402,3 +8402,135 @@ java.lang.ClassNotFoundException: java.text.ListFormat
 2026-01-15 14:27:09.069 [http-nio-8080-exec-9] DEBUG o.s.w.s.m.m.a.HttpEntityMethodProcessor - Using 'application/json', given [application/json, text/plain, */*] and supported [application/json, application/*+json, application/yaml]
 2026-01-15 14:27:09.069 [http-nio-8080-exec-9] DEBUG o.s.w.s.m.m.a.HttpEntityMethodProcessor - Writing [ProduitPaginatedResponseDTO(produits=[ProduitDetailsResponseDTO(id=11, nom=Formation sur le MDV, pri (truncated)...]
 2026-01-15 14:27:09.070 [http-nio-8080-exec-9] DEBUG o.s.web.servlet.DispatcherServlet - Completed 200 OK
+2026-01-15 15:08:16.258 [http-nio-8080-exec-5] DEBUG o.s.web.servlet.DispatcherServlet - GET "/api/auth/caisse/derniere/1", parameters={}
+2026-01-15 15:08:16.258 [http-nio-8080-exec-3] DEBUG o.s.web.servlet.DispatcherServlet - GET "/api/auth/boutique/1/caisses", parameters={}
+2026-01-15 15:08:16.261 [http-nio-8080-exec-3] DEBUG o.s.w.s.m.m.a.RequestMappingHandlerMapping - Mapped to com.xpertcash.controller.VENTE.CaisseController#getToutesLesCaisses(Long, HttpServletRequest)
+2026-01-15 15:08:16.261 [http-nio-8080-exec-5] DEBUG o.s.w.s.m.m.a.RequestMappingHandlerMapping - Mapped to com.xpertcash.controller.VENTE.CaisseController#getDerniereCaisseVendeur(Long, HttpServletRequest)
+2026-01-15 15:08:16.295 [http-nio-8080-exec-4] DEBUG o.s.web.servlet.DispatcherServlet - GET "/api/auth/boutiqueEntreprise", parameters={}
+2026-01-15 15:08:16.295 [http-nio-8080-exec-7] DEBUG o.s.web.servlet.DispatcherServlet - GET "/api/auth/user/info", parameters={}
+2026-01-15 15:08:16.295 [http-nio-8080-exec-4] DEBUG o.s.w.s.m.m.a.RequestMappingHandlerMapping - Mapped to com.xpertcash.controller.BoutiqueController#getBoutiquesByEntreprise(HttpServletRequest)
+2026-01-15 15:08:16.295 [http-nio-8080-exec-7] DEBUG o.s.w.s.m.m.a.RequestMappingHandlerMapping - Mapped to com.xpertcash.controller.UsersController#getUserInfo(HttpServletRequest)
+2026-01-15 15:08:16.400 [http-nio-8080-exec-7] DEBUG o.s.w.s.m.m.a.HttpEntityMethodProcessor - Using 'application/json', given [application/json, text/plain, */*] and supported [application/json, application/*+json, application/yaml]
+2026-01-15 15:08:16.401 [http-nio-8080-exec-4] DEBUG o.s.w.s.m.m.a.HttpEntityMethodProcessor - Using 'application/json', given [application/json, text/plain, */*] and supported [application/json, application/*+json, application/yaml]
+2026-01-15 15:08:16.401 [http-nio-8080-exec-4] DEBUG o.s.w.s.m.m.a.HttpEntityMethodProcessor - Writing [[BoutiqueResponse(id=1, nomBoutique=Ma Boutique, adresse=null, telephone=+22372303158, email=hadyfof (truncated)...]
+2026-01-15 15:08:16.405 [http-nio-8080-exec-7] DEBUG o.s.w.s.m.m.a.HttpEntityMethodProcessor - Writing [UserRequest(id=2, nomComplet=Hady Fofana carter, nomEntreprise=Fofana Building, siege=Bamako, email= (truncated)...]
+2026-01-15 15:08:16.406 [http-nio-8080-exec-5] DEBUG o.s.w.s.m.m.a.HttpEntityMethodProcessor - Using 'application/json', given [application/json, text/plain, */*] and supported [application/json, application/*+json, application/yaml]
+2026-01-15 15:08:16.407 [http-nio-8080-exec-5] DEBUG o.s.w.s.m.m.a.HttpEntityMethodProcessor - Writing [CaisseResponseDTO(id=7, montantInitial=0.0, montantCourant=425000.0, montantDette=null, montantEnMai (truncated)...]
+2026-01-15 15:08:16.414 [http-nio-8080-exec-5] DEBUG o.s.web.servlet.DispatcherServlet - Completed 200 OK
+2026-01-15 15:08:16.415 [http-nio-8080-exec-7] DEBUG o.s.web.servlet.DispatcherServlet - Completed 200 OK
+2026-01-15 15:08:16.415 [http-nio-8080-exec-4] DEBUG o.s.web.servlet.DispatcherServlet - Completed 200 OK
+2026-01-15 15:08:16.416 [http-nio-8080-exec-5] DEBUG o.s.web.servlet.DispatcherServlet - GET "/api/auth/caisse/derniere/1", parameters={}
+2026-01-15 15:08:16.416 [http-nio-8080-exec-6] DEBUG o.s.web.servlet.DispatcherServlet - GET "/api/auth/user/info", parameters={}
+2026-01-15 15:08:16.416 [http-nio-8080-exec-5] DEBUG o.s.w.s.m.m.a.RequestMappingHandlerMapping - Mapped to com.xpertcash.controller.VENTE.CaisseController#getDerniereCaisseVendeur(Long, HttpServletRequest)
+2026-01-15 15:08:16.416 [http-nio-8080-exec-6] DEBUG o.s.w.s.m.m.a.RequestMappingHandlerMapping - Mapped to com.xpertcash.controller.UsersController#getUserInfo(HttpServletRequest)
+2026-01-15 15:08:16.432 [http-nio-8080-exec-3] DEBUG o.s.w.s.m.m.a.HttpEntityMethodProcessor - Using 'application/json', given [application/json, text/plain, */*] and supported [application/json, application/*+json, application/yaml]
+2026-01-15 15:08:16.432 [http-nio-8080-exec-3] DEBUG o.s.w.s.m.m.a.HttpEntityMethodProcessor - Writing [[CaisseResponseDTO(id=6, montantInitial=0.0, montantCourant=525000.0, montantDette=null, montantEnMa (truncated)...]
+2026-01-15 15:08:16.433 [http-nio-8080-exec-3] DEBUG o.s.web.servlet.DispatcherServlet - Completed 200 OK
+2026-01-15 15:08:16.438 [http-nio-8080-exec-6] DEBUG o.s.w.s.m.m.a.HttpEntityMethodProcessor - Using 'application/json', given [application/json, text/plain, */*] and supported [application/json, application/*+json, application/yaml]
+2026-01-15 15:08:16.439 [http-nio-8080-exec-6] DEBUG o.s.w.s.m.m.a.HttpEntityMethodProcessor - Writing [UserRequest(id=2, nomComplet=Hady Fofana carter, nomEntreprise=Fofana Building, siege=Bamako, email= (truncated)...]
+2026-01-15 15:08:16.439 [http-nio-8080-exec-6] DEBUG o.s.web.servlet.DispatcherServlet - Completed 200 OK
+2026-01-15 15:08:16.440 [http-nio-8080-exec-5] DEBUG o.s.w.s.m.m.a.HttpEntityMethodProcessor - Using 'application/json', given [application/json, text/plain, */*] and supported [application/json, application/*+json, application/yaml]
+2026-01-15 15:08:16.440 [http-nio-8080-exec-9] DEBUG o.s.web.servlet.DispatcherServlet - GET "/api/auth/boutique/1/caisses", parameters={}
+2026-01-15 15:08:16.440 [http-nio-8080-exec-5] DEBUG o.s.w.s.m.m.a.HttpEntityMethodProcessor - Writing [CaisseResponseDTO(id=7, montantInitial=0.0, montantCourant=425000.0, montantDette=null, montantEnMai (truncated)...]
+2026-01-15 15:08:16.440 [http-nio-8080-exec-9] DEBUG o.s.w.s.m.m.a.RequestMappingHandlerMapping - Mapped to com.xpertcash.controller.VENTE.CaisseController#getToutesLesCaisses(Long, HttpServletRequest)
+2026-01-15 15:08:16.441 [http-nio-8080-exec-5] DEBUG o.s.web.servlet.DispatcherServlet - Completed 200 OK
+2026-01-15 15:08:16.444 [http-nio-8080-exec-2] DEBUG o.s.web.servlet.DispatcherServlet - GET "/api/auth/caisse/derniere/1", parameters={}
+2026-01-15 15:08:16.444 [http-nio-8080-exec-2] DEBUG o.s.w.s.m.m.a.RequestMappingHandlerMapping - Mapped to com.xpertcash.controller.VENTE.CaisseController#getDerniereCaisseVendeur(Long, HttpServletRequest)
+2026-01-15 15:08:16.467 [http-nio-8080-exec-2] DEBUG o.s.w.s.m.m.a.HttpEntityMethodProcessor - Using 'application/json', given [application/json, text/plain, */*] and supported [application/json, application/*+json, application/yaml]
+2026-01-15 15:08:16.467 [http-nio-8080-exec-2] DEBUG o.s.w.s.m.m.a.HttpEntityMethodProcessor - Writing [CaisseResponseDTO(id=7, montantInitial=0.0, montantCourant=425000.0, montantDette=null, montantEnMai (truncated)...]
+2026-01-15 15:08:16.468 [http-nio-8080-exec-2] DEBUG o.s.web.servlet.DispatcherServlet - Completed 200 OK
+2026-01-15 15:08:16.484 [http-nio-8080-exec-8] DEBUG o.s.web.servlet.DispatcherServlet - GET "/api/auth/boutiqueEntreprise", parameters={}
+2026-01-15 15:08:16.484 [http-nio-8080-exec-8] DEBUG o.s.w.s.m.m.a.RequestMappingHandlerMapping - Mapped to com.xpertcash.controller.BoutiqueController#getBoutiquesByEntreprise(HttpServletRequest)
+2026-01-15 15:08:16.488 [http-nio-8080-exec-9] DEBUG o.s.w.s.m.m.a.HttpEntityMethodProcessor - Using 'application/json', given [application/json, text/plain, */*] and supported [application/json, application/*+json, application/yaml]
+2026-01-15 15:08:16.489 [http-nio-8080-exec-9] DEBUG o.s.w.s.m.m.a.HttpEntityMethodProcessor - Writing [[CaisseResponseDTO(id=6, montantInitial=0.0, montantCourant=525000.0, montantDette=null, montantEnMa (truncated)...]
+2026-01-15 15:08:16.489 [http-nio-8080-exec-9] DEBUG o.s.web.servlet.DispatcherServlet - Completed 200 OK
+2026-01-15 15:08:16.500 [http-nio-8080-exec-8] DEBUG o.s.w.s.m.m.a.HttpEntityMethodProcessor - Using 'application/json', given [application/json, text/plain, */*] and supported [application/json, application/*+json, application/yaml]
+2026-01-15 15:08:16.500 [http-nio-8080-exec-8] DEBUG o.s.w.s.m.m.a.HttpEntityMethodProcessor - Writing [[BoutiqueResponse(id=1, nomBoutique=Ma Boutique, adresse=null, telephone=+22372303158, email=hadyfof (truncated)...]
+2026-01-15 15:08:16.501 [http-nio-8080-exec-8] DEBUG o.s.web.servlet.DispatcherServlet - Completed 200 OK
+2026-01-15 15:08:16.545 [http-nio-8080-exec-11] DEBUG o.s.web.servlet.DispatcherServlet - GET "/api/auth/caisse/derniere/1", parameters={}
+2026-01-15 15:08:16.545 [http-nio-8080-exec-11] DEBUG o.s.w.s.m.m.a.RequestMappingHandlerMapping - Mapped to com.xpertcash.controller.VENTE.CaisseController#getDerniereCaisseVendeur(Long, HttpServletRequest)
+2026-01-15 15:08:16.570 [http-nio-8080-exec-11] DEBUG o.s.w.s.m.m.a.HttpEntityMethodProcessor - Using 'application/json', given [application/json, text/plain, */*] and supported [application/json, application/*+json, application/yaml]
+2026-01-15 15:08:16.570 [http-nio-8080-exec-11] DEBUG o.s.w.s.m.m.a.HttpEntityMethodProcessor - Writing [CaisseResponseDTO(id=7, montantInitial=0.0, montantCourant=425000.0, montantDette=null, montantEnMai (truncated)...]
+2026-01-15 15:08:16.570 [http-nio-8080-exec-11] DEBUG o.s.web.servlet.DispatcherServlet - Completed 200 OK
+2026-01-15 15:08:16.572 [http-nio-8080-exec-7] DEBUG o.s.web.servlet.DispatcherServlet - GET "/api/auth/caisse/derniere/1", parameters={}
+2026-01-15 15:08:16.573 [http-nio-8080-exec-7] DEBUG o.s.w.s.m.m.a.RequestMappingHandlerMapping - Mapped to com.xpertcash.controller.VENTE.CaisseController#getDerniereCaisseVendeur(Long, HttpServletRequest)
+2026-01-15 15:08:16.608 [http-nio-8080-exec-7] DEBUG o.s.w.s.m.m.a.HttpEntityMethodProcessor - Using 'application/json', given [application/json, text/plain, */*] and supported [application/json, application/*+json, application/yaml]
+2026-01-15 15:08:16.608 [http-nio-8080-exec-7] DEBUG o.s.w.s.m.m.a.HttpEntityMethodProcessor - Writing [CaisseResponseDTO(id=7, montantInitial=0.0, montantCourant=425000.0, montantDette=null, montantEnMai (truncated)...]
+2026-01-15 15:08:16.608 [http-nio-8080-exec-7] DEBUG o.s.web.servlet.DispatcherServlet - Completed 200 OK
+2026-01-15 15:08:17.408 [http-nio-8080-exec-4] DEBUG o.s.web.servlet.DispatcherServlet - GET "/api/auth/user/info", parameters={}
+2026-01-15 15:08:17.415 [http-nio-8080-exec-4] DEBUG o.s.w.s.m.m.a.RequestMappingHandlerMapping - Mapped to com.xpertcash.controller.UsersController#getUserInfo(HttpServletRequest)
+2026-01-15 15:08:17.445 [http-nio-8080-exec-10] DEBUG o.s.web.servlet.DispatcherServlet - GET "/api/auth/stockhistorique", parameters={}
+2026-01-15 15:08:17.445 [http-nio-8080-exec-10] DEBUG o.s.w.s.m.m.a.RequestMappingHandlerMapping - Mapped to com.xpertcash.controller.ProduitController#getAllStockHistory(HttpServletRequest)
+2026-01-15 15:08:17.447 [http-nio-8080-exec-9] DEBUG o.s.web.servlet.DispatcherServlet - GET "/api/auth/entreprise/modules", parameters={}
+2026-01-15 15:08:17.447 [http-nio-8080-exec-9] DEBUG o.s.w.s.m.m.a.RequestMappingHandlerMapping - Mapped to com.xpertcash.controller.Module.ModuleActivationController#getModulesEntreprise(HttpServletRequest)
+2026-01-15 15:08:17.448 [http-nio-8080-exec-8] DEBUG o.s.web.servlet.DispatcherServlet - GET "/api/auth/allCategory", parameters={}
+2026-01-15 15:08:17.448 [http-nio-8080-exec-8] DEBUG o.s.w.s.m.m.a.RequestMappingHandlerMapping - Mapped to com.xpertcash.controller.CategorieController#getAllCategoriesOld(HttpServletRequest)
+2026-01-15 15:08:17.473 [http-nio-8080-exec-4] DEBUG o.s.w.s.m.m.a.HttpEntityMethodProcessor - Using 'application/json', given [application/json, text/plain, */*] and supported [application/json, application/*+json, application/yaml]
+2026-01-15 15:08:17.474 [http-nio-8080-exec-4] DEBUG o.s.w.s.m.m.a.HttpEntityMethodProcessor - Writing [UserRequest(id=2, nomComplet=Hady Fofana carter, nomEntreprise=Fofana Building, siege=Bamako, email= (truncated)...]
+2026-01-15 15:08:17.477 [http-nio-8080-exec-4] DEBUG o.s.web.servlet.DispatcherServlet - Completed 200 OK
+2026-01-15 15:08:17.481 [http-nio-8080-exec-11] DEBUG o.s.web.servlet.DispatcherServlet - GET "/api/auth/user/info", parameters={}
+2026-01-15 15:08:17.482 [http-nio-8080-exec-11] DEBUG o.s.w.s.m.m.a.RequestMappingHandlerMapping - Mapped to com.xpertcash.controller.UsersController#getUserInfo(HttpServletRequest)
+2026-01-15 15:08:17.516 [http-nio-8080-exec-8] DEBUG o.s.w.s.m.m.a.HttpEntityMethodProcessor - Using 'application/json', given [application/json, text/plain, */*] and supported [application/json, application/*+json, application/yaml]
+2026-01-15 15:08:17.519 [http-nio-8080-exec-8] DEBUG o.s.w.s.m.m.a.HttpEntityMethodProcessor - Writing [[CategorieResponseDTO(id=10, nom=Sans Category, description=null, produitCount=3, createdAt=2026-01- (truncated)...]
+2026-01-15 15:08:17.522 [http-nio-8080-exec-8] DEBUG o.s.web.servlet.DispatcherServlet - Completed 200 OK
+2026-01-15 15:08:17.529 [http-nio-8080-exec-10] DEBUG o.s.w.s.m.m.a.HttpEntityMethodProcessor - Using 'application/json', given [application/json, text/plain, */*] and supported [application/json, application/*+json, application/yaml]
+2026-01-15 15:08:17.530 [http-nio-8080-exec-10] DEBUG o.s.w.s.m.m.a.HttpEntityMethodProcessor - Writing [[StockHistoryDTO(id=1, action=Ajout sur quantité, quantite=9, stockAvant=19, stockApres=28, descript (truncated)...]
+2026-01-15 15:08:17.531 [http-nio-8080-exec-10] DEBUG o.s.web.servlet.DispatcherServlet - Completed 200 OK
+2026-01-15 15:08:17.533 [http-nio-8080-exec-11] DEBUG o.s.w.s.m.m.a.HttpEntityMethodProcessor - Using 'application/json', given [application/json, text/plain, */*] and supported [application/json, application/*+json, application/yaml]
+2026-01-15 15:08:17.533 [http-nio-8080-exec-11] DEBUG o.s.w.s.m.m.a.HttpEntityMethodProcessor - Writing [UserRequest(id=2, nomComplet=Hady Fofana carter, nomEntreprise=Fofana Building, siege=Bamako, email= (truncated)...]
+2026-01-15 15:08:17.533 [http-nio-8080-exec-11] DEBUG o.s.web.servlet.DispatcherServlet - Completed 200 OK
+2026-01-15 15:08:17.536 [http-nio-8080-exec-7] DEBUG o.s.web.servlet.DispatcherServlet - GET "/api/auth/user/info", parameters={}
+2026-01-15 15:08:17.537 [http-nio-8080-exec-7] DEBUG o.s.w.s.m.m.a.RequestMappingHandlerMapping - Mapped to com.xpertcash.controller.UsersController#getUserInfo(HttpServletRequest)
+2026-01-15 15:08:17.544 [http-nio-8080-exec-3] DEBUG o.s.web.servlet.DispatcherServlet - GET "/api/auth/produits/compteurs-boutiques", parameters={}
+2026-01-15 15:08:17.544 [http-nio-8080-exec-3] DEBUG o.s.w.s.m.m.a.RequestMappingHandlerMapping - Mapped to com.xpertcash.controller.ProduitController#getCompteursBoutiques(HttpServletRequest)
+2026-01-15 15:08:17.544 [http-nio-8080-exec-9] DEBUG o.s.w.s.m.m.a.HttpEntityMethodProcessor - Using 'application/json', given [application/json, text/plain, */*] and supported [application/json, application/*+json, application/yaml]
+2026-01-15 15:08:17.546 [http-nio-8080-exec-9] DEBUG o.s.w.s.m.m.a.HttpEntityMethodProcessor - Writing [[ModuleDTO(id=1, nom=Gestion des Ventes, code=VENTE, description=Le POS sert à vendre, payant=false, (truncated)...]
+2026-01-15 15:08:17.548 [http-nio-8080-exec-9] DEBUG o.s.web.servlet.DispatcherServlet - Completed 200 OK
+2026-01-15 15:08:17.550 [http-nio-8080-exec-4] DEBUG o.s.web.servlet.DispatcherServlet - GET "/api/auth/produits/entreprise/2", parameters={}
+2026-01-15 15:08:17.550 [http-nio-8080-exec-6] DEBUG o.s.web.servlet.DispatcherServlet - GET "/api/auth/entreprise/modules", parameters={}
+2026-01-15 15:08:17.550 [http-nio-8080-exec-6] DEBUG o.s.w.s.m.m.a.RequestMappingHandlerMapping - Mapped to com.xpertcash.controller.Module.ModuleActivationController#getModulesEntreprise(HttpServletRequest)
+2026-01-15 15:08:17.550 [http-nio-8080-exec-4] DEBUG o.s.w.s.m.m.a.RequestMappingHandlerMapping - Mapped to com.xpertcash.controller.ProduitController#getProduitsParEntreprise(Long, HttpServletRequest)
+2026-01-15 15:08:17.557 [http-nio-8080-exec-7] DEBUG o.s.w.s.m.m.a.HttpEntityMethodProcessor - Using 'application/json', given [application/json, text/plain, */*] and supported [application/json, application/*+json, application/yaml]
+2026-01-15 15:08:17.557 [http-nio-8080-exec-7] DEBUG o.s.w.s.m.m.a.HttpEntityMethodProcessor - Writing [UserRequest(id=2, nomComplet=Hady Fofana carter, nomEntreprise=Fofana Building, siege=Bamako, email= (truncated)...]
+2026-01-15 15:08:17.557 [http-nio-8080-exec-7] DEBUG o.s.web.servlet.DispatcherServlet - Completed 200 OK
+2026-01-15 15:08:17.559 [http-nio-8080-exec-8] DEBUG o.s.web.servlet.DispatcherServlet - GET "/api/auth/user/info", parameters={}
+2026-01-15 15:08:17.559 [http-nio-8080-exec-8] DEBUG o.s.w.s.m.m.a.RequestMappingHandlerMapping - Mapped to com.xpertcash.controller.UsersController#getUserInfo(HttpServletRequest)
+2026-01-15 15:08:17.609 [http-nio-8080-exec-8] DEBUG o.s.w.s.m.m.a.HttpEntityMethodProcessor - Using 'application/json', given [application/json, text/plain, */*] and supported [application/json, application/*+json, application/yaml]
+2026-01-15 15:08:17.610 [http-nio-8080-exec-8] DEBUG o.s.w.s.m.m.a.HttpEntityMethodProcessor - Writing [UserRequest(id=2, nomComplet=Hady Fofana carter, nomEntreprise=Fofana Building, siege=Bamako, email= (truncated)...]
+2026-01-15 15:08:17.611 [http-nio-8080-exec-8] DEBUG o.s.web.servlet.DispatcherServlet - Completed 200 OK
+2026-01-15 15:08:17.613 [http-nio-8080-exec-3] DEBUG o.s.w.s.m.m.a.HttpEntityMethodProcessor - Using 'application/json', given [application/json, text/plain, */*] and supported [application/json, application/*+json, application/yaml]
+2026-01-15 15:08:17.614 [http-nio-8080-exec-3] DEBUG o.s.w.s.m.m.a.HttpEntityMethodProcessor - Writing [[CompteurBoutiqueDTO(boutiqueId=1, nomBoutique=Ma Boutique, totalProduits=4, totalEnStock=3)]]
+2026-01-15 15:08:17.614 [http-nio-8080-exec-3] DEBUG o.s.web.servlet.DispatcherServlet - Completed 200 OK
+2026-01-15 15:08:17.616 [http-nio-8080-exec-4] DEBUG o.s.w.s.m.m.a.HttpEntityMethodProcessor - Using 'application/json', given [application/json, text/plain, */*] and supported [application/json, application/*+json, application/yaml]
+2026-01-15 15:08:17.617 [http-nio-8080-exec-4] DEBUG o.s.w.s.m.m.a.HttpEntityMethodProcessor - Writing [[ProduitDTO(id=10, nom=Samusung, prixVente=300000.0, prixAchat=89000.0, quantite=39, seuilAlert=5, c (truncated)...]
+2026-01-15 15:08:17.617 [http-nio-8080-exec-10] DEBUG o.s.web.servlet.DispatcherServlet - GET "/api/auth/produits/compteurs-boutiques", parameters={}
+2026-01-15 15:08:17.617 [http-nio-8080-exec-10] DEBUG o.s.w.s.m.m.a.RequestMappingHandlerMapping - Mapped to com.xpertcash.controller.ProduitController#getCompteursBoutiques(HttpServletRequest)
+2026-01-15 15:08:17.618 [http-nio-8080-exec-4] DEBUG o.s.web.servlet.DispatcherServlet - Completed 200 OK
+2026-01-15 15:08:17.620 [http-nio-8080-exec-6] DEBUG o.s.w.s.m.m.a.HttpEntityMethodProcessor - Using 'application/json', given [application/json, text/plain, */*] and supported [application/json, application/*+json, application/yaml]
+2026-01-15 15:08:17.620 [http-nio-8080-exec-6] DEBUG o.s.w.s.m.m.a.HttpEntityMethodProcessor - Writing [[ModuleDTO(id=1, nom=Gestion des Ventes, code=VENTE, description=Le POS sert à vendre, payant=false, (truncated)...]
+2026-01-15 15:08:17.620 [http-nio-8080-exec-6] DEBUG o.s.web.servlet.DispatcherServlet - Completed 200 OK
+2026-01-15 15:08:17.645 [http-nio-8080-exec-2] DEBUG o.s.web.servlet.DispatcherServlet - GET "/uploads/0e9857d9-1904-4bdb-82d4-44ddb1ab4a93_Capture%20d%E2%80%99e%CC%81cran%202025-09-04%20a%CC%80%2009.png", parameters={}
+2026-01-15 15:08:17.646 [http-nio-8080-exec-11] DEBUG o.s.web.servlet.DispatcherServlet - GET "/uploads/e7b041c7-a30a-4e41-abfe-7c3157e2972c_Capture%20d%E2%80%99e%CC%81cran%202025-09-02%20a%CC%80%2014.png", parameters={}
+2026-01-15 15:08:17.646 [http-nio-8080-exec-2] DEBUG o.s.w.s.h.SimpleUrlHandlerMapping - Mapped to ResourceHttpRequestHandler [URL [file:src/main/resources/static/], ServletContext [/]]
+2026-01-15 15:08:17.645 [http-nio-8080-exec-5] DEBUG o.s.web.servlet.DispatcherServlet - GET "/uploads/008ce896-5c97-43c4-a995-f4795a360646_Capture%20d%E2%80%99e%CC%81cran%202025-09-02%20a%CC%80%2014.png", parameters={}
+2026-01-15 15:08:17.647 [http-nio-8080-exec-5] DEBUG o.s.w.s.h.SimpleUrlHandlerMapping - Mapped to ResourceHttpRequestHandler [URL [file:src/main/resources/static/], ServletContext [/]]
+2026-01-15 15:08:17.648 [http-nio-8080-exec-11] DEBUG o.s.w.s.h.SimpleUrlHandlerMapping - Mapped to ResourceHttpRequestHandler [URL [file:src/main/resources/static/], ServletContext [/]]
+2026-01-15 15:08:17.666 [http-nio-8080-exec-9] DEBUG o.s.web.servlet.DispatcherServlet - GET "/uploads/c8845a38-599e-4923-bad2-032013d56394_default.svg", parameters={}
+2026-01-15 15:08:17.667 [http-nio-8080-exec-9] DEBUG o.s.w.s.h.SimpleUrlHandlerMapping - Mapped to ResourceHttpRequestHandler [URL [file:src/main/resources/static/], ServletContext [/]]
+2026-01-15 15:08:17.671 [http-nio-8080-exec-9] DEBUG o.s.web.servlet.DispatcherServlet - Completed 200 OK
+2026-01-15 15:08:17.681 [http-nio-8080-exec-5] DEBUG o.s.web.servlet.DispatcherServlet - Completed 200 OK
+2026-01-15 15:08:17.688 [http-nio-8080-exec-11] DEBUG o.s.web.servlet.DispatcherServlet - Completed 200 OK
+2026-01-15 15:08:17.689 [http-nio-8080-exec-10] DEBUG o.s.w.s.m.m.a.HttpEntityMethodProcessor - Using 'application/json', given [application/json, text/plain, */*] and supported [application/json, application/*+json, application/yaml]
+2026-01-15 15:08:17.689 [http-nio-8080-exec-10] DEBUG o.s.w.s.m.m.a.HttpEntityMethodProcessor - Writing [[CompteurBoutiqueDTO(boutiqueId=1, nomBoutique=Ma Boutique, totalProduits=4, totalEnStock=3)]]
+2026-01-15 15:08:17.689 [http-nio-8080-exec-10] DEBUG o.s.web.servlet.DispatcherServlet - Completed 200 OK
+2026-01-15 15:08:17.692 [http-nio-8080-exec-2] DEBUG o.s.web.servlet.DispatcherServlet - Completed 200 OK
+2026-01-15 15:08:19.080 [http-nio-8080-exec-7] DEBUG o.s.web.servlet.DispatcherServlet - GET "/api/auth/user/info", parameters={}
+2026-01-15 15:08:19.080 [http-nio-8080-exec-7] DEBUG o.s.w.s.m.m.a.RequestMappingHandlerMapping - Mapped to com.xpertcash.controller.UsersController#getUserInfo(HttpServletRequest)
+2026-01-15 15:08:19.095 [http-nio-8080-exec-7] DEBUG o.s.w.s.m.m.a.HttpEntityMethodProcessor - Using 'application/json', given [application/json, text/plain, */*] and supported [application/json, application/*+json, application/yaml]
+2026-01-15 15:08:19.095 [http-nio-8080-exec-7] DEBUG o.s.w.s.m.m.a.HttpEntityMethodProcessor - Writing [UserRequest(id=2, nomComplet=Hady Fofana carter, nomEntreprise=Fofana Building, siege=Bamako, email= (truncated)...]
+2026-01-15 15:08:19.096 [http-nio-8080-exec-7] DEBUG o.s.web.servlet.DispatcherServlet - Completed 200 OK
+2026-01-15 15:08:19.149 [http-nio-8080-exec-3] DEBUG o.s.web.servlet.DispatcherServlet - GET "/api/auth/factureVente/entreprise/paginated?page=0&size=20", parameters={masked}
+2026-01-15 15:08:19.150 [http-nio-8080-exec-3] DEBUG o.s.w.s.m.m.a.RequestMappingHandlerMapping - Mapped to com.xpertcash.controller.VENTE.FactureVenteController#getFacturesForEntrepriseWithPagination(int, int, String, String, HttpServletRequest)
+2026-01-15 15:08:19.415 [http-nio-8080-exec-3] DEBUG o.s.w.s.m.m.a.HttpEntityMethodProcessor - Using 'application/json', given [application/json, text/plain, */*] and supported [application/json, application/*+json, application/yaml]
+2026-01-15 15:08:19.444 [http-nio-8080-exec-3] DEBUG o.s.w.s.m.m.a.HttpEntityMethodProcessor - Writing [FactureVentePaginatedDTO(page=0, size=20, totalElements=8, totalPages=1, first=true, last=true, hasN (truncated)...]
+2026-01-15 15:08:19.454 [http-nio-8080-exec-3] DEBUG o.s.web.servlet.DispatcherServlet - Completed 200 OK

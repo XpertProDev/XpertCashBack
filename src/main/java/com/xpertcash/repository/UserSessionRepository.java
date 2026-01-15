@@ -17,22 +17,55 @@ import java.util.Optional;
 @Repository
 public interface UserSessionRepository extends JpaRepository<UserSession, Long> {
     
-    // Trouver une session par token
-    Optional<UserSession> findBySessionToken(String sessionToken);
+    // Trouver une session par ID avec relations (optimisé avec JOIN FETCH)
+    @Query("SELECT s FROM UserSession s " +
+           "LEFT JOIN FETCH s.user u " +
+           "LEFT JOIN FETCH u.entreprise e " +
+           "WHERE s.id = :id")
+    Optional<UserSession> findByIdWithRelations(@Param("id") Long id);
     
-    // Trouver toutes les sessions actives d'un utilisateur
-    List<UserSession> findByUserUuidAndIsActiveTrue(String userUuid);
+    // Trouver une session par token (optimisé avec JOIN FETCH)
+    @Query("SELECT s FROM UserSession s " +
+           "LEFT JOIN FETCH s.user u " +
+           "LEFT JOIN FETCH u.entreprise e " +
+           "WHERE s.sessionToken = :sessionToken")
+    Optional<UserSession> findBySessionToken(@Param("sessionToken") String sessionToken);
     
-    // Trouver une session par deviceId et userUuid
-    Optional<UserSession> findByDeviceIdAndUserUuidAndIsActiveTrue(String deviceId, String userUuid);
+    // Trouver toutes les sessions actives d'un utilisateur (optimisé avec JOIN FETCH)
+    @Query("SELECT DISTINCT s FROM UserSession s " +
+           "LEFT JOIN FETCH s.user u " +
+           "LEFT JOIN FETCH u.entreprise e " +
+           "WHERE s.userUuid = :userUuid AND s.isActive = true")
+    List<UserSession> findByUserUuidAndIsActiveTrue(@Param("userUuid") String userUuid);
     
-    // Trouver une session par deviceId et userUuid avec verrou pessimiste (évite les race conditions)
+    // Trouver une session par deviceId et userUuid (optimisé avec JOIN FETCH)
+    @Query("SELECT s FROM UserSession s " +
+           "LEFT JOIN FETCH s.user u " +
+           "LEFT JOIN FETCH u.entreprise e " +
+           "WHERE s.deviceId = :deviceId AND s.userUuid = :userUuid AND s.isActive = true")
+    Optional<UserSession> findByDeviceIdAndUserUuidAndIsActiveTrue(@Param("deviceId") String deviceId, @Param("userUuid") String userUuid);
+    
+    // Trouver une session par deviceId et userUuid avec verrou pessimiste (optimisé avec JOIN FETCH)
     @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query("SELECT s FROM UserSession s WHERE s.deviceId = :deviceId AND s.userUuid = :userUuid AND s.isActive = true")
+    @Query("SELECT s FROM UserSession s " +
+           "LEFT JOIN FETCH s.user u " +
+           "LEFT JOIN FETCH u.entreprise e " +
+           "WHERE s.deviceId = :deviceId AND s.userUuid = :userUuid AND s.isActive = true")
     Optional<UserSession> findByDeviceIdAndUserUuidAndIsActiveTrueWithLock(@Param("deviceId") String deviceId, @Param("userUuid") String userUuid);
     
-    // Trouver toutes les sessions d'un utilisateur (actives et inactives)
-    List<UserSession> findByUserUuid(String userUuid);
+    // Trouver toutes les sessions d'un utilisateur (actives et inactives) (optimisé avec JOIN FETCH)
+    @Query("SELECT DISTINCT s FROM UserSession s " +
+           "LEFT JOIN FETCH s.user u " +
+           "LEFT JOIN FETCH u.entreprise e " +
+           "WHERE s.userUuid = :userUuid")
+    List<UserSession> findByUserUuid(@Param("userUuid") String userUuid);
+    
+    // Trouver toutes les sessions actives d'une entreprise (pour isolation)
+    @Query("SELECT DISTINCT s FROM UserSession s " +
+           "LEFT JOIN FETCH s.user u " +
+           "LEFT JOIN FETCH u.entreprise e " +
+           "WHERE e.id = :entrepriseId AND s.isActive = true")
+    List<UserSession> findByEntrepriseIdAndIsActiveTrue(@Param("entrepriseId") Long entrepriseId);
     
     // Révoker toutes les sessions d'un utilisateur sauf celle spécifiée
     @Modifying
@@ -63,6 +96,7 @@ public interface UserSessionRepository extends JpaRepository<UserSession, Long> 
     void updateLastActivity(@Param("sessionId") Long sessionId, @Param("now") LocalDateTime now);
     
     // Trouver les sessions orphelines (sans token ou créées il y a plus de 5 minutes sans token)
+    // Note: Pas besoin de JOIN FETCH ici car on ne charge pas les relations
     @Query("SELECT s FROM UserSession s WHERE s.sessionToken IS NULL AND s.createdAt < :threshold")
     List<UserSession> findOrphanSessions(@Param("threshold") LocalDateTime threshold);
     

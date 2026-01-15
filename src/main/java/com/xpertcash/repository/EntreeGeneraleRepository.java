@@ -11,11 +11,27 @@ import java.util.Optional;
 
 @Repository
 public interface EntreeGeneraleRepository extends JpaRepository<EntreeGenerale, Long> {
-    List<EntreeGenerale> findByEntrepriseIdOrderByDateCreationDesc(Long entrepriseId);
     
-    List<EntreeGenerale> findByEntrepriseId(Long entrepriseId);
+    // Récupérer toutes les entrées générales d'une entreprise triées par date (optimisé avec JOIN FETCH)
+    @Query("SELECT DISTINCT e FROM EntreeGenerale e " +
+           "LEFT JOIN FETCH e.entreprise ent " +
+           "LEFT JOIN FETCH e.categorie " +
+           "WHERE ent.id = :entrepriseId " +
+           "ORDER BY e.dateCreation DESC")
+    List<EntreeGenerale> findByEntrepriseIdOrderByDateCreationDesc(@Param("entrepriseId") Long entrepriseId);
     
-    @Query("SELECT e FROM EntreeGenerale e WHERE e.entreprise.id = :entrepriseId " +
+    // Récupérer toutes les entrées générales d'une entreprise (optimisé avec JOIN FETCH)
+    @Query("SELECT DISTINCT e FROM EntreeGenerale e " +
+           "LEFT JOIN FETCH e.entreprise ent " +
+           "LEFT JOIN FETCH e.categorie " +
+           "WHERE ent.id = :entrepriseId")
+    List<EntreeGenerale> findByEntrepriseId(@Param("entrepriseId") Long entrepriseId);
+    
+    // Récupérer les entrées générales par entreprise, mois et année (optimisé avec JOIN FETCH)
+    @Query("SELECT DISTINCT e FROM EntreeGenerale e " +
+           "LEFT JOIN FETCH e.entreprise ent " +
+           "LEFT JOIN FETCH e.categorie " +
+           "WHERE ent.id = :entrepriseId " +
            "AND MONTH(e.dateCreation) = :month AND YEAR(e.dateCreation) = :year " +
            "ORDER BY e.numero DESC")
     List<EntreeGenerale> findByEntrepriseIdAndMonthAndYear(
@@ -26,8 +42,12 @@ public interface EntreeGeneraleRepository extends JpaRepository<EntreeGenerale, 
     /**
      * Trouve une EntreeGenerale par son ID et l'ID de l'entreprise (sécurité)
      * Retourne Optional.empty() si l'entrée n'existe pas ou n'appartient pas à l'entreprise
+     * Optimisé avec JOIN FETCH pour charger les relations
      */
-    @Query("SELECT e FROM EntreeGenerale e WHERE e.id = :id AND e.entreprise.id = :entrepriseId")
+    @Query("SELECT e FROM EntreeGenerale e " +
+           "LEFT JOIN FETCH e.entreprise ent " +
+           "LEFT JOIN FETCH e.categorie " +
+           "WHERE e.id = :id AND ent.id = :entrepriseId")
     Optional<EntreeGenerale> findByIdAndEntrepriseId(
             @Param("id") Long id,
             @Param("entrepriseId") Long entrepriseId);
