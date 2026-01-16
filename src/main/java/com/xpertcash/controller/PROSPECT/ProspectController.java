@@ -37,9 +37,7 @@ public class ProspectController {
     @Autowired
     private ProspectService prospectService;
 
-    /**
-     * Créer un nouveau prospect
-     */
+     // Créer un nouveau prospect
     @PostMapping("/creat-prospects")
     public ResponseEntity<?> createProspect(@RequestBody CreateProspectRequestDTO request, HttpServletRequest httpRequest) {
         Map<String, Object> response = new HashMap<>();
@@ -57,9 +55,7 @@ public class ProspectController {
         }
     }
 
-    /**
-     * Récupérer un prospect par son ID avec ses interactions
-     */
+     // Récupérer un prospect par son ID avec ses interactions
     @GetMapping("/prospects/{id}")
     public ResponseEntity<?> getProspectById(@PathVariable Long id, HttpServletRequest httpRequest) {
         Map<String, Object> response = new HashMap<>();
@@ -76,9 +72,7 @@ public class ProspectController {
         }
     }
 
-    /**
-     * Récupérer tous les prospects avec pagination
-     */
+     // Récupérer tous les prospects avec pagination
     @GetMapping("/Allprospects")
     public ResponseEntity<?> getAllProspects(
             @RequestParam(defaultValue = "0") int page,
@@ -101,9 +95,7 @@ public class ProspectController {
 
 
 
-    /**
-     * Mettre à jour un prospect
-     */
+     // Mettre à jour un prospect
     @PutMapping("/Updateprospects/{id}")
     public ResponseEntity<?> updateProspect(
             @PathVariable Long id,
@@ -124,9 +116,7 @@ public class ProspectController {
         }
     }
 
-    /**
-     * Supprimer un prospect
-     */
+     // Supprimer un prospect
     @DeleteMapping("/deletprospects/{id}")
     public ResponseEntity<?> deleteProspect(@PathVariable Long id, HttpServletRequest httpRequest) {
         Map<String, Object> response = new HashMap<>();
@@ -143,9 +133,7 @@ public class ProspectController {
         }
     }
 
-    /**
-     * Ajouter une interaction à un prospect
-     */
+     // Ajouter une interaction à un prospect
     @PostMapping("/add-prospects/{prospectId}/interactions")
     public ResponseEntity<?> addInteraction(
             @PathVariable Long prospectId,
@@ -166,9 +154,8 @@ public class ProspectController {
         }
     }
 
-    /**
-     * Récupérer les interactions d'un prospect
-     */
+     // Récupérer les interactions d'un prospect
+
     @GetMapping("/prospects/{prospectId}/interactions")
     public ResponseEntity<?> getProspectInteractions(@PathVariable Long prospectId, HttpServletRequest httpRequest) {
         Map<String, Object> response = new HashMap<>();
@@ -187,9 +174,7 @@ public class ProspectController {
         }
     }
 
-    /**
-     * Supprimer une interaction
-     */
+     // Supprimer une interaction
     @DeleteMapping("/delet-interactions/{interactionId}")
     public ResponseEntity<?> deleteInteraction(@PathVariable Long interactionId, HttpServletRequest httpRequest) {
         Map<String, Object> response = new HashMap<>();
@@ -206,9 +191,7 @@ public class ProspectController {
         }
     }
 
-    /**
-     * Convertir un prospect en client (après achat)
-     */
+     // Convertir un prospect en client (après achat)
     @PostMapping("/convert-prospect/{prospectId}")
     public ResponseEntity<?> convertProspectToClient(
             @PathVariable Long prospectId, 
@@ -231,9 +214,7 @@ public class ProspectController {
    
 
 
-    /**
-     * Ajouter un nouvel achat à un prospect déjà converti
-     */
+     // Ajouter un nouvel achat à un prospect déjà converti
     @PostMapping("/add-achat-prospect/{prospectId}")
     public ResponseEntity<?> addAchatToConvertedProspect(
             @PathVariable Long prospectId,

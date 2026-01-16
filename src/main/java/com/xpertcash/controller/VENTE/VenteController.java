@@ -167,10 +167,8 @@ public ResponseEntity<List<VenteParClientResponse>> getVentesClientsAffilies(Htt
     return ResponseEntity.ok(ventes);
 }
 
-    /**
-     * Endpoint pour récupérer les ventes récentes
-     * @param limit Nombre de ventes à retourner (par défaut 10)
-     */
+     // Endpoint pour récupérer les ventes récentes
+  
     @GetMapping("/vente/recentes")
     public ResponseEntity<?> getVentesRecentes(
             @RequestParam(defaultValue = "10") int limit,

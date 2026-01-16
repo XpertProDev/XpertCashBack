@@ -55,7 +55,6 @@ public class FactureVenteController {
             HttpServletRequest httpRequest) {
         
         try {
-            // Validation des données requises
             if (request.getEmail() == null || request.getEmail().trim().isEmpty()) {
                 return ResponseEntity.badRequest().body("L'adresse email est requise");
             }
@@ -64,14 +63,12 @@ public class FactureVenteController {
                 return ResponseEntity.badRequest().body("L'ID de la vente est requis");
             }
 
-            // Récupérer les données complètes de la facture
             ReceiptEmailRequest factureData = factureVenteService.getFactureDataForEmail(
                 request.getVenteId(), 
                 request.getEmail(),
                 httpRequest
             );
 
-            // Envoi de l'email sans pièces jointes
             mailService.sendReceiptEmail(factureData);
             
             return ResponseEntity.ok("Facture envoyée par email avec succès");
@@ -94,7 +91,6 @@ public class FactureVenteController {
             HttpServletRequest httpRequest) {
         
         try {
-            // Validation des données requises
             if (email == null || email.trim().isEmpty()) {
                 return ResponseEntity.badRequest().body("L'adresse email est requise");
             }
@@ -103,19 +99,16 @@ public class FactureVenteController {
                 return ResponseEntity.badRequest().body("L'ID de la vente est requis");
             }
 
-            // Récupérer les données complètes de la facture
             ReceiptEmailRequest factureData = factureVenteService.getFactureDataForEmail(
                 venteId, 
                 email,
                 httpRequest
             );
 
-            // Convertir les pièces jointes en liste
             List<MultipartFile> attachmentsList = attachments != null 
                 ? Arrays.asList(attachments) 
                 : Collections.emptyList();
 
-            // Envoi de l'email avec pièces jointes
             mailService.sendReceiptEmailWithAttachments(factureData, attachmentsList);
             
             return ResponseEntity.ok("Facture envoyée par email avec succès");

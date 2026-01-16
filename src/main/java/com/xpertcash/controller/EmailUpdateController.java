@@ -15,10 +15,7 @@ public class EmailUpdateController {
     @Autowired
     private EmailUpdateService emailUpdateService;
 
-    /**
-     * Endpoint pour initier la demande de changement d'email.
-     * Le code de vérification est envoyé à l'email actuel de l'utilisateur.
-     */
+    // Endpoint pour initier la demande de changement d'email.
     @PutMapping("/email-update/{userId}")
     public ResponseEntity<String> requestEmailUpdate(@PathVariable Long userId, @Valid @RequestBody EmailUpdateRequest request) {
         try {
@@ -29,9 +26,8 @@ public class EmailUpdateController {
         }
     }
 
-    /**
-     * Endpoint pour confirmer le changement d'email avec le code de vérification.
-     */
+    // Endpoint pour confirmer le changement d'email avec le code de vérification.
+   
     @PostMapping("/confirm-email/{userId}")
     public ResponseEntity<String> confirmEmailUpdate(@PathVariable Long userId, @Valid @RequestBody EmailUpdateConfirmationRequest request) {
         try {

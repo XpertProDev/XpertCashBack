@@ -34,5 +34,5 @@ public class ProspectAchat {
     
     // Informations sur le client créé
     private Long clientId;
-    private String clientType; // "CLIENT" ou "ENTREPRISE_CLIENT"
+    private String clientType; 
 }

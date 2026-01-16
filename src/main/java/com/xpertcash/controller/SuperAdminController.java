@@ -21,9 +21,8 @@ import com.xpertcash.service.SuperAdminService;
 
 import jakarta.servlet.http.HttpServletRequest;
 
-/**
- * Endpoints réservés au SUPER_ADMIN (propriétaire de la plateforme).
- */
+ // Endpoints réservés au SUPER_ADMIN (propriétaire de la plateforme).
+  
 @RestController
 @RequestMapping("/api/auth")
 public class SuperAdminController {
@@ -34,9 +33,8 @@ public class SuperAdminController {
     @Autowired
     private AuthenticationHelper authHelper;
 
-    /**
-     * Retourne les infos de l'utilisateur SUPER_ADMIN connecté.
-     */
+     // Retourne les infos de l'utilisateur SUPER_ADMIN connecté.
+  
     @GetMapping("/me")
     public ResponseEntity<?> getSuperAdminInfo(HttpServletRequest request) {
         try {
@@ -59,9 +57,8 @@ public class SuperAdminController {
         }
     }
 
-    /**
-     * Liste toutes les entreprises (vue globale) – réservé au SUPER_ADMIN.
-     */
+     // Liste toutes les entreprises (vue globale) – réservé au SUPER_ADMIN.
+  
     @GetMapping("/allentreprises")
     public ResponseEntity<?> getAllEntreprises(
             HttpServletRequest request,
@@ -71,12 +68,10 @@ public class SuperAdminController {
             User user = authHelper.getAuthenticatedUserWithFallback(request);
             var entreprisesPage = superAdminService.getAllEntreprisesAsSuperAdmin(user, page, size);
 
-            // Calculer le nombre global de personnes dans toutes les entreprises listées
             long totalUsersAllEntreprises = entreprisesPage.getContent().stream()
                     .mapToLong(dto -> dto.getNombreUtilisateursEntreprise())
                     .sum();
 
-            // Réponse personnalisée : liste + nombre total d'entreprises + total global de personnes
             return ResponseEntity.ok(Map.of(
                     "totalEntreprises", entreprisesPage.getTotalElements(),
                     "totalUsersAllEntreprises", totalUsersAllEntreprises,
@@ -91,9 +86,8 @@ public class SuperAdminController {
         }
     }
 
-    /**
-     * Désactiver une entreprise (réservé au SUPER_ADMIN).
-     */
+     // Désactiver une entreprise (réservé au SUPER_ADMIN).
+  
     @PatchMapping("/entreprises/{entrepriseId}/desactiver")
     public ResponseEntity<?> desactiverEntreprise(@PathVariable Long entrepriseId, HttpServletRequest request) {
         try {
@@ -109,9 +103,8 @@ public class SuperAdminController {
         }
     }
 
-    /**
-     * Réactiver une entreprise (réservé au SUPER_ADMIN).
-     */
+     // Réactiver une entreprise (réservé au SUPER_ADMIN).
+  
     @PatchMapping("/entreprises/{entrepriseId}/activer")
     public ResponseEntity<?> activerEntreprise(@PathVariable Long entrepriseId, HttpServletRequest request) {
         try {
@@ -146,18 +139,8 @@ public class SuperAdminController {
         }
     }
 
-    /**
-     * Supprime un Admin et TOUTES les données associées à son entreprise.
-     * ATTENTION : Cette opération est irréversible et supprime toutes les données de l'entreprise.
-     * 
-     * Peut être appelée par :
-     * - SUPER_ADMIN (peut supprimer n'importe quel admin)
-     * - L'admin lui-même (peut supprimer uniquement son propre compte)
-     * 
-     *  adinId L'ID de l'admin à supprimer
-     *  request La requête HTTP pour récupérer l'utilisateur connecté
-     *  Réponse indiquant le succès ou l'échec de l'opération
-     */
+     // Supprime un Admin et TOUTES les données associées à son entreprise.
+  
     @DeleteMapping("/deleteAdminAndEntreprise/{adminId}")
     public ResponseEntity<?> deleteAdminAndEntreprise(@PathVariable Long adminId, HttpServletRequest request) {
         try {
@@ -165,7 +148,6 @@ public class SuperAdminController {
             superAdminService.deleteAdminAndEntreprise(user, adminId);
             return ResponseEntity.ok(Map.of("message", "Admin et toutes les données de son entreprise ont été supprimés avec succès."));
         } catch (RuntimeException e) {
-            // Si c'est une erreur d'accès, retourner 403, sinon 500
             if (e.getMessage() != null && e.getMessage().contains("Accès refusé")) {
                 return ResponseEntity.status(HttpStatus.FORBIDDEN)
                         .body(Map.of("error", e.getMessage()));
@@ -179,20 +161,9 @@ public class SuperAdminController {
         }
     }
 
-    /**
-     * Supprime toutes les données de l'entreprise mais garde l'admin et l'entreprise.
-     * 
-     * Cette opération :
-     * - Supprime tous les utilisateurs SAUF l'admin
-     * - Supprime toutes les données métier (ventes, produits, clients, factures, etc.)
-     * - Supprime tous les fichiers/images associés
-     * - Garde l'admin et l'entreprise pour permettre une réinitialisation complète
-     * 
-     * Réservé à l'admin lui-même (utilise l'ID depuis le token JWT).
-     * 
-     *  request La requête HTTP pour récupérer l'utilisateur connecté
-     *  Réponse indiquant le succès de l'opération
-     */
+    
+     // Supprime toutes les données de l'entreprise mais garde l'admin et l'entreprise.
+  
     @DeleteMapping("/vider-entreprise")
     public ResponseEntity<?> viderEntrepriseButKeepAdmin(HttpServletRequest request) {
         try {
@@ -213,18 +184,8 @@ public class SuperAdminController {
         }
     }
 
-    /**
-     * Déconnecte tous les utilisateurs du système (réservé au SUPER_ADMIN).
-     * 
-     * Cette opération :
-     * - Supprime toutes les sessions actives de la base de données
-     * - Invalide tous les tokens JWT existants en mettant à jour lastActivity
-     * 
-     * Utile lors des mises à jour système pour forcer tous les utilisateurs à se reconnecter.
-     * 
-     *request La requête HTTP pour récupérer l'utilisateur connecté
-     *Réponse indiquant le succès de l'opération
-     */
+     // Déconnecte tous les utilisateurs du système (réservé au SUPER_ADMIN).
+  
     @PostMapping("/deconnecter-tous")
     public ResponseEntity<?> deconnecterTousLesUtilisateurs(HttpServletRequest request) {
         try {

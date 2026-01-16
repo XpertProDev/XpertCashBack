@@ -19,7 +19,7 @@ public class Unite {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "entreprise_id", nullable = false)
-    @JsonBackReference // Évite la référence circulaire lors de la sérialisation JSON
+    @JsonBackReference 
     private Entreprise entreprise;
 
 }

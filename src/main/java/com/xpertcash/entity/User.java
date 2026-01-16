@@ -48,7 +48,6 @@ public class User {
 
     @NotNull(message = "Champs vide")
     @Column(unique = true ,nullable = false)
-    //@Size(min = 8, message = "Le numéro de téléphone doit contenir au moins 8 caractères.")
     private String phone;
 
 

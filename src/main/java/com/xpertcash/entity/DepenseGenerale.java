@@ -36,7 +36,7 @@ public class DepenseGenerale {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "categorie_liee_id", nullable = true)
     @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
-    private Categorie categorieLiee; // Catégorie liée (Categorie) pour CHARGE_VARIABLE (peut être PRODUIT ou COMPTABILITE)
+    private Categorie categorieLiee;
 
     @Column(nullable = false)
     private Double prixUnitaire;
@@ -45,7 +45,7 @@ public class DepenseGenerale {
     private Integer quantite;
 
     @Column(nullable = false)
-    private Double montant; // Calculé automatiquement: prixUnitaire * quantite
+    private Double montant;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
@@ -73,7 +73,7 @@ public class DepenseGenerale {
     private Fournisseur fournisseur;
 
     @Column(name = "piece_jointe")
-    private String pieceJointe; // URL ou chemin du fichier
+    private String pieceJointe;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "entreprise_id", nullable = false)
@@ -93,7 +93,6 @@ public class DepenseGenerale {
         if (dateCreation == null) {
             dateCreation = LocalDateTime.now();
         }
-        // Calculer le montant automatiquement
         if (montant == null && prixUnitaire != null && quantite != null) {
             montant = prixUnitaire * quantite;
         }
@@ -101,7 +100,6 @@ public class DepenseGenerale {
 
     @PreUpdate
     protected void onUpdate() {
-        // Recalculer le montant si prixUnitaire ou quantite change
         if (prixUnitaire != null && quantite != null) {
             montant = prixUnitaire * quantite;
         }

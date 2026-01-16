@@ -101,7 +101,6 @@ public ResponseEntity<?> consulterTempsEssaiModules(HttpServletRequest request) 
         }
 
         try {
-            // Appeler le service pour activer le module avec paiement
             moduleActivationService.activerModuleAvecPaiement(
                 user.getId(),
                 demande.getNomModule(),
@@ -202,7 +201,6 @@ public ResponseEntity<?> consulterTempsEssaiModules(HttpServletRequest request) 
             String adresse = (String) body.get("adresse");
             String ville = (String) body.get("ville");
 
-            // Appeler le service pour renouveler l'abonnement
             moduleActivationService.activerModuleAvecPaiement(
                 user.getId(),
                 nomModule,
@@ -339,7 +337,6 @@ public ResponseEntity<?> consulterTempsEssaiModules(HttpServletRequest request) 
 
             Map<String, Object> moduleData = regroupement.get(cle);
 
-            // Incrément du compteur et du montant
             moduleData.put("totalPaiements", (Integer) moduleData.get("totalPaiements") + 1);
             moduleData.put("montantTotal", ((BigDecimal) moduleData.get("montantTotal")).add(paiement.getMontant()));
 

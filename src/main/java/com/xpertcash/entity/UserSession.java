@@ -6,10 +6,6 @@ import lombok.Setter;
 
 import java.time.LocalDateTime;
 
-/**
- * Entité pour gérer les sessions utilisateur par appareil
- * Permet à un utilisateur de se connecter sur plusieurs appareils simultanément
- */
 @Entity
 @Getter
 @Setter
@@ -28,19 +24,19 @@ public class UserSession {
     private String userUuid;
 
     @Column(name = "session_token", unique = true, nullable = true, length = 500)
-    private String sessionToken; // JWT token complet (nullable pour permettre création puis mise à jour)
+    private String sessionToken;
 
     @Column(name = "device_id", nullable = true)
-    private String deviceId; // Identifiant de l'appareil (optionnel, généré si absent)
+    private String deviceId;
 
     @Column(name = "device_name", nullable = true)
-    private String deviceName; // Nom de l'appareil (ex: "iPhone 12", "Chrome sur Windows")
+    private String deviceName;
 
     @Column(name = "ip_address", nullable = true)
-    private String ipAddress; // Adresse IP de connexion
+    private String ipAddress;
 
     @Column(name = "user_agent", nullable = true, length = 500)
-    private String userAgent; // User-Agent du navigateur/appareil
+    private String userAgent;
 
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
@@ -52,7 +48,7 @@ public class UserSession {
     private LocalDateTime expiresAt;
 
     @Column(name = "is_active", nullable = false)
-    private boolean isActive = true; // Session active ou révoquée
+    private boolean isActive = true;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
@@ -64,12 +60,10 @@ public class UserSession {
         this.lastActivity = LocalDateTime.now();
     }
 
-    // Méthode pour mettre à jour la dernière activité
     public void updateLastActivity() {
         this.lastActivity = LocalDateTime.now();
     }
 
-    // Méthode pour vérifier si la session est expirée
     public boolean isExpired() {
         return LocalDateTime.now().isAfter(expiresAt) || !isActive;
     }

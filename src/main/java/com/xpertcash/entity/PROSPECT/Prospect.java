@@ -43,13 +43,13 @@ public class Prospect {
     private String email;
     private String telephone;
     @Column(length = 2000)
-    private String notes; // notes générales sur le prospect
+    private String notes;
 
     // Statut de conversion
     private Boolean convertedToClient = false;
     private LocalDateTime convertedAt;
-    private Long clientId; // ID du client créé (Client ou EntrepriseClient)
-    private String clientType; // "CLIENT" ou "ENTREPRISE_CLIENT"
+    private Long clientId;
+    private String clientType;
 
     @OneToMany(mappedBy = "prospect", cascade = CascadeType.ALL, orphanRemoval = true)
     @com.fasterxml.jackson.annotation.JsonManagedReference

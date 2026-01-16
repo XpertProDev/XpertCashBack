@@ -29,30 +29,15 @@ public class ComptabiliteController {
     @Autowired
     private ObjectMapper objectMapper;
 
-    /**
-     * Endpoint qui retourne toutes les données comptables de l'entreprise
-     * 
-     * Retourne:
-     * {
-     *   chiffreAffaires: { total, duJour, duMois, deLAnnee, totalVentes, totalFactures, totalPaiementsFactures },
-     *   ventes: { nombreTotal, montantTotal, duJour, montantDuJour, duMois, montantDuMois, deLAnnee, montantDeLAnnee },
-     *   facturation: { nombreTotalFactures, montantTotalFactures, montantPaye, montantImpaye, duJour, ... },
-     *   depenses: { nombreTotal, montantTotal, duJour, montantDuJour, ... },
-     *   boutiques: [ { id, nom, chiffreAffaires, nombreVentes, totalDepenses, nombreDepenses } ],
-     *   clients: { nombreTotal, actifs, montantTotalAchete, meilleursClients: [ Top 3 ] },
-     *   vendeurs: { nombreTotal, actifs, chiffreAffairesTotal, meilleursVendeurs: [ Top 3 ] },
-     *   activites: { nombreVentesTotal, nombreFacturesTotal, nombreDepensesTotal, nombreTransactionsJour }
-     * }
-     */
+     // Endpoint qui retourne toutes les données comptables de l'entreprise
+
     @GetMapping("/comptabilite")
     public ResponseEntity<?> getComptabilite(HttpServletRequest request) {
         return handleRequest(() -> comptabiliteService.getComptabilite(request));
     }
 
-    /**
-     * Crée une dépense générale pour l'entreprise.
-     * Accepte multipart/form-data pour permettre l'upload de pièces jointes.
-     */
+     // Crée une dépense générale pour l'entreprise.
+    
     @PostMapping(value = "/create/depenses-generales", consumes = { MediaType.MULTIPART_FORM_DATA_VALUE })
     public ResponseEntity<?> creerDepenseGenerale(
             @RequestParam("depense") String depenseJson,
@@ -99,10 +84,8 @@ public class ComptabiliteController {
     //     return handleRequest(() -> comptabiliteService.listerCategoriesEntree(request));
     // }
 
-    /**
-     * Crée une entrée générale pour l'entreprise.
-     * Accepte multipart/form-data pour permettre l'upload de pièces jointes.
-     */
+
+     // Crée une entrée générale pour l'entreprise.
     @PostMapping(value = "/create/entrees-generales", consumes = { MediaType.MULTIPART_FORM_DATA_VALUE })
     public ResponseEntity<?> creerEntreeGenerale(
             @RequestParam("entree") String entreeJson,
@@ -129,9 +112,7 @@ public class ComptabiliteController {
         return handleRequest(() -> comptabiliteService.getComptabiliteCompletePaginated(request, page, size));
     }
 
-    /**
-     * Payer une dette depuis la comptabilité (actuellement pour VENTE_CREDIT).
-     */
+     // Payer une dette depuis la comptabilité (actuellement pour VENTE_CREDIT).
     @PostMapping("/comptabilite/dettes/payer")
     public ResponseEntity<?> payerDette(@RequestBody PayerDetteRequest request, HttpServletRequest httpRequest) {
         return handleRequest(() -> {
@@ -143,11 +124,9 @@ public class ComptabiliteController {
         });
     }
 
-    // ========== Méthodes utilitaires privées ==========
 
-    /**
-     * Gère les requêtes avec gestion d'erreur centralisée
-     */
+     // Gère les requêtes avec gestion d'erreur centralisée
+    
     private ResponseEntity<?> handleRequest(java.util.function.Supplier<Object> supplier) {
         try {
             return ResponseEntity.ok(supplier.get());
@@ -158,18 +137,14 @@ public class ComptabiliteController {
         }
     }
 
-    /**
-     * Crée une réponse d'erreur
-     */
+     // Crée une réponse d'erreur
     private Map<String, String> createErrorResponse(String message) {
         Map<String, String> error = new HashMap<>();
         error.put("error", message);
         return error;
     }
 
-    /**
-     * Parse le JSON de dépense et corrige les problèmes de format
-     */
+     // Parse le JSON de dépense et corrige les problèmes de format
     private DepenseGeneraleRequestDTO parseDepenseJson(String depenseJson) {
         try {
             String cleanedJson = cleanJson(depenseJson);
@@ -179,9 +154,7 @@ public class ComptabiliteController {
         }
     }
 
-    /**
-     * Nettoie et corrige le JSON si nécessaire (ajoute les accolades manquantes)
-     */
+     // Nettoie et corrige le JSON si nécessaire (ajoute les accolades manquantes)
     private String cleanJson(String json) {
         if (json == null || json.trim().isEmpty()) {
             throw new RuntimeException("Le JSON de dépense est vide");
@@ -189,12 +162,10 @@ public class ComptabiliteController {
         
         String cleaned = json.trim();
         
-        // Si le JSON ne commence pas par {, l'ajouter
         if (!cleaned.startsWith("{")) {
             cleaned = "{" + cleaned;
         }
         
-        // Si le JSON ne se termine pas par }, l'ajouter
         if (!cleaned.endsWith("}")) {
             cleaned = cleaned + "}";
         }
@@ -202,9 +173,7 @@ public class ComptabiliteController {
         return cleaned;
     }
 
-    /**
-     * Sauvegarde la pièce jointe si elle est présente
-     */
+     // Sauvegarde la pièce jointe si elle est présente
     private String savePieceJointe(MultipartFile pieceJointeFile) {
         if (pieceJointeFile != null && !pieceJointeFile.isEmpty()) {
             return imageStorageService.saveDepensePieceJointe(pieceJointeFile);
@@ -212,9 +181,7 @@ public class ComptabiliteController {
         return null;
     }
 
-    /**
-     * Parse le JSON d'entrée et corrige les problèmes de format
-     */
+     // Parse le JSON d'entrée et corrige les problèmes de format
     private EntreeGeneraleRequestDTO parseEntreeJson(String entreeJson) {
         try {
             String cleanedJson = cleanJson(entreeJson);

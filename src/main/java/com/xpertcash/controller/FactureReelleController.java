@@ -139,7 +139,6 @@ public class FactureReelleController {
             @RequestBody FactureReelle modifications,
             HttpServletRequest request) {
 
-        // Assigner l'ID reçu dans l'URL à l'objet modifications (pour éviter qu'il soit null)
         modifications.setId(factureId);
 
         FactureProForma factureAnnulee = factureReelleService.annulerFactureReelle(modifications, request);
@@ -160,12 +159,10 @@ public ResponseEntity<?> getFacturesParPeriode(
     try {
         User user = authHelper.getAuthenticatedUserWithFallback(request);
         
-        // Appel du service pour obtenir les factures sous forme de DTO
         List<FactureReelleDTO> facturesDTO = factureReelleService.getFacturesParPeriode(
                 user.getId(), request, typePeriode, dateDebut, dateFin
         );
 
-        // Renvoi de la liste de FactureReelleDTO en réponse
         return ResponseEntity.ok(facturesDTO);
     } catch (Exception e) {
         e.printStackTrace(); // Log pour le développeur
@@ -176,10 +173,8 @@ public ResponseEntity<?> getFacturesParPeriode(
     }
 }
 
-    /**
-     * Endpoint pour récupérer les factures réelles récentes
-     * @param limit Nombre de factures à retourner (par défaut 10)
-     */
+    // Endpoint pour récupérer les factures réelles récentes
+   
     @GetMapping("/factureReelle/recentes")
     public ResponseEntity<?> getFacturesReellesRecentes(
             @RequestParam(defaultValue = "10") int limit,

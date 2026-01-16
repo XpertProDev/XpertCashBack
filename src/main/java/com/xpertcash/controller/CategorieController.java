@@ -37,15 +37,12 @@ public class CategorieController {
         try {
             String nom = payload.get("nom");
 
-            // Si le nom de la catégorie est vide
             if (nom == null || nom.isEmpty()) {
                 throw new RuntimeException("Catégorie ne peut pas être vide !");
             }
 
-            // Créer la catégorie - la méthode du service récupère automatiquement l'entreprise de l'utilisateur connecté
             Categorie savedCategorie = categorieService.createCategorie(nom, request);
 
-            // Retourner un message de succès ou un objet simple
             Map<String, Object> response = new HashMap<>();
             response.put("id", savedCategorie.getId());
             response.put("nom", savedCategorie.getNom());

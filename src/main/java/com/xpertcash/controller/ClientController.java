@@ -40,14 +40,12 @@ public class ClientController {
     public ResponseEntity<?> createClient(@RequestBody Client client, HttpServletRequest request) {
         Map<String, String> response = new HashMap<>();
         try {
-            // Sauvegarder le client avec son entreprise (si elle est associée)
             Client savedClient = clientService.saveClient(client, request);
             response.put("message", "Client créé avec succès");
             response.put("clientId", savedClient.getId().toString());
             response.put("createdAt", savedClient.getCreatedAt().toString());
             return ResponseEntity.ok(response);
         } catch (RuntimeException e) {
-            // Gestion des erreurs pour les doublons de client ou entreprise
             response.put("error", e.getMessage());
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
         }

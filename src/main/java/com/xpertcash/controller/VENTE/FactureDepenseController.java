@@ -18,12 +18,8 @@ public class FactureDepenseController {
     @Autowired
     private FactureDepenseService factureDepenseService;
 
-    /**
-     * Récupère toutes les factures de vente et dépenses avec pagination
-     * 
-     * @param page Numéro de page (commence à 0)
-     * @param size Taille de la page (défaut: 20)
-     */
+     // Récupère toutes les factures de vente et dépenses avec pagination
+   
     @GetMapping("/factures-depenses")
     public ResponseEntity<?> getAllFacturesEtDepenses(
             @RequestParam(defaultValue = "0") int page,
@@ -31,7 +27,6 @@ public class FactureDepenseController {
             HttpServletRequest request) {
         
         try {
-            // Validation des paramètres
             if (page < 0) {
                 Map<String, String> error = new HashMap<>();
                 error.put("error", "Le numéro de page doit être >= 0");
@@ -44,7 +39,6 @@ public class FactureDepenseController {
                 return ResponseEntity.badRequest().body(error);
             }
             
-            // Utiliser des valeurs par défaut pour les autres paramètres
             FactureDepensePaginatedDTO result = factureDepenseService.getAllFacturesEtDepenses(
                 page, size, "date", "desc", null, null, "ALL", request);
             
@@ -61,9 +55,7 @@ public class FactureDepenseController {
         }
     }
 
-    /**
-     * Récupère les factures et dépenses du jour avec pagination
-     */
+     // Récupère les factures et dépenses du jour avec pagination
     @GetMapping("/factures-depenses/jour")
     public ResponseEntity<?> getFacturesEtDepensesDuJour(
             @RequestParam(defaultValue = "0") int page,
@@ -87,9 +79,7 @@ public class FactureDepenseController {
         }
     }
 
-    /**
-     * Récupère les factures et dépenses du mois avec pagination
-     */
+     // Récupère les factures et dépenses du mois avec pagination
     @GetMapping("/factures-depenses/mois")
     public ResponseEntity<?> getFacturesEtDepensesDuMois(
             @RequestParam(defaultValue = "0") int page,
@@ -113,9 +103,7 @@ public class FactureDepenseController {
         }
     }
 
-    /**
-     * Récupère les factures et dépenses pour une boutique spécifique
-     */
+     // Récupère les factures et dépenses pour une boutique spécifique
     @GetMapping("/factures-depenses/boutique/{boutiqueId}")
     public ResponseEntity<?> getFacturesEtDepensesByBoutique(
             @PathVariable Long boutiqueId,
@@ -124,7 +112,6 @@ public class FactureDepenseController {
             HttpServletRequest request) {
         
         try {
-            // Validation des paramètres
             if (page < 0) {
                 Map<String, String> error = new HashMap<>();
                 error.put("error", "Le numéro de page doit être >= 0");
@@ -153,9 +140,7 @@ public class FactureDepenseController {
         }
     }
 
-    /**
-     * Récupère les factures et dépenses pour une caisse spécifique
-     */
+     // Récupère les factures et dépenses pour une caisse spécifique
     @GetMapping("/factures-depenses/caisse/{caisseId}")
     public ResponseEntity<?> getFacturesEtDepensesByCaisse(
             @PathVariable Long caisseId,
@@ -164,7 +149,6 @@ public class FactureDepenseController {
             HttpServletRequest request) {
         
         try {
-            // Validation des paramètres
             if (page < 0) {
                 Map<String, String> error = new HashMap<>();
                 error.put("error", "Le numéro de page doit être >= 0");
@@ -193,9 +177,7 @@ public class FactureDepenseController {
         }
     }
 
-    /**
-     * Récupère toutes les factures de vente d'une entreprise
-     */
+     // Récupère toutes les factures de vente d'une entreprise
     @GetMapping("/factures-vente")
     public ResponseEntity<?> getAllFacturesVente(
             @RequestParam(defaultValue = "0") int page,
@@ -203,7 +185,6 @@ public class FactureDepenseController {
             HttpServletRequest request) {
         
         try {
-            // Validation des paramètres
             if (page < 0) {
                 Map<String, String> error = new HashMap<>();
                 error.put("error", "Le numéro de page doit être >= 0");
@@ -232,9 +213,7 @@ public class FactureDepenseController {
         }
     }
 
-    /**
-     * Récupère toutes les factures de vente d'une boutique spécifique
-     */
+     // Récupère toutes les factures de vente d'une boutique spécifique
     @GetMapping("/factures-vente/boutique/{boutiqueId}")
     public ResponseEntity<?> getFacturesVenteByBoutique(
             @PathVariable Long boutiqueId,
@@ -243,7 +222,6 @@ public class FactureDepenseController {
             HttpServletRequest request) {
         
         try {
-            // Validation des paramètres
             if (page < 0) {
                 Map<String, String> error = new HashMap<>();
                 error.put("error", "Le numéro de page doit être >= 0");
@@ -272,18 +250,14 @@ public class FactureDepenseController {
         }
     }
 
-    /**
-     * Récupère uniquement les totaux (sans pagination) pour un aperçu rapide
-     */
+     // Récupère uniquement les totaux (sans pagination) pour un aperçu rapide
     @GetMapping("/factures-depenses/totaux")
     public ResponseEntity<?> getTotauxFacturesEtDepenses(HttpServletRequest request) {
         
         try {
-            // Récupérer seulement la première page pour obtenir les totaux
             FactureDepensePaginatedDTO result = factureDepenseService.getAllFacturesEtDepenses(
                 0, 1, "date", "desc", null, null, "ALL", request);
             
-            // Créer une réponse simplifiée avec seulement les totaux
             Map<String, Object> totaux = new HashMap<>();
             totaux.put("totalFacturesVente", result.getTotalFacturesVente());
             totaux.put("totalDepenses", result.getTotalDepenses());

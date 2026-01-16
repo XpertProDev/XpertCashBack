@@ -23,6 +23,8 @@ public class NoteFactureProForma {
     @ManyToOne
     private User auteur;
 
+    @Lob
+    @Column(name = "contenu", columnDefinition = "TEXT")
     private String contenu;
 
     private LocalDateTime dateCreation;

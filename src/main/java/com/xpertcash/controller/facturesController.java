@@ -44,7 +44,6 @@ public class facturesController {
             throw new RuntimeException("Aucune entreprise associée à cet utilisateur");
         }
 
-        // Récupérer toutes les factures de l'entreprise (isolé)
         List<Facture> factures = factureRepository.findAllByEntrepriseId(entreprise.getId());
 
         if (factures.isEmpty()) {
@@ -68,11 +67,9 @@ public class facturesController {
             throw new RuntimeException("Aucune entreprise associée à cet utilisateur");
         }
 
-        // Vérifier que la boutique appartient à l'entreprise de l'utilisateur
         boutiqueRepository.findByIdAndEntrepriseId(boutiqueId, entreprise.getId())
                 .orElseThrow(() -> new RuntimeException("Boutique introuvable ou n'appartient pas à votre entreprise"));
 
-        // Récupérer les factures de la boutique (isolé par entreprise)
         List<Facture> factures = factureRepository.findByBoutiqueIdAndEntrepriseId(boutiqueId, entreprise.getId());
 
         System.out.println("Nombre de factures trouvées pour la boutique " + boutiqueId + " : " + factures.size());

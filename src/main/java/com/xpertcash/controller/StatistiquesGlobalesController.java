@@ -20,17 +20,8 @@ public class StatistiquesGlobalesController {
     @Autowired
     private StatistiquesGlobalesService statistiquesService;
 
-    /**
-     * Endpoint unique qui retourne TOUTES les statistiques globales de l'entreprise
-     * 
-     * Retourne:
-     * {
-     *   produits: { total, enStock, horsStock },
-     *   ventes: { jour, mois, annuel },
-     *   benefices: { jour, mois, annuel },
-     *   utilisateurs: { total, vendeurs }
-     * }
-     */
+     // Endpoint unique qui retourne TOUTES les statistiques globales de l'entreprise
+  
     @GetMapping("/statistiques/globales")
     public ResponseEntity<?> getStatistiquesGlobales(HttpServletRequest request) {
         try {
@@ -47,9 +38,7 @@ public class StatistiquesGlobalesController {
         }
     }
 
-    /**
-     * Endpoint qui retourne les statistiques d'activité hebdomadaire (7 derniers jours)
-     */
+     // Endpoint qui retourne les statistiques d'activité hebdomadaire (7 derniers jours)
     @GetMapping("/statistiques/activite-hebdo")
     public ResponseEntity<?> getActiviteHebdomadaire(HttpServletRequest request) {
         try {

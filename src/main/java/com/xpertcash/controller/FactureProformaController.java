@@ -386,10 +386,8 @@ public ResponseEntity<?> getFacturesParPeriode(
         }
     }
 
-    /**
-     * Endpoint pour récupérer les factures proforma en attente
-     * @param limit Nombre de factures à retourner (par défaut 10)
-     */
+    // Endpoint pour récupérer les factures proforma en attente
+   
     @GetMapping("/factureProforma/en-attente")
     public ResponseEntity<?> getFacturesProformaEnAttente(
             @RequestParam(defaultValue = "10") int limit,

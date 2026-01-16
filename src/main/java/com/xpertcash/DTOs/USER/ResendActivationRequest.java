@@ -6,7 +6,6 @@ import lombok.Data;
 public class ResendActivationRequest {
      private String email;
 
-     // Getter et Setter
         public String getEmail() {
             return email;
         }

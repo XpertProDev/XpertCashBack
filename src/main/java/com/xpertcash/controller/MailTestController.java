@@ -66,7 +66,7 @@ public class MailTestController {
             ? testEmail 
             : "carterhedy57@gmail.com";
         
-        logger.info("🧪 Test de connexion SMTP [{}] - Host: {}, Port: {}, User: {}, Recipient: {}", 
+        logger.info(" Test de connexion SMTP [{}] - Host: {}, Port: {}, User: {}, Recipient: {}", 
             accountType, host, port, username, recipientEmail);
         
         try {

@@ -41,14 +41,12 @@ public class UniteController {
         Unite unite = new Unite();
         unite.setNom(nom);
 
-        // Utiliser le service qui va associer automatiquement l'entreprise de l'utilisateur
         Unite createdUnite = uniteService.createUnite(unite, request);
 
         return ResponseEntity.status(HttpStatus.CREATED).body(createdUnite);
     } catch (IllegalArgumentException e) {
         Map<String, String> errorResponse = new HashMap<>();
         errorResponse.put("error", e.getMessage());
-        // Vérifier si c'est une erreur de duplication
         if (e.getMessage().contains("existe déjà")) {
             return ResponseEntity.status(HttpStatus.CONFLICT).body(errorResponse);
         }
@@ -65,11 +63,9 @@ public class UniteController {
     public ResponseEntity<Unite> updateUnite(@PathVariable Long uniteId, @RequestBody Unite uniteDetails, HttpServletRequest request) {
         try {
             
-            // Appeler le service pour mettre à jour l'unité
             Unite updatedUnite = uniteService.updateUnite(request, uniteId, uniteDetails);
-            return ResponseEntity.ok(updatedUnite);  // Retourner l'unité mise à jour
+            return ResponseEntity.ok(updatedUnite);
         } catch (RuntimeException e) {
-            // Retour d'une erreur en cas de problème
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(null);
         }
     }

@@ -64,7 +64,7 @@ public class JwtUtil {
         return claimsResolver.apply(claims);
     }
 
-    // Méthode pour extraire toutes les informations du token (claims)
+    // Méthode pour extraire toutes les informations du token 
     private Claims extractAllClaims(String token) {
         return Jwts.parserBuilder()
                 .setSigningKey(jwtConfig.getSecretKey()) 

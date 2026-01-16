@@ -21,7 +21,7 @@ public class AuthControllerPassword {
      @Autowired
     private PasswordService passwordService;
 
-        // Étape 1 : Demander un code de réinitialisation
+        // Demander un code de réinitialisation
         @PostMapping("/forgot-password")
         public ResponseEntity<?> forgotPassword(@RequestBody Map<String, String> request) {
             String email = request.get("email");
@@ -38,7 +38,7 @@ public class AuthControllerPassword {
         
 
 
-        // Étape 2 : Modifier le mot de passe
+        //  Modifier le mot de passe
         @PostMapping("/reset-password")
         public ResponseEntity<?> resetPassword(@RequestBody Map<String, String> request) {
             try {
