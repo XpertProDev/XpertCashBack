@@ -142,18 +142,11 @@ public class ComptabiliteService {
         return comptabilite;
     }
 
-    /**
-     * Payer une dette depuis la comptabilité (actuellement supporte VENTE_CREDIT et ENTREE_DETTE).
-     * Réduit la dette et met à jour le statut de la vente ou de l'entrée.
-     * 
-     * 🔐 Sécurité : Vérifie l'authentification, l'appartenance à l'entreprise et les permissions.
-     */
+  
     @Transactional
     public void payerDette(PayerDetteRequest request, HttpServletRequest httpRequest) {
-        // 🔐 Vérification de l'authentification et des permissions
         User user = validateComptabilitePermission(httpRequest);
 
-        // Validation des paramètres de la requête
         if (request.getId() == null) {
             throw new RuntimeException("L'id de la dette est obligatoire.");
         }
@@ -169,7 +162,6 @@ public class ComptabiliteService {
 
         String type = request.getType();
 
-        // Gestion des différents types de dettes payables depuis la comptabilité
         if ("VENTE_CREDIT".equals(type)) {
             payerVenteCreditDepuisComptabilite(request, user);
         } else if ("ENTREE_DETTE".equals(type)) {
@@ -180,11 +172,9 @@ public class ComptabiliteService {
     }
 
     private void payerVenteCreditDepuisComptabilite(PayerDetteRequest request, User user) {
-        // 🔐 Récupération de la vente avec vérification d'existence
         Vente vente = venteRepository.findById(request.getId())
                 .orElseThrow(() -> new RuntimeException("Vente introuvable"));
 
-        // 🔐 Vérification de l'appartenance à l'entreprise
         if (vente.getBoutique() == null || vente.getBoutique().getEntreprise() == null) {
             throw new RuntimeException("La vente n'est pas rattachée à une entreprise.");
         }
@@ -214,7 +204,6 @@ public class ComptabiliteService {
 
         double montantPaiement = request.getMontant();
 
-        // 💰 Enregistrer l'entrée de trésorerie dans le bon canal (CAISSE / BANQUE / MOBILE_MONEY)
         ModePaiement mode;
         try {
             mode = ModePaiement.valueOf(request.getModePaiement());
@@ -253,10 +242,9 @@ public class ComptabiliteService {
         entree.setCreePar(user);
         entree.setResponsable(user);
         
-        // 🔗 Lier l'entrée à la dette payée
+        //  Lier l'entrée à la dette payée
         entree.setDetteId(vente.getId());
         entree.setDetteType("VENTE_CREDIT");
-        // Récupérer le numéro de facture si disponible (isolé par entreprise)
         Long venteEntrepriseId = vente.getBoutique() != null && vente.getBoutique().getEntreprise() != null 
                 ? vente.getBoutique().getEntreprise().getId() : null;
         if (venteEntrepriseId != null) {
@@ -266,7 +254,6 @@ public class ComptabiliteService {
         
         entreeGeneraleRepository.save(entree);
 
-        // Mise à jour de la vente (dette)
         double nouveauTotalRembourse = dejaRembourse + montantPaiement;
         vente.setMontantTotalRembourse(nouveauTotalRembourse);
         vente.setDateDernierRemboursement(LocalDateTime.now());
@@ -277,7 +264,6 @@ public class ComptabiliteService {
             vente.setStatus(VenteStatus.EN_COURS);
         }
 
-        // On peut refléter le montant payé cumulé dans montantPaye
         vente.setMontantPaye(nouveauTotalRembourse);
 
         venteRepository.save(vente);
@@ -293,19 +279,11 @@ public class ComptabiliteService {
         venteHistoriqueRepository.save(historique);
     }
 
-    /**
-     * Encaisse une dette créée via EntreeGenerale avec source = DETTE.
-     * - Réduit le montant restant de l'entrée DETTE
-     * - Crée une nouvelle EntreeGenerale réelle (CAISSE/BANQUE/MOBILE_MONEY) pour l'encaissement
-     * 
-     * 🔐 Sécurité : Vérifie l'appartenance à l'entreprise de l'utilisateur
-     */
+
     private void payerEntreeDetteDepuisComptabilite(PayerDetteRequest request, User user) {
-        // 🔐 Récupération de l'entrée de dette avec vérification d'existence
         EntreeGenerale entreeDette = entreeGeneraleRepository.findById(request.getId())
                 .orElseThrow(() -> new RuntimeException("Entrée de dette introuvable"));
 
-        // 🔐 Vérification de l'appartenance à l'entreprise
         if (entreeDette.getEntreprise() == null) {
             throw new RuntimeException("Cette entrée de dette n'est pas rattachée à une entreprise.");
         }
@@ -322,7 +300,6 @@ public class ComptabiliteService {
         }
 
         double montantInitial = entreeDette.getMontant() != null ? entreeDette.getMontant() : 0.0;
-        // Montant restant actuel (si null, on considère tout le montant initial comme restant)
         double montantRestantActuel = entreeDette.getMontantReste() != null
                 ? entreeDette.getMontantReste()
                 : montantInitial;
@@ -337,7 +314,6 @@ public class ComptabiliteService {
                     ") dépasse le montant restant dû (" + montantRestantActuel + ").");
         }
 
-        // Déterminer la source réelle (CAISSE / BANQUE / MOBILE_MONEY) en fonction du mode de paiement
         ModePaiement mode;
         try {
             mode = ModePaiement.valueOf(request.getModePaiement().trim().toUpperCase());
@@ -363,7 +339,6 @@ public class ComptabiliteService {
                 break;
         }
 
-        // 1️⃣ Créer l'entrée réelle encaissée
         EntreeGenerale encaissement = new EntreeGenerale();
         encaissement.setNumero(genererNumeroEntree(user.getEntreprise().getId()));
         encaissement.setDesignation(
@@ -381,18 +356,16 @@ public class ComptabiliteService {
         encaissement.setCreePar(user);
         encaissement.setResponsable(entreeDette.getResponsable() != null ? entreeDette.getResponsable() : user);
         
-        // 🔗 Lier l'entrée à la dette payée
+        //  Lier l'entrée à la dette payée
         encaissement.setDetteId(entreeDette.getId());
         encaissement.setDetteType("ENTREE_DETTE");
         encaissement.setDetteNumero(entreeDette.getNumero());
         
         entreeGeneraleRepository.save(encaissement);
 
-        // 2️⃣ Réduire ou clôturer la dette initiale (on joue uniquement sur montantReste)
         double restant = montantRestantActuel - montantPaiement;
         entreeDette.setMontantReste(restant);
         if (restant <= 0) {
-            // On peut marquer la dette comme encaissée en changeant la source
             entreeDette.setSource(sourceReelle);
         }
         entreeGeneraleRepository.save(entreeDette);
@@ -406,21 +379,17 @@ public class ComptabiliteService {
         LocalDateTime startOfDay = today.atStartOfDay();
         LocalDateTime endOfDay = today.atTime(LocalTime.MAX);
 
-        // Pour le mois
         LocalDateTime startOfMonth = today.withDayOfMonth(1).atStartOfDay();
         LocalDateTime endOfMonth = today.withDayOfMonth(today.lengthOfMonth()).atTime(LocalTime.MAX);
 
-        // Pour l'année
         LocalDate firstDayOfYear = today.withDayOfYear(1);
         LocalDate lastDayOfYear = today.withDayOfYear(today.lengthOfYear());
         LocalDateTime startOfYear = firstDayOfYear.atStartOfDay();
         LocalDateTime endOfYear = lastDayOfYear.atTime(LocalTime.MAX);
 
-        // Récupérer factures réelles et proforma
         List<FactureReelle> toutesFacturesReelles = factureReelleRepository.findByEntrepriseId(entrepriseId);
         List<FactureProForma> toutesFacturesProforma = factureProformaRepository.findByEntrepriseId(entrepriseId);
         
-        // Calculer le total des paiements pour toutes les factures (optimisation N+1)
         double totalPaiementsFactures = 0.0;
         if (!toutesFacturesReelles.isEmpty()) {
             List<Long> factureIds = toutesFacturesReelles.stream().map(FactureReelle::getId).collect(Collectors.toList());
@@ -430,13 +399,11 @@ public class ComptabiliteService {
             }
         }
 
-        // Calculer les ventes nettes (avec remboursements)
         double totalVentes = calculerVentesNet(entrepriseId, null, null);
         double ventesJour = calculerVentesNet(entrepriseId, startOfDay, endOfDay);
         double ventesMois = calculerVentesNet(entrepriseId, startOfMonth, endOfMonth);
         double ventesAnnee = calculerVentesNet(entrepriseId, startOfYear, endOfYear);
 
-        // Calculer les montants de factures
         double totalFacturesEmises = toutesFacturesReelles.stream()
                 .mapToDouble(FactureReelle::getTotalFacture)
                 .sum();
@@ -446,7 +413,7 @@ public class ComptabiliteService {
         int nombreFacturesReelles = toutesFacturesReelles.size();
         int nombreFacturesProforma = toutesFacturesProforma.size();
 
-        // Construire les détails des ventes
+        //  les détails des ventes
         List<Vente> ventes = venteRepository.findAllByEntrepriseId(entrepriseId);
         List<Long> venteIds = ventes.stream().map(Vente::getId).collect(Collectors.toList());
         Map<Long, Double> remboursementsMap = venteIds.isEmpty() ? java.util.Collections.emptyMap() :
@@ -484,7 +451,7 @@ public class ComptabiliteService {
             );
         }).collect(Collectors.toList());
 
-        // Détails factures (lisibles: remise/TVA et reste à payer)
+        // Détails factures (remise/TVA et reste à payer)
         List<Long> factureIds = toutesFacturesReelles.stream().map(FactureReelle::getId).collect(Collectors.toList());
         Map<Long, Double> paiementsParFacture = new HashMap<>();
         Map<Long, String> dernierEncaisseurParFacture = new HashMap<>();
@@ -495,7 +462,6 @@ public class ComptabiliteService {
                 double somme = ((Number) row[1]).doubleValue();
                 paiementsParFacture.put(fid, somme);
             }
-            // Récupérer tous les paiements pour déterminer le dernier encaisseur
             List<Paiement> paiementsList = paiementRepository.findByFactureReelle_IdIn(factureIds);
             java.util.Map<Long, Paiement> dernierPaiement = paiementsList.stream()
                     .filter(p -> p.getDatePaiement() != null)
@@ -532,10 +498,8 @@ public class ComptabiliteService {
             return d;
         }).collect(Collectors.toList());
 
-        // Calculer les dépenses générales
         List<DepenseGenerale> toutesDepensesGenerales = depenseGeneraleRepository.findByEntrepriseId(entrepriseId);
         
-        // Filtrer les dépenses générales par période
         List<DepenseGenerale> depensesGeneralesJour = toutesDepensesGenerales.stream()
                 .filter(d -> d.getDateCreation() != null && 
                         !d.getDateCreation().isBefore(startOfDay) && 
@@ -554,7 +518,6 @@ public class ComptabiliteService {
                         !d.getDateCreation().isAfter(endOfYear))
                 .collect(Collectors.toList());
 
-        // Calculer les montants des dépenses générales
         double totalDepensesGenerales = toutesDepensesGenerales.stream()
                 .mapToDouble(d -> d.getMontant() != null ? d.getMontant() : 0.0)
                 .sum();
@@ -568,7 +531,6 @@ public class ComptabiliteService {
                 .mapToDouble(d -> d.getMontant() != null ? d.getMontant() : 0.0)
                 .sum();
 
-        // Total chiffre d'affaires = ventes + paiements de factures
         double total = totalVentes + totalPaiementsFactures;
 
         ComptabiliteDTO.ChiffreAffairesDTO dto = new ComptabiliteDTO.ChiffreAffairesDTO();
@@ -654,7 +616,6 @@ public class ComptabiliteService {
         double montantDuMois = calculerVentesNet(entrepriseId, startOfMonth, endOfMonth);
         double montantDeLAnnee = calculerVentesNet(entrepriseId, startOfYear, endOfYear);
 
-        // Nombre de ventes annulées (considérées comme totalement remboursées)
         int annulees = (int) toutesVentes.stream()
                 .filter(v -> v.getStatus() != null && v.getStatus() == VenteStatus.REMBOURSEE)
                 .count();
@@ -681,7 +642,6 @@ public class ComptabiliteService {
         List<FactureReelle> toutesFactures = factureReelleRepository.findByEntrepriseId(entrepriseId);
         List<FactureProForma> toutesProforma = factureProformaRepository.findByEntrepriseId(entrepriseId);
         
-        // Filtrer par date pour les stats périodiques
         List<FactureReelle> facturesJour = toutesFactures.stream()
                 .filter(f -> f.getDateCreation() != null && f.getDateCreation().equals(today))
                 .collect(Collectors.toList());
@@ -700,7 +660,6 @@ public class ComptabiliteService {
                 .mapToDouble(FactureReelle::getTotalFacture)
                 .sum();
 
-        // Calculer le montant payé et impayé
         double montantPaye = 0.0;
         List<Long> factureIds = toutesFactures.stream().map(FactureReelle::getId).collect(Collectors.toList());
         if (!factureIds.isEmpty()) {
@@ -724,7 +683,6 @@ public class ComptabiliteService {
                 .mapToDouble(FactureReelle::getTotalFacture)
                 .sum();
 
-        // Détails factures pour lisibilité (remise/tva et reste à payer)
         Map<Long, Double> paiementsParFacture = new HashMap<>();
         Map<Long, String> dernierEncaisseurParFacture = new HashMap<>();
         if (!factureIds.isEmpty()) {
@@ -735,7 +693,6 @@ public class ComptabiliteService {
                 paiementsParFacture.put(fid, somme);
             }
 
-            // Déterminer le dernier encaisseur par facture à partir des paiements
             List<Paiement> paiementsList = paiementRepository.findByFactureReelle_IdIn(factureIds);
             java.util.Map<Long, Paiement> dernierPaiement = paiementsList.stream()
                     .filter(p -> p.getDatePaiement() != null)
@@ -772,7 +729,6 @@ public class ComptabiliteService {
             return d;
         }).collect(java.util.stream.Collectors.toList());
 
-        // Ajouter les PROFORMA aux détails
         List<ComptabiliteDTO.FactureDetail> proformaDetails = toutesProforma.stream().map(pf -> {
             ComptabiliteDTO.FactureDetail d = new ComptabiliteDTO.FactureDetail();
             d.setFactureId(pf.getId());
@@ -829,7 +785,6 @@ public class ComptabiliteService {
             return dto;
         }
 
-        // Récupérer les mouvements de type DEPENSE
         List<MouvementCaisse> toutesDepenses = mouvementCaisseRepository
                 .findByCaisse_Boutique_Entreprise_IdAndTypeMouvement(
                         entrepriseId, TypeMouvementCaisse.DEPENSE);
@@ -871,7 +826,6 @@ public class ComptabiliteService {
                 .mapToDouble(m -> m.getMontant() != null ? m.getMontant() : 0.0)
                 .sum();
 
-        // Détails des dépenses (Date, Libellé, Méthode, Montant)
         List<ComptabiliteDTO.DepenseDetail> details = toutesDepenses.stream().map(d -> {
             ComptabiliteDTO.DepenseDetail dd = new ComptabiliteDTO.DepenseDetail();
             dd.setDate(d.getDateMouvement());
@@ -898,10 +852,8 @@ public class ComptabiliteService {
      * Calcule les statistiques des dépenses générales
      */
     private ComptabiliteDTO.DepensesGeneralesDTO calculerDepensesGenerales(Long entrepriseId) {
-        // Récupérer toutes les dépenses générales de l'entreprise
         List<DepenseGenerale> toutesDepensesGenerales = depenseGeneraleRepository.findByEntrepriseId(entrepriseId);
 
-        // Définir les périodes
         LocalDate today = LocalDate.now();
         LocalDateTime startOfDay = today.atStartOfDay();
         LocalDateTime endOfDay = today.atTime(LocalTime.MAX);
@@ -912,7 +864,6 @@ public class ComptabiliteService {
         LocalDateTime startOfYear = firstDayOfYear.atStartOfDay();
         LocalDateTime endOfYear = lastDayOfYear.atTime(LocalTime.MAX);
 
-        // Filtrer par période
         List<DepenseGenerale> depensesJour = toutesDepensesGenerales.stream()
                 .filter(d -> d.getDateCreation() != null && 
                         !d.getDateCreation().isBefore(startOfDay) && 
@@ -931,7 +882,6 @@ public class ComptabiliteService {
                         !d.getDateCreation().isAfter(endOfYear))
                 .collect(Collectors.toList());
 
-        // Calculer les montants
         double montantTotal = toutesDepensesGenerales.stream()
                 .mapToDouble(d -> d.getMontant() != null ? d.getMontant() : 0.0)
                 .sum();
@@ -945,7 +895,6 @@ public class ComptabiliteService {
                 .mapToDouble(d -> d.getMontant() != null ? d.getMontant() : 0.0)
                 .sum();
 
-        // Créer les détails
         List<ComptabiliteDTO.DepenseGeneraleDetail> details = toutesDepensesGenerales.stream()
                 .map(this::mapToDepenseGeneraleDetail)
                 .collect(Collectors.toList());
@@ -1019,7 +968,6 @@ public class ComptabiliteService {
         for (Boutique boutique : boutiques) {
             List<Vente> ventes = venteRepository.findByBoutiqueId(boutique.getId());
             
-            // Calculer les ventes nettes de cette boutique
             List<Long> venteIds = ventes.stream().map(Vente::getId).collect(Collectors.toList());
             Map<Long, Double> remboursementsMap = new HashMap<>();
             if (!venteIds.isEmpty()) {
@@ -1038,7 +986,6 @@ public class ComptabiliteService {
                 chiffreAffaires += montantVente - remboursements;
             }
 
-            // Calculer les dépenses de cette boutique
             List<Caisse> caisses = getCaissesForBoutique(boutique.getId());
             List<Long> caisseIds = caisses.stream().map(Caisse::getId).collect(Collectors.toList());
 
@@ -1052,7 +999,6 @@ public class ComptabiliteService {
                     .mapToDouble(m -> m.getMontant() != null ? m.getMontant() : 0.0)
                     .sum();
 
-            // Calculer le stock total de la boutique
             List<Stock> stocks = stockRepository.findByBoutiqueId(boutique.getId());
             int stockTotal = stocks.stream()
                     .mapToInt(s -> s.getStockActuel() != null ? s.getStockActuel() : 0)
@@ -1078,7 +1024,6 @@ public class ComptabiliteService {
     private List<ComptabiliteDTO.BoutiqueDisponibleDTO> listerBoutiquesDisponibles(Long entrepriseId) {
         List<Boutique> boutiques = boutiqueRepository.findByEntrepriseId(entrepriseId);
         return boutiques.stream().map(b -> {
-            // Calculer le stock total de la boutique
             List<Stock> stocks = stockRepository.findByBoutiqueId(b.getId());
             int stockTotal = stocks.stream()
                     .mapToInt(s -> s.getStockActuel() != null ? s.getStockActuel() : 0)
@@ -1105,14 +1050,11 @@ public class ComptabiliteService {
         return caisseRepository.findByBoutiqueId(boutiqueId);
     }
 
-    /**
-     * Calcule les statistiques des clients
-     */
+   
     private ComptabiliteDTO.ClientsDTO calculerClients(Long entrepriseId) {
         List<Client> tousClients = clientRepository.findClientsByEntrepriseOrEntrepriseClient(entrepriseId);
         List<EntrepriseClient> tousEntreprisesClients = entrepriseClientRepository.findByEntrepriseId(entrepriseId);
         
-        // Compter les clients actifs (ayant au moins une vente)
         Set<Long> clientsActifsIds = new HashSet<>();
         Set<Long> entrepriseClientsActifsIds = new HashSet<>();
         List<Vente> toutesVentes = venteRepository.findAllByEntrepriseId(entrepriseId);
@@ -1125,7 +1067,6 @@ public class ComptabiliteService {
             }
         }
 
-        // Calculer le montant total acheté par les clients
         double montantTotalAchete = 0.0;
         List<Long> venteIds = toutesVentes.stream().map(Vente::getId).collect(Collectors.toList());
         Map<Long, Double> remboursementsMap = new HashMap<>();
@@ -1144,10 +1085,8 @@ public class ComptabiliteService {
             montantTotalAchete += montantVente - remboursements;
         }
 
-        // Calculer les top 3 meilleurs clients
         List<ComptabiliteDTO.MeilleurClientDTO> meilleursClients = calculerTop3Clients(entrepriseId, toutesVentes, remboursementsMap);
 
-        // Construire la liste de tous les clients (Client + EntrepriseClient)
         List<ComptabiliteDTO.ClientResumeDTO> clientsList = new ArrayList<>();
         for (Client c : tousClients) {
             ComptabiliteDTO.ClientResumeDTO cr = new ComptabiliteDTO.ClientResumeDTO();
@@ -1171,7 +1110,6 @@ public class ComptabiliteService {
             clientsList.add(cr);
         }
 
-        // Assurer que tous les meilleurs clients figurent aussi dans la liste complète
         java.util.Set<String> signatures = clientsList.stream()
                 .map(cl -> (cl.getType() + "|" + (cl.getId() != null ? cl.getId() : -1) + "|" +
                         (cl.getNomComplet() != null ? cl.getNomComplet() : "") + "|" +
@@ -1196,7 +1134,6 @@ public class ComptabiliteService {
             }
         }
 
-        // Inclure également les clients saisis en caisse (clientNom/clientNumero) absents du référentiel
         for (Vente v : toutesVentes) {
             if (v.getClient() != null || v.getEntrepriseClient() != null) continue;
             String nom = v.getClientNom();
@@ -1217,7 +1154,6 @@ public class ComptabiliteService {
             }
         }
 
-        // Total clients = clients normaux + entreprises clients
         int totalClients = tousClients.size() + tousEntreprisesClients.size();
         int clientsActifsTotal = clientsActifsIds.size() + entrepriseClientsActifsIds.size();
 
@@ -1234,7 +1170,6 @@ public class ComptabiliteService {
      * Calcule les top 3 meilleurs clients par montant acheté
      */
     private List<ComptabiliteDTO.MeilleurClientDTO> calculerTop3Clients(Long entrepriseId, List<Vente> toutesVentes, Map<Long, Double> remboursementsMap) {
-        // Calculer le montant acheté et nombre d'achats par client
         Map<String, ClientStats> statsParClient = new HashMap<>();
         
         for (Vente vente : toutesVentes) {
@@ -1269,7 +1204,6 @@ public class ComptabiliteService {
             }
         }
 
-        // Trier par montant acheté décroissant et prendre le top 3
         List<ComptabiliteDTO.MeilleurClientDTO> top3 = statsParClient.values().stream()
                 .sorted((a, b) -> Double.compare(b.montantAchete, a.montantAchete))
                 .limit(3)
@@ -1327,7 +1261,6 @@ public class ComptabiliteService {
     private ComptabiliteDTO.VendeursDTO calculerVendeurs(Long entrepriseId) {
         List<User> tousVendeurs = usersRepository.findByEntrepriseId(entrepriseId);
         
-        // Compter les vendeurs actifs (ayant au moins une vente)
         Set<Long> vendeursActifsIds = new HashSet<>();
         List<Vente> toutesVentes = venteRepository.findAllByEntrepriseId(entrepriseId);
         for (Vente vente : toutesVentes) {
@@ -1336,13 +1269,10 @@ public class ComptabiliteService {
             }
         }
 
-        // Calculer le chiffre d'affaires total généré par les vendeurs
         double chiffreAffairesTotal = calculerVentesNet(entrepriseId, null, null);
 
-        // Calculer les top 3 meilleurs vendeurs
         List<ComptabiliteDTO.MeilleurVendeurDTO> meilleursVendeurs = calculerTop3Vendeurs(entrepriseId, toutesVentes);
 
-        // Construire la liste de tous les vendeurs
         List<ComptabiliteDTO.VendeurResumeDTO> vendeursList = tousVendeurs.stream().map(u -> {
             ComptabiliteDTO.VendeurResumeDTO vr = new ComptabiliteDTO.VendeurResumeDTO();
             vr.setId(u.getId());
@@ -1367,7 +1297,6 @@ public class ComptabiliteService {
      * Calcule les top 3 meilleurs vendeurs par chiffre d'affaires
      */
     private List<ComptabiliteDTO.MeilleurVendeurDTO> calculerTop3Vendeurs(Long entrepriseId, List<Vente> toutesVentes) {
-        // Récupérer tous les remboursements d'un coup
         List<Long> venteIds = toutesVentes.stream().map(Vente::getId).collect(Collectors.toList());
         Map<Long, Double> remboursementsMap = new HashMap<>();
         if (!venteIds.isEmpty()) {
@@ -1398,7 +1327,6 @@ public class ComptabiliteService {
             }
         }
 
-        // Trier par chiffre d'affaires décroissant et prendre le top 3
         List<ComptabiliteDTO.MeilleurVendeurDTO> top3 = statsParVendeur.values().stream()
                 .sorted((a, b) -> Double.compare(b.chiffreAffaires, a.chiffreAffaires))
                 .limit(3)
@@ -1497,7 +1425,6 @@ public class ComptabiliteService {
         Ordonnateur ordonnateur = parseEnum(Ordonnateur.class, request.getOrdonnateur(), "Ordonnateur");
         TypeCharge typeCharge = parseEnum(TypeCharge.class, request.getTypeCharge(), "TypeCharge");
         
-        // Pour la catégorie liée : accepter soit categorieLieeId, soit produitId (pour compatibilité avec le frontend)
         Categorie categorieLiee = null;
         Long categorieLieeId = request.getCategorieLieeId() != null ? request.getCategorieLieeId() : request.getProduitId();
         if (categorieLieeId != null) {
@@ -1505,7 +1432,7 @@ public class ComptabiliteService {
                     .orElseThrow(() -> new RuntimeException("Catégorie liée non trouvée. Vérifiez que la catégorie existe et appartient à votre entreprise."));
         }
         
-        Produit produit = validateProduit(null, user); // Ne plus utiliser produitId pour les catégories liées
+        Produit produit = validateProduit(null, user);
         Fournisseur fournisseur = validateFournisseur(request.getFournisseurId(), user);
         
         DepenseGenerale depense = createDepenseGenerale(request, user, categorie, source, ordonnateur, typeCharge, produit, fournisseur, categorieLiee);
@@ -1570,7 +1497,6 @@ public class ComptabiliteService {
         String nomTrim = nom.trim();
         Categorie categorieExistante = categorieRepository.findByNomAndEntrepriseId(nomTrim, user.getEntreprise().getId());
         if (categorieExistante != null) {
-            // Mettre à jour la description si elle est fournie
             if (description != null && !description.trim().isEmpty()) {
                 categorieExistante.setDescription(description.trim());
                 categorieExistante = categorieRepository.save(categorieExistante);
@@ -1590,13 +1516,6 @@ public class ComptabiliteService {
         return mapCategorieToCategorieEntreeDTO(categorie);
     }
 
-    // @Transactional(readOnly = true)
-    // public List<CategorieResponseDTO> listerCategoriesEntree(HttpServletRequest httpRequest) {
-    //     // Utiliser CategorieService pour obtenir les catégories avec CategorieResponseDTO
-    //     return categorieService.getAllCategoriesWithProduitCount(httpRequest);
-    // }
-
-    // ========== Méthodes utilitaires privées pour les dépenses générales ==========
 
     /**
      * Valide que l'utilisateur a la permission COMPTABILITE
@@ -1611,7 +1530,6 @@ public class ComptabiliteService {
 
         Long entrepriseId = user.getEntreprise().getId();
         
-        // Vérifier si l'utilisateur est admin ou manager de l'entreprise
         boolean isAdminOrManager = CentralAccess.isAdminOrManagerOfEntreprise(user, entrepriseId);
         boolean isComptable = user.getRole() != null && user.getRole().getName() == RoleType.COMPTABLE;
         boolean hasPermission = user.getRole() != null && user.getRole().hasPermission(PermissionType.COMPTABILITE);
@@ -1645,7 +1563,6 @@ public class ComptabiliteService {
         if (request.getTypeCharge() == null || request.getTypeCharge().trim().isEmpty()) {
             throw new RuntimeException("Le type de charge est obligatoire.");
         }
-        // Pour CHARGE_VARIABLE, la catégorie liée est obligatoire
         if ("CHARGE_VARIABLE".equals(request.getTypeCharge())) {
             Long categorieLieeId = request.getCategorieLieeId() != null ? request.getCategorieLieeId() : request.getProduitId();
             if (categorieLieeId == null) {
@@ -1654,9 +1571,7 @@ public class ComptabiliteService {
         }
     }
 
-    /**
-     * Parse un enum de manière générique avec gestion d'erreur
-     */
+
     private <T extends Enum<T>> T parseEnum(Class<T> enumClass, String value, String fieldName) {
         if (value == null || value.trim().isEmpty()) {
             throw new RuntimeException(fieldName + " est obligatoire.");
@@ -1664,7 +1579,6 @@ public class ComptabiliteService {
         try {
             return Enum.valueOf(enumClass, value.trim().toUpperCase());
         } catch (IllegalArgumentException e) {
-            // Construire la liste des valeurs valides
             List<String> validValuesList = new ArrayList<>();
             for (T enumValue : enumClass.getEnumConstants()) {
                 validValuesList.add(enumValue.name());
@@ -1676,11 +1590,9 @@ public class ComptabiliteService {
 
     /**
      * Récupère ou crée une catégorie de dépense (CategorieDepense)
-     * Accepte maintenant aussi les catégories PRODUIT (Categorie) pour la catégorie principale
      */
     private CategorieDepense getOrCreateCategorie(DepenseGeneraleRequestDTO request, User user) {
         if (request.getCategorieId() != null) {
-            // Essayer d'abord comme CategorieDepense
             CategorieDepense categorieDepense = categorieDepenseRepository.findByIdAndEntrepriseId(request.getCategorieId(), user.getEntreprise().getId())
                     .orElse(null);
             
@@ -1688,17 +1600,14 @@ public class ComptabiliteService {
                 return categorieDepense;
             }
             
-            // Si pas trouvé comme CategorieDepense, essayer comme Categorie (PRODUIT ou COMPTABILITE)
             Categorie categorie = categorieRepository.findByIdAndEntrepriseId(request.getCategorieId(), user.getEntreprise().getId())
                     .orElse(null);
             
             if (categorie != null) {
-                // Convertir la Categorie en CategorieDepense (créer une nouvelle si elle n'existe pas)
                 CategorieDepense categorieDepenseExistante = categorieDepenseRepository.findByNomAndEntrepriseId(categorie.getNom(), user.getEntreprise().getId())
                         .orElse(null);
                 
                 if (categorieDepenseExistante == null) {
-                    // Créer une nouvelle CategorieDepense avec le même nom
                     CategorieDepense nouvelleCategorieDepense = new CategorieDepense();
                     nouvelleCategorieDepense.setNom(categorie.getNom());
                     nouvelleCategorieDepense.setEntreprise(user.getEntreprise());
@@ -1760,7 +1669,6 @@ public class ComptabiliteService {
             throw new RuntimeException("L'utilisateur n'a pas d'entreprise associée.");
         }
         
-        // Récupérer le fournisseur (isolé par entreprise)
         Fournisseur fournisseur = fournisseurRepository.findByIdAndEntrepriseId(fournisseurId, entrepriseId)
                 .orElseThrow(() -> new RuntimeException("Fournisseur non trouvé ou n'appartient pas à votre entreprise."));
         
@@ -1796,7 +1704,6 @@ public class ComptabiliteService {
         int month = currentDate.getMonthValue();
         int year = currentDate.getYear();
         
-        // Récupérer les dépenses du mois en cours
         List<DepenseGenerale> depensesDuMois = depenseGeneraleRepository
                 .findByEntrepriseIdAndMonthAndYear(entrepriseId, month, year);
         
@@ -1888,13 +1795,12 @@ public class ComptabiliteService {
         
         DepenseGenerale depense = new DepenseGenerale();
         
-        // Générer le numéro unique avant de sauvegarder
         String numero = genererNumeroDepense(user.getEntreprise().getId());
         depense.setNumero(numero);
         
         depense.setDesignation(request.getDesignation().trim());
         depense.setCategorie(categorie);
-        depense.setCategorieLiee(categorieLiee); // Catégorie liée (Categorie) pour CHARGE_VARIABLE
+        depense.setCategorieLiee(categorieLiee);
         depense.setPrixUnitaire(request.getPrixUnitaire());
         depense.setQuantite(request.getQuantite());
         depense.setMontant(request.getPrixUnitaire() * request.getQuantite());
@@ -1957,7 +1863,7 @@ public class ComptabiliteService {
         }
         dto.setDateCreation(depense.getDateCreation());
         dto.setTypeTransaction("SORTIE");
-        dto.setOrigine("COMPTABILITE"); // Les dépenses générales viennent de la comptabilité
+        dto.setOrigine("COMPTABILITE");
         return dto;
     }
 
@@ -2027,25 +1933,18 @@ public class ComptabiliteService {
 
     /**
      * Liste toutes les entrées générales de l'entreprise de l'utilisateur connecté.
-     * 
-     * 🔐 Sécurité : Vérifie l'authentification, l'appartenance à l'entreprise et les permissions.
-     * Filtre automatiquement les données par entreprise.
      */
     @Transactional(readOnly = true)
     public List<EntreeGeneraleResponseDTO> listerEntreesGenerales(HttpServletRequest httpRequest) {
-        // 🔐 Vérification de l'authentification et des permissions
         User user = validateComptabilitePermission(httpRequest);
         
-        // 🔐 Filtrage par entreprise pour garantir l'isolation des données
         List<EntreeGenerale> entrees = entreeGeneraleRepository.findByEntrepriseIdOrderByDateCreationDesc(user.getEntreprise().getId());
         return entrees.stream()
                 .map(this::mapEntreeGeneraleToResponse)
                 .collect(Collectors.toList());
     }
 
-    /**
-     * Valide les champs obligatoires d'une entrée
-     */
+
     private void validateEntreeRequest(EntreeGeneraleRequestDTO request) {
         if (request.getDesignation() == null || request.getDesignation().trim().isEmpty()) {
             throw new RuntimeException("La désignation est obligatoire.");
@@ -2170,9 +2069,6 @@ public class ComptabiliteService {
         // Si c'est une entrée en DETTE, on initialise le montant restant à encaisser
         if (source == SourceDepense.DETTE) {
             entree.setMontantReste(entree.getMontant());
-            // 🔗 Cette entrée EST la dette, on ne remplit donc pas detteId/detteNumero ici.
-            // numero = numéro de la dette elle-même
-            // Les champs detteId / detteNumero ne sont utilisés que sur les PAIEMENTS de dette.
             entree.setDetteType("ENTREE_DETTE");
         }
         
@@ -2214,31 +2110,27 @@ public class ComptabiliteService {
             dto.setResponsableEmail(entree.getResponsable().getEmail());
         }
         dto.setDateCreation(entree.getDateCreation());
-        // Si la source est DETTE, ce n'est pas encore une entrée encaissée mais une créance
         if (entree.getSource() == SourceDepense.DETTE) {
             dto.setTypeTransaction("DETTE");
-            dto.setOrigine("COMPTABILITE"); // Dette non encore encaissée
+            dto.setOrigine("COMPTABILITE");
         } else {
             dto.setTypeTransaction("ENTREE");
-            // Déterminer l'origine selon le type de dette
             if (entree.getDetteId() != null && entree.getDetteType() != null) {
                 if ("PAIEMENT_FACTURE".equals(entree.getDetteType())) {
-                    dto.setOrigine("Facturation"); // Paiement de facture
+                    dto.setOrigine("Facturation");
                 } else if ("VENTE_CREDIT".equals(entree.getDetteType())) {
-                    // Pour les paiements de vente à crédit, récupérer le nom de la boutique
                     String nomBoutique = recupererNomBoutiquePourVente(entree.getDetteId());
                     dto.setOrigine(nomBoutique != null ? nomBoutique : "PAIEMENT_DETTE");
                 } else if ("ENTREE_DETTE".equals(entree.getDetteType())) {
-                    dto.setOrigine("PAIEMENT_DETTE"); // Paiement de dette (entrée générale)
+                    dto.setOrigine("PAIEMENT_DETTE");
                 } else {
                     dto.setOrigine("COMPTABILITE");
                 }
             } else {
-                dto.setOrigine("COMPTABILITE"); // Entrée classique
+                dto.setOrigine("COMPTABILITE");
             }
         }
         
-        // 🔗 Mapper les champs de liaison avec la dette (si c'est un paiement de dette)
         dto.setDetteId(entree.getDetteId());
         dto.setDetteType(entree.getDetteType());
         dto.setDetteNumero(entree.getDetteNumero());
@@ -2260,7 +2152,6 @@ public class ComptabiliteService {
                 return vente.getBoutique().getNomBoutique();
             }
         } catch (Exception e) {
-            // En cas d'erreur, on retourne null et on utilisera la valeur par défaut
             System.err.println("Erreur lors de la récupération de la boutique pour la vente " + venteId + " : " + e.getMessage());
         }
         return null;
@@ -2323,11 +2214,7 @@ public class ComptabiliteService {
     }
 
     /**
-     * Récupère toutes les données comptables paginées de l'entreprise de l'utilisateur connecté.
-     * 
-     * 🔐 Sécurité : Vérifie l'authentification, l'appartenance à l'entreprise et les permissions.
-     * Toutes les requêtes filtrent automatiquement les données par entreprise pour garantir l'isolation.
-
+     * Récupère toutes les données comptables paginées de l'entreprise
      */
     @Transactional(readOnly = true)
     public ComptabiliteCompletePaginatedDTO getComptabiliteCompletePaginated(HttpServletRequest httpRequest, int page, int size) {
@@ -2336,25 +2223,20 @@ public class ComptabiliteService {
         if (size <= 0) size = 20;
         if (size > 100) size = 100; 
 
-        // 🔐 Vérification de l'authentification et des permissions
         User user = validateComptabilitePermission(httpRequest);
         
-        // 🔐 Récupération de l'ID de l'entreprise pour filtrer toutes les données
         Long entrepriseId = user.getEntreprise().getId();
 
-        // Charger les catégories et le résumé (petites données, pas besoin de pagination)
-        // 🔐 Toutes ces méthodes appellent validateComptabilitePermission et filtrent par entreprise
+
         List<CategorieDepenseDTO> categoriesDepense = listerCategoriesDepense(httpRequest);
         List<CategorieResponseDTO> categoriesEntree = categorieService.getAllCategoriesWithProduitCount(httpRequest);
         TransactionSummaryDTO transactionSummary = transactionSummaryService.getTransactionSummary(httpRequest);
        
         int limitParType = Math.max((page + 1) * size, 1000);
 
-        // 🔐 Charger les transactions avec limite (toutes filtrées par entreprise)
-        // ⚠️ IMPORTANT : Filtrer les dépenses/entrées générales créées par les transferts de fonds
-        // pour éviter la duplication (les transferts sont déjà affichés via TransfertFondsResponseDTO)
+
         List<DepenseGeneraleResponseDTO> depensesGenerales = listerDepensesGenerales(httpRequest).stream()
-                .filter(d -> !estDepenseDeTransfert(d.getDesignation())) // Exclure les dépenses de transferts
+                .filter(d -> !estDepenseDeTransfert(d.getDesignation()))
                 .sorted((a, b) -> {
                     LocalDateTime dateA = a.getDateCreation();
                     LocalDateTime dateB = b.getDateCreation();
@@ -2367,8 +2249,8 @@ public class ComptabiliteService {
                 .collect(Collectors.toList());
 
         List<EntreeGeneraleResponseDTO> entreesGenerales = listerEntreesGenerales(httpRequest).stream()
-                .filter(e -> !estEntreeDeTransfert(e.getDesignation())) // Exclure les entrées de transferts
-                .filter(e -> !estEntreeDePaiementFacture(e.getDetteType())) // Exclure les entrées créées par les paiements de factures
+                .filter(e -> !estEntreeDeTransfert(e.getDesignation()))
+                .filter(e -> !estEntreeDePaiementFacture(e.getDetteType()))
                 .sorted((a, b) -> {
                     LocalDateTime dateA = a.getDateCreation();
                     LocalDateTime dateB = b.getDateCreation();
@@ -2380,18 +2262,14 @@ public class ComptabiliteService {
                 .limit(limitParType)
                 .collect(Collectors.toList());
 
-        // 🔐 Récupérer toutes les ventes des caisses fermées (filtrées par entreprise)
         List<Vente> toutesVentesCaissesFermees = venteRepository.findByEntrepriseIdAndCaisseFermee(entrepriseId);
         
-        // Grouper les ventes par caisse fermée
         Map<Long, List<Vente>> ventesParCaisse = toutesVentesCaissesFermees.stream()
                 .filter(v -> v.getCaisse() != null)
                 .collect(Collectors.groupingBy(v -> v.getCaisse().getId()));
         
-        // 🔐 Récupérer toutes les caisses fermées (filtrées par entreprise)
         List<Caisse> caissesFermees = caisseRepository.findByEntrepriseIdAndStatut(entrepriseId, StatutCaisse.FERMEE);
         
-        // Créer les DTOs de fermeture de caisse avec leurs ventes
         List<FermetureCaisseResponseDTO> fermeturesCaissesDTO = caissesFermees.stream()
                 .filter(c -> ventesParCaisse.containsKey(c.getId()) && !ventesParCaisse.get(c.getId()).isEmpty())
                 .sorted((a, b) -> {
@@ -2400,7 +2278,7 @@ public class ComptabiliteService {
                     if (dateA == null && dateB == null) return 0;
                     if (dateA == null) return 1;
                     if (dateB == null) return -1;
-                    return dateB.compareTo(dateA); // Plus récent en premier
+                    return dateB.compareTo(dateA);
                 })
                 .limit(limitParType)
                 .map(caisse -> {
@@ -2409,7 +2287,6 @@ public class ComptabiliteService {
                 })
                 .collect(Collectors.toList());
 
-        // 🔐 Récupérer les paiements (filtrés par entreprise)
         List<Paiement> paiements = paiementRepository.findByEntrepriseId(entrepriseId).stream()
                 .sorted((a, b) -> {
                     LocalDateTime dateA = a.getDatePaiement();
@@ -2426,25 +2303,20 @@ public class ComptabiliteService {
                     PaiementDTO dto = new PaiementDTO(p);
                     dto.setTypeTransaction("PAIEMENT_FACTURE");
                     
-                    // Construire la description avec les informations de la facture
                     if (p.getFactureReelle() != null) {
                         FactureReelle facture = p.getFactureReelle();
                         
-                        // Charger explicitement les lignes de facture si elles ne sont pas déjà chargées
                         if (facture.getLignesFacture() != null) {
                             org.hibernate.Hibernate.initialize(facture.getLignesFacture());
                         }
                         
-                        // Définir le numéro de facture
                         dto.setNumeroFacture(facture.getNumeroFacture());
                         
-                        // Définir l'objet (description de la facture)
                         String objetFacture = facture.getDescription() != null && !facture.getDescription().trim().isEmpty() 
                             ? facture.getDescription() 
                             : null;
                         dto.setObjet(objetFacture);
                         
-                        // Mapper les lignes de facture
                         if (facture.getLignesFacture() != null && !facture.getLignesFacture().isEmpty()) {
                             List<LigneFactureDTO> lignesDTO = facture.getLignesFacture().stream()
                                     .map(LigneFactureDTO::new)
@@ -2454,15 +2326,12 @@ public class ComptabiliteService {
                             dto.setLignesFacture(new ArrayList<>());
                         }
                         
-                        // Construire la description principale
                         String description = "Paiement facture " + facture.getNumeroFacture();
                         
-                        // Ajouter la description de la facture si elle existe
                         if (objetFacture != null) {
                             description += " - " + objetFacture;
                         }
                         
-                        // Ajouter le montant restant si la facture est partiellement payée
                         String statutFacture = facture.getStatutPaiement() != null ? facture.getStatutPaiement().name() : "INCONNU";
                         if ("PARTIELLEMENT_PAYEE".equals(statutFacture)) {
                             java.math.BigDecimal totalPaye = paiementRepository.sumMontantsByFactureReelle(facture.getId());
@@ -2473,13 +2342,13 @@ public class ComptabiliteService {
                         
                         dto.setDescription(description);
                         dto.setStatut(statutFacture);
-                        dto.setOrigine("FACTURATION"); // Les paiements viennent des factures réelles
+                        dto.setOrigine("FACTURATION");
                     } else {
                         dto.setDescription("Paiement sans facture associée");
                         dto.setObjet(null);
                         dto.setNumeroFacture(null);
                         dto.setStatut("INCONNU");
-                        dto.setOrigine("FACTURATION"); // Par défaut même sans facture associée
+                        dto.setOrigine("FACTURATION");
                         dto.setLignesFacture(new ArrayList<>());
                     }
                     
@@ -2487,7 +2356,7 @@ public class ComptabiliteService {
                 })
                 .collect(Collectors.toList());
 
-        // Récupérer les transferts de fonds et créer deux transactions par transfert (SORTIE et ENTREE)
+        // Récupérer les transferts de fonds et créer deux transactions  (SORTIE et ENTREE)
         List<TransfertFondsResponseDTO> transfertsFondsBruts = transfertFondsService.listerTransferts(httpRequest).stream()
                 .sorted((a, b) -> {
                     LocalDateTime dateA = a.getDateTransfert();
@@ -2500,10 +2369,8 @@ public class ComptabiliteService {
                 .limit(limitParType)
                 .collect(Collectors.toList());
         
-        // Créer deux transactions par transfert : une SORTIE (source) et une ENTREE (destination)
         List<TransfertFondsResponseDTO> transfertsFonds = new ArrayList<>();
         for (TransfertFondsResponseDTO transfert : transfertsFondsBruts) {
-            // Transaction SORTIE (depuis la source)
             TransfertFondsResponseDTO sortie = creerTransactionTransfert(transfert, "SORTIE", transfert.getDe());
             transfertsFonds.add(sortie);
             
@@ -2512,25 +2379,22 @@ public class ComptabiliteService {
             transfertsFonds.add(entree);
         }
 
-        // Combiner toutes les transactions dans une seule liste
         List<Object> toutesTransactions = new ArrayList<>();
         toutesTransactions.addAll(depensesGenerales);
         toutesTransactions.addAll(entreesGenerales);
-        toutesTransactions.addAll(fermeturesCaissesDTO); // Utiliser les fermetures regroupées au lieu des ventes individuelles
+        toutesTransactions.addAll(fermeturesCaissesDTO);
         toutesTransactions.addAll(paiementsDTO);
         toutesTransactions.addAll(transfertsFonds);
 
-        // Trier par date (plus récent en premier) - maintenant sur un ensemble limité
         toutesTransactions.sort((a, b) -> {
             LocalDateTime dateA = getDateFromTransaction(a);
             LocalDateTime dateB = getDateFromTransaction(b);
             if (dateA == null && dateB == null) return 0;
             if (dateA == null) return 1;
             if (dateB == null) return -1;
-            return dateB.compareTo(dateA); // Tri décroissant
+            return dateB.compareTo(dateA);
         });
 
-        // Pagination manuelle
         int totalElements = toutesTransactions.size();
         int totalPages = (int) Math.ceil((double) totalElements / size);
         int start = page * size;
@@ -2591,11 +2455,9 @@ public class ComptabiliteService {
         dto.setMontantEnMain(caisse.getMontantEnMain());
         dto.setEcart(caisse.getEcart());
         
-        // Générer le numéro de fermeture
         String numeroFermeture = genererNumeroFermeture(entrepriseId, caisse.getDateFermeture());
         dto.setNumeroFermeture(numeroFermeture);
         
-        // Informations de la boutique
         if (caisse.getBoutique() != null) {
             dto.setBoutiqueId(caisse.getBoutique().getId());
             dto.setNomBoutique(caisse.getBoutique().getNomBoutique());
@@ -2604,20 +2466,17 @@ public class ComptabiliteService {
             dto.setOrigine("BOUTIQUE");
         }
         
-        // Informations du vendeur
         if (caisse.getVendeur() != null) {
             dto.setVendeurId(caisse.getVendeur().getId());
             dto.setNomVendeur(caisse.getVendeur().getNomComplet());
         }
         
-        // Calculer le montant total et le nombre de ventes
         Double montantTotal = ventes.stream()
                 .mapToDouble(v -> v.getMontantTotal() != null ? v.getMontantTotal() : 0.0)
                 .sum();
         dto.setMontantTotal(montantTotal);
         dto.setNombreVentes(ventes.size());
         
-        // Mapper les ventes en VenteResponse
         List<VenteResponse> ventesDTO = ventes.stream()
                 .map(this::mapVenteToResponse)
                 .collect(Collectors.toList());
@@ -2671,7 +2530,6 @@ public class ComptabiliteService {
         response.setRemiseGlobale(vente.getRemiseGlobale());
         response.setLignes(lignesDTO);
         
-        // Récupérer le numéro de facture (isolé par entreprise)
         Long venteEntrepriseId = vente.getBoutique() != null && vente.getBoutique().getEntreprise() != null 
                 ? vente.getBoutique().getEntreprise().getId() : null;
         FactureVente facture = venteEntrepriseId != null 
@@ -2688,7 +2546,6 @@ public class ComptabiliteService {
         response.setDateDernierRemboursement(vente.getDateDernierRemboursement());
         response.setNombreRemboursements(vente.getNombreRemboursements());
         response.setTypeTransaction("ENTREE");
-        // L'origine pour les ventes est le nom de la boutique
         response.setOrigine(nomBoutique != null ? nomBoutique : "BOUTIQUE");
         
         return response;
@@ -2709,12 +2566,11 @@ public class ComptabiliteService {
         transaction.setPersonneALivrer(transfert.getPersonneALivrer());
         transaction.setEntrepriseId(transfert.getEntrepriseId());
         transaction.setEntrepriseNom(transfert.getEntrepriseNom());
-        transaction.setTypeTransaction(sens); // SORTIE ou ENTREE
-        transaction.setSensTransfert(sens); // SORTIE ou ENTREE
-        transaction.setOrigine(origine); // Source ou destination selon le sens
-        transaction.setPieceJointe(transfert.getPieceJointe()); // Préserver la pièce jointe
+        transaction.setTypeTransaction(sens); 
+        transaction.setSensTransfert(sens);
+        transaction.setOrigine(origine);
+        transaction.setPieceJointe(transfert.getPieceJointe());
         
-        // Créer une description explicite selon le sens
         String description;
         if ("SORTIE".equals(sens)) {
             description = "Transfert sortant de " + origine + " vers " + transfert.getVers() + " - " + transfert.getMotif();
@@ -2728,7 +2584,6 @@ public class ComptabiliteService {
 
     /**
      * Vérifie si une dépense générale provient d'un transfert de fonds.
-     * Les transferts créent des dépenses avec la description "Transfert vers ..."
      */
     private boolean estDepenseDeTransfert(String designation) {
         if (designation == null || designation.trim().isEmpty()) {
@@ -2739,7 +2594,6 @@ public class ComptabiliteService {
 
     /**
      * Vérifie si une entrée générale provient d'un transfert de fonds.
-     * Les transferts créent des entrées avec la description "Transfert depuis ..."
      */
     private boolean estEntreeDeTransfert(String designation) {
         if (designation == null || designation.trim().isEmpty()) {
@@ -2750,8 +2604,6 @@ public class ComptabiliteService {
 
     /**
      * Vérifie si une entrée générale provient d'un paiement de facture.
-     * Les paiements de factures créent des entrées avec detteType = "PAIEMENT_FACTURE"
-     * pour éviter la duplication avec les PaiementDTO.
      */
     private boolean estEntreeDePaiementFacture(String detteType) {
         return "PAIEMENT_FACTURE".equals(detteType);

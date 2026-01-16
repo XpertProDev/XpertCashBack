@@ -20,6 +20,8 @@ import com.xpertcash.entity.Enum.RoleType;
 import com.xpertcash.entity.Enum.TypeBoutique;
 import com.xpertcash.entity.PermissionType;
 import com.xpertcash.entity.Module.AppModule;
+import com.xpertcash.entity.UserSession;
+import com.xpertcash.entity.PASSWORD.InitialPasswordToken;
 import com.xpertcash.exceptions.BusinessException;
 import com.xpertcash.repository.BoutiqueRepository;
 import com.xpertcash.repository.EntrepriseRepository;
@@ -28,6 +30,8 @@ import com.xpertcash.repository.PermissionRepository;
 import com.xpertcash.repository.RoleRepository;
 import com.xpertcash.repository.UsersRepository;
 import com.xpertcash.repository.Module.ModuleRepository;
+import com.xpertcash.repository.UserSessionRepository;
+import com.xpertcash.repository.PASSWORD.InitialPasswordTokenRepository;
 import com.xpertcash.service.IMAGES.ImageStorageService;
 import com.xpertcash.service.Module.ModuleActivationService;
 
@@ -68,7 +72,6 @@ import org.springframework.web.multipart.MultipartFile;
 @Service
 public class UsersService {
 
-    // Maps statiques pour les descriptions (O(1) lookup)
     private static final Map<PermissionType, String> PERMISSION_DESCRIPTIONS = new HashMap<>();
     private static final Map<RoleType, String> ROLE_DESCRIPTIONS = new HashMap<>();
     
@@ -143,13 +146,13 @@ public class UsersService {
     private FactureProformaRepository factureProformaRepository;
 
     @Autowired
-    private com.xpertcash.repository.UserSessionRepository userSessionRepository;
+    private UserSessionRepository userSessionRepository;
 
     @Autowired
     private DeviceDetectionService deviceDetectionService;
 
     @Autowired
-    private com.xpertcash.repository.PASSWORD.InitialPasswordTokenRepository initialPasswordTokenRepository;
+    private InitialPasswordTokenRepository initialPasswordTokenRepository;
 
     @Autowired
     public UsersService(UsersRepository usersRepository, JwtConfig jwtConfig, BCryptPasswordEncoder passwordEncoder) {
@@ -158,10 +161,7 @@ public class UsersService {
         this.passwordEncoder = passwordEncoder;
     }
 
-    /**
-     * Logout : supprime immédiatement la session courante de la base de données
-     * Permet à l'utilisateur de rester connecté sur d'autres appareils
-     */
+
     @Transactional
     public void logout(HttpServletRequest request) {
         String authHeader = request.getHeader("Authorization");
@@ -171,7 +171,6 @@ public class UsersService {
 
         String token = authHeader.substring(7);
 
-        // Extraire l'UUID de l'utilisateur et le sessionId depuis le token
         Claims claims = jwtUtil.extractAllClaimsSafe(token);
         if (claims == null) {
             throw new RuntimeException("Token invalide ou expiré");
@@ -182,29 +181,22 @@ public class UsersService {
             throw new RuntimeException("UUID utilisateur non trouvé dans le token");
         }
 
-        // Récupérer la session par sessionId dans le token (méthode principale)
-        com.xpertcash.entity.UserSession session = null;
+        UserSession session = null;
         Object sessionIdClaim = claims.get("sessionId");
         
         if (sessionIdClaim != null) {
-            // Méthode principale : chercher par sessionId (le plus fiable)
             Long sessionId = ((Number) sessionIdClaim).longValue();
             session = userSessionRepository.findById(sessionId).orElse(null);
         }
         
-        // Fallback : chercher par token si sessionId n'est pas présent (anciens tokens)
         if (session == null) {
             session = userSessionRepository.findBySessionToken(token).orElse(null);
         }
 
         if (session != null) {
-            // Supprimer immédiatement la session de la base de données
             userSessionRepository.delete(session);
         } else {
-            // Si la session n'existe pas, c'est probablement un ancien token sans sessionId
-            // On ne fait RIEN pour éviter d'invalider toutes les sessions par erreur
-            // L'utilisateur devra simplement se reconnecter
-            // Ne pas appeler revokeAllSessions() car cela invaliderait toutes les sessions actives
+            
         }
     }
 
@@ -214,7 +206,6 @@ public class UsersService {
     public RegisterResponse registerUsers(String nomComplet, String email, String password, String phone, String pays, String nomEntreprise, String nomBoutique) {
         RegisterResponse response = new RegisterResponse();
 
-        // Vérification des données déjà existantes
         if (usersRepository.findByEmail(email).isPresent()) {
             throw new RuntimeException("Cet email est déjà utilisé.");
         }
@@ -225,18 +216,15 @@ public class UsersService {
             throw new RuntimeException("Le nom de l'entreprise est déjà utilisé.");
         }
     
-        // Génération du mot de passe haché
         BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
         String hashedPassword = passwordEncoder.encode(password);
 
-       // Générer un code PIN de 4 chiffres unique pour la connexion future
        String personalCode;
        boolean isUnique;
        do {
-           personalCode = String.format("%04d", new Random().nextInt(10000));  // 4 chiffres (0000 à 9999)
-           isUnique = !usersRepository.existsByPersonalCode(personalCode);  // Vérifier si le code PIN existe déjà dans la base de données
-       } while (!isUnique);  // Répéter jusqu'à ce qu'un code unique soit généré
-
+           personalCode = String.format("%04d", new Random().nextInt(10000));
+           isUnique = !usersRepository.existsByPersonalCode(personalCode);
+       } while (!isUnique);
 
     
         // Générer le code PIN d'activation
@@ -275,27 +263,21 @@ public class UsersService {
         entreprise.setSuffixe(null);
         entreprise.setTauxTva(null);
 
-            // Affecter les modules actifs par défaut
         Set<AppModule> modulesParDefaut = new HashSet<>(moduleRepository.findByActifParDefautTrue());
         entreprise.setModulesActifs(modulesParDefaut);
 
-        // Date fin d'essai globale
         entreprise.setDateFinEssaiModulesPayants(LocalDateTime.now().plusDays(30));
 
-        // Sauvegarde entreprise (obligatoire pour générer ID)
         entreprise = entrepriseRepository.save(entreprise);
 
-        // Initialiser essais par module (saveAll optimisé)
         moduleActivationService.initialiserEssaisModulesPayants(entreprise);
         
         entreprise = entrepriseRepository.save(entreprise);
 
-        // Vérifier et attribuer un nom par défaut à la boutique
         if (nomBoutique == null || nomBoutique.trim().isEmpty()) {
             nomBoutique = "Ma Boutique";
         }
     
-        // Créer la boutique associée à l'entreprise
         Boutique boutique = new Boutique();
         boutique.setNomBoutique(nomBoutique);
         boutique.setEntreprise(entreprise);
@@ -306,10 +288,8 @@ public class UsersService {
         boutiqueRepository.save(boutique);
 
             
-        // Créer un stock vide initial
        
     
-        // Attribution du rôle ADMIN à l'utilisateur
         Role adminRole = roleRepository.findFirstByName(RoleType.ADMIN)
                 .orElseThrow(() -> new RuntimeException("Rôle ADMIN non trouvé"));
     
@@ -333,7 +313,6 @@ public class UsersService {
         
         // génération du QR Code 
         try {
-        // Contenu du QR code = juste le personalCode
         String qrContent = personalCode;
 
         byte[] qrCodeBytes = QRCodeGenerator.generateQRCode(qrContent, 200, 200);
@@ -354,17 +333,15 @@ public class UsersService {
 
         usersRepository.save(user);
     
-        // Assigner l'utilisateur admin à l'entreprise
         entreprise.setAdmin(user);
         entrepriseRepository.save(entreprise);
 
-         // Essayer d'envoyer l'email, mais ne pas rollback si ça échoue
         try {
             mailService.sendActivationLinkEmail(email, activationCode, personalCode);
             response.setSuccess(true);
             response.setMessage("Compte créé avec succès. Un email d’activation vous a été envoyé.");
         } catch (Exception e) { 
-            System.err.println("⚠️ Erreur lors de l'envoi de l'email : " + e.getMessage());
+            System.err.println(" Erreur lors de l'envoi de l'email : " + e.getMessage());
             response.setSuccess(true);
             response.setMessage("Compte créé avec succès. Un email d’activation vous a été envoyé.");
 
@@ -378,30 +355,25 @@ public class UsersService {
 
     //Admin name
     public String getNomCompletAdminDeEntreprise(Long entrepriseId) {
-        // Récupérer l'entreprise par ID
         Entreprise entreprise = entrepriseRepository.findById(entrepriseId)
                 .orElseThrow(() -> new RuntimeException("Entreprise non trouvée"));
 
-        // Vérifier si l'entreprise a un administrateur
         User admin = entreprise.getAdmin();
         if (admin != null) {
-            return admin.getNomComplet();  // Récupérer le nom complet de l'administrateur
+            return admin.getNomComplet();
         } else {
             throw new RuntimeException("Aucun administrateur assigné à cette entreprise.");
         }
     }
 
-    // Connexion : permet la connexion même si le compte n'est pas activé
-    // Supporte maintenant les sessions multiples par appareil
+    // permet la connexion même si le compte n'est pas activé
     @Transactional(isolation = org.springframework.transaction.annotation.Isolation.READ_COMMITTED, 
                    rollbackFor = Exception.class)
     public Map<String, String> login(String email, String password, String deviceId, String deviceName, String ipAddress, String userAgent) {
     User user = usersRepository.findByEmail(email)
         .orElseThrow(() -> new RuntimeException("Email ou mot de passe incorrect"));
 
-    // Vérifier si l'entreprise de l'utilisateur est désactivée
     Entreprise entreprise = user.getEntreprise();
-    // On considère qu'une valeur null pour "active" signifie "active" (compatibilité anciennes données)
     if (entreprise != null && Boolean.FALSE.equals(entreprise.getActive())) {
         throw new RuntimeException("Cette entreprise est désactivée. La connexion est impossible.");
     }
@@ -414,12 +386,8 @@ public class UsersService {
         throw new RuntimeException("Votre compte est verrouillé pour inactivité.");
     }
 
-    // NE PAS charger l'entreprise/admin ici pour éviter les deadlocks
-    // On le chargera plus tard, après les opérations sur les sessions
-    // User admin = user.getEntreprise().getAdmin(); // DÉPLACÉ PLUS BAS
-    // boolean within24Hours = LocalDateTime.now().isBefore(user.getCreatedAt().plusHours(24)); // DÉPLACÉ PLUS BAS
 
-        // Générer deviceId si non fourni (avant les opérations de session pour éviter les deadlocks)
+        // Générer deviceId si non fourni
         final String finalDeviceId;
         if (deviceId == null || deviceId.trim().isEmpty()) {
             finalDeviceId = UUID.randomUUID().toString();
@@ -427,87 +395,71 @@ public class UsersService {
             finalDeviceId = deviceId;
         }
 
-        // Vérifier si une session existe déjà pour ce deviceId (sans verrou pour optimiser)
-        // Le verrou sera utilisé uniquement lors de la création pour éviter les race conditions
-        com.xpertcash.entity.UserSession existingSession = userSessionRepository
+
+        UserSession existingSession = userSessionRepository
                 .findByDeviceIdAndUserUuidAndIsActiveTrue(finalDeviceId, user.getUuid())
                 .orElse(null);
 
-        // Créer ou mettre à jour la session
-        com.xpertcash.entity.UserSession session;
+        UserSession session;
         boolean isExistingSession = (existingSession != null);
         
         if (isExistingSession) {
-            // Mettre à jour la session existante
             session = existingSession;
             session.updateLastActivity();
-            session.setExpiresAt(LocalDateTime.now().plusYears(1)); // 1 an
+            session.setExpiresAt(LocalDateTime.now().plusYears(1));
         } else {
             // Limite de sessions actives : 2 par utilisateur
             final int MAX_ACTIVE_SESSIONS = 2;
             long activeSessionsCount = userSessionRepository.countByUserUuidAndIsActiveTrue(user.getUuid());
             
             if (activeSessionsCount >= MAX_ACTIVE_SESSIONS) {
-                // L'utilisateur a déjà 2 sessions actives, on lui demande de choisir laquelle fermer
                 throw new RuntimeException("SESSION_LIMIT_REACHED");
             }
             
             // Créer une nouvelle session
-            session = new com.xpertcash.entity.UserSession();
+            session = new UserSession();
             session.setUserUuid(user.getUuid());
             session.setUser(user);
             session.setDeviceId(finalDeviceId);
-            // Détecter et améliorer le nom de l'appareil avec le modèle spécifique
             String enhancedDeviceName = deviceDetectionService.detectDeviceName(userAgent, deviceName);
             session.setDeviceName(enhancedDeviceName);
             session.setIpAddress(ipAddress);
             session.setUserAgent(userAgent);
             session.setCreatedAt(LocalDateTime.now());
             session.setLastActivity(LocalDateTime.now());
-            session.setExpiresAt(LocalDateTime.now().plusYears(1)); // 1 an
+            session.setExpiresAt(LocalDateTime.now().plusYears(1));
             session.setActive(true);
         }
 
-        // Charger l'admin et calculer within24Hours AVANT de sauvegarder
-        // Optimisé : on charge l'admin seulement si nécessaire (évite de charger l'entreprise si pas besoin)
         User admin = null;
         try {
             admin = user.getEntreprise().getAdmin();
         } catch (Exception e) {
-            // Si l'entreprise n'est pas chargée, la charger explicitement
             admin = usersRepository.findByUuid(user.getUuid())
                     .map(u -> u.getEntreprise().getAdmin())
                     .orElse(null);
         }
         boolean within24Hours = LocalDateTime.now().isBefore(user.getCreatedAt().plusHours(24));
         
-        // Sauvegarder la session et générer le token en une seule fois
-        // Gérer le cas où une session avec le même deviceId existe déjà (race condition)
+
         String accessToken = null;
         
         if (!isExistingSession) {
-            // Pour une nouvelle session, on doit d'abord la sauvegarder pour obtenir l'ID
-            // Vérifier une dernière fois avant de créer avec verrou pessimiste
-            // Cela garantit qu'aucune autre requête ne peut créer une session entre temps
-            Optional<com.xpertcash.entity.UserSession> lastCheck = userSessionRepository
+            Optional<UserSession> lastCheck = userSessionRepository
                     .findByDeviceIdAndUserUuidAndIsActiveTrueWithLock(finalDeviceId, user.getUuid());
             
             if (lastCheck.isPresent()) {
-                // Une session a été créée entre temps par une autre requête
                 session = lastCheck.get();
-                isExistingSession = true; // Traiter comme une session existante
+                isExistingSession = true;
             } else {
-                // Aucune session n'existe, on peut créer
                 try {
                     session = userSessionRepository.save(session);
-                    // Maintenant qu'on a l'ID, générer le token
                     accessToken = generateAccessTokenWithSession(user, admin, within24Hours, session.getId());
-                    // Mettre à jour le token avec une requête UPDATE directe (évite un deuxième save())
                     userSessionRepository.updateSessionToken(session.getId(), accessToken);
-                    session.setSessionToken(accessToken); // Mettre à jour l'objet en mémoire aussi
+                    session.setSessionToken(accessToken);
                 } catch (org.springframework.dao.DataIntegrityViolationException e) {
                     // Si une session avec le même deviceId existe déjà (contrainte unique violée)
-                    Optional<com.xpertcash.entity.UserSession> existingSessionOpt = userSessionRepository
+                    Optional<UserSession> existingSessionOpt = userSessionRepository  
                             .findByDeviceIdAndUserUuidAndIsActiveTrue(finalDeviceId, user.getUuid());
                     
                     if (existingSessionOpt.isPresent()) {
@@ -520,49 +472,40 @@ public class UsersService {
             }
         }
         
-        // Si c'est une session existante (soit trouvée au début, soit récupérée)
-        // et que le token n'a pas encore été généré
+
         if (isExistingSession && accessToken == null) {
-            // Générer le token pour une session existante
+    
             accessToken = generateAccessTokenWithSession(user, admin, within24Hours, session.getId());
             LocalDateTime now = LocalDateTime.now();
             LocalDateTime expiresAt = now.plusYears(1);
-            // Utiliser une requête UPDATE directe pour mettre à jour tout en une fois (optimisé)
             userSessionRepository.updateSessionActivityAndToken(session.getId(), now, expiresAt, accessToken);
-            // Mettre à jour l'objet en mémoire pour la cohérence
             session.setSessionToken(accessToken);
             session.setLastActivity(now);
             session.setExpiresAt(expiresAt);
         }
         
-        // S'assurer que le token a été généré (sécurité)
         if (accessToken == null) {
             throw new RuntimeException("Erreur : le token n'a pas pu être généré");
         }
 
-        // NOTE: On ne met PAS à jour user.lastActivity ici pour éviter les deadlocks
-        // La mise à jour de lastActivity est déjà gérée dans AuthenticationHelper lors des requêtes suivantes
-        // Cela évite les verrous sur la table user pendant le login
+
 
     Map<String, String> tokens = new HashMap<>();
     tokens.put("accessToken", accessToken);
-        tokens.put("deviceId", finalDeviceId); // Retourner le deviceId pour le frontend
+        tokens.put("deviceId", finalDeviceId);
     return tokens;
 }
 
-    // Méthode de compatibilité pour login sans paramètres de session
     public Map<String, String> login(String email, String password) {
         return login(email, password, null, null, null, null);
     }
 
-            // Génération du token avec infos supplémentaires (sans sessionId - pour compatibilité)
             public String generateAccessToken(User user, User admin, boolean within24Hours) {
                 return generateAccessTokenWithSession(user, admin, within24Hours, null);
             }
 
-            // Génération du token avec sessionId pour gestion des sessions multiples
             public String generateAccessTokenWithSession(User user, User admin, boolean within24Hours, Long sessionId) {
-            long expirationTime = 1000L * 60 * 60 * 24 * 365; // 1 an
+            long expirationTime = 1000L * 60 * 60 * 24 * 365; 
             Date now = new Date();
             Date expirationDate = new Date(now.getTime() + expirationTime);
 
@@ -570,11 +513,9 @@ public class UsersService {
                     || user.getRole().getName().equals(RoleType.SUPER_ADMIN);
 
             boolean userActivated = user.isEnabledLien();
-            // Pour éviter les NullPointer (cas du SUPER_ADMIN ou entreprises sans admin défini)
             boolean adminActivated = (admin != null) ? admin.isEnabledLien() : true;
             boolean userActivationPossible = isAdminRole ? (user.isActivatedLien() || within24Hours) : true;
 
-            // Inclure lastActivity dans le token pour invalider les anciens tokens lors du logout
             long lastActivityTimestamp = user.getLastActivity() != null 
                     ? user.getLastActivity().atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
                     : now.getTime();
@@ -585,11 +526,10 @@ public class UsersService {
                     .claim("userActivated", userActivated)
                     .claim("adminActivated", adminActivated)
                     .claim("userActivationPossible", userActivationPossible)
-                    .claim("lastActivity", lastActivityTimestamp) // Version du token basée sur lastActivity
+                    .claim("lastActivity", lastActivityTimestamp)
                     .setIssuedAt(now)
                         .setExpiration(expirationDate);
 
-                // Ajouter le sessionId si fourni (pour gestion des sessions multiples)
                 if (sessionId != null) {
                     tokenBuilder.claim("sessionId", sessionId);
                 }
@@ -601,16 +541,13 @@ public class UsersService {
     //Resent Mail
     @Transactional
     public void resendActivationEmail(String email) {
-        // Vérifier que l'utilisateur existe
         User user = usersRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("Utilisateur introuvable avec cet email."));
 
-        // Vérifier si le compte est déjà activé
         if (user.isActivatedLien()) {
             throw new RuntimeException("Ce compte est déjà activé.");
         }
 
-        // Essayer d'envoyer l'email d'activation
         try {
             mailService.sendActivationLinkEmail(user.getEmail(), user.getActivationCode(), user.getPersonalCode());
         } catch (MessagingException e) {
@@ -619,24 +556,19 @@ public class UsersService {
         }
     }
 
-    // Renvoyer l'email d'employé avec les identifiants (utilise le token sécurisé)
     @Transactional
     public void resendEmployeEmail(String email) {
-        // Vérifier que l'utilisateur existe
         User user = usersRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("Utilisateur introuvable avec cet email."));
 
-        // Récupérer le token du mot de passe initial
-        com.xpertcash.entity.PASSWORD.InitialPasswordToken token = initialPasswordTokenRepository
+        InitialPasswordToken token = initialPasswordTokenRepository
                 .findByUser(user)
                 .orElseThrow(() -> new RuntimeException("Impossible de renvoyer l'email : le token d'initialisation n'est plus disponible. L'utilisateur doit réinitialiser son mot de passe."));
 
-        // Vérifier que le token n'est pas expiré
         if (token.getExpirationDate().isBefore(LocalDateTime.now())) {
             throw new RuntimeException("Le token d'initialisation a expiré. L'utilisateur doit réinitialiser son mot de passe.");
         }
 
-        // Essayer d'envoyer l'email avec les identifiants
         try {
             mailService.sendEmployeEmail(
                 user.getEmail(),
@@ -644,7 +576,7 @@ public class UsersService {
                 user.getEntreprise().getNomEntreprise(),
                 user.getRole().getName().toString(),
                 user.getEmail(),
-                token.getGeneratedPassword(), // Utiliser le mot de passe depuis le token
+                token.getGeneratedPassword(),
                 user.getPersonalCode()
             );
         } catch (MessagingException e) {
@@ -665,12 +597,10 @@ public class UsersService {
             throw new RuntimeException("Code d'activation invalide.");
         }
 
-        // Activer le compte de l'utilisateur
         user.setActivatedLien(true);
         user.setEnabledLien(true);
         user = usersRepository.save(user);
 
-        // Si c'est un ADMIN, activer tous ses employés
         if (user.getRole() != null && user.getRole().getName().equals(RoleType.ADMIN)) {
             Long entrepriseId = user.getEntreprise() != null ? user.getEntreprise().getId() : null;
             if (entrepriseId == null) {
@@ -684,7 +614,6 @@ public class UsersService {
         return user;
     }
 
-    // Pour récupérer le statut du compte d'un utilisateur
     public Map<String, Object> getAccountStatus(String email) {
         User user = usersRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
@@ -695,7 +624,6 @@ public class UsersService {
         status.put("locked", user.isLocked());
         status.put("enabled", user.isEnabledLien());
 
-        // Vérification du temps restant avant expiration
         LocalDateTime expirationTime = user.getCreatedAt().plusHours(24);
         long minutesRemaining = ChronoUnit.MINUTES.between(LocalDateTime.now(), expirationTime);
 
@@ -708,7 +636,6 @@ public class UsersService {
         return status;
     }
 
-    // Déverrouillage du compte en cas d'inactivité de 30 minutes, via le lien de déverrouillage
     public void unlockAccount(String email, String code) {
         User users = usersRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
@@ -725,7 +652,6 @@ public class UsersService {
     //Admin addUserToEntreprise
     @Transactional
     public User addUserToEntreprise(HttpServletRequest request, UserRequest userRequest) {
-                // Vérifier la présence du token JWT dans l'entête de la requête
                 String token = request.getHeader("Authorization");
                 if (token == null || !token.startsWith("Bearer ")) {
                     throw new RuntimeException("Token JWT manquant ou mal formaté");
@@ -733,13 +659,11 @@ public class UsersService {
 
                 User admin = authHelper.getAuthenticatedUserWithFallback(request);
 
-                 // Vérifier que l'utilisateur a une entreprise
                 Entreprise entreprise = admin.getEntreprise();
                 if (entreprise == null) {
                     throw new BusinessException("Vous n'avez pas d'entreprise associée.");
                 }
 
-                  // 🔐 Vérification des droits : admin, manager ou permission gestion personnel
                 boolean isAdmin = CentralAccess.isAdminOfEntreprise(admin, entreprise.getId());
                 boolean hasPermission = admin.getRole().hasPermission(PermissionType.GERER_UTILISATEURS);
 
@@ -747,7 +671,6 @@ public class UsersService {
                     throw new RuntimeException("Accès refusé : seuls les administrateurs, managers ou les utilisateurs autorisés peuvent ajouter un employé.");
                 }
 
-                // Vérifier si un utilisateur avec le même email ou téléphone existe déjà (isolé par entreprise)
                 Long entrepriseId = admin.getEntreprise() != null ? admin.getEntreprise().getId() : null;
                 if (entrepriseId == null) {
                     throw new BusinessException("L'admin n'a pas d'entreprise associée.");
@@ -766,50 +689,38 @@ public class UsersService {
                     throw new BusinessException("Un utilisateur avec ce numéro de téléphone existe déjà dans votre entreprise.");
                 }
 
-                // 🎯 Stratégie optimale selon le type de rôle
-                // - ADMIN/MANAGER : Utiliser le rôle template avec permissions par défaut
-                // - UTILISATEUR et autres : Créer un rôle sans permissions (ajoutées plus tard)
-                
-                // Vérifier que le RoleType existe dans la base (validation)
+      
                 List<Role> existingRoles = roleRepository.findAllByName(userRequest.getRoleType());
                 if (existingRoles.isEmpty()) {
                     throw new RuntimeException("Rôle invalide : " + userRequest.getRoleType() + ". Ce rôle n'existe pas dans la base de données.");
                 }
                 
                 Role role;
-                // entrepriseId déjà défini plus haut dans la méthode
                 
-                // Rôles avec permissions par défaut (ADMIN, MANAGER) : utiliser le template et cloner
                 boolean isRoleWithDefaultPermissions = userRequest.getRoleType() == RoleType.ADMIN 
                         || userRequest.getRoleType() == RoleType.MANAGER;
                 
                 if (isRoleWithDefaultPermissions) {
-                    // Pour ADMIN/MANAGER : chercher d'abord un rôle réutilisable dans la même entreprise
-                    // avec les mêmes permissions par défaut
+
                     Role templateRole = existingRoles.get(0);
                     
-                    // Vérifier si ce rôle template a des permissions (doit en avoir)
                     if (templateRole.getPermissions() == null || templateRole.getPermissions().isEmpty()) {
                         throw new RuntimeException("Le rôle " + userRequest.getRoleType() + " doit avoir des permissions par défaut.");
                     }
                     
-                    // Chercher un rôle existant dans la même entreprise avec les mêmes permissions
-                    // Réutilisation ILLIMITÉE : une entreprise peut créer autant d'utilisateurs qu'elle veut
+
                     Role reusableRole = null;
                     
-                    // Extraire les PermissionType du template pour comparaison
                     Set<PermissionType> templatePermissionTypes = templateRole.getPermissions().stream()
                             .map(Permission::getType)
                             .collect(Collectors.toSet());
                     
                     for (Role r : existingRoles) {
-                        // Vérifier si ce rôle est utilisé dans la même entreprise ou pas utilisé du tout
                         List<User> usersWithRoleInEntreprise = usersRepository.findByRoleAndEntrepriseId(r, entrepriseId);
-                        List<User> allUsersWithRole = usersRepository.findByRole(r); // Tous les utilisateurs avec ce rôle (toutes entreprises)
+                        List<User> allUsersWithRole = usersRepository.findByRole(r);
                         boolean isUsedInSameEntreprise = !usersWithRoleInEntreprise.isEmpty();
-                        boolean isNotUsedAnywhere = allUsersWithRole.isEmpty(); // Pas utilisé par aucune entreprise
+                        boolean isNotUsedAnywhere = allUsersWithRole.isEmpty();
                         
-                        // Comparer les PermissionType (pas les objets Permission)
                         boolean hasSamePermissions = false;
                         if (r.getPermissions() != null && r.getPermissions().size() == templatePermissionTypes.size()) {
                             Set<PermissionType> rolePermissionTypes = r.getPermissions().stream()
@@ -818,11 +729,7 @@ public class UsersService {
                             hasSamePermissions = rolePermissionTypes.equals(templatePermissionTypes);
                         }
                         
-                        // Réutilisable si :
-                        // 1. Mêmes permissions ET utilisé dans la même entreprise (réutilisation illimitée)
-                        // 2. Mêmes permissions ET pas utilisé du tout (peut être réutilisé)
-                        // Isolation : ne pas réutiliser un rôle utilisé par une autre entreprise
-                        // Pas de limite : une entreprise peut créer autant d'utilisateurs qu'elle veut
+                    
                         if (hasSamePermissions && (isUsedInSameEntreprise || isNotUsedAnywhere)) {
                             reusableRole = r;
                             break;
@@ -830,30 +737,24 @@ public class UsersService {
                     }
                     
                     if (reusableRole != null) {
-                        // Réutiliser un rôle existant avec les mêmes permissions dans la même entreprise
                         role = reusableRole;
                     } else {
-                        // Créer un nouveau rôle cloné avec les permissions par défaut
                         role = new Role();
                         role.setName(templateRole.getName());
-                        role.setPermissions(new ArrayList<>(templateRole.getPermissions())); // Copier les permissions
+                        role.setPermissions(new ArrayList<>(templateRole.getPermissions()));
                         role = roleRepository.save(role);
                     }
                 } else {
-                    // Pour UTILISATEUR et autres : chercher un rôle réutilisable SANS permissions dans la même entreprise
                     Role reusableRole = null;
                     
                     for (Role r : existingRoles) {
                         List<User> usersWithRoleInEntreprise = usersRepository.findByRoleAndEntrepriseId(r, entrepriseId);
-                        List<User> allUsersWithRole = usersRepository.findByRole(r); // Tous les utilisateurs avec ce rôle (toutes entreprises)
+                        List<User> allUsersWithRole = usersRepository.findByRole(r);
                         boolean hasNoPermissions = r.getPermissions() == null || r.getPermissions().isEmpty();
                         
-                        // Réutilisation ILLIMITÉE : une entreprise peut créer autant d'utilisateurs qu'elle veut
-                        // Réutilisable si : sans permissions ET (utilisé dans la même entreprise OU pas utilisé du tout)
                         boolean isUsedInSameEntreprise = !usersWithRoleInEntreprise.isEmpty();
-                        boolean isNotUsedAnywhere = allUsersWithRole.isEmpty(); // Pas utilisé par aucune entreprise
+                        boolean isNotUsedAnywhere = allUsersWithRole.isEmpty();
                         
-                        // Isolation : ne pas réutiliser un rôle utilisé par une autre entreprise
                         if (hasNoPermissions && (isUsedInSameEntreprise || isNotUsedAnywhere)) {
                             reusableRole = r;
                             break;
@@ -861,27 +762,23 @@ public class UsersService {
                     }
                     
                     if (reusableRole != null) {
-                        // Réutiliser un rôle existant sans permissions
                         role = reusableRole;
                     } else {
-                        // Créer un nouveau rôle sans permissions
                         role = new Role();
                         role.setName(userRequest.getRoleType());
-                        role.setPermissions(new ArrayList<>()); // Liste vide : aucune permission par défaut
+                        role.setPermissions(new ArrayList<>());
                         role = roleRepository.save(role);
                     }
                 }
 
-                // Générer un mot de passe et l'encoder
                 String generatedPassword = PasswordGenerator.generatePassword();
                 String encodedPassword = passwordEncoder.encode(generatedPassword);
 
-                // Générer un code PIN de 4 chiffres unique pour la connexion future
                     String personalCode;
                     boolean isUnique;
                     do {
                         personalCode = String.format("%04d", new Random().nextInt(10000));
-                        isUnique = !usersRepository.existsByPersonalCode(personalCode);  // Vérifier si le code PIN existe déjà dans la base de données
+                        isUnique = !usersRepository.existsByPersonalCode(personalCode); 
                     } while (!isUnique);
 
                 // Vérifier que l'ID de la boutique est présent s'il s'agit d'un vendeur
@@ -931,20 +828,17 @@ public class UsersService {
                 }
 
 
-                // Enregistrer l'utilisateur
                 User savedUser = usersRepository.save(newUser);
 
-                // Créer un token pour le mot de passe initial (sécurisé)
                 String initialPasswordTokenValue = UUID.randomUUID().toString();
-                com.xpertcash.entity.PASSWORD.InitialPasswordToken initialPasswordToken = 
-                    new com.xpertcash.entity.PASSWORD.InitialPasswordToken();
+                InitialPasswordToken initialPasswordToken = 
+                    new InitialPasswordToken();
                 initialPasswordToken.setToken(initialPasswordTokenValue);
                 initialPasswordToken.setUser(savedUser);
                 initialPasswordToken.setGeneratedPassword(generatedPassword);
-                initialPasswordToken.setExpirationDate(LocalDateTime.now().plusDays(30)); // Valide 30 jours
+                initialPasswordToken.setExpirationDate(LocalDateTime.now().plusDays(30));
                 initialPasswordTokenRepository.save(initialPasswordToken);
 
-                // Essayer d'envoyer l'email, mais ne pas interrompre l'inscription si ça échoue
                 try {
                     mailService.sendEmployeEmail(
                         savedUser.getEmail(),
@@ -956,8 +850,7 @@ public class UsersService {
                         savedUser.getPersonalCode()
                     );
                 } catch (Exception e) {
-                    System.err.println("⚠️ Erreur lors de l'envoi de l'email à " + savedUser.getEmail() + " : " + e.getMessage());
-                    // Ne pas lancer d'exception, l'utilisateur est créé et l'email pourra être renvoyé plus tard
+                    System.err.println(" Erreur lors de l'envoi de l'email à " + savedUser.getEmail() + " : " + e.getMessage());
                 }
                 return savedUser;
             }
@@ -967,23 +860,19 @@ public class UsersService {
     public UserDTO assignPermissionsToUser(Long userId, Map<PermissionType, Boolean> permissions, HttpServletRequest request) {
         User currentUser = authHelper.getAuthenticatedUserWithFallback(request);
 
-        // 👤 Utilisateur cible
         User targetUser = usersRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("Utilisateur cible non trouvé"));
 
-        // 🔒 Vérifier qu’ils sont dans la même entreprise
         if (currentUser.getEntreprise() == null || targetUser.getEntreprise() == null ||
             !currentUser.getEntreprise().getId().equals(targetUser.getEntreprise().getId())) {
             throw new RuntimeException("Les utilisateurs doivent appartenir à la même entreprise.");
         }
 
-        // 🚫 Interdiction de modifier les permissions de l'admin
         boolean isTargetAdmin = CentralAccess.isAdminOfEntreprise(targetUser, targetUser.getEntreprise().getId());
         if (isTargetAdmin) {
             throw new RuntimeException("Impossible de modifier les permissions de l'administrateur de l'entreprise.");
         }
 
-        // 🚫 Interdiction de modifier ses propres permissions sauf si ADMIN
         boolean isSelf = currentUser.getId().equals(targetUser.getId());
         boolean isAdmin = CentralAccess.isAdminOfEntreprise(currentUser, currentUser.getEntreprise().getId());
         boolean hasPermission = currentUser.getRole().hasPermission(PermissionType.GERER_UTILISATEURS);
@@ -996,17 +885,14 @@ public class UsersService {
             throw new RuntimeException("Accès refusé : seuls les administrateurs ou personnes autorisées peuvent gérer les permissions.");
         }
 
-        // 🎯 Vérification que l’utilisateur cible a bien un rôle
         if (targetUser.getRole() == null) {
             throw new RuntimeException("L'utilisateur cible n'a pas de rôle attribué.");
         }
 
-        // ⚙️ Clonage du rôle si celui-ci est partagé par plusieurs utilisateurs
         Role targetRole = targetUser.getRole();
         List<User> usersWithSameRole = usersRepository.findByRole(targetRole);
 
         if (usersWithSameRole.size() > 1) {
-            // Le rôle est partagé, on le duplique pour cet utilisateur uniquement
             Role clonedRole = new Role();
             clonedRole.setName(targetRole.getName());
             clonedRole.setPermissions(
@@ -1017,14 +903,12 @@ public class UsersService {
 
             clonedRole = roleRepository.save(clonedRole);
 
-            // Assigner le nouveau rôle cloné à l'utilisateur cible
             targetUser.setRole(clonedRole);
             usersRepository.save(targetUser);
 
             targetRole = clonedRole;
         }
 
-        // ⚙️ Mise à jour des permissions du rôle (désormais propre à l'utilisateur si cloné)
         List<Permission> existingPermissions = targetRole.getPermissions();
         if (existingPermissions == null) {
             existingPermissions = new ArrayList<>();
@@ -1047,18 +931,14 @@ public class UsersService {
             }
         }
 
-        // 💾 Sauvegarde du rôle modifié
         roleRepository.save(targetRole);
 
-        // Récupération des permissions du rôle mis à jour
         List<PermissionDTO> permissionsDTO = targetUser.getRole().getPermissions().stream()
                 .map(permission -> new PermissionDTO(permission.getId(), permission.getType().toString()))
                 .collect(Collectors.toList());
 
-        // Création du RoleDTO avec les permissions
         RoleDTO roleDTO = new RoleDTO(targetUser.getRole().getId(), targetUser.getRole().getName().toString(), permissionsDTO);
 
-        // Conversion de l'utilisateur en DTO et retour
         return new UserDTO(
             targetUser.getId(),
             targetUser.getUuid(),
@@ -1100,29 +980,24 @@ public class UsersService {
     User userToDelete = usersRepository.findById(userId)
             .orElseThrow(() -> new RuntimeException("Utilisateur à supprimer non trouvé"));
 
-    // Empêcher de se supprimer soi-même
     if (admin.getId().equals(userId)) {
         throw new RuntimeException("Vous ne pouvez pas supprimer votre propre compte.");
     }
 
-    // Empêcher qu’un manager supprime un admin
     if (role == RoleType.MANAGER && userToDelete.getRole().getName() == RoleType.ADMIN) {
         throw new RuntimeException("Un Manager ne peut pas supprimer un Admin.");
     }
 
-    // Vérifier que l'utilisateur appartient à la même entreprise
     if (!userToDelete.getEntreprise().equals(admin.getEntreprise())) {
         throw new RuntimeException("Vous ne pouvez supprimer que les utilisateurs de votre entreprise.");
     }
 
-    // Vérification des factures liées (isolée par entreprise)
     List<FactureProForma> facturesLiees = factureProformaRepository.findByUtilisateurCreateurIdAndEntrepriseId(
             userId, admin.getEntreprise().getId());
     if (!facturesLiees.isEmpty()) {
         throw new RuntimeException("Impossible de supprimer cet utilisateur : il est lié à des factures.");
     }
 
-    // Suppression du QR Code associé
     if (userToDelete.getQrCodeUrl() != null) {
         try {
             imageStorageService.deleteQrCodeImage(userToDelete.getQrCodeUrl());
@@ -1132,8 +1007,7 @@ public class UsersService {
         }
     }
    
-    // Supprimer les InitialPasswordToken de l'utilisateur AVANT de supprimer l'utilisateur
-    // Cela évite l'erreur de contrainte de clé étrangère
+
     initialPasswordTokenRepository.deleteByUser(userToDelete);
 
     usersRepository.delete(userToDelete);
@@ -1146,20 +1020,17 @@ public class UsersService {
     User user = usersRepository.findById(userId)
             .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
 
-    // Détecter s’il y a une modification sensible
     boolean isSensitiveChange =
             (request.getNewPassword() != null && !request.getNewPassword().isEmpty()) ||
             (request.getEmail() != null && !request.getEmail().equals(user.getEmail())) ||
             (request.getPhone() != null && !request.getPhone().equals(user.getPhone())) ||
             (request.getNomComplet() != null && !request.getNomComplet().equals(user.getNomComplet()));
 
-    // Si modification sensible, vérification du mot de passe
     if (isSensitiveChange) {
         if (request.getPassword() == null || !passwordEncoder.matches(request.getPassword(), user.getPassword())) {
             throw new RuntimeException("Mot de passe incorrect. Modification refusée.");
         }
 
-        // Mise à jour du mot de passe
         if (request.getNewPassword() != null && !request.getNewPassword().isEmpty()) {
             if (request.getNewPassword().length() < 8) {
                 throw new RuntimeException("Le nouveau mot de passe doit contenir au moins 8 caractères.");
@@ -1168,11 +1039,9 @@ public class UsersService {
                 throw new RuntimeException("Le nouveau mot de passe ne peut pas être identique à l'ancien.");
             }
             user.setPassword(passwordEncoder.encode(request.getNewPassword()));
-            // Supprimer le token d'initialisation après le premier changement de mot de passe
             initialPasswordTokenRepository.deleteByUser(user);
         }
 
-        // Vérification et mise à jour du téléphone (isolé par entreprise)
         Long entrepriseId = user.getEntreprise() != null ? user.getEntreprise().getId() : null;
         if (entrepriseId == null) {
             throw new RuntimeException("L'utilisateur n'a pas d'entreprise associée.");
@@ -1186,7 +1055,6 @@ public class UsersService {
             user.setPhone(request.getPhone());
         }
 
-        // Vérification et mise à jour de l'email (isolé par entreprise)
         if (request.getEmail() != null && !request.getEmail().equals(user.getEmail())) {
             Optional<User> existingUserWithEmail = usersRepository.findByEmailAndEntrepriseId(request.getEmail(), entrepriseId);
             if (existingUserWithEmail.isPresent() && !existingUserWithEmail.get().getId().equals(userId)) {
@@ -1195,31 +1063,29 @@ public class UsersService {
             user.setEmail(request.getEmail());
         }
 
-        //Mise à jour du nom complet
        if (request.getNomComplet() != null) {
            user.setNomComplet(request.getNomComplet());
        }
     }
 
-    // Mise à jour de la photo si image présente
     if (imageUserFile != null && !imageUserFile.isEmpty()) {
         String oldImagePath = user.getPhoto();
         if (oldImagePath != null && !oldImagePath.isBlank()) {
             Path oldPath = Paths.get("src/main/resources/static" + oldImagePath);
             try {
                 Files.deleteIfExists(oldPath);
-                System.out.println("🗑️ Ancien photo profile supprimé : " + oldImagePath);
+                System.out.println(" Ancien photo profile supprimé : " + oldImagePath);
             } catch (IOException e) {
-                System.out.println("⚠️ Impossible de supprimer l'ancien photo profile : " + e.getMessage());
+                System.out.println(" Impossible de supprimer l'ancien photo profile : " + e.getMessage());
             }
         }
 
         String newImageUrl = imageStorageService.saveUserImage(imageUserFile);
         user.setPhoto(newImageUrl);
-        System.out.println("📸 Nouveau logo enregistré : " + newImageUrl);
+        System.out.println(" Nouveau logo enregistré : " + newImageUrl);
     }
 
-    System.out.println("📥 DTO reçu dans le controller : " + request);
+    System.out.println(" DTO reçu dans le controller : " + request);
 
         if (Boolean.TRUE.equals(deletePhoto)) {
         String oldImagePath = user.getPhoto();
@@ -1227,9 +1093,9 @@ public class UsersService {
             Path oldPath = Paths.get("src/main/resources/static" + oldImagePath);
             try {
                 Files.deleteIfExists(oldPath);
-                System.out.println("🗑️ Ancienne photo supprimée : " + oldImagePath);
+                System.out.println(" Ancienne photo supprimée : " + oldImagePath);
             } catch (IOException e) {
-                System.out.println("⚠️ Erreur suppression photo : " + e.getMessage());
+                System.out.println(" Erreur suppression photo : " + e.getMessage());
             }
             user.setPhoto(null);
         }
@@ -1241,7 +1107,6 @@ public class UsersService {
     //Get user info
     public UserRequest getInfo(Long userId) {
         
-        // --- 1. Récupérer l'utilisateur avec entreprise et role join fetch ---
         User user = usersRepository.findByIdWithEntrepriseAndRole(userId)
                 .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
 
@@ -1298,22 +1163,18 @@ public class UsersService {
 
 // Pour la récupération de tous les utilisateurs d'une entreprise
  public List<UserDTO> getAllUsersOfEntreprise(HttpServletRequest request) {
-    // Extraction du token JWT
     String token = request.getHeader("Authorization");
     if (token == null || !token.startsWith("Bearer ")) {
         throw new RuntimeException("Token JWT manquant ou mal formaté");
     }
 
-    // Extraction de l'ID de l'utilisateur à partir du token
     User user = authHelper.getAuthenticatedUserWithFallback(request);
 
-    // Récupération de l'entreprise associée à l'utilisateur
     Entreprise entreprise = user.getEntreprise();
     if (entreprise == null) {
         throw new RuntimeException("Aucune entreprise associée à cet utilisateur.");
     }
 
-    // Vérification des permissions de l'utilisateur
     boolean isAdminOrManager = CentralAccess.isAdminOrManagerOfEntreprise(user, entreprise.getId());
     boolean hasPermission = user.getRole().hasPermission(PermissionType.GERER_UTILISATEURS);
     boolean isComptable = user.getRole().hasPermission(PermissionType.VOIR_FLUX_COMPTABLE);
@@ -1321,30 +1182,23 @@ public class UsersService {
 
     
 
-    // Vérification des droits d'accès
     if (!isAdminOrManager && !hasPermission && isComptable) {
         throw new RuntimeException("Accès refusé : vous n'avez pas les droits nécessaires.");
     }
 
-    // Récupération de tous les utilisateurs de l'entreprise
     List<User> users = usersRepository.findByEntrepriseId(entreprise.getId());
 
-    // Transformation de la liste d'utilisateurs en liste de UserDTO
     return users.stream().map(userEntity -> {
-        // Récupérer les permissions du rôle
         List<PermissionDTO> permissionsDTO = userEntity.getRole().getPermissions().stream()
             .map(permission -> new PermissionDTO(permission.getId(), permission.getType().toString()))
             .collect(Collectors.toList());
 
-        // Création du RoleDTO avec les permissions
         RoleDTO roleDTO = new RoleDTO(userEntity.getRole().getId(), userEntity.getRole().getName().toString(), permissionsDTO);
 
-        // Liste simplifiée des ID des UserBoutiques
         List<Long> userBoutiques = userEntity.getUserBoutiques().stream()
                 .map(userBoutique -> userBoutique.getId())
                 .collect(Collectors.toList());
 
-        // Création du UserDTO
         return new UserDTO(
             userEntity.getId(),
             userEntity.getUuid(),
@@ -1372,15 +1226,12 @@ public class UsersService {
 
     User connectedUser = authHelper.getAuthenticatedUserWithFallback(request);
 
-    // Récupération du user ciblé
     User targetUser = usersRepository.findById(userId)
             .orElseThrow(() -> new RuntimeException("Utilisateur demandé introuvable"));
 
-    // Vérification des permissions : gestion des utilisateurs
     boolean hasGestionUtilisateurPermission = targetUser.getRole() != null &&
             targetUser.getRole().hasPermission(PermissionType.GERER_UTILISATEURS);
 
-    // Vérification des droits : admin ou manager de la même entreprise
     RoleType role = connectedUser.getRole().getName();
     boolean isAdminOrManager = (role == RoleType.ADMIN || role == RoleType.MANAGER)
             && connectedUser.getEntreprise() != null
@@ -1389,25 +1240,20 @@ public class UsersService {
 
     boolean isSelf = connectedUser.getId().equals(userId);
 
-    // Vérification des droits d'accès
     if (!isAdminOrManager && !isSelf && !hasGestionUtilisateurPermission) {
         throw new RuntimeException("Accès interdit : vous ne pouvez consulter que vos propres informations !");
     }
 
-    // Récupération des permissions du rôle
     List<PermissionDTO> permissionsDTO = targetUser.getRole().getPermissions().stream()
             .map(permission -> new PermissionDTO(permission.getId(), permission.getType().toString()))
             .collect(Collectors.toList());
 
-    // Création du DTO du rôle avec les permissions
     RoleDTO roleDTO = new RoleDTO(targetUser.getRole().getId(), targetUser.getRole().getName().toString(), permissionsDTO);
     
-    // Liste des boutiques de l'utilisateur (par leur ID)
     List<Long> userBoutiquesIds = targetUser.getUserBoutiques().stream()
             .map(userBoutique -> userBoutique.getBoutique().getId())
             .collect(Collectors.toList());
 
-    // Conversion de l'utilisateur en UserDTO
     UserDTO userDTO = new UserDTO(
         targetUser.getId(),
         targetUser.getUuid(),
@@ -1435,17 +1281,14 @@ public class UsersService {
     public void suspendUser(HttpServletRequest request, Long userId, boolean suspend) {
         User currentUser = authHelper.getAuthenticatedUserWithFallback(request);
 
-        // 👤 Utilisateur cible
         User targetUser = usersRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("Utilisateur cible non trouvé"));
 
-        // 🔐 Vérifier qu’ils sont dans la même entreprise
         if (currentUser.getEntreprise() == null || targetUser.getEntreprise() == null ||
             !currentUser.getEntreprise().getId().equals(targetUser.getEntreprise().getId())) {
             throw new RuntimeException("Les utilisateurs doivent appartenir à la même entreprise.");
         }
 
-        // 🚫 Interdiction de se suspendre soi-même, sauf si ADMIN
         
         boolean isSelf = currentUser.getId().equals(targetUser.getId());
         boolean isAdminOrManager = CentralAccess.isAdminOrManagerOfEntreprise(currentUser, currentUser.getEntreprise().getId());
@@ -1459,20 +1302,17 @@ public class UsersService {
             throw new RuntimeException("Accès refusé : seuls les administrateurs ou personnes autorisées peuvent suspendre/réactiver des utilisateurs.");
         }
 
-        // 🚫 Interdiction de suspendre l'admin
         boolean isTargetAdmin = CentralAccess.isAdminOfEntreprise(targetUser, targetUser.getEntreprise().getId());
         if (isTargetAdmin) {
             throw new RuntimeException("Impossible de suspendre l'administrateur de l'entreprise.");
         }
 
-        // ✅ Suspension ou réactivation
         targetUser.setEnabledLien(!suspend);
         usersRepository.save(targetUser);
     }
 
     // Methode pour nombre de utilisateurs dans l'entreprise
     public int countUsersInEntreprise(HttpServletRequest request) {
-        // Extraction du token JWT
         String token = request.getHeader("Authorization");
         if (token == null || !token.startsWith("Bearer ")) {
             throw new RuntimeException("Token JWT manquant ou mal formaté");
@@ -1486,16 +1326,13 @@ public class UsersService {
             throw new RuntimeException("Aucune entreprise associée à cet utilisateur.");
         }
 
-        // Vérification des permissions de l'utilisateur
         boolean isAdminOrManager = CentralAccess.isAdminOrManagerOfEntreprise(user, entreprise.getId());
         boolean hasPermission = user.getRole().hasPermission(PermissionType.GERER_UTILISATEURS);
 
-        // Vérification des droits d'accès
         if (!isAdminOrManager && !hasPermission) {
             throw new RuntimeException("Accès refusé : vous n'avez pas les droits nécessaires.");
         }
 
-        // Récupération du nombre d'utilisateurs dans l'entreprise
       return (int) usersRepository.countByEntrepriseIdExcludingRole(entreprise.getId(), RoleType.ADMIN);
 
 
@@ -1510,7 +1347,6 @@ public class UsersService {
     if (entreprise == null) {
         throw new RuntimeException("Entreprise associée à l'utilisateur non trouvée");
     }
-    // Création et retour du DTO
     EntrepriseDTO dto = new EntrepriseDTO();
     dto.setId(entreprise.getId());
     dto.setNom(entreprise.getNomEntreprise());
@@ -1542,7 +1378,6 @@ public class UsersService {
 
     @Transactional(readOnly = true)
     public UserOptimalDTO getDashboardData(HttpServletRequest request) {
-        // 🔐 Récupération de l'utilisateur connecté
         User currentUser = authHelper.getAuthenticatedUserWithFallback(request);
 
         if (currentUser.getEntreprise() == null) {
@@ -1551,7 +1386,6 @@ public class UsersService {
 
         Long entrepriseId = currentUser.getEntreprise().getId();
 
-        // 1. Informations de l'utilisateur connecté
         UserOptimalDTO.UserInfoDTO userInfo = new UserOptimalDTO.UserInfoDTO();
         userInfo.setId(currentUser.getId());
         userInfo.setNomComplet(currentUser.getNomComplet());
@@ -1561,7 +1395,6 @@ public class UsersService {
         userInfo.setPays(currentUser.getPays());
         userInfo.setPhone(currentUser.getPhone());
 
-        // 2. Tous les rôles disponibles
         List<UserOptimalDTO.RoleDTO> roles = roleRepository.findAll().stream()
                 .map(role -> {
                     UserOptimalDTO.RoleDTO roleDTO = new UserOptimalDTO.RoleDTO();
@@ -1572,7 +1405,6 @@ public class UsersService {
                 })
                 .collect(Collectors.toList());
 
-        // 3. Toutes les boutiques de l'entreprise
         List<UserOptimalDTO.BoutiqueDTO> boutiques = boutiqueRepository.findByEntrepriseId(entrepriseId).stream()
                 .map(boutique -> {
                     UserOptimalDTO.BoutiqueDTO boutiqueDTO = new UserOptimalDTO.BoutiqueDTO();
@@ -1584,7 +1416,6 @@ public class UsersService {
                 })
                 .collect(Collectors.toList());
 
-        // 4. Tous les utilisateurs de l'entreprise
         List<UserOptimalDTO.UserDTO> users = usersRepository.findByEntrepriseId(entrepriseId).stream()
                 .map(user -> {
                     UserOptimalDTO.UserDTO userDTO = new UserOptimalDTO.UserDTO();
@@ -1596,7 +1427,6 @@ public class UsersService {
                     userDTO.setPays(user.getPays());
                     userDTO.setPhone(user.getPhone());
 
-                    // Ajouter les détails du rôle
                     if (user.getRole() != null) {
                         UserOptimalDTO.RoleDTO roleDTO = new UserOptimalDTO.RoleDTO();
                         roleDTO.setId(user.getRole().getId());
@@ -1604,7 +1434,6 @@ public class UsersService {
                         roleDTO.setDescription(getRoleDescription(user.getRole().getName()));
                         userDTO.setRole(roleDTO);
 
-                        // Ajouter les permissions du rôle
                         List<UserOptimalDTO.PermissionDTO> permissions = user.getRole().getPermissions().stream()
                                 .map(permission -> {
                                     UserOptimalDTO.PermissionDTO permissionDTO = new UserOptimalDTO.PermissionDTO();
@@ -1623,10 +1452,8 @@ public class UsersService {
                 })
                 .collect(Collectors.toList());
 
-        // 5. Rôle de l'utilisateur connecté
         String currentUserRole = currentUser.getRole() != null ? currentUser.getRole().getName().toString() : null;
 
-        // Construire et retourner le DTO
         UserOptimalDTO dashboard = new UserOptimalDTO();
         dashboard.setUserInfo(userInfo);
         dashboard.setRoles(roles);
@@ -1650,7 +1477,7 @@ public class UsersService {
      */
     // Méthode pour récupérer les sessions actives par userUuid (sans authentification)
     public List<com.xpertcash.DTOs.UserSessionDTO> getActiveSessionsByUserUuid(String userUuid) {
-        List<com.xpertcash.entity.UserSession> sessions = userSessionRepository.findByUserUuidAndIsActiveTrue(userUuid);
+        List<UserSession> sessions = userSessionRepository.findByUserUuidAndIsActiveTrue(userUuid);
         return sessions.stream()
                 .map(session -> {
                     com.xpertcash.DTOs.UserSessionDTO dto = new com.xpertcash.DTOs.UserSessionDTO();
@@ -1663,18 +1490,16 @@ public class UsersService {
                     dto.setLastActivity(session.getLastActivity());
                     dto.setExpiresAt(session.getExpiresAt());
                     dto.setActive(session.isActive());
-                    dto.setCurrentSession(false); // On ne peut pas déterminer la session courante sans token
+                    dto.setCurrentSession(false);
                     return dto;
                 })
                 .collect(java.util.stream.Collectors.toList());
     }
     
-    // Méthode pour trouver un utilisateur par email (pour récupérer les sessions avant login)
     public User findUserByEmail(String email) {
         return usersRepository.findByEmail(email).orElse(null);
     }
     
-    // Méthode pour vérifier le mot de passe (pour sécurité lors de la récupération des sessions)
     public boolean verifyPassword(String rawPassword, String encodedPassword) {
         return passwordEncoder.matches(rawPassword, encodedPassword);
     }
@@ -1682,7 +1507,6 @@ public class UsersService {
     // Méthode pour fermer une session spécifique avant login (quand limite atteinte)
     @Transactional
     public void closeSessionBeforeLogin(String email, String password, Long sessionId) {
-        // Vérifier l'email et le mot de passe
         User user = usersRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("Email ou mot de passe incorrect"));
         
@@ -1690,26 +1514,22 @@ public class UsersService {
             throw new RuntimeException("Email ou mot de passe incorrect");
         }
         
-        // Vérifier que la session appartient à cet utilisateur
-        com.xpertcash.entity.UserSession session = userSessionRepository.findById(sessionId)
+        UserSession session = userSessionRepository.findById(sessionId)
                 .orElseThrow(() -> new RuntimeException("Session introuvable"));
         
         if (!session.getUserUuid().equals(user.getUuid())) {
             throw new RuntimeException("Cette session ne vous appartient pas");
         }
         
-        // Supprimer la session
         userSessionRepository.delete(session);
     }
     
     public List<com.xpertcash.DTOs.UserSessionDTO> getActiveSessions(HttpServletRequest request) {
         User user = authHelper.getAuthenticatedUserWithFallback(request);
         
-        // Récupérer toutes les sessions actives de l'utilisateur
-        List<com.xpertcash.entity.UserSession> sessions = userSessionRepository
+        List<UserSession> sessions = userSessionRepository
                 .findByUserUuidAndIsActiveTrue(user.getUuid());
         
-        // Extraire le sessionId du token courant pour identifier la session actuelle
         String authHeader = request.getHeader("Authorization");
         Long currentSessionId = null;
         if (authHeader != null && authHeader.startsWith("Bearer ")) {
@@ -1725,7 +1545,6 @@ public class UsersService {
         
         final Long finalCurrentSessionId = currentSessionId;
         
-        // Convertir en DTO
         return sessions.stream()
                 .map(session -> {
                     com.xpertcash.DTOs.UserSessionDTO dto = new com.xpertcash.DTOs.UserSessionDTO();
@@ -1753,7 +1572,7 @@ public class UsersService {
         User user = authHelper.getAuthenticatedUserWithFallback(request);
         
         // Vérifier que la session appartient à l'utilisateur
-        com.xpertcash.entity.UserSession session = userSessionRepository.findById(sessionId)
+        UserSession session = userSessionRepository.findById(sessionId)
                 .orElseThrow(() -> new RuntimeException("Session introuvable"));
         
         if (!session.getUserUuid().equals(user.getUuid())) {
@@ -1772,7 +1591,6 @@ public class UsersService {
     public void revokeOtherSessions(HttpServletRequest request) {
         User user = authHelper.getAuthenticatedUserWithFallback(request);
         
-        // Extraire le sessionId du token courant
         String authHeader = request.getHeader("Authorization");
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
             throw new RuntimeException("Token JWT manquant ou mal formaté");
@@ -1791,7 +1609,6 @@ public class UsersService {
         
         Long currentSessionId = ((Number) sessionIdClaim).longValue();
         
-        // Révoquer toutes les sessions sauf la session courante
         userSessionRepository.revokeAllSessionsExcept(user.getUuid(), currentSessionId);
     }
 

@@ -77,7 +77,7 @@ public ResponseEntity<?> getVersementsParStatut(
         statutEnum = StatutVersement.valueOf(filtre.getStatut().toUpperCase());
     } catch (IllegalArgumentException e) {
         return ResponseEntity.badRequest().body(
-                Map.of("message", "❌ Statut invalide. Valeurs possibles : EN_ATTENTE, VALIDE, REFUSE")
+                Map.of("message", " Statut invalide. Valeurs possibles : EN_ATTENTE, VALIDE, REFUSE")
         );
     }
 

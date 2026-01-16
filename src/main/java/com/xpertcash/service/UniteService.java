@@ -24,11 +24,9 @@ public class UniteService {
    private AuthenticationHelper authHelper;
 
 
-    // Ajouter une nouvelle unité
     @Transactional
     public Unite createUnite(Unite unite, HttpServletRequest request) {
         try {
-            // Récupérer l'utilisateur authentifié
             User user = authHelper.getAuthenticatedUserWithFallback(request);
             Entreprise entreprise = user.getEntreprise();
             
@@ -36,20 +34,16 @@ public class UniteService {
                 throw new RuntimeException("Aucune entreprise associée à cet utilisateur");
             }
             
-            // Vérifier que le nom de l'unité est valide
             if (unite.getNom() == null || unite.getNom().trim().isEmpty()) {
                 throw new IllegalArgumentException("Le nom de l'unité ne peut pas être vide.");
             }
 
-            // Vérifier si l'unité existe déjà pour cette entreprise
             if (uniteRepository.existsByNomAndEntrepriseId(unite.getNom(), entreprise.getId())) {
                 throw new IllegalArgumentException("Cette unité de mesure existe déjà.");
             }
 
-            // Associer l'unité à l'entreprise de l'utilisateur
             unite.setEntreprise(entreprise);
 
-            // Enregistrer l'unité dans la base de données
             return uniteRepository.save(unite);
 
         } catch (Exception e) {
@@ -61,7 +55,6 @@ public class UniteService {
 
     //Récupérer toutes les unités de mesure de l'entreprise de l'utilisateur connecté
     public List<Unite> getAllUnites(HttpServletRequest request) {
-        // Récupérer l'utilisateur authentifié
         User user = authHelper.getAuthenticatedUserWithFallback(request);
         Entreprise entreprise = user.getEntreprise();
         
@@ -69,13 +62,11 @@ public class UniteService {
             throw new RuntimeException("Aucune entreprise associée à cet utilisateur");
         }
         
-        // Retourner uniquement les unités de l'entreprise de l'utilisateur
         return uniteRepository.findByEntrepriseId(entreprise.getId());
     }
 
     //Récupérer unité de mesure par son ID (vérifie qu'elle appartient à l'entreprise de l'utilisateur)
     public Unite getUniteById(Long id, HttpServletRequest request) {
-        // Récupérer l'utilisateur authentifié
         User user = authHelper.getAuthenticatedUserWithFallback(request);
         Entreprise entreprise = user.getEntreprise();
         
@@ -83,7 +74,6 @@ public class UniteService {
             throw new RuntimeException("Aucune entreprise associée à cet utilisateur");
         }
         
-        // Vérifier que l'unité appartient à l'entreprise de l'utilisateur
         return uniteRepository.findByIdAndEntrepriseId(id, entreprise.getId())
                 .orElseThrow(() -> new RuntimeException("Unité de mesure non trouvée ou n'appartient pas à votre entreprise"));
     }
@@ -94,7 +84,6 @@ public class UniteService {
     @Transactional
     public Unite updateUnite(HttpServletRequest request, Long uniteId, Unite uniteDetails) {
         try {
-            // Récupérer l'utilisateur authentifié
             User user = authHelper.getAuthenticatedUserWithFallback(request);
             Entreprise entreprise = user.getEntreprise();
             
@@ -102,13 +91,10 @@ public class UniteService {
                 throw new RuntimeException("Aucune entreprise associée à cet utilisateur");
             }
             
-            // Vérifier que l'unité existe et appartient à l'entreprise de l'utilisateur
             Unite unite = uniteRepository.findByIdAndEntrepriseId(uniteId, entreprise.getId())
                     .orElseThrow(() -> new RuntimeException("Unité non trouvée ou n'appartient pas à votre entreprise"));
 
-            // Vérifier si le nom a changé et si un autre nom existe déjà pour cette entreprise
             if (!unite.getNom().equals(uniteDetails.getNom())) {
-                // Optimisation: utiliser directement findByNomAndEntrepriseId au lieu de exists puis find
                 Optional<Unite> uniteAvecMemeNom = uniteRepository.findByNomAndEntrepriseId(uniteDetails.getNom(), entreprise.getId());
                 if (uniteAvecMemeNom.isPresent() && !uniteAvecMemeNom.get().getId().equals(uniteId)) {
                     throw new RuntimeException("Le nom de l'unité existe déjà.");
@@ -118,7 +104,6 @@ public class UniteService {
             
             unite.setNom(uniteDetails.getNom());
     
-            // Enregistrer l'unité mise à jour
             return uniteRepository.save(unite);
         } catch (Exception e) {
             throw new RuntimeException("Erreur lors de la mise à jour de l'unité : " + e.getMessage());

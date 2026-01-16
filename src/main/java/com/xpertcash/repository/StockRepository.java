@@ -23,7 +23,7 @@ public interface StockRepository extends JpaRepository<Stock, Long> {
            "WHERE b.id = :boutiqueId")
     List<Stock> findByBoutiqueId(@Param("boutiqueId") Long boutiqueId);
 
-    // ⚠️ ATTENTION: Cette méthode ne filtre PAS par boutique - peut retourner plusieurs stocks
+    //  ATTENTION: Cette méthode ne filtre PAS par boutique - peut retourner plusieurs stocks
     // Un produit peut avoir un stock dans plusieurs boutiques
     // Préférer findByBoutiqueAndProduit ou findByProduitIdAndBoutiqueId
     Stock findByProduit(Produit produit);
@@ -49,7 +49,7 @@ public interface StockRepository extends JpaRepository<Stock, Long> {
            "WHERE b.id = :boutiqueId AND s.stockActuel > :quantite")
     List<Stock> findByBoutiqueAndStockActuelGreaterThan(@Param("boutiqueId") Long boutiqueId, @Param("quantite") Integer quantite);
 
-    // 🔒 Récupère tous les stocks liés à une liste de produits pour une boutique spécifique
+    //  Récupère tous les stocks liés à une liste de produits pour une boutique spécifique
     // en posant un verrou PESSIMISTIC_WRITE (bloque la ligne pendant la transaction)
     @Query("SELECT s FROM Stock s " +
            "LEFT JOIN FETCH s.boutique b " +
@@ -58,7 +58,7 @@ public interface StockRepository extends JpaRepository<Stock, Long> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     List<Stock> findAllByProduitIdInAndBoutiqueIdWithLock(@Param("produitIds") List<Long> produitIds, @Param("boutiqueId") Long boutiqueId);
 
-    // 🔒 Récupère tous les stocks liés à une liste de produits (gardé pour compatibilité, mais moins optimal)
+    //  Récupère tous les stocks liés à une liste de produits (gardé pour compatibilité, mais moins optimal)
     // en posant un verrou PESSIMISTIC_WRITE (bloque la ligne pendant la transaction)
     @Query("SELECT s FROM Stock s WHERE s.produit.id IN :ids")
     @Lock(LockModeType.PESSIMISTIC_WRITE)

@@ -61,30 +61,18 @@ public class TresorerieService {
     @Autowired
     private FactureVenteRepository factureVenteRepository;
 
-    /**
-     * Calcule la trésorerie complète de l'entreprise de l'utilisateur connecté.
-     * 
-     * 🔐 Sécurité : Vérifie l'authentification, l'appartenance à l'entreprise et les permissions.
-     * Toutes les données sont filtrées par entreprise pour garantir l'isolation.
-     */
+     // Calcule la trésorerie complète de l'entreprise de l'utilisateur connecté.
     @Transactional(readOnly = true)
     public TresorerieDTO calculerTresorerie(HttpServletRequest request) {
         Long entrepriseId = validerEntrepriseEtPermissions(request);
         return calculerTresorerieParEntrepriseId(entrepriseId);
     }
 
-    /**
-     * Calcule la trésorerie pour une entreprise donnée.
-     * 
-     * ⚠️ Cette méthode est privée et ne doit être appelée que depuis calculerTresorerie()
-     * qui valide déjà les permissions. L'entrepriseId est garanti d'appartenir à l'utilisateur authentifié.
-     * 
-     * 🔐 Sécurité : Toutes les données sont chargées via chargerDonnees() qui filtre par entrepriseId.
-     */
+     // Calcule la trésorerie pour une entreprise donnée.
+  
     @Transactional(readOnly = true)
     public TresorerieDTO calculerTresorerieParEntrepriseId(Long entrepriseId) {
         try {
-            // 🔐 Toutes les données chargées sont filtrées par entrepriseId
             TresorerieData data = chargerDonnees(entrepriseId);
             TresorerieDTO tresorerie = new TresorerieDTO();
 
@@ -99,7 +87,6 @@ public class TresorerieService {
             double entreesGeneralesCaisse = calculerEntreesGeneralesCaisse(data);
             double entreesPaiementsEspeces = calculerEntreesPaiementsFactures(data, ModePaiement.ESPECES, null);
             
-            // montantCaisse = montantTotal (des caisses fermées) + entrées générales + paiements en espèces - dépenses générales
             double montantCaisseReel = caisseDetail.getMontantTotal() + entreesGeneralesCaisse + entreesPaiementsEspeces - depensesGeneralesCaisse;
             tresorerie.setMontantCaisse(Math.max(0.0, montantCaisseReel));
 
@@ -130,25 +117,16 @@ public class TresorerieService {
         }
     }
 
-    /**
-     * Récupère la liste paginée des dettes (factures impayées, ventes à crédit, dépenses en DETTE)
-     * pour l'entreprise de l'utilisateur connecté.
-     * 
-     * 🔐 Sécurité : Vérifie l'authentification, l'appartenance à l'entreprise et les permissions.
-     * Toutes les données sont filtrées par entreprise pour garantir l'isolation.
-     */
+     // Récupère la liste paginée des dettes (factures impayées, ventes à crédit, dépenses en DETTE)
+    
     @Transactional(readOnly = true)
     public PaginatedResponseDTO<DetteItemDTO> getDettesDetaillees(HttpServletRequest request, int page, int size) {
-        // 🔐 Vérification de l'authentification et des permissions
         Long entrepriseId = validerEntrepriseEtPermissions(request);
         
-        // 🔐 Chargement des données filtrées par entrepriseId
         TresorerieData data = chargerDonnees(entrepriseId);
 
-        // Construire la liste complète des dettes
         java.util.List<DetteItemDTO> items = new java.util.ArrayList<>();
 
-        // 1️⃣ Factures réelles impayées (filtrées par entreprise via chargerDonnees)
         for (FactureReelle facture : data.factures) {
             BigDecimal totalPaye = data.paiementsParFacture.getOrDefault(facture.getId(), BigDecimal.ZERO);
             double montantRestant = facture.getTotalFacture() - totalPaye.doubleValue();
@@ -178,8 +156,8 @@ public class TresorerieService {
             }
         }
 
-        // 2️⃣ Dépenses générales avec source DETTE (filtrées par entreprise via chargerDonnees)
-        java.util.List<DepenseGenerale> depensesDette = data.depensesGenerales.stream()
+        //  Dépenses générales avec source DETTE (filtrées par entreprise via chargerDonnees)
+        List<DepenseGenerale> depensesDette = data.depensesGenerales.stream()
                 .filter(d -> d.getSource() == SourceDepense.DETTE)
                 .collect(Collectors.toList());
 
@@ -202,10 +180,8 @@ public class TresorerieService {
             items.add(dto);
         }
 
-        // 3️⃣ Entrées générales avec source DETTE (dettes à encaisser, filtrées par entreprise via chargerDonnees)
-        // ⚠️ IMPORTANT : Exclure les entrées créées par les paiements de factures (detteType = "PAIEMENT_FACTURE")
-        // car elles ont source = CAISSE/BANQUE/MOBILE_MONEY et ne sont pas des dettes
-        java.util.List<EntreeGenerale> entreesDette = data.entreesGenerales.stream()
+     
+        List<EntreeGenerale> entreesDette = data.entreesGenerales.stream()
                 .filter(e -> e.getSource() == SourceDepense.DETTE)
                 .filter(e -> e.getDetteType() == null || !"PAIEMENT_FACTURE".equals(e.getDetteType()))
                 .collect(Collectors.toList());
@@ -232,9 +208,8 @@ public class TresorerieService {
             items.add(dto);
         }
 
-        // 4️⃣ Ventes à crédit (CREDIT)
-        // 🔐 Requête filtrée par entrepriseId pour garantir l'isolation des données
-        java.util.List<Vente> ventesCredit = venteRepository.findByBoutique_Entreprise_IdAndModePaiement(entrepriseId, ModePaiement.CREDIT);
+      
+        List<Vente> ventesCredit = venteRepository.findByBoutique_Entreprise_IdAndModePaiement(entrepriseId, ModePaiement.CREDIT);
         for (Vente v : ventesCredit) {
             double total = getValeurDouble(v.getMontantTotal());
             double rembourse = getValeurDouble(v.getMontantTotalRembourse());
@@ -250,14 +225,12 @@ public class TresorerieService {
             dto.setMontantRestant(restant);
             dto.setDate(v.getDateVente());
             dto.setDescription(v.getDescription());
-            // Numéro de facture vente si disponible (isolé par entreprise)
             Long venteEntrepriseId = v.getBoutique() != null && v.getBoutique().getEntreprise() != null 
                     ? v.getBoutique().getEntreprise().getId() : null;
             if (venteEntrepriseId != null) {
                 factureVenteRepository.findByVenteIdAndEntrepriseId(v.getId(), venteEntrepriseId)
                         .ifPresent(f -> dto.setNumero(f.getNumeroFacture()));
             }
-            // Client pouvant être un Client ou une EntrepriseClient, ou juste un nom/numéro libre
             if (v.getClient() != null) {
                 dto.setClient(v.getClient().getNomComplet());
                 dto.setContact(v.getClient().getTelephone());
@@ -272,7 +245,6 @@ public class TresorerieService {
             items.add(dto);
         }
 
-        // Tri par date décroissante (nulls en dernier)
         items.sort((a, b) -> {
             if (a.getDate() == null && b.getDate() == null) return 0;
             if (a.getDate() == null) return 1;
@@ -280,7 +252,6 @@ public class TresorerieService {
             return b.getDate().compareTo(a.getDate());
         });
 
-        // Pagination manuelle
         int totalElements = items.size();
         int totalPages = (int) Math.ceil((double) totalElements / size);
         int fromIndex = page * size;
@@ -303,26 +274,17 @@ public class TresorerieService {
         return response;
     }
 
-    /**
-     * Valide l'authentification, l'appartenance à une entreprise et les permissions pour accéder à la trésorerie.
-     * 
-     * 🔐 Sécurité : 
-     * - Vérifie le token JWT (via authHelper.getAuthenticatedUserWithFallback)
-     * - Vérifie que l'utilisateur est associé à une entreprise
-     * - Vérifie les permissions/rôles : ADMIN, MANAGER, COMPTABLE, ou permission COMPTABILITE
-     */
+     // Valide l'authentification, l'appartenance à une entreprise et les permissions pour accéder à la trésorerie.
+
     private Long validerEntrepriseEtPermissions(HttpServletRequest request) {
-        // 🔐 Vérification de l'authentification (token JWT)
         User user = authHelper.getAuthenticatedUserWithFallback(request);
         
-        // 🔐 Vérification de l'appartenance à une entreprise
         if (user.getEntreprise() == null) {
             throw new BusinessException("Vous n'êtes associé à aucune entreprise.");
         }
 
         Long entrepriseId = user.getEntreprise().getId();
         
-        // 🔐 Vérification des permissions/rôles
         boolean isAdminOrManager = CentralAccess.isAdminOrManagerOfEntreprise(user, entrepriseId);
         boolean isComptable = user.getRole() != null && user.getRole().getName() == RoleType.COMPTABLE;
         boolean hasPermission = user.getRole() != null && user.getRole().hasPermission(PermissionType.COMPTABILITE);
@@ -364,13 +326,9 @@ public class TresorerieService {
         }
     }
 
-    /**
-     * Charge toutes les données nécessaires pour le calcul de la trésorerie.
-     * 
-     * 🔐 Sécurité : Toutes les requêtes filtrent par entrepriseId pour garantir l'isolation des données.
-     */
+     // Charge toutes les données nécessaires pour le calcul de la trésorerie.
+    
     private TresorerieData chargerDonnees(Long entrepriseId) {
-        // 🔐 Toutes les requêtes suivantes filtrent par entrepriseId
         List<Boutique> boutiques = boutiqueRepository.findByEntrepriseId(entrepriseId);
         List<Long> boutiqueIds = boutiques.stream()
                 .map(Boutique::getId)
@@ -458,7 +416,7 @@ public class TresorerieService {
         if (!caisseIdsFermees.isEmpty()) {
             List<MouvementCaisse> mouvementsVente = mouvementCaisseRepository.findByCaisseIdInAndTypeMouvement(
                 caisseIdsFermees, TypeMouvementCaisse.VENTE);
-            // 💰 Inclure ESPECES et MOBILE_MONEY (OrangeMoney) dans la caisse
+            //  Inclure ESPECES et MOBILE_MONEY (OrangeMoney) dans la caisse
             entreesMouvementsVente = mouvementsVente.stream()
                     .filter(m -> m.getModePaiement() == ModePaiement.ESPECES 
                             || m.getModePaiement() == ModePaiement.MOBILE_MONEY)
@@ -467,7 +425,7 @@ public class TresorerieService {
             
             List<MouvementCaisse> mouvementsAjout = mouvementCaisseRepository.findByCaisseIdInAndTypeMouvement(
                 caisseIdsFermees, TypeMouvementCaisse.AJOUT);
-            // 💰 Inclure ESPECES et MOBILE_MONEY (OrangeMoney) dans la caisse
+            //  Inclure ESPECES et MOBILE_MONEY (OrangeMoney) dans la caisse
             entreesMouvementsAjout = mouvementsAjout.stream()
                     .filter(m -> m.getModePaiement() == ModePaiement.ESPECES 
                             || m.getModePaiement() == ModePaiement.MOBILE_MONEY)
@@ -475,14 +433,11 @@ public class TresorerieService {
                     .sum();
         }
         
-        // 💰 Seules les ventes MOBILE_MONEY (OrangeMoney) depuis VenteService vont dans la caisse (via MouvementCaisse)
-        // Les paiements de factures et entrées générales MOBILE_MONEY restent dans Mobile Money
+   
         double entreesPaiementsEspeces = calculerEntreesPaiementsFactures(data, ModePaiement.ESPECES, null);
         double entreesGeneralesCaisse = calculerEntreesGeneralesCaisse(data);
         
-        // Note: entreesMouvementsVente inclut déjà les ventes MOBILE_MONEY via les MouvementCaisse créés lors de la vente dans VenteService
-        // Les paiements de factures MOBILE_MONEY ne sont PAS inclus ici (ils restent dans Mobile Money)
-        
+
         double entrees = entreesMouvementsVente + entreesMouvementsAjout + entreesPaiementsEspeces 
                 + entreesGeneralesCaisse;
         
@@ -522,8 +477,7 @@ public class TresorerieService {
 
 
     private double calculerSortiesCaisse(TresorerieData data) {
-        // 💰 Seules les ventes MOBILE_MONEY (OrangeMoney) depuis VenteService vont dans la caisse
-        // Les dépenses MOBILE_MONEY restent dans Mobile Money, donc on ne compte que ESPECES ici
+
         double depensesEspeces = data.mouvementsDepense.stream()
                 .filter(m -> m.getModePaiement() == ModePaiement.ESPECES)
                 .mapToDouble(m -> getValeurDouble(m.getMontant()))
@@ -574,8 +528,7 @@ public class TresorerieService {
     }
 
     private TresorerieDTO.MobileMoneyDetail calculerMobileMoney(TresorerieData data) {
-        // 💰 Seules les ventes MOBILE_MONEY (OrangeMoney) depuis VenteService vont dans la caisse
-        // Ici on compte : paiements de factures MOBILE_MONEY + entrées générales MOBILE_MONEY (pas les ventes)
+
         double entreesPaiements = calculerEntreesPaiementsFactures(data, ModePaiement.MOBILE_MONEY, null);
         double entreesGenerales = calculerEntreesGeneralesParSource(data, SourceDepense.MOBILE_MONEY);
         double entrees = entreesPaiements + entreesGenerales;
@@ -593,7 +546,7 @@ public class TresorerieService {
         double sorties = sortiesDepenses + sortiesMouvements;
 
         TresorerieDTO.MobileMoneyDetail mobileMoneyDetail = new TresorerieDTO.MobileMoneyDetail();
-        mobileMoneyDetail.setEntrees(entrees); // Paiements de factures + entrées générales (pas les ventes)
+        mobileMoneyDetail.setEntrees(entrees);
         mobileMoneyDetail.setSorties(sorties);
         mobileMoneyDetail.setSolde(entrees - sorties);
         return mobileMoneyDetail;
@@ -756,9 +709,7 @@ public class TresorerieService {
                 .mapToDouble(d -> getValeurDouble(d.getMontant()))
                 .sum();
 
-        // 💰 Dettes issues des entrées générales marquées comme DETTE (créances à encaisser)
-        // ⚠️ IMPORTANT : Exclure les entrées créées par les paiements de factures (detteType = "PAIEMENT_FACTURE")
-        // car elles ont source = CAISSE/BANQUE/MOBILE_MONEY et ne sont pas des dettes
+
         List<EntreeGenerale> entreesDette = data.entreesGenerales.stream()
                 .filter(e -> e.getSource() == SourceDepense.DETTE)
                 .filter(e -> e.getDetteType() == null || !"PAIEMENT_FACTURE".equals(e.getDetteType()))
@@ -771,7 +722,6 @@ public class TresorerieService {
                 })
                 .sum();
 
-        // 💳 Dettes issues des ventes à crédit (CREDIT) pour cette entreprise
         List<Vente> ventesCredit = venteRepository.findByBoutique_Entreprise_IdAndModePaiement(entrepriseId, ModePaiement.CREDIT);
         logger.info("Ventes à crédit trouvées pour l'entreprise {} : {}", entrepriseId, ventesCredit.size());
 
@@ -797,7 +747,6 @@ public class TresorerieService {
         TresorerieDTO.DetteDetail detail = new TresorerieDTO.DetteDetail();
         detail.setFacturesImpayees(totalFacturesEtCredits);
         detail.setNombreFacturesImpayees(totalNombreFacturesEtCredits);
-        // On agrège ici les "dettes" provenant des dépenses en DETTE et des entrées en DETTE
         detail.setDepensesDette(montantDepensesDette + montantEntreesDette);
         detail.setNombreDepensesDette(depensesDette.size() + entreesDette.size());
         detail.setTotal(totalFacturesEtCredits + montantDepensesDette + montantEntreesDette);
@@ -814,9 +763,7 @@ public class TresorerieService {
     }
 
     private double calculerEntreesGeneralesCaisse(TresorerieData data) {
-        // ⚠️ IMPORTANT : Exclure les entrées créées par les paiements de factures (detteType = "PAIEMENT_FACTURE")
-        // car elles sont déjà comptées via calculerEntreesPaiementsFactures()
-        // Sinon on aurait une double comptabilisation
+
         return data.entreesGenerales.stream()
                 .filter(e -> e.getSource() == SourceDepense.CAISSE)
                 .filter(e -> e.getDetteType() == null || !"PAIEMENT_FACTURE".equals(e.getDetteType()))
@@ -825,9 +772,7 @@ public class TresorerieService {
     }
 
     private double calculerEntreesGeneralesParSource(TresorerieData data, SourceDepense sourceDepense) {
-        // ⚠️ IMPORTANT : Exclure les entrées créées par les paiements de factures (detteType = "PAIEMENT_FACTURE")
-        // car elles sont déjà comptées via calculerEntreesPaiementsFactures()
-        // Sinon on aurait une double comptabilisation
+
         return data.entreesGenerales.stream()
                 .filter(e -> e.getSource() == sourceDepense)
                 .filter(e -> e.getDetteType() == null || !"PAIEMENT_FACTURE".equals(e.getDetteType()))

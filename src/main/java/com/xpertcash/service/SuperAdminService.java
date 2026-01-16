@@ -96,9 +96,7 @@ import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.List;
 
-/**
- * Service réservé aux opérations du SUPER_ADMIN (propriétaire de la plateforme).
- */
+
 @Service
 public class SuperAdminService {
 
@@ -119,12 +117,6 @@ public class SuperAdminService {
 
     @Autowired
     private StockRepository stockRepository;
-
-    @Autowired
-    private StockHistoryRepository stockHistoryRepository;
-
-    @Autowired
-    private StockProduitFournisseurRepository stockProduitFournisseurRepository;
 
     @Autowired
     private UserSessionRepository userSessionRepository;
@@ -225,19 +217,14 @@ public class SuperAdminService {
     @PersistenceContext
     private EntityManager entityManager;
 
-    /**
-     * Vérifie que l'utilisateur est SUPER_ADMIN, sinon lève une exception.
-     */
+   
     public void ensureSuperAdmin(User user) {
         if (user == null || user.getRole() == null || user.getRole().getName() != RoleType.SUPER_ADMIN) {
             throw new RuntimeException("Accès refusé : réservé au SUPER_ADMIN.");
         }
     }
 
-    /**
-     * Récupère la liste paginée des entreprises avec leurs infos (vue globale plateforme)
-     * pour la vue SUPER_ADMIN.
-     */
+    
     public Page<SuperAdminEntrepriseListDTO> getAllEntreprisesAsSuperAdmin(User superAdmin, int page, int size) {
         ensureSuperAdmin(superAdmin);
 
@@ -274,9 +261,7 @@ public class SuperAdminService {
         });
     }
 
-    /**
-     * Désactiver une entreprise (réservé SUPER_ADMIN).
-     */
+  
     public void desactiverEntreprise(User superAdmin, Long entrepriseId) {
         ensureSuperAdmin(superAdmin);
         Entreprise entreprise = entrepriseService.getEntrepriseById(entrepriseId);
@@ -284,9 +269,7 @@ public class SuperAdminService {
         entrepriseRepository.save(entreprise);
     }
 
-    /**
-     * Réactiver une entreprise (réservé SUPER_ADMIN).
-     */
+ 
     public void activerEntreprise(User superAdmin, Long entrepriseId) {
         ensureSuperAdmin(superAdmin);
         Entreprise entreprise = entrepriseService.getEntrepriseById(entrepriseId);
@@ -294,10 +277,7 @@ public class SuperAdminService {
         entrepriseRepository.save(entreprise);
     }
 
-    /**
-     * Récupérer une entreprise par son id avec toutes les statistiques demandées
-     * (réservé au SUPER_ADMIN).
-     */
+ 
     public SuperAdminEntrepriseStatsDTO getEntrepriseStats(User superAdmin, Long entrepriseId) {
         ensureSuperAdmin(superAdmin);
 
@@ -305,34 +285,25 @@ public class SuperAdminService {
 
         Long id = entreprise.getId();
 
-        // Utilisateurs (tous ceux de l'entreprise)
         long nombreUtilisateurs = usersRepository.countByEntrepriseId(id);
 
-        // Boutiques
         long nombreBoutiques = boutiqueRepository.countByEntrepriseId(id);
 
-        // Produits (références uniques, déjà optimisé via COUNT DISTINCT)
         long nombreProduits = produitRepository.countProduitsUniquesByEntrepriseId(id);
 
-        // Stocks (nombre d'enregistrements de stock pour les boutiques de l'entreprise)
         long nombreStocks = stockRepository.countByEntrepriseId(id);
 
-        // Clients
         long particuliers = clientRepository.countClientsDirectByEntrepriseId(id);
         long entreprisesClients = clientRepository.countClientsEntrepriseByEntrepriseId(id);
         long totalClients = particuliers + entreprisesClients;
 
-        // Prospects
         long nombreProspects = prospectRepository.countByEntrepriseId(id);
 
-        // Factures
         long nombreFacturesProforma = factureProformaRepository.countFacturesByEntrepriseId(id);
         long nombreFacturesReelles = factureReelleRepository.countByEntrepriseId(id);
 
-        // Caisses ouvertes
         long nombreCaissesOuvertes = caisseRepository.countByEntrepriseIdAndStatut(id, StatutCaisse.OUVERTE);
 
-        // Ventes
         long nombreVentes = venteRepository.countByEntrepriseId(id);
 
         SuperAdminEntrepriseStatsDTO dto = new SuperAdminEntrepriseStatsDTO();
@@ -361,17 +332,10 @@ public class SuperAdminService {
         return dto;
     }
 
-    /**
-     * Supprime un Admin et TOUTES les données associées à son entreprise.
-     * Cette méthode supprime de manière récursive toutes les entités liées à l'entreprise.
-     * 
-     * Peut être appelée par :
-     * - SUPER_ADMIN (peut supprimer n'importe quel admin)
-     * - L'admin lui-même (peut supprimer uniquement son propre compte)
-     */
+    // Supprime un Admin et TOUTES les données associées à son entreprise.
+
     @Transactional(rollbackFor = Exception.class)
     public void deleteAdminAndEntreprise(User user, Long adminId) {
-        // Vérifier les droits : soit SUPER_ADMIN, soit l'admin lui-même
         boolean isSuperAdmin = user.getRole() != null && user.getRole().getName() == RoleType.SUPER_ADMIN;
         boolean isSelf = user.getId().equals(adminId);
         
@@ -379,7 +343,6 @@ public class SuperAdminService {
             throw new RuntimeException("Accès refusé : vous ne pouvez supprimer que votre propre compte ou être SUPER_ADMIN.");
         }
 
-        // 1. Récupérer l'admin et vérifier qu'il existe et qu'il est bien un admin
         User admin = usersRepository.findById(adminId)
                 .orElseThrow(() -> new RuntimeException("Admin introuvable avec l'ID : " + adminId));
 
@@ -387,20 +350,16 @@ public class SuperAdminService {
             throw new RuntimeException("L'utilisateur avec l'ID " + adminId + " n'est pas un administrateur.");
         }
 
-        // 2. Si c'est l'admin lui-même (pas SUPER_ADMIN), vérifier qu'il supprime bien son propre compte
         if (!isSuperAdmin && isSelf) {
-            // Vérifier que l'utilisateur connecté est bien un admin
             if (user.getRole() == null || user.getRole().getName() != RoleType.ADMIN) {
                 throw new RuntimeException("Vous devez être administrateur pour supprimer votre compte.");
             }
-            // Vérifier que l'admin appartient à la même entreprise (déjà vérifié par isSelf, mais double vérification)
             if (user.getEntreprise() == null || admin.getEntreprise() == null ||
                 !user.getEntreprise().getId().equals(admin.getEntreprise().getId())) {
                 throw new RuntimeException("Vous ne pouvez supprimer que votre propre compte.");
             }
         }
 
-        // 3. Récupérer l'entreprise de l'admin
         Entreprise entreprise = admin.getEntreprise();
         if (entreprise == null) {
             throw new RuntimeException("L'admin n'a pas d'entreprise associée.");
@@ -408,46 +367,37 @@ public class SuperAdminService {
 
         Long entrepriseId = entreprise.getId();
 
-        // 3. Retirer la référence admin de l'entreprise avant de supprimer les utilisateurs
-        // Cela évite l'erreur TransientObjectException
+     
         entreprise.setAdmin(null);
         entrepriseRepository.save(entreprise);
 
-        // 4. Supprimer toutes les dépenses générales AVANT les utilisateurs (car elles référencent creePar)
         List<DepenseGenerale> depenses = depenseGeneraleRepository.findByEntrepriseId(entrepriseId);
         for (DepenseGenerale depense : depenses) {
-            // Supprimer la pièce jointe de la dépense
             if (depense.getPieceJointe() != null && !depense.getPieceJointe().isBlank()) {
                 try {
                     Path pieceJointePath = Paths.get("src/main/resources/static" + depense.getPieceJointe());
                     Files.deleteIfExists(pieceJointePath);
                 } catch (IOException e) {
-                    // Erreur silencieuse lors de la suppression de la pièce jointe
                 }
             }
         }
         depenseGeneraleRepository.deleteAll(depenses);
 
-        // 5. Supprimer toutes les entrées générales AVANT les utilisateurs (car elles référencent creePar et responsable)
         List<EntreeGenerale> entrees = entreeGeneraleRepository.findByEntrepriseId(entrepriseId);
         for (EntreeGenerale entree : entrees) {
-            // Supprimer la pièce jointe de l'entrée
             if (entree.getPieceJointe() != null && !entree.getPieceJointe().isBlank()) {
                 try {
                     Path pieceJointePath = Paths.get("src/main/resources/static" + entree.getPieceJointe());
                     Files.deleteIfExists(pieceJointePath);
                 } catch (IOException e) {
-                    // Erreur silencieuse lors de la suppression de la pièce jointe
                 }
             }
         }
         entreeGeneraleRepository.deleteAll(entrees);
 
-        // 5.5. Supprimer tous les transferts de fonds AVANT les utilisateurs (car ils référencent creePar)
         List<TransfertFonds> transferts = transfertFondsRepository.findByEntrepriseIdOrderByDateTransfertDesc(entrepriseId);
         transfertFondsRepository.deleteAll(transferts);
 
-        // 5.6. Supprimer toutes les notifications globales AVANT les utilisateurs (car elles référencent recipient)
         List<User> usersForNotifications = usersRepository.findByEntrepriseId(entrepriseId);
         for (User u : usersForNotifications) {
             List<GlobalNotification> notifications = globalNotificationRepository.findByRecipientIdOrderByCreatedAtDesc(u.getId());
@@ -456,15 +406,12 @@ public class SuperAdminService {
             }
         }
 
-        // 5.6.5. Supprimer tous les FactureProduit AVANT les factures (car ils référencent facture qui référence user)
         List<Boutique> boutiquesForFactureProduit = boutiqueRepository.findByEntrepriseId(entrepriseId);
         int totalFactureProduits = 0;
         for (Boutique boutique : boutiquesForFactureProduit) {
             List<Facture> facturesBoutique = factureRepository.findByBoutiqueIdAndEntrepriseId(
                     boutique.getId(), entrepriseId);
             for (Facture facture : facturesBoutique) {
-                // FactureProduit est supprimé en cascade avec Facture, mais on le fait explicitement pour être sûr
-                // Utiliser une requête native pour supprimer directement
                 int deleted = entityManager.createNativeQuery(
                     "DELETE FROM facture_produit WHERE facture_id = :factureId"
                 ).setParameter("factureId", facture.getId()).executeUpdate();
@@ -475,17 +422,14 @@ public class SuperAdminService {
             entityManager.flush();
         }
 
-        // 5.7. Supprimer toutes les factures (liées aux boutiques) AVANT les utilisateurs (car elles référencent user)
         List<Facture> factures = factureRepository.findAllByEntrepriseId(entrepriseId);
         factureRepository.deleteAll(factures);
         entityManager.flush();
 
-        // 5.7.5. Supprimer tous les mouvements de caisse AVANT les versements comptables (car ils référencent caisse)
         List<Boutique> boutiquesForMouvements = boutiqueRepository.findByEntrepriseId(entrepriseId);
         for (Boutique boutique : boutiquesForMouvements) {
             List<Caisse> caissesBoutique = caisseRepository.findByBoutiqueId(boutique.getId());
             for (Caisse caisse : caissesBoutique) {
-                // Récupérer tous les mouvements de cette caisse (tous types confondus)
                 List<MouvementCaisse> allMouvements = mouvementCaisseRepository.findByCaisseId(caisse.getId());
                 
                 if (!allMouvements.isEmpty()) {
@@ -494,7 +438,6 @@ public class SuperAdminService {
             }
         }
 
-        // 5.8. Supprimer tous les versements comptables AVANT les utilisateurs (car ils référencent creePar)
         List<Boutique> boutiquesForVersements = boutiqueRepository.findByEntrepriseId(entrepriseId);
         for (Boutique boutique : boutiquesForVersements) {
             List<VersementComptable> versements = versementComptableRepository.findByCaisse_BoutiqueId(boutique.getId());
@@ -503,7 +446,6 @@ public class SuperAdminService {
             }
         }
 
-        // 5.9. Supprimer toutes les relations UserBoutique AVANT les utilisateurs
         for (User u : usersForNotifications) {
             List<UserBoutique> userBoutiques = userBoutiqueRepository.findByUserId(u.getId());
             if (!userBoutiques.isEmpty()) {
@@ -511,7 +453,6 @@ public class SuperAdminService {
             }
         }
 
-        // 5.9.5. Supprimer tous les PasswordResetToken AVANT les utilisateurs (car ils référencent User)
         int totalPasswordTokens = 0;
         for (User u : usersForNotifications) {
             passwordResetTokenRepository.deleteByUser(u);
@@ -521,7 +462,6 @@ public class SuperAdminService {
             entityManager.flush();
         }
 
-        // 5.9.5.5. Supprimer tous les InitialPasswordToken AVANT les utilisateurs (car ils référencent User)
         int totalInitialPasswordTokens = 0;
         for (User u : usersForNotifications) {
             initialPasswordTokenRepository.deleteByUser(u);
@@ -531,11 +471,9 @@ public class SuperAdminService {
             entityManager.flush();
         }
 
-        // 5.9.6. Supprimer tous les paiements AVANT les utilisateurs (car ils référencent User encaissePar)
         List<FactureReelle> facturesReellesForPaiements = factureReelleRepository.findByEntrepriseId(entrepriseId);
         int totalPaiements = 0;
         for (FactureReelle factureReelle : facturesReellesForPaiements) {
-            // Utiliser une requête native pour supprimer directement les paiements
             int deleted = entityManager.createNativeQuery(
                 "DELETE FROM paiement WHERE facture_reelle_id = :factureReelleId"
             ).setParameter("factureReelleId", factureReelle.getId()).executeUpdate();
@@ -545,7 +483,6 @@ public class SuperAdminService {
             entityManager.flush();
         }
 
-        // 5.9.7. Mettre à null toutes les références User dans les FactureReelle AVANT de supprimer les User
         int facturesReellesUpdated = 0;
         for (FactureReelle factureReelle : facturesReellesForPaiements) {
             boolean updated = false;
@@ -570,7 +507,6 @@ public class SuperAdminService {
             entityManager.flush();
         }
 
-        // 5.9.8. Mettre à null toutes les références User dans les FactureProForma AVANT de supprimer les User
         List<FactureProForma> facturesProformaForNull = factureProformaRepository.findByEntrepriseId(entrepriseId);
         int facturesProformaUpdated = 0;
         for (FactureProForma factureProforma : facturesProformaForNull) {
@@ -599,7 +535,6 @@ public class SuperAdminService {
                 factureProforma.setUtilisateurAnnulateur(null);
                 updated = true;
             }
-            // Vider la collection ManyToMany des approbateurs
             if (factureProforma.getApprobateurs() != null && !factureProforma.getApprobateurs().isEmpty()) {
                 factureProforma.getApprobateurs().clear();
                 updated = true;
@@ -613,11 +548,9 @@ public class SuperAdminService {
             entityManager.flush();
         }
 
-        // 5.9.9. Supprimer toutes les NoteFactureProForma AVANT les utilisateurs (car elles référencent User auteur)
         List<FactureProForma> facturesProformaForNotes = factureProformaRepository.findByEntrepriseId(entrepriseId);
         int totalNotes = 0;
         for (FactureProForma facture : facturesProformaForNotes) {
-            // Supprimer les notes de cette facture (isolé par entreprise)
             Long factureEntrepriseId = facture.getEntreprise() != null ? facture.getEntreprise().getId() : null;
             if (factureEntrepriseId != null) {
                 List<NoteFactureProForma> notes = noteFactureProFormaRepository.findByFactureProFormaIdAndEntrepriseId(
@@ -632,11 +565,9 @@ public class SuperAdminService {
             entityManager.flush();
         }
 
-        // 5.9.10. Supprimer tous les FactProHistoriqueAction AVANT les utilisateurs (car ils référencent User utilisateur)
         List<FactureProForma> facturesProformaForHistoriques = factureProformaRepository.findByEntrepriseId(entrepriseId);
         int totalFactProHistoriquesActions = 0;
         for (FactureProForma facture : facturesProformaForHistoriques) {
-            // Supprimer les historiques d'action de cette facture
             factProHistoriqueActionRepository.deleteByFacture(facture);
             totalFactProHistoriquesActions++;
         }
@@ -644,8 +575,6 @@ public class SuperAdminService {
             entityManager.flush();
         }
 
-        // 5.9.11. Supprimer tous les StockHistory AVANT les utilisateurs (car ils référencent User)
-        // Utiliser une requête native pour supprimer directement tous les StockHistory liés à l'entreprise
         int totalStockHistories = entityManager.createNativeQuery(
             "DELETE sh FROM stock_history sh " +
             "INNER JOIN stock s ON sh.stock_id = s.id " +
@@ -657,21 +586,17 @@ public class SuperAdminService {
             entityManager.flush();
         }
 
-        // 5.10. Supprimer d'abord les entités qui référencent les ventes, puis les ventes elles-mêmes
         List<Vente> ventesWithReferences = venteRepository.findAllByEntrepriseId(entrepriseId);
         
-        // ÉTAPE 1 : Supprimer les historiques et factures de vente AVANT de modifier les ventes
         int totalHistoriques = 0;
-        int[] totalFacturesVente = {0}; // Utiliser un tableau pour être modifiable dans la lambda
+        int[] totalFacturesVente = {0};
         for (Vente vente : ventesWithReferences) {
-            // Supprimer les historiques de cette vente
             List<VenteHistorique> historiques = venteHistoriqueRepository.findByVenteId(vente.getId());
             if (!historiques.isEmpty()) {
                 totalHistoriques += historiques.size();
                 venteHistoriqueRepository.deleteAll(historiques);
             }
             
-            // Supprimer les factures de vente pour cette vente spécifique (isolé par entreprise)
             Long venteEntrepriseId = vente.getBoutique() != null && vente.getBoutique().getEntreprise() != null 
                     ? vente.getBoutique().getEntreprise().getId() : null;
             if (venteEntrepriseId != null) {
@@ -687,16 +612,13 @@ public class SuperAdminService {
         if (totalFacturesVente[0] > 0) {
         }
         
-        // Vérifier s'il reste des factures de vente (par sécurité, avant de modifier les ventes)
         List<FactureVente> facturesVenteRestantes = factureVenteRepository.findAllByEntrepriseId(entrepriseId);
         if (!facturesVenteRestantes.isEmpty()) {
             factureVenteRepository.deleteAll(facturesVenteRestantes);
         }
         
-        // Forcer un flush pour s'assurer que toutes les FactureVente sont supprimées
         entityManager.flush();
         
-        // ÉTAPE 2 : Maintenant mettre à null les références dans les ventes
         int ventesUpdated = 0;
         for (Vente vente : ventesWithReferences) {
             boolean updated = false;
@@ -729,14 +651,11 @@ public class SuperAdminService {
             entityManager.flush();
         }
         
-        // ÉTAPE 3 : Maintenant supprimer les ventes elles-mêmes
         if (!ventesWithReferences.isEmpty()) {
             venteRepository.deleteAll(ventesWithReferences);
-            // Forcer un flush pour s'assurer que les Vente sont supprimées
             entityManager.flush();
         }
 
-        // 5.11. Supprimer toutes les caisses AVANT les utilisateurs (car elles référencent vendeur_id)
         List<Boutique> boutiquesForCaisses = boutiqueRepository.findByEntrepriseId(entrepriseId);
         for (Boutique boutique : boutiquesForCaisses) {
             List<Caisse> caisses = caisseRepository.findByBoutiqueId(boutique.getId());
@@ -745,8 +664,6 @@ public class SuperAdminService {
             }
         }
 
-        // 5.12. Supprimer toutes les sessions des utilisateurs de cette entreprise AVANT de supprimer les utilisateurs
-        // Cela évite les erreurs de contrainte de clé étrangère sur user_sessions.user_id
         entityManager.createNativeQuery(
                 "DELETE us FROM user_sessions us " +
                 "INNER JOIN user u ON us.user_id = u.id " +
@@ -754,17 +671,14 @@ public class SuperAdminService {
         ).setParameter("entrepriseId", entrepriseId).executeUpdate();
         entityManager.flush();
 
-        // 6. Supprimer tous les utilisateurs de l'entreprise (avec leurs fichiers)
         List<User> users = usersRepository.findByEntrepriseId(entrepriseId);
         for (User utilisateur : users) {
-            // Supprimer le QR Code de l'utilisateur
             if (utilisateur.getQrCodeUrl() != null && !utilisateur.getQrCodeUrl().isBlank()) {
                 try {
                     imageStorageService.deleteQrCodeImage(utilisateur.getQrCodeUrl());
                 } catch (Exception e) {
                 }
             }
-            // Supprimer la photo de l'utilisateur
             if (utilisateur.getPhoto() != null && !utilisateur.getPhoto().isBlank()) {
                 try {
                     Path photoPath = Paths.get("src/main/resources/static" + utilisateur.getPhoto());
@@ -776,21 +690,17 @@ public class SuperAdminService {
         usersRepository.deleteAll(users);
         entityManager.flush();
 
-        // 7. Supprimer toutes les factures réelles
         List<FactureReelle> facturesReelles = factureReelleRepository.findByEntrepriseId(entrepriseId);
         factureReelleRepository.deleteAll(facturesReelles);
         entityManager.flush();
 
 
-        // 9. Supprimer toutes les factures proforma
         List<FactureProForma> facturesProforma = factureProformaRepository.findByEntrepriseId(entrepriseId);
         factureProformaRepository.deleteAll(facturesProforma);
         entityManager.flush();
 
-        // 10. Supprimer tous les clients (directement liés et via EntrepriseClient) avec leurs photos
         List<Client> clients = clientRepository.findClientsByEntrepriseOrEntrepriseClient(entrepriseId);
         for (Client client : clients) {
-            // Supprimer la photo du client
             if (client.getPhoto() != null && !client.getPhoto().isBlank()) {
                 try {
                     Path photoPath = Paths.get("src/main/resources/static" + client.getPhoto());
@@ -801,32 +711,26 @@ public class SuperAdminService {
         }
         if (!clients.isEmpty()) {
             clientRepository.deleteAll(clients);
-            // Forcer un flush pour s'assurer que tous les clients sont supprimés
             entityManager.flush();
         }
-        
-        // Vérification supplémentaire avec une requête native pour s'assurer qu'il ne reste aucun client
-        // Utiliser EntityManager pour exécuter une requête native
+
         Long countClientsRestants = (Long) entityManager.createNativeQuery(
             "SELECT COUNT(*) FROM client WHERE entreprise_id = :entrepriseId"
         ).setParameter("entrepriseId", entrepriseId).getSingleResult();
         
         if (countClientsRestants > 0) {
-            // Supprimer directement avec une requête native
             entityManager.createNativeQuery(
                 "DELETE FROM client WHERE entreprise_id = :entrepriseId"
             ).setParameter("entrepriseId", entrepriseId).executeUpdate();
             entityManager.flush();
         }
 
-        // 11. Supprimer toutes les entreprises clients
         List<EntrepriseClient> entreprisesClients = entrepriseClientRepository.findByEntrepriseId(entrepriseId);
         if (!entreprisesClients.isEmpty()) {
             entrepriseClientRepository.deleteAll(entreprisesClients);
             entityManager.flush();
         }
         
-        // Vérification finale : s'assurer qu'il ne reste aucun client ou entreprise client
         Long countClientsFinal = (Long) entityManager.createNativeQuery(
             "SELECT COUNT(*) FROM client WHERE entreprise_id = :entrepriseId"
         ).setParameter("entrepriseId", entrepriseId).getSingleResult();
@@ -849,10 +753,8 @@ public class SuperAdminService {
             entityManager.flush();
         }
 
-        // 12. Supprimer tous les fournisseurs avec leurs photos (isolé par entreprise)
         List<Fournisseur> fournisseurs = fournisseurRepository.findByEntrepriseId(entrepriseId);
         for (Fournisseur fournisseur : fournisseurs) {
-            // Supprimer la photo du fournisseur
             if (fournisseur.getPhoto() != null && !fournisseur.getPhoto().isBlank()) {
                 try {
                     Path photoPath = Paths.get("src/main/resources/static" + fournisseur.getPhoto());
@@ -863,13 +765,11 @@ public class SuperAdminService {
         }
         fournisseurRepository.deleteAll(fournisseurs);
 
-        // 12.3. Supprimer tous les StockProduitFournisseur AVANT les Stock (car ils référencent stock_id)
         List<Boutique> boutiquesForStockProduitFournisseur = boutiqueRepository.findByEntrepriseId(entrepriseId);
         int totalStockProduitFournisseur = 0;
         for (Boutique boutique : boutiquesForStockProduitFournisseur) {
             List<Stock> stocks = stockRepository.findByBoutiqueId(boutique.getId());
             for (Stock stock : stocks) {
-                // Utiliser une requête native pour supprimer directement les StockProduitFournisseur
                 int deleted = entityManager.createNativeQuery(
                     "DELETE FROM stock_produit_fournisseur WHERE stock_id = :stockId"
                 ).setParameter("stockId", stock.getId()).executeUpdate();
@@ -880,7 +780,6 @@ public class SuperAdminService {
             entityManager.flush();
         }
 
-        // 12.4. Supprimer tous les Stock AVANT les produits (car ils référencent produit_id)
         List<Boutique> boutiquesForStocks = boutiqueRepository.findByEntrepriseId(entrepriseId);
         int totalStocks = 0;
         for (Boutique boutique : boutiquesForStocks) {
@@ -894,8 +793,7 @@ public class SuperAdminService {
             entityManager.flush();
         }
 
-        // 12.4.5. Supprimer toutes les Interaction qui référencent des Produit AVANT les produits (car elles référencent produit_id)
-        // Utiliser une requête native pour supprimer toutes les interactions liées aux produits de l'entreprise
+
         int totalInteractionsProduit = entityManager.createNativeQuery(
             "DELETE i FROM interactions i " +
             "INNER JOIN produit p ON i.produit_id = p.id " +
@@ -906,8 +804,6 @@ public class SuperAdminService {
             entityManager.flush();
         }
 
-        // 12.4.6. Supprimer tous les ProspectAchat qui référencent des Produit AVANT les produits (car ils référencent produit_id)
-        // Utiliser une requête native pour supprimer tous les achats de prospection liés aux produits de l'entreprise
         int totalProspectAchatsProduit = entityManager.createNativeQuery(
             "DELETE pa FROM prospect_achat pa " +
             "INNER JOIN produit p ON pa.produit_id = p.id " +
@@ -918,10 +814,8 @@ public class SuperAdminService {
             entityManager.flush();
         }
 
-        // 12.5. Supprimer les produits avec leurs photos AVANT les catégories (car ils référencent categorie_id)
         List<Produit> produits = produitRepository.findByEntrepriseId(entrepriseId);
         for (Produit produit : produits) {
-            // Supprimer la photo du produit
             if (produit.getPhoto() != null && !produit.getPhoto().isBlank()) {
                 try {
                     Path photoPath = Paths.get("src/main/resources/static" + produit.getPhoto());
@@ -935,8 +829,7 @@ public class SuperAdminService {
             entityManager.flush();
         }
         
-        // 12.5.5. Vérification supplémentaire : supprimer tous les produits restants via requête native
-        // pour s'assurer qu'aucun produit ne reste avant de supprimer les catégories
+
         Long countProduitsRestants = (Long) entityManager.createNativeQuery(
             "SELECT COUNT(*) FROM produit p " +
             "INNER JOIN boutique b ON p.boutique_id = b.id " +
@@ -944,7 +837,6 @@ public class SuperAdminService {
         ).setParameter("entrepriseId", entrepriseId).getSingleResult();
         
         if (countProduitsRestants > 0) {
-            // Supprimer tous les produits restants via requête native
             entityManager.createNativeQuery(
                 "DELETE p FROM produit p " +
                 "INNER JOIN boutique b ON p.boutique_id = b.id " +
@@ -953,31 +845,25 @@ public class SuperAdminService {
             entityManager.flush();
         }
 
-        // 13. Supprimer toutes les catégories (maintenant que tous les produits sont supprimés)
         List<Categorie> categories = categorieRepository.findByEntrepriseId(entrepriseId);
         categorieRepository.deleteAll(categories);
 
-        // 14. Supprimer toutes les unités
         List<Unite> unites = uniteRepository.findByEntrepriseId(entrepriseId);
         uniteRepository.deleteAll(unites);
 
-        // 15. Supprimer toutes les catégories de dépenses
         List<CategorieDepense> categoriesDepenses = categorieDepenseRepository.findByEntrepriseId(entrepriseId);
         categorieDepenseRepository.deleteAll(categoriesDepenses);
 
-        // 15.5. Supprimer toutes les interactions et achats de prospection AVANT les prospects (car ils référencent prospect qui référence entreprise)
         List<Prospect> prospectsForInteractions = prospectRepository.findByEntrepriseId(entrepriseId, Pageable.unpaged()).getContent();
         int totalInteractions = 0;
         int totalAchats = 0;
         for (Prospect prospect : prospectsForInteractions) {
-            // Supprimer les interactions de ce prospect
             List<Interaction> interactions = interactionRepository.findByProspectIdOrderByOccurredAtDesc(prospect.getId());
             if (!interactions.isEmpty()) {
                 totalInteractions += interactions.size();
                 interactionRepository.deleteAll(interactions);
             }
             
-            // Supprimer les achats de ce prospect
             List<ProspectAchat> achats = prospectAchatRepository.findByProspectId(prospect.getId());
             if (!achats.isEmpty()) {
                 totalAchats += achats.size();
@@ -992,30 +878,24 @@ public class SuperAdminService {
             entityManager.flush();
         }
 
-        // 16. Supprimer tous les prospects
         List<Prospect> prospects = prospectRepository.findByEntrepriseId(entrepriseId, Pageable.unpaged()).getContent();
         prospectRepository.deleteAll(prospects);
         entityManager.flush();
 
-        // 17. Supprimer tous les paiements de modules
         List<PaiementModule> paiementsModules = paiementModuleRepository.findByEntrepriseId(entrepriseId);
         paiementModuleRepository.deleteAll(paiementsModules);
 
-        // 18. Supprimer tous les essais de modules
         List<EntrepriseModuleEssai> essaisModules = entrepriseModuleEssaiRepository.findByEntreprise(entreprise);
         entrepriseModuleEssaiRepository.deleteAll(essaisModules);
 
-        // 19. Supprimer tous les abonnements de modules
         List<EntrepriseModuleAbonnement> abonnementsModules = entrepriseModuleAbonnementRepository.findByEntrepriseAndActifTrue(entreprise); 
         entrepriseModuleAbonnementRepository.deleteAll(abonnementsModules);
 
 
-        // 21. Supprimer les boutiques (les stocks ont déjà été supprimés dans la section 12.4)
         List<Boutique> boutiques = boutiqueRepository.findByEntrepriseId(entrepriseId);
         boutiqueRepository.deleteAll(boutiques);
         entityManager.flush();
 
-        // 22. Supprimer les fichiers images de l'entreprise (logo, signature, cachet)
         if (entreprise.getLogo() != null && !entreprise.getLogo().isBlank()) {
             try {
                 Path logoPath = Paths.get("src/main/resources/static" + entreprise.getLogo());
@@ -1040,25 +920,19 @@ public class SuperAdminService {
             }
         }
 
-        // 22.5. Vider la relation ManyToMany avec AppModule avant de supprimer l'entreprise
         entreprise = entrepriseRepository.findById(entrepriseId).orElse(null);
         if (entreprise != null) {
-            // Vider la collection modulesActifs pour éviter les problèmes avec la table de jointure
             if (entreprise.getModulesActifs() != null && !entreprise.getModulesActifs().isEmpty()) {
                 entreprise.getModulesActifs().clear();
                 entrepriseRepository.save(entreprise);
             }
         }
 
-        // 22.6. Forcer un flush et clear la session Hibernate pour éviter les références persistantes
         entityManager.flush();
         entityManager.clear();
 
-        // 23. Supprimer l'entreprise elle-même
-        // Recharger l'entreprise depuis la base (session propre maintenant)
         entreprise = entrepriseRepository.findById(entrepriseId).orElse(null);
         if (entreprise != null) {
-            // S'assurer que toutes les collections sont vides
             if (entreprise.getUtilisateurs() != null) {
                 entreprise.getUtilisateurs().clear();
             }
@@ -1073,16 +947,12 @@ public class SuperAdminService {
             }
             entreprise.setAdmin(null);
             
-            // Sauvegarder avant de supprimer pour s'assurer que toutes les relations sont nettoyées
             entrepriseRepository.save(entreprise);
             
-            // Forcer un flush avant la suppression
             entityManager.flush();
             
-            // Maintenant supprimer
             entrepriseRepository.delete(entreprise);
             
-            // Forcer un flush final pour s'assurer que la suppression est effectuée
             entityManager.flush();
         } else {
         }
@@ -1094,27 +964,16 @@ public class SuperAdminService {
      * 
      * Cette méthode supprime toutes les données associées à l'entreprise :
      * - Tous les utilisateurs SAUF l'admin
-     * - Toutes les données métier (ventes, produits, clients, factures, etc.)
-     * - Tous les fichiers/images associés
-     * 
-     * L'admin et l'entreprise sont conservés pour permettre une réinitialisation complète.
-     * 
-     * Réservé à l'admin lui-même (utilise son propre ID depuis le token JWT).
-     * 
-     *  user L'admin qui effectue l'opération (doit être un ADMIN)
      */
     @Transactional(rollbackFor = Exception.class)
     public void deleteEntrepriseDataButKeepAdmin(User user) {
-        // Vérifier que l'utilisateur est bien un admin
         if (user.getRole() == null || user.getRole().getName() != RoleType.ADMIN) {
             throw new RuntimeException("Accès refusé : vous devez être administrateur pour vider votre entreprise.");
         }
 
-        // Utiliser directement l'ID de l'utilisateur connecté
         Long adminId = user.getId();
         User admin = user;
 
-        // 3. Récupérer l'entreprise de l'admin
         Entreprise entreprise = admin.getEntreprise();
         if (entreprise == null) {
             throw new RuntimeException("L'admin n'a pas d'entreprise associée.");
@@ -1122,7 +981,6 @@ public class SuperAdminService {
 
         Long entrepriseId = entreprise.getId();
 
-        // 3.1. Identifier la première boutique à conserver (par ID le plus petit)
         List<Boutique> toutesBoutiques = boutiqueRepository.findByEntrepriseId(entrepriseId);
         Boutique premiereBoutique = null;
         final Long finalPremiereBoutiqueId;
@@ -1135,11 +993,9 @@ public class SuperAdminService {
             finalPremiereBoutiqueId = null;
         }
 
-        // 3. Retirer la référence admin de l'entreprise temporairement (pour éviter les erreurs)
         entreprise.setAdmin(null);
         entrepriseRepository.save(entreprise);
 
-        // 4. Supprimer toutes les dépenses générales AVANT les utilisateurs (car elles référencent creePar)
         List<DepenseGenerale> depenses = depenseGeneraleRepository.findByEntrepriseId(entrepriseId);
         for (DepenseGenerale depense : depenses) {
             if (depense.getPieceJointe() != null && !depense.getPieceJointe().isBlank()) {
@@ -1152,7 +1008,6 @@ public class SuperAdminService {
         }
         depenseGeneraleRepository.deleteAll(depenses);
 
-        // 5. Supprimer toutes les entrées générales AVANT les utilisateurs (car elles référencent creePar et responsable)
         List<EntreeGenerale> entrees = entreeGeneraleRepository.findByEntrepriseId(entrepriseId);
         for (EntreeGenerale entree : entrees) {
             if (entree.getPieceJointe() != null && !entree.getPieceJointe().isBlank()) {
@@ -1165,11 +1020,9 @@ public class SuperAdminService {
         }
         entreeGeneraleRepository.deleteAll(entrees);
 
-        // 5.5. Supprimer tous les transferts de fonds AVANT les utilisateurs (car ils référencent creePar)
         List<TransfertFonds> transferts = transfertFondsRepository.findByEntrepriseIdOrderByDateTransfertDesc(entrepriseId);
         transfertFondsRepository.deleteAll(transferts);
 
-        // 5.6. Supprimer toutes les notifications globales AVANT les utilisateurs (car elles référencent recipient)
         List<User> usersForNotifications = usersRepository.findByEntrepriseId(entrepriseId);
         for (User u : usersForNotifications) {
             List<GlobalNotification> notifications = globalNotificationRepository.findByRecipientIdOrderByCreatedAtDesc(u.getId());
@@ -1178,7 +1031,6 @@ public class SuperAdminService {
             }
         }
 
-        // 5.6.5. Supprimer tous les FactureProduit AVANT les factures (car ils référencent facture qui référence user)
         List<Boutique> boutiquesForFactureProduit = boutiqueRepository.findByEntrepriseId(entrepriseId);
         int totalFactureProduits = 0;
         for (Boutique boutique : boutiquesForFactureProduit) {
@@ -1195,12 +1047,10 @@ public class SuperAdminService {
             entityManager.flush();
         }
 
-        // 5.7. Supprimer toutes les factures (liées aux boutiques) AVANT les utilisateurs (car elles référencent user)
         List<Facture> factures = factureRepository.findAllByEntrepriseId(entrepriseId);
         factureRepository.deleteAll(factures);
         entityManager.flush();
 
-        // 5.7.5. Supprimer tous les mouvements de caisse AVANT les versements comptables (car ils référencent caisse)
         List<Boutique> boutiquesForMouvements = boutiqueRepository.findByEntrepriseId(entrepriseId);
         for (Boutique boutique : boutiquesForMouvements) {
             List<Caisse> caissesBoutique = caisseRepository.findByBoutiqueId(boutique.getId());
@@ -1212,7 +1062,6 @@ public class SuperAdminService {
             }
         }
 
-        // 5.8. Supprimer tous les versements comptables AVANT les utilisateurs (car ils référencent creePar)
         List<Boutique> boutiquesForVersements = boutiqueRepository.findByEntrepriseId(entrepriseId);
         for (Boutique boutique : boutiquesForVersements) {
             List<VersementComptable> versements = versementComptableRepository.findByCaisse_BoutiqueId(boutique.getId());
@@ -1221,7 +1070,6 @@ public class SuperAdminService {
             }
         }
 
-        // 5.9. Supprimer toutes les relations UserBoutique AVANT les utilisateurs
         for (User u : usersForNotifications) {
             List<UserBoutique> userBoutiques = userBoutiqueRepository.findByUserId(u.getId());
             if (!userBoutiques.isEmpty()) {
@@ -1229,19 +1077,16 @@ public class SuperAdminService {
             }
         }
 
-        // 5.9.5. Supprimer tous les PasswordResetToken AVANT les utilisateurs (car ils référencent User)
         for (User u : usersForNotifications) {
             passwordResetTokenRepository.deleteByUser(u);
         }
         entityManager.flush();
 
-        // 5.9.5.5. Supprimer tous les InitialPasswordToken AVANT les utilisateurs (car ils référencent User)
         for (User u : usersForNotifications) {
             initialPasswordTokenRepository.deleteByUser(u);
         }
         entityManager.flush();
 
-        // 5.9.6. Supprimer tous les paiements AVANT les utilisateurs (car ils référencent User encaissePar)
         List<FactureReelle> facturesReellesForPaiements = factureReelleRepository.findByEntrepriseId(entrepriseId);
         for (FactureReelle factureReelle : facturesReellesForPaiements) {
             int deleted = entityManager.createNativeQuery(
@@ -1250,7 +1095,6 @@ public class SuperAdminService {
         }
         entityManager.flush();
 
-        // 5.9.7. Mettre à null toutes les références User dans les FactureReelle AVANT de supprimer les User
         int facturesReellesUpdated = 0;
         for (FactureReelle factureReelle : facturesReellesForPaiements) {
             boolean updated = false;
@@ -1275,7 +1119,6 @@ public class SuperAdminService {
             entityManager.flush();
         }
 
-        // 5.9.8. Mettre à null toutes les références User dans les FactureProForma AVANT de supprimer les User
         List<FactureProForma> facturesProformaForNull = factureProformaRepository.findByEntrepriseId(entrepriseId);
         int facturesProformaUpdated = 0;
         for (FactureProForma factureProforma : facturesProformaForNull) {
@@ -1317,10 +1160,8 @@ public class SuperAdminService {
             entityManager.flush();
         }
 
-        // 5.9.9. Supprimer toutes les NoteFactureProForma AVANT les utilisateurs (car elles référencent User auteur)
         List<FactureProForma> facturesProformaForNotes = factureProformaRepository.findByEntrepriseId(entrepriseId);
         for (FactureProForma facture : facturesProformaForNotes) {
-            // Supprimer les notes de cette facture (isolé par entreprise)
             Long factureEntrepriseId = facture.getEntreprise() != null ? facture.getEntreprise().getId() : null;
             if (factureEntrepriseId != null) {
                 List<NoteFactureProForma> notes = noteFactureProFormaRepository.findByFactureProFormaIdAndEntrepriseId(
@@ -1332,14 +1173,12 @@ public class SuperAdminService {
         }
         entityManager.flush();
 
-        // 5.9.10. Supprimer tous les FactProHistoriqueAction AVANT les utilisateurs (car ils référencent User utilisateur)
         List<FactureProForma> facturesProformaForHistoriques = factureProformaRepository.findByEntrepriseId(entrepriseId);
         for (FactureProForma facture : facturesProformaForHistoriques) {
             factProHistoriqueActionRepository.deleteByFacture(facture);
         }
         entityManager.flush();
 
-        // 5.9.11. Supprimer tous les StockHistory AVANT les utilisateurs (car ils référencent User)
         int totalStockHistories = entityManager.createNativeQuery(
             "DELETE sh FROM stock_history sh " +
             "INNER JOIN stock s ON sh.stock_id = s.id " +
@@ -1351,10 +1190,8 @@ public class SuperAdminService {
             entityManager.flush();
         }
 
-        // 5.10. Supprimer d'abord les entités qui référencent les ventes, puis les ventes elles-mêmes
         List<Vente> ventesWithReferences = venteRepository.findAllByEntrepriseId(entrepriseId);
         
-        // ÉTAPE 1 : Supprimer les historiques et factures de vente AVANT de modifier les ventes
         int totalHistoriques = 0;
         int[] totalFacturesVente = {0};
         for (Vente vente : ventesWithReferences) {
@@ -1364,7 +1201,6 @@ public class SuperAdminService {
                 venteHistoriqueRepository.deleteAll(historiques);
             }
             
-            // Supprimer les factures de vente pour cette vente spécifique (isolé par entreprise)
             Long venteEntrepriseId = vente.getBoutique() != null && vente.getBoutique().getEntreprise() != null 
                     ? vente.getBoutique().getEntreprise().getId() : null;
             if (venteEntrepriseId != null) {
@@ -1383,7 +1219,6 @@ public class SuperAdminService {
         
         entityManager.flush();
         
-        // ÉTAPE 2 : Maintenant mettre à null les références dans les ventes
         int ventesUpdated = 0;
         for (Vente vente : ventesWithReferences) {
             boolean updated = false;
@@ -1416,13 +1251,11 @@ public class SuperAdminService {
             entityManager.flush();
         }
         
-        // ÉTAPE 3 : Maintenant supprimer les ventes elles-mêmes
         if (!ventesWithReferences.isEmpty()) {
             venteRepository.deleteAll(ventesWithReferences);
             entityManager.flush();
         }
 
-        // 5.11. Supprimer toutes les caisses AVANT les utilisateurs (car elles référencent vendeur_id)
         List<Boutique> boutiquesForCaisses = boutiqueRepository.findByEntrepriseId(entrepriseId);
         for (Boutique boutique : boutiquesForCaisses) {
             List<Caisse> caisses = caisseRepository.findByBoutiqueId(boutique.getId());
@@ -1431,8 +1264,7 @@ public class SuperAdminService {
             }
         }
 
-        // 5.12. Supprimer toutes les sessions des utilisateurs de cette entreprise SAUF celle de l'admin
-        // Supprimer les sessions de tous les utilisateurs sauf l'admin
+
         entityManager.createNativeQuery(
                 "DELETE us FROM user_sessions us " +
                 "INNER JOIN user u ON us.user_id = u.id " +
@@ -1442,22 +1274,18 @@ public class SuperAdminService {
          .executeUpdate();
         entityManager.flush();
 
-        // 6. Supprimer tous les utilisateurs de l'entreprise SAUF l'admin (avec leurs fichiers)
         List<User> users = usersRepository.findByEntrepriseId(entrepriseId);
         for (User utilisateur : users) {
-            // Ne pas supprimer l'admin
             if (utilisateur.getId().equals(adminId)) {
                 continue;
             }
             
-            // Supprimer le QR Code de l'utilisateur
             if (utilisateur.getQrCodeUrl() != null && !utilisateur.getQrCodeUrl().isBlank()) {
                 try {
                     imageStorageService.deleteQrCodeImage(utilisateur.getQrCodeUrl());
                 } catch (Exception e) {
                 }
             }
-            // Supprimer la photo de l'utilisateur
             if (utilisateur.getPhoto() != null && !utilisateur.getPhoto().isBlank()) {
                 try {
                     Path photoPath = Paths.get("src/main/resources/static" + utilisateur.getPhoto());
@@ -1466,24 +1294,20 @@ public class SuperAdminService {
                 }
             }
         }
-        // Supprimer tous les utilisateurs sauf l'admin
         users.removeIf(u -> u.getId().equals(adminId));
         if (!users.isEmpty()) {
             usersRepository.deleteAll(users);
             entityManager.flush();
         }
 
-        // 7. Supprimer toutes les factures réelles
         List<FactureReelle> facturesReelles = factureReelleRepository.findByEntrepriseId(entrepriseId);
         factureReelleRepository.deleteAll(facturesReelles);
         entityManager.flush();
 
-        // 9. Supprimer toutes les factures proforma
         List<FactureProForma> facturesProforma = factureProformaRepository.findByEntrepriseId(entrepriseId);
         factureProformaRepository.deleteAll(facturesProforma);
         entityManager.flush();
 
-        // 10. Supprimer tous les clients (directement liés et via EntrepriseClient) avec leurs photos
         List<Client> clients = clientRepository.findClientsByEntrepriseOrEntrepriseClient(entrepriseId);
         for (Client client : clients) {
             if (client.getPhoto() != null && !client.getPhoto().isBlank()) {
@@ -1499,7 +1323,6 @@ public class SuperAdminService {
             entityManager.flush();
         }
         
-        // Vérification supplémentaire avec une requête native pour s'assurer qu'il ne reste aucun client
         Long countClientsRestants = (Long) entityManager.createNativeQuery(
             "SELECT COUNT(*) FROM client WHERE entreprise_id = :entrepriseId"
         ).setParameter("entrepriseId", entrepriseId).getSingleResult();
@@ -1511,14 +1334,12 @@ public class SuperAdminService {
             entityManager.flush();
         }
 
-        // 11. Supprimer toutes les entreprises clients
         List<EntrepriseClient> entreprisesClients = entrepriseClientRepository.findByEntrepriseId(entrepriseId);
         if (!entreprisesClients.isEmpty()) {
             entrepriseClientRepository.deleteAll(entreprisesClients);
             entityManager.flush();
         }
         
-        // Vérification finale : s'assurer qu'il ne reste aucun client ou entreprise client
         Long countClientsFinal = (Long) entityManager.createNativeQuery(
             "SELECT COUNT(*) FROM client WHERE entreprise_id = :entrepriseId"
         ).setParameter("entrepriseId", entrepriseId).getSingleResult();
@@ -1541,7 +1362,6 @@ public class SuperAdminService {
             entityManager.flush();
         }
 
-        // 12. Supprimer tous les fournisseurs avec leurs photos (isolé par entreprise)
         List<Fournisseur> fournisseurs = fournisseurRepository.findByEntrepriseId(entrepriseId);
         for (Fournisseur fournisseur : fournisseurs) {
             if (fournisseur.getPhoto() != null && !fournisseur.getPhoto().isBlank()) {
@@ -1554,7 +1374,6 @@ public class SuperAdminService {
         }
         fournisseurRepository.deleteAll(fournisseurs);
 
-        // 12.3. Supprimer tous les StockProduitFournisseur AVANT les Stock (car ils référencent stock_id)
         List<Boutique> boutiquesForStockProduitFournisseur = boutiqueRepository.findByEntrepriseId(entrepriseId);
         for (Boutique boutique : boutiquesForStockProduitFournisseur) {
             List<Stock> stocks = stockRepository.findByBoutiqueId(boutique.getId());
@@ -1566,7 +1385,6 @@ public class SuperAdminService {
         }
         entityManager.flush();
 
-        // 12.4. Supprimer tous les Stock AVANT les produits (car ils référencent produit_id)
         List<Boutique> boutiquesForStocks = boutiqueRepository.findByEntrepriseId(entrepriseId);
         for (Boutique boutique : boutiquesForStocks) {
             List<Stock> stocks = stockRepository.findByBoutiqueId(boutique.getId());
@@ -1576,7 +1394,6 @@ public class SuperAdminService {
         }
         entityManager.flush();
 
-        // 12.4.5. Supprimer toutes les Interaction qui référencent des Produit AVANT les produits (car elles référencent produit_id)
         int totalInteractionsProduit = entityManager.createNativeQuery(
             "DELETE i FROM interactions i " +
             "INNER JOIN produit p ON i.produit_id = p.id " +
@@ -1587,7 +1404,6 @@ public class SuperAdminService {
             entityManager.flush();
         }
 
-        // 12.4.6. Supprimer tous les ProspectAchat qui référencent des Produit AVANT les produits (car ils référencent produit_id)
         int totalProspectAchatsProduit = entityManager.createNativeQuery(
             "DELETE pa FROM prospect_achat pa " +
             "INNER JOIN produit p ON pa.produit_id = p.id " +
@@ -1598,8 +1414,7 @@ public class SuperAdminService {
             entityManager.flush();
         }
 
-        // 12.5. Supprimer les produits avec leurs photos AVANT les catégories (car ils référencent categorie_id)
-        // Exclure les produits de la première boutique (ils seront supprimés dans la section 12.5.5)
+ 
         List<Produit> produits = produitRepository.findByEntrepriseId(entrepriseId);
         if (finalPremiereBoutiqueId != null) {
             produits = produits.stream()
@@ -1620,7 +1435,6 @@ public class SuperAdminService {
             entityManager.flush();
         }
 
-        // 12.5.5. Supprimer les produits de la première boutique AVANT les catégories
         if (premiereBoutique != null) {
             List<Produit> produitsPremiereBoutique = produitRepository.findByBoutique(premiereBoutique);
             for (Produit produit : produitsPremiereBoutique) {
@@ -1638,19 +1452,15 @@ public class SuperAdminService {
             }
         }
 
-        // 13. Supprimer toutes les catégories (maintenant que tous les produits sont supprimés)
         List<Categorie> categories = categorieRepository.findByEntrepriseId(entrepriseId);
         categorieRepository.deleteAll(categories);
 
-        // 14. Supprimer toutes les unités
         List<Unite> unites = uniteRepository.findByEntrepriseId(entrepriseId);
         uniteRepository.deleteAll(unites);
 
-        // 15. Supprimer toutes les catégories de dépenses
         List<CategorieDepense> categoriesDepenses = categorieDepenseRepository.findByEntrepriseId(entrepriseId);
         categorieDepenseRepository.deleteAll(categoriesDepenses);
 
-        // 15.5. Supprimer toutes les interactions et achats de prospection AVANT les prospects (car ils référencent prospect qui référence entreprise)
         List<Prospect> prospectsForInteractions = prospectRepository.findByEntrepriseId(entrepriseId, Pageable.unpaged()).getContent();
         for (Prospect prospect : prospectsForInteractions) {
             List<Interaction> interactions = interactionRepository.findByProspectIdOrderByOccurredAtDesc(prospect.getId());
@@ -1665,7 +1475,6 @@ public class SuperAdminService {
         }
         entityManager.flush();
 
-        // 16. Supprimer tous les prospects
         List<Prospect> prospects = prospectRepository.findByEntrepriseId(entrepriseId, Pageable.unpaged()).getContent();
         prospectRepository.deleteAll(prospects);
         entityManager.flush();
@@ -1687,9 +1496,7 @@ public class SuperAdminService {
         if (premiereBoutique != null && !boutiques.isEmpty() && finalPremiereBoutiqueId != null) {
             Long premiereBoutiqueId = finalPremiereBoutiqueId;
             
-            // 21.1. Vider le contenu de la première boutique
             
-            // 21.1.1. Supprimer tous les FactureProduit de la première boutique
             List<Facture> facturesPremiereBoutique = factureRepository.findByBoutiqueIdAndEntrepriseId(
                     premiereBoutiqueId, entrepriseId);
             for (Facture facture : facturesPremiereBoutique) {
@@ -1699,11 +1506,9 @@ public class SuperAdminService {
             }
             entityManager.flush();
             
-            // 21.1.2. Supprimer toutes les factures de la première boutique
             factureRepository.deleteAll(facturesPremiereBoutique);
             entityManager.flush();
             
-            // 21.1.3. Supprimer tous les mouvements de caisse de la première boutique
             List<Caisse> caissesPremiereBoutique = caisseRepository.findByBoutiqueId(premiereBoutiqueId);
             for (Caisse caisse : caissesPremiereBoutique) {
                 List<MouvementCaisse> mouvements = mouvementCaisseRepository.findByCaisseId(caisse.getId());
@@ -1713,27 +1518,23 @@ public class SuperAdminService {
             }
             entityManager.flush();
             
-            // 21.1.4. Supprimer tous les versements comptables de la première boutique
             List<VersementComptable> versementsPremiereBoutique = versementComptableRepository.findByCaisse_BoutiqueId(premiereBoutiqueId);
             if (!versementsPremiereBoutique.isEmpty()) {
                 versementComptableRepository.deleteAll(versementsPremiereBoutique);
             }
             entityManager.flush();
             
-            // 21.1.5. Supprimer toutes les caisses de la première boutique
             if (!caissesPremiereBoutique.isEmpty()) {
                 caisseRepository.deleteAll(caissesPremiereBoutique);
             }
             entityManager.flush();
             
-            // 21.1.6. Supprimer toutes les relations UserBoutique de la première boutique
             List<UserBoutique> userBoutiquesPremiere = userBoutiqueRepository.findByBoutiqueId(premiereBoutiqueId);
             if (!userBoutiquesPremiere.isEmpty()) {
                 userBoutiqueRepository.deleteAll(userBoutiquesPremiere);
             }
             entityManager.flush();
             
-            // 21.1.7. Supprimer tous les StockProduitFournisseur de la première boutique
             List<Stock> stocksPremiereBoutique = stockRepository.findByBoutiqueId(premiereBoutiqueId);
             for (Stock stock : stocksPremiereBoutique) {
                 entityManager.createNativeQuery(
@@ -1742,13 +1543,11 @@ public class SuperAdminService {
             }
             entityManager.flush();
             
-            // 21.1.8. Supprimer tous les Stock de la première boutique
             if (!stocksPremiereBoutique.isEmpty()) {
                 stockRepository.deleteAll(stocksPremiereBoutique);
             }
             entityManager.flush();
             
-            // 21.1.9. Supprimer toutes les Interactions liées aux produits de la première boutique
             int interactionsPremiereBoutique = entityManager.createNativeQuery(
                 "DELETE i FROM interactions i " +
                 "INNER JOIN produit p ON i.produit_id = p.id " +
@@ -1758,7 +1557,6 @@ public class SuperAdminService {
                 entityManager.flush();
             }
             
-            // 21.1.10. Supprimer tous les ProspectAchat liés aux produits de la première boutique
             int prospectAchatsPremiereBoutique = entityManager.createNativeQuery(
                 "DELETE pa FROM prospect_achat pa " +
                 "INNER JOIN produit p ON pa.produit_id = p.id " +
@@ -1768,19 +1566,15 @@ public class SuperAdminService {
                 entityManager.flush();
             }
             
-            // 21.1.11. Les produits de la première boutique ont déjà été supprimés dans la section 12.5.5
-            // Pas besoin de les supprimer à nouveau ici
+
             
-            // 21.1.12. Supprimer toutes les ventes de la première boutique
             List<Vente> ventesPremiereBoutique = venteRepository.findByBoutiqueId(premiereBoutiqueId);
             for (Vente vente : ventesPremiereBoutique) {
-                // Supprimer les historiques de vente
                 List<VenteHistorique> historiques = venteHistoriqueRepository.findByVenteId(vente.getId());
                 if (!historiques.isEmpty()) {
                     venteHistoriqueRepository.deleteAll(historiques);
                 }
                 
-                // Supprimer les factures de vente (isolé par entreprise)
                 Long venteEntrepriseId = vente.getBoutique() != null && vente.getBoutique().getEntreprise() != null 
                         ? vente.getBoutique().getEntreprise().getId() : null;
                 if (venteEntrepriseId != null) {
@@ -1790,7 +1584,6 @@ public class SuperAdminService {
             }
             entityManager.flush();
             
-            // Mettre à null les références dans les ventes avant de les supprimer
             for (Vente vente : ventesPremiereBoutique) {
                 vente.setCaisse(null);
                 vente.setVendeur(null);
@@ -1806,7 +1599,6 @@ public class SuperAdminService {
             }
             entityManager.flush();
             
-            // 21.2. Supprimer toutes les autres boutiques (sauf la première)
             List<Boutique> autresBoutiques = boutiques.stream()
                     .filter(b -> !b.getId().equals(premiereBoutiqueId))
                     .collect(Collectors.toList());
@@ -1816,14 +1608,12 @@ public class SuperAdminService {
             }
             entityManager.flush();
         } else {
-            // Si pas de première boutique, supprimer toutes les boutiques
             if (!boutiques.isEmpty()) {
                 boutiqueRepository.deleteAll(boutiques);
                 entityManager.flush();
             }
         }
 
-        // 22. Supprimer les fichiers images de l'entreprise (logo, signature, cachet)
         if (entreprise.getLogo() != null && !entreprise.getLogo().isBlank()) {
             try {
                 Path logoPath = Paths.get("src/main/resources/static" + entreprise.getLogo());
@@ -1858,14 +1648,11 @@ public class SuperAdminService {
         //     }
         // }
 
-        // 22.6. Forcer un flush et clear la session Hibernate
         entityManager.flush();
         entityManager.clear();
 
-        // 23. Remettre la référence admin sur l'entreprise (car on l'avait retirée au début)
         entreprise = entrepriseRepository.findById(entrepriseId).orElse(null);
         if (entreprise != null) {
-            // S'assurer que toutes les collections sont vides (SAUF les modules actifs pour conserver les essais)
             if (entreprise.getUtilisateurs() != null) {
                 entreprise.getUtilisateurs().clear();
             }
@@ -1899,24 +1686,19 @@ public class SuperAdminService {
      * Utile lors des mises à jour système pour forcer tous les utilisateurs à se reconnecter.
      * Fonctionne même si les utilisateurs n'ont pas de session (anciens tokens sans session).
      * 
-     * @param superAdmin L'utilisateur SUPER_ADMIN qui effectue l'opération
      */
     @Transactional(rollbackFor = Exception.class)
     public void deconnecterTousLesUtilisateurs(User superAdmin) {
         ensureSuperAdmin(superAdmin);
 
-        // 1. Supprimer toutes les sessions actives de la base de données (si elles existent)
-        // Cela déconnecte les utilisateurs qui ont des sessions dans le nouveau système
+   
         List<com.xpertcash.entity.UserSession> allSessions = userSessionRepository.findAll();
         if (!allSessions.isEmpty()) {
             userSessionRepository.deleteAll(allSessions);
             entityManager.flush();
         }
 
-        // 2. Mettre à jour le lastActivity de tous les utilisateurs pour invalider leurs tokens JWT
-        // Cela force TOUS les tokens existants (avec ou sans session) à être considérés comme révoqués
-        // Lors de la prochaine requête, le système vérifie si userLastActivity > tokenLastActivity
-        // et rejette le token si c'est le cas
+
         List<User> allUsers = usersRepository.findAll();
         LocalDateTime now = LocalDateTime.now();
         for (User user : allUsers) {
@@ -1925,9 +1707,7 @@ public class SuperAdminService {
         }
         entityManager.flush();
 
-        // Résultat : Tous les utilisateurs devront se reconnecter car :
-        // - Leurs sessions sont supprimées (s'ils en avaient)
-        // - Leurs tokens JWT sont invalidés (userLastActivity > tokenLastActivity)
+    
     }
 }
 

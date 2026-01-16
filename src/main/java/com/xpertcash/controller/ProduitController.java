@@ -61,9 +61,9 @@ public class ProduitController {
     try {
         // Vérification de l'image reçue
         if (imageFile != null) {
-            System.out.println("📸 Image reçue : " + imageFile.getOriginalFilename());
+            System.out.println(" Image reçue : " + imageFile.getOriginalFilename());
         } else {
-            System.out.println("🚫 Aucune image reçue !");
+            System.out.println(" Aucune image reçue !");
         }
 
         ObjectMapper objectMapper = new ObjectMapper();
@@ -89,7 +89,7 @@ public class ProduitController {
         String photo = null;
         if (imageFile != null && !imageFile.isEmpty()) {
             photo = imageStorageService.saveImage(imageFile);
-            System.out.println("✅ URL enregistrée : " + photo);
+            System.out.println(" URL enregistrée : " + photo);
         }
         produitRequest.setPhoto(photo); // Ajouter l'URL de l'image au produit
 
@@ -101,7 +101,7 @@ public class ProduitController {
 
     } catch (DuplicateProductException e) {
         // Gestion des erreurs de duplication de produit
-        System.out.println("⚠️ Produit déjà existant : " + e.getMessage());
+        System.out.println(" Produit déjà existant : " + e.getMessage());
         Map<String, String> errorResponse = new HashMap<>();
         errorResponse.put("error", e.getMessage());
         return ResponseEntity.status(HttpStatus.CONFLICT).body(errorResponse);
@@ -125,7 +125,7 @@ public ResponseEntity<?> updateProduit(
         @RequestParam boolean addToStock,
         HttpServletRequest request) {
     try {
-        // ✅ Créer l'ObjectMapper et activer le module JavaTime pour LocalDate/LocalDateTime
+        //  Créer l'ObjectMapper et activer le module JavaTime pour LocalDate/LocalDateTime
         ObjectMapper objectMapper = new ObjectMapper();
         objectMapper.registerModule(new JavaTimeModule());
         objectMapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);

@@ -11,11 +11,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-/**
- * Service helper pour gérer l'authentification avec UUID
- * Ce service facilite la transition et centralise la logique d'extraction d'utilisateur
- * Supporte maintenant la gestion des sessions multiples par appareil
- */
+
 @Service
 public class AuthenticationHelper {
 
@@ -41,19 +37,16 @@ public class AuthenticationHelper {
         }
         String token = authHeader.substring(7);
 
-        // 🔒 Valider la signature et l'expiration du token
         Claims claims = jwtUtil.extractAllClaimsSafe(token);
         if (claims == null) {
             throw new RuntimeException("Token invalide ou expiré. Veuillez vous reconnecter.");
         }
 
-        // 🔒 Récupérer l'UUID utilisateur
         String userUuid = claims.getSubject();
         if (userUuid == null || userUuid.trim().isEmpty()) {
             throw new RuntimeException("UUID utilisateur non trouvé dans le token");
         }
 
-        // 🔒 Vérifier la session si sessionId présent (nouveau système)
         Object sessionIdClaim = claims.get("sessionId");
         if (sessionIdClaim != null) {
             Long sessionId = ((Number) sessionIdClaim).longValue();
@@ -63,21 +56,18 @@ public class AuthenticationHelper {
                 throw new RuntimeException("Session invalide ou expirée. Veuillez vous reconnecter.");
             }
             
-            // Vérifier que le token correspond à la session (si sessionToken n'est pas null)
-            // Permet de gérer les cas où le token n'a pas encore été mis à jour
+
             if (session.get().getSessionToken() != null && !token.equals(session.get().getSessionToken())) {
                 throw new RuntimeException("Token ne correspond pas à la session. Veuillez vous reconnecter.");
             }
             
-            // Mettre à jour la dernière activité de la session (optimisé : query directe)
-            // On met à jour seulement si la dernière activité date de plus de 1 minute (évite trop de requêtes)
+            
             LocalDateTime now = LocalDateTime.now();
             if (session.get().getLastActivity() == null || 
                 session.get().getLastActivity().isBefore(now.minusMinutes(1))) {
                 userSessionRepository.updateLastActivity(sessionId, now);
             }
         } else {
-            // 🔒 Fallback : vérifier lastActivity pour les anciens tokens (compatibilité)
         User user = usersRepository.findByUuid(userUuid)
                 .orElseThrow(() -> new RuntimeException("Utilisateur introuvable avec UUID: " + userUuid));
 
@@ -99,7 +89,6 @@ public class AuthenticationHelper {
             return user;
         }
 
-        // Récupérer l'utilisateur
         User user = usersRepository.findByUuid(userUuid)
                 .orElseThrow(() -> new RuntimeException("Utilisateur introuvable avec UUID: " + userUuid));
 
@@ -120,21 +109,13 @@ public class AuthenticationHelper {
         return userUuid;
     }
 
-    /**
-     * Méthode LEGACY - Extrait l'ID de l'utilisateur depuis la requête HTTP
-     * @deprecated Utiliser getAuthenticatedUserUuid() à la place
-     */
     @Deprecated
     public Long getAuthenticatedUserId(HttpServletRequest request) {
         User user = getAuthenticatedUser(request);
         return user.getId();
     }
 
-    /**
-     * Extrait le token JWT depuis l'header Authorization
-     * Valide la signature et l'expiration (mais pas lastActivity pour éviter double requête)
-     * La vérification lastActivity est faite dans getAuthenticatedUser pour optimiser
-     */
+
     private String extractTokenFromRequest(HttpServletRequest request) {
         String authHeader = request.getHeader("Authorization");
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
@@ -142,7 +123,6 @@ public class AuthenticationHelper {
         }
         String token = authHeader.substring(7);
 
-        // 🔒 Valider la signature et l'expiration du token
         Claims claims = jwtUtil.extractAllClaimsSafe(token);
         if (claims == null) {
             throw new RuntimeException("Token invalide ou expiré. Veuillez vous reconnecter.");
@@ -163,11 +143,7 @@ public class AuthenticationHelper {
         }
     }
 
-    /**
-     * Méthode de transition - essaie UUID d'abord, puis ID si échec
-     * À utiliser temporairement pendant la migration
-     * Optimisé : vérifie d'abord la session, puis lastActivity pour compatibilité
-     */
+
     public User getAuthenticatedUserWithFallback(HttpServletRequest request) {
         String authHeader = request.getHeader("Authorization");
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
@@ -175,17 +151,14 @@ public class AuthenticationHelper {
         }
         String token = authHeader.substring(7);
 
-        // 🔒 Valider la signature et l'expiration du token
         Claims claims = jwtUtil.extractAllClaimsSafe(token);
         if (claims == null) {
             throw new RuntimeException("Token invalide ou expiré. Veuillez vous reconnecter.");
         }
 
-        // Essayer d'abord avec UUID et session
         try {
             String userUuid = claims.getSubject();
             if (userUuid != null && isUuidBasedToken(token)) {
-                // Vérifier la session si sessionId présent
                 Object sessionIdClaim = claims.get("sessionId");
                 if (sessionIdClaim != null) {
                     Long sessionId = ((Number) sessionIdClaim).longValue();
@@ -202,7 +175,6 @@ public class AuthenticationHelper {
                     session.get().updateLastActivity();
                     userSessionRepository.save(session.get());
                 } else {
-                    // Fallback : vérifier lastActivity pour les anciens tokens
                 User user = usersRepository.findByUuid(userUuid)
                         .orElseThrow(() -> new RuntimeException("Utilisateur introuvable avec UUID: " + userUuid));
                 
@@ -222,18 +194,16 @@ public class AuthenticationHelper {
                 return user;
                 }
                 
-                // Récupérer l'utilisateur après validation de session
                 return usersRepository.findByUuid(userUuid)
                         .orElseThrow(() -> new RuntimeException("Utilisateur introuvable avec UUID: " + userUuid));
             }
         } catch (RuntimeException e) {
             if (e.getMessage().contains("Token révoqué") || e.getMessage().contains("Session invalide") || e.getMessage().contains("Token ne correspond pas")) {
-                throw e; // Propager l'erreur de révocation
+                throw e;
             }
-            System.out.println("⚠️ Échec extraction UUID, tentative avec ID legacy...");
+            System.out.println(" Échec extraction UUID, tentative avec ID legacy...");
         }
         
-        // Fallback vers l'ancienne méthode avec ID (pas de vérification pour compatibilité)
         try {
             Long userId = jwtUtil.extractUserId(token);
             if (userId != null) {

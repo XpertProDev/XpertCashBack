@@ -75,7 +75,7 @@ public class EntreeGenerale {
     @Column(nullable = false)
     private LocalDateTime dateCreation;
 
-    // 🔗 Champs pour lier les entrées de paiement aux dettes
+    //  Champs pour lier les entrées de paiement aux dettes
     @Column(name = "dette_id")
     private Long detteId; // ID de la dette payée (vente_id pour VENTE_CREDIT, entree_generale_id pour ENTREE_DETTE)
 

@@ -83,7 +83,7 @@ public class MailService {
     
      // Méthode d'envoi d'email pour relancer une facture
      public void sendRelanceeEmail(String to, String fullName, String factureNumero, String clientName, Date relanceDate, boolean estEntreprise) throws MessagingException {
-        System.out.println("📧 Envoi d'un email à : " + to);
+        System.out.println(" Envoi d'un email à : " + to);
         String subject = "Relance de la facture " + factureNumero;
         SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm");
         String formattedDate = sdf.format(relanceDate);
@@ -112,7 +112,7 @@ public class MailService {
     
     //ici
     public void sendEmail(String toEmail, String subject, String htmlContent) throws MessagingException {
-    logger.info("📧 Tentative d'envoi d'email - Destinataire: {}, Sujet: {}, Expéditeur: {}, Host: {}, Port: {}", 
+    logger.info(" Tentative d'envoi d'email - Destinataire: {}, Sujet: {}, Expéditeur: {}, Host: {}, Port: {}", 
         toEmail, subject, from, mailHost, mailPort);
     
     try {
@@ -123,7 +123,7 @@ public class MailService {
             helper.setFrom(from, "Tchakeda");
             logger.debug("Expéditeur configuré: {}", from);
         } catch (UnsupportedEncodingException e) {
-            logger.error("❌ Erreur lors de la configuration de l'expéditeur: {}", e.getMessage(), e);
+            logger.error(" Erreur lors de la configuration de l'expéditeur: {}", e.getMessage(), e);
             throw new MessagingException("Erreur lors de la configuration de l'expéditeur", e);
         }
     helper.setTo(toEmail);
@@ -133,7 +133,7 @@ public class MailService {
     try {
         InputStream logoStream = getClass().getClassLoader().getResourceAsStream("assets/tchakeda.png");
         if (logoStream == null) {
-                logger.warn("⚠️ Logo image not found in resources");
+                logger.warn(" Logo image not found in resources");
             throw new MessagingException("Logo image not found in resources.");
         }
 
@@ -141,22 +141,22 @@ public class MailService {
         helper.addInline("logo", logoDataSource);
             logger.debug("Logo ajouté au message");
     } catch (IOException e) {
-            logger.error("❌ Erreur lors du chargement du logo: {}", e.getMessage(), e);
+            logger.error(" Erreur lors du chargement du logo: {}", e.getMessage(), e);
         throw new MessagingException("Error loading logo image", e);
     }
 
         logger.info("Envoi du message email en cours...");
     mailSender.send(message);
-        logger.info("✅ Email envoyé avec succès à {}", toEmail);
+        logger.info(" Email envoyé avec succès à {}", toEmail);
     } catch (jakarta.mail.AuthenticationFailedException e) {
-        logger.error("❌ ÉCHEC D'AUTHENTIFICATION EMAIL - Host: {}, Port: {}, User: {}, Erreur: {}", 
+        logger.error(" ÉCHEC D'AUTHENTIFICATION EMAIL - Host: {}, Port: {}, User: {}, Erreur: {}", 
             mailHost, mailPort, from, e.getMessage(), e);
         throw new MessagingException("Échec d'authentification email: " + e.getMessage(), e);
     } catch (MessagingException e) {
-        logger.error("❌ Erreur lors de l'envoi de l'email à {} - Erreur: {}", toEmail, e.getMessage(), e);
+        logger.error(" Erreur lors de l'envoi de l'email à {} - Erreur: {}", toEmail, e.getMessage(), e);
         throw e;
     } catch (Exception e) {
-        logger.error("❌ Erreur inattendue lors de l'envoi de l'email à {} - Erreur: {}", toEmail, e.getMessage(), e);
+        logger.error(" Erreur inattendue lors de l'envoi de l'email à {} - Erreur: {}", toEmail, e.getMessage(), e);
         throw new MessagingException("Erreur inattendue lors de l'envoi de l'email", e);
     }
 }
@@ -170,7 +170,7 @@ public class MailService {
 
     // Méthode pour envoyer des emails de facture avec le compte facture@tchakeda.com
     public void sendFactureEmail(String toEmail, String subject, String htmlContent) throws MessagingException {
-        logger.info("📧 Tentative d'envoi d'email FACTURE - Destinataire: {}, Sujet: {}, Expéditeur: {}", 
+        logger.info(" Tentative d'envoi d'email FACTURE - Destinataire: {}, Sujet: {}, Expéditeur: {}", 
             toEmail, subject, factureFrom);
     
         try {
@@ -181,7 +181,7 @@ public class MailService {
                 helper.setFrom(factureFrom, "Tchakeda");
                 logger.debug("Expéditeur facture configuré: {}", factureFrom);
             } catch (UnsupportedEncodingException e) {
-                logger.error("❌ Erreur lors de la configuration de l'expéditeur facture: {}", e.getMessage(), e);
+                logger.error(" Erreur lors de la configuration de l'expéditeur facture: {}", e.getMessage(), e);
                 throw new MessagingException("Erreur lors de la configuration de l'expéditeur facture", e);
             }
             helper.setTo(toEmail);
@@ -191,7 +191,7 @@ public class MailService {
             try {
                 InputStream logoStream = getClass().getClassLoader().getResourceAsStream("assets/tchakeda.png");
                 if (logoStream == null) {
-                    logger.warn("⚠️ Logo image not found in resources");
+                    logger.warn(" Logo image not found in resources");
                     throw new MessagingException("Logo image not found in resources.");
                 }
 
@@ -199,22 +199,22 @@ public class MailService {
                 helper.addInline("logo", logoDataSource);
                 logger.debug("Logo ajouté au message facture");
             } catch (IOException e) {
-                logger.error("❌ Erreur lors du chargement du logo: {}", e.getMessage(), e);
+                logger.error(" Erreur lors du chargement du logo: {}", e.getMessage(), e);
                 throw new MessagingException("Error loading logo image", e);
             }
 
             logger.info("Envoi du message email facture en cours...");
             factureMailSender.send(message);
-            logger.info("✅ Email facture envoyé avec succès à {}", toEmail);
+            logger.info(" Email facture envoyé avec succès à {}", toEmail);
         } catch (jakarta.mail.AuthenticationFailedException e) {
-            logger.error("❌ ÉCHEC D'AUTHENTIFICATION EMAIL FACTURE - User: {}, Erreur: {}", 
+            logger.error(" ÉCHEC D'AUTHENTIFICATION EMAIL FACTURE - User: {}, Erreur: {}", 
                 factureFrom, e.getMessage(), e);
             throw new MessagingException("Échec d'authentification email facture: " + e.getMessage(), e);
         } catch (MessagingException e) {
-            logger.error("❌ Erreur lors de l'envoi de l'email facture à {} - Erreur: {}", toEmail, e.getMessage(), e);
+            logger.error(" Erreur lors de l'envoi de l'email facture à {} - Erreur: {}", toEmail, e.getMessage(), e);
             throw e;
         } catch (Exception e) {
-            logger.error("❌ Erreur inattendue lors de l'envoi de l'email facture à {} - Erreur: {}", toEmail, e.getMessage(), e);
+            logger.error(" Erreur inattendue lors de l'envoi de l'email facture à {} - Erreur: {}", toEmail, e.getMessage(), e);
             throw new MessagingException("Erreur inattendue lors de l'envoi de l'email facture", e);
         }
     }
@@ -227,7 +227,7 @@ public class MailService {
         String htmlContent,
         List<MultipartFile> attachments
     ) throws MessagingException, IOException {
-        logger.info("📧 Tentative d'envoi d'email FACTURE avec pièces jointes - Destinataire: {}, Sujet: {}, Expéditeur: {}", 
+        logger.info(" Tentative d'envoi d'email FACTURE avec pièces jointes - Destinataire: {}, Sujet: {}, Expéditeur: {}", 
             toEmail, subject, factureFrom);
         
         MimeMessage message = factureMailSender.createMimeMessage();
@@ -268,7 +268,7 @@ public class MailService {
         }
 
         factureMailSender.send(message);
-        logger.info("✅ Email facture avec pièces jointes envoyé avec succès à {}", toEmail);
+        logger.info(" Email facture avec pièces jointes envoyé avec succès à {}", toEmail);
     }
 
     
@@ -405,7 +405,7 @@ public class MailService {
 
     // Méthode d'envoi d'email pour demande d'approbation de facture
     public void sendDemandeApprobationEmail(String to, String fullName, String factureNumero, String createurNom, String montantTotal, String objetFacture, Long factureId, HttpServletRequest request) throws MessagingException {
-        System.out.println("📧 Envoi d'un email d'approbation à : " + to);
+        System.out.println(" Envoi d'un email d'approbation à : " + to);
         String subject = "Demande d'approbation - Facture " + factureNumero;
         String htmlContent = generateDemandeApprobationMessage(fullName, factureNumero, createurNom, montantTotal, objetFacture, factureId, request);
         sendFactureEmail(to, subject, htmlContent);
@@ -450,7 +450,7 @@ public class MailService {
 
     // Méthode d'envoi d'email pour notification d'approbation de facture
     public void sendFactureApprouveeEmail(String to, String fullName, String factureNumero, String approbateurNom, String montantTotal, String objetFacture) throws MessagingException {
-        System.out.println("📧 Envoi d'un email d'approbation confirmée à : " + to);
+        System.out.println(" Envoi d'un email d'approbation confirmée à : " + to);
         String subject = "Facture approuvée - " + factureNumero;
         String htmlContent = generateFactureApprouveeMessage(fullName, factureNumero, approbateurNom, montantTotal, objetFacture);
         sendFactureEmail(to, subject, htmlContent);
@@ -486,7 +486,7 @@ public class MailService {
 
     // Méthode d'envoi d'email pour notification de modification de facture
     public void sendFactureModifieeEmail(String to, String fullName, String factureNumero, String modificateurNom, String montantTotal, String objetFacture) throws MessagingException {
-        System.out.println("📧 Envoi d'un email de modification de facture à : " + to);
+        System.out.println(" Envoi d'un email de modification de facture à : " + to);
         String subject = "Facture modifiée - " + factureNumero;
         String htmlContent = generateFactureModifieeMessage(fullName, factureNumero, modificateurNom, montantTotal, objetFacture);
         sendFactureEmail(to, subject, htmlContent);

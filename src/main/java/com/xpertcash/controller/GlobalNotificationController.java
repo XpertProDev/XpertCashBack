@@ -37,10 +37,10 @@ public class GlobalNotificationController {
         try {
             User user = authHelper.getAuthenticatedUserWithFallback(request);
             
-            // 3️⃣ Récupérer les notifications
+            //  Récupérer les notifications
             List<GlobalNotification> notifs = globalNotificationService.getUserNotifications(user.getId());
 
-            // 4️⃣ Mapper vers le DTO
+            //  Mapper vers le DTO
             List<GlobalNotificationDto> dtoList = notifs.stream()
                     .map(notif -> new GlobalNotificationDto(
                             notif.getId(),

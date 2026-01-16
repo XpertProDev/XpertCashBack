@@ -47,9 +47,7 @@ public class CategorieService {
 
     @Autowired EntrepriseRepository entrepriseRepository;
 
-     // Ajouter une nouvelle catégorie (seul ADMIN peut le faire)
   public Categorie createCategorie(String nom, HttpServletRequest request) {
-    // Récupérer l'utilisateur connecté depuis le token
     String token = request.getHeader("Authorization");
     if (token == null || !token.startsWith("Bearer ")) {
         throw new RuntimeException("Token JWT manquant ou mal formaté");
@@ -61,7 +59,6 @@ public class CategorieService {
         throw new RuntimeException("Aucune entreprise associée à cet utilisateur");
     }
 
-    // Vérifier l'unicité du nom de catégorie pour cette entreprise spécifique
     if (categorieRepository.existsByNomAndEntrepriseId(nom, entreprise.getId())) {
         throw new RuntimeException("Cette catégorie existe déjà pour votre entreprise !");
     }
@@ -78,7 +75,6 @@ public class CategorieService {
 
     // Récupérer toutes les catégories avec comptage des produits (sans pagination)
     public List<CategorieResponseDTO> getAllCategoriesWithProduitCount(HttpServletRequest request) {
-        // --- JWT & utilisateur inchangé ---
         String token = request.getHeader("Authorization");
         if (token == null || !token.startsWith("Bearer ")) {
             throw new RuntimeException("Token JWT manquant ou mal formaté");
@@ -96,10 +92,8 @@ public class CategorieService {
         //     throw new RuntimeException("Accès refusé");
         // }
 
-        // --- Récupérer toutes les catégories de l'entreprise ---
         List<Categorie> allCategories = categorieRepository.findByEntrepriseId(entreprise.getId());
 
-        // --- Récupérer le count groupé par catégorie ---
         Map<Long, Long> produitCountMap = produitRepository.countProduitsParCategorie(entreprise.getId())
                 .stream()
                 .collect(Collectors.toMap(
@@ -107,14 +101,11 @@ public class CategorieService {
                         obj -> (Long) obj[1]
                 ));
 
-        // --- Construire la réponse sans les produits (seulement le comptage) ---
         List<CategorieResponseDTO> categorieResponseDTOs = new ArrayList<>();
         for (Categorie categorie : allCategories) {
-            // set le count directement depuis la DB
             categorie.setProduitCount(produitCountMap.getOrDefault(categorie.getId(), 0L));
 
             CategorieResponseDTO categorieDTO = new CategorieResponseDTO(categorie);
-            // Ne pas charger les produits ici - ils seront chargés séparément avec pagination
             categorieDTO.setProduits(Collections.emptyList());
             categorieResponseDTOs.add(categorieDTO);
         }
@@ -129,7 +120,6 @@ public class CategorieService {
             int size, 
             HttpServletRequest request) {
         
-        // --- JWT & utilisateur inchangé ---
         String token = request.getHeader("Authorization");
         if (token == null || !token.startsWith("Bearer ")) {
             throw new RuntimeException("Token JWT manquant ou mal formaté");
@@ -147,44 +137,35 @@ public class CategorieService {
             throw new RuntimeException("Accès refusé");
         }
 
-        // --- Vérifier que la catégorie existe et appartient à l'entreprise ---
         categorieRepository.findByIdAndEntrepriseId(categorieId, entreprise.getId())
                 .orElseThrow(() -> new RuntimeException("Catégorie introuvable ou non autorisée"));
 
-        // --- Validation des paramètres de pagination ---
         if (page < 0) page = 0;
-        if (size <= 0) size = 20; // Taille par défaut
-        if (size > 100) size = 100; // Limite maximale pour éviter la surcharge
+        if (size <= 0) size = 20;
+        if (size > 100) size = 100;
 
-        // --- Pagination des produits de la catégorie ---
         Pageable pageable = PageRequest.of(page, size, Sort.by("nom").ascending());
         Page<Produit> produitsPage = produitRepository.findByCategorieIdAndEntrepriseIdPaginated(
                 categorieId, entreprise.getId(), pageable);
 
-        // --- Filtrer et mapper les produits selon les permissions ---
         List<ProduitDetailsResponseDTO> produitDTOs = produitsPage.getContent().stream()
                 .filter(produit -> {
                     if (Boolean.TRUE.equals(produit.getDeleted())) return false;
-                    // ADMIN et MANAGER voient tous les produits (sauf deleted et SERVICE)
                     if (isAdminOrManager) {
                         return !TypeProduit.SERVICE.equals(produit.getTypeProduit());
                     }
-                    // Pour les vendeurs (avec VENDRE_PRODUITS mais pas admin/manager), filtrer par boutique
                     if (isVendeur && produit.getBoutique() != null) {
                         List<UserBoutique> userBoutiques = user.getUserBoutiques();
                         if (userBoutiques != null && !userBoutiques.isEmpty()) {
-                            // Vérifier si le produit appartient à n'importe quelle boutique assignée à l'utilisateur
                             return userBoutiques.stream()
                                     .anyMatch(ub -> ub.getBoutique().getId().equals(produit.getBoutique().getId()));
                         }
-                        return false; // Si l'utilisateur n'a pas de boutiques assignées, ne pas afficher le produit
                     }
                     return !TypeProduit.SERVICE.equals(produit.getTypeProduit());
                 })
                 .map(this::toProduitDTO)
                 .collect(Collectors.toList());
 
-        // --- Créer la page de DTOs ---
         Page<ProduitDetailsResponseDTO> dtoPage = new PageImpl<>(
                 produitDTOs, 
                 pageable, 
@@ -194,14 +175,12 @@ public class CategorieService {
         return ProduitPaginatedResponseDTO.fromPage(dtoPage);
     }
 
-    // Méthode de compatibilité (maintenue pour l'ancienne API)
     public List<CategorieResponseDTO> getCategoriesWithProduitCount(HttpServletRequest request) {
         return getAllCategoriesWithProduitCount(request);
     }
 
-    // Récupérer toutes les catégories et ses produits avec pagination (méthode scalable pour SaaS)
+    // Récupérer toutes les catégories et ses produits avec pagination (méthode scalable)
     public CategoriePaginatedResponseDTO getCategoriesWithProduitCountPaginated(HttpServletRequest request, int page, int size) {
-        // --- JWT & utilisateur inchangé ---
         String token = request.getHeader("Authorization");
         if (token == null || !token.startsWith("Bearer ")) {
             throw new RuntimeException("Token JWT manquant ou mal formaté");
@@ -219,16 +198,13 @@ public class CategorieService {
             throw new RuntimeException("Accès refusé");
         }
 
-        // --- Validation des paramètres de pagination ---
         if (page < 0) page = 0;
-        if (size <= 0) size = 20; // Taille par défaut
-        if (size > 100) size = 100; // Limite maximale pour éviter la surcharge
+        if (size <= 0) size = 20;
+        if (size > 100) size = 100;
 
-        // --- Récupérer les catégories avec pagination ---
         Pageable pageable = PageRequest.of(page, size, Sort.by("nom").ascending());
         Page<Categorie> categoriesPage = categorieRepository.findByEntrepriseId(entreprise.getId(), pageable);
 
-        // --- Récupérer le count groupé par catégorie pour les catégories de la page ---
         List<Long> categorieIds = categoriesPage.getContent().stream()
                 .map(Categorie::getId)
                 .collect(Collectors.toList());
@@ -243,7 +219,6 @@ public class CategorieService {
                     ));
         }
 
-        // --- Récupérer les produits pour les catégories de la page seulement ---
         Map<Long, List<Produit>> produitsParCategorie = new HashMap<>();
         if (!categorieIds.isEmpty()) {
             List<Produit> produits = produitRepository.findByCategorieIdsAndEntrepriseId(categorieIds, entreprise.getId());
@@ -251,33 +226,27 @@ public class CategorieService {
                     .collect(Collectors.groupingBy(p -> p.getCategorie().getId()));
         }
 
-        // --- Construire la réponse paginée ---
         List<CategorieResponseDTO> categorieResponseDTOs = new ArrayList<>();
         for (Categorie categorie : categoriesPage.getContent()) {
-            // set le count directement depuis la DB
             categorie.setProduitCount(produitCountMap.getOrDefault(categorie.getId(), 0L));
 
             List<ProduitDetailsResponseDTO> produitDTOs = produitsParCategorie.getOrDefault(categorie.getId(), Collections.emptyList())
                     .stream()
                     .filter(produit -> {
                         if (Boolean.TRUE.equals(produit.getDeleted())) return false;
-                        // ADMIN et MANAGER voient tous les produits (sauf deleted et SERVICE)
                         if (isAdminOrManager) {
                             return !TypeProduit.SERVICE.equals(produit.getTypeProduit());
                         }
-                        // Pour les vendeurs (avec VENDRE_PRODUITS mais pas admin/manager), filtrer par boutique
                         if (isVendeur && produit.getBoutique() != null) {
                             List<UserBoutique> userBoutiques = user.getUserBoutiques();
                             if (userBoutiques != null && !userBoutiques.isEmpty()) {
-                                // Vérifier si le produit appartient à n'importe quelle boutique assignée à l'utilisateur
                                 return userBoutiques.stream()
                                         .anyMatch(ub -> ub.getBoutique().getId().equals(produit.getBoutique().getId()));
                             }
-                            return false; // Si l'utilisateur n'a pas de boutiques assignées, ne pas afficher le produit
                         }
                         return !TypeProduit.SERVICE.equals(produit.getTypeProduit());
                     })
-                    .map(this::toProduitDTO)  // mapping vers DTO dans méthode privée
+                    .map(this::toProduitDTO)
                     .collect(Collectors.toList());
 
             CategorieResponseDTO categorieDTO = new CategorieResponseDTO(categorie);
@@ -285,7 +254,6 @@ public class CategorieService {
             categorieResponseDTOs.add(categorieDTO);
         }
 
-        // --- Créer la page de DTOs ---
         Page<CategorieResponseDTO> dtoPage = new PageImpl<>(
                 categorieResponseDTOs, 
                 pageable, 
@@ -295,7 +263,6 @@ public class CategorieService {
         return CategoriePaginatedResponseDTO.fromPage(dtoPage);
     }
 
-    // Méthode privée pour mapping DTO
     private ProduitDetailsResponseDTO toProduitDTO(Produit produit) {
         Long uniteId = produit.getUniteDeMesure() != null ? produit.getUniteDeMesure().getId() : null;
         String uniteNom = produit.getUniteDeMesure() != null ? produit.getUniteDeMesure().getNom() : "Non spécifiée";
@@ -356,7 +323,6 @@ private ProduitDetailsResponseDTO toProduitDTO(Produit produit) {
 
      // Supprimer une catégorie
    public void supprimerCategorieSiVide(Long categorieId, HttpServletRequest request) {
-    // 1. Récupérer l'utilisateur depuis le token
     String token = request.getHeader("Authorization");
     if (token == null || !token.startsWith("Bearer ")) {
         throw new RuntimeException("Token JWT manquant ou mal formaté");
@@ -364,30 +330,25 @@ private ProduitDetailsResponseDTO toProduitDTO(Produit produit) {
 
     User user = authHelper.getAuthenticatedUserWithFallback(request);
 
-    // 2. Vérifier l'appartenance à une entreprise
     Entreprise entreprise = user.getEntreprise();
     if (entreprise == null) {
         throw new RuntimeException("Aucune entreprise associée à cet utilisateur");
     }
 
-    // 3. Vérifier les droits d'accès
     boolean isAdminOrManager = CentralAccess.isAdminOrManagerOfEntreprise(user, entreprise.getId());
     if (!isAdminOrManager) {
         throw new RuntimeException("Accès refusé : seuls les administrateurs ou managers peuvent supprimer une catégorie.");
     }
 
-    // 4. Vérifier que la catégorie existe
     Categorie categorie = categorieRepository.findById(categorieId)
             .orElseThrow(() -> new RuntimeException("Catégorie introuvable"));
 
-    // 5. Vérifier que la catégorie est bien liée à des produits de l'entreprise
-    // Optimisation : utilisation de la même requête countByCategorieIdAndEntrepriseId
+
     long produitCount = produitRepository.countByCategorieIdAndEntrepriseId(categorieId, entreprise.getId());
     if (produitCount > 0) {
         throw new RuntimeException("Impossible de supprimer une catégorie contenant des produits.");
     }
 
-    // 6. Supprimer la catégorie
     categorieRepository.delete(categorie);
 }
 
@@ -395,7 +356,6 @@ private ProduitDetailsResponseDTO toProduitDTO(Produit produit) {
     // Mettre à jour categorie
     public Categorie updateCategorie(HttpServletRequest request, Long categorieId, Categorie categorieDetails) {
         try {
-            // Récupérer l'utilisateur connecté depuis le token
             String token = request.getHeader("Authorization");
             if (token == null || !token.startsWith("Bearer ")) {
                 throw new RuntimeException("Token JWT manquant ou mal formaté");
@@ -407,11 +367,9 @@ private ProduitDetailsResponseDTO toProduitDTO(Produit produit) {
                 throw new RuntimeException("Aucune entreprise associée à cet utilisateur");
             }
 
-            // Vérifier que la catégorie existe et appartient à l'entreprise de l'utilisateur
             Categorie categorie = categorieRepository.findByIdAndEntrepriseId(categorieId, entreprise.getId())
                     .orElseThrow(() -> new RuntimeException("Catégorie introuvable ou non autorisée"));
 
-            // Vérifier l'unicité du nom pour cette entreprise (en excluant la catégorie actuelle)
             if (!categorie.getNom().equals(categorieDetails.getNom()) && 
                 categorieRepository.existsByNomAndEntrepriseId(categorieDetails.getNom(), entreprise.getId())) {
                 throw new RuntimeException("Le nom de cette catégorie existe déjà pour votre entreprise.");
@@ -419,7 +377,6 @@ private ProduitDetailsResponseDTO toProduitDTO(Produit produit) {
             
             categorie.setNom(categorieDetails.getNom());
     
-            // Enregistrer la catégorie mise à jour
             return categorieRepository.save(categorie);
         } catch (Exception e) {
             throw new RuntimeException("Erreur lors de la mise à jour du categorie : " + e.getMessage());
@@ -428,7 +385,6 @@ private ProduitDetailsResponseDTO toProduitDTO(Produit produit) {
 
     // Méthode simple pour obtenir le nombre de produits par catégorie (OPTIMISÉE)
     public List<Map<String, Object>> getCategoriesWithProductCount(HttpServletRequest request) {
-        // --- JWT & utilisateur inchangé ---
         String token = request.getHeader("Authorization");
         if (token == null || !token.startsWith("Bearer ")) {
             throw new RuntimeException("Token JWT manquant ou mal formaté");
@@ -446,10 +402,8 @@ private ProduitDetailsResponseDTO toProduitDTO(Produit produit) {
             throw new RuntimeException("Accès refusé");
         }
 
-        // --- Récupérer toutes les catégories de l'entreprise ---
         List<Categorie> allCategories = categorieRepository.findByEntrepriseId(entreprise.getId());
 
-        // --- Récupérer le count groupé par catégorie (OPTIMISÉ avec filtre deleted et excluant SERVICE) ---
         Map<Long, Long> produitCountMap = produitRepository.countProduitsParCategorieExcluantService(entreprise.getId())
                 .stream()
                 .collect(Collectors.toMap(
@@ -457,7 +411,6 @@ private ProduitDetailsResponseDTO toProduitDTO(Produit produit) {
                         obj -> (Long) obj[1]
                 ));
 
-        // --- Construire la réponse simple ---
         List<Map<String, Object>> result = new ArrayList<>();
         for (Categorie categorie : allCategories) {
             Map<String, Object> categorieInfo = new HashMap<>();

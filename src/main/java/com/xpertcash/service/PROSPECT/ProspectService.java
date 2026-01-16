@@ -66,7 +66,6 @@ public class ProspectService {
      * Créer un nouveau prospect
      */
     public ProspectDTO createProspect(CreateProspectRequestDTO request, HttpServletRequest httpRequest) {
-        // --- 1. Extraction et validation du token JWT ---
         String token = httpRequest.getHeader("Authorization");
         if (token == null || !token.startsWith("Bearer ")) {
             throw new RuntimeException("Token JWT manquant ou mal formaté");
@@ -78,7 +77,6 @@ public class ProspectService {
             throw new RuntimeException("L'utilisateur n'est associé à aucune entreprise");
         }
 
-        // --- 2. Vérification des permissions ---
         boolean isAdminOrManager = CentralAccess.isAdminOrManagerOfEntreprise(user, entreprise.getId());
         boolean hasPermission = user.getRole().hasPermission(PermissionType.GERER_MARKETING);
         
@@ -86,12 +84,10 @@ public class ProspectService {
             throw new RuntimeException("Accès refusé : Vous n'avez pas les permissions nécessaires pour créer un prospect");
         }
 
-        // --- 3. Validation des données ---
         if (request.getType() == null) {
             throw new IllegalArgumentException("Le type de prospect est obligatoire (PARTICULIER ou ENTREPRISE)");
         }
 
-        // Validation selon le type
         if (request.getType() == ProspectType.ENTREPRISE) {
             if (request.getNom() == null || request.getNom().trim().isEmpty()) {
                 throw new IllegalArgumentException("Le nom de l'entreprise est obligatoire pour un prospect ENTREPRISE");
@@ -102,7 +98,6 @@ public class ProspectService {
             }
         }
 
-        // --- 4. Vérifier si un prospect avec le même email ou téléphone existe déjà dans l'entreprise ---
         if (request.getEmail() != null && !request.getEmail().trim().isEmpty()) {
             Optional<Prospect> existingProspect = prospectRepository.findByEmailAndEntrepriseId(request.getEmail(), entreprise.getId());
             if (existingProspect.isPresent()) {
@@ -125,12 +120,10 @@ public class ProspectService {
             }
         }
 
-        // --- 5. Créer le prospect ---
         Prospect prospect = new Prospect();
         prospect.setType(request.getType());
         prospect.setEntreprise(entreprise);
         
-        // Remplir les champs selon le type
         if (request.getType() == ProspectType.ENTREPRISE) {
             prospect.setNom(request.getNom().trim());
             prospect.setSecteur(request.getSecteur() != null ? request.getSecteur().trim() : null);
@@ -145,7 +138,6 @@ public class ProspectService {
             prospect.setPays(request.getPays() != null ? request.getPays().trim() : null);
         }
         
-        // Champs communs
         prospect.setEmail(request.getEmail() != null ? request.getEmail().trim() : null);
         prospect.setTelephone(request.getTelephone() != null ? request.getTelephone().trim() : null);
         prospect.setNotes(request.getNotes() != null ? request.getNotes().trim() : null);
@@ -154,11 +146,8 @@ public class ProspectService {
         return convertToDTO(savedProspect);
     }
 
-    /**
-     * Récupérer un prospect par son ID avec ses interactions
-     */
+ 
     public ProspectDTO getProspectById(Long id, HttpServletRequest httpRequest) {
-        // --- 1. Extraction et validation du token JWT ---
         String token = httpRequest.getHeader("Authorization");
         if (token == null || !token.startsWith("Bearer ")) {
             throw new RuntimeException("Token JWT manquant ou mal formaté");
@@ -170,7 +159,6 @@ public class ProspectService {
             throw new RuntimeException("L'utilisateur n'est associé à aucune entreprise");
         }
 
-        // --- 2. Vérification des permissions ---
         boolean isAdminOrManager = CentralAccess.isAdminOrManagerOfEntreprise(user, entreprise.getId());
         boolean hasPermission = user.getRole().hasPermission(PermissionType.GERER_MARKETING);
         
@@ -178,7 +166,6 @@ public class ProspectService {
             throw new RuntimeException("Accès refusé : Vous n'avez pas les permissions nécessaires pour voir ce prospect");
         }
 
-        // --- 3. Récupérer le prospect avec vérification d'appartenance ---
         Prospect prospect = prospectRepository.findByIdAndEntrepriseId(id, entreprise.getId())
                 .orElseThrow(() -> new IllegalArgumentException("Prospect non trouvé avec l'ID: " + id));
         
@@ -189,7 +176,6 @@ public class ProspectService {
      * Récupérer tous les prospects avec pagination et interactions
      */
     public ProspectPaginatedResponseDTO getAllProspects(int page, int size, HttpServletRequest httpRequest) {
-        // --- 1. Extraction et validation du token JWT ---
         String token = httpRequest.getHeader("Authorization");
         if (token == null || !token.startsWith("Bearer ")) {
             throw new RuntimeException("Token JWT manquant ou mal formaté");
@@ -201,7 +187,6 @@ public class ProspectService {
             throw new RuntimeException("L'utilisateur n'est associé à aucune entreprise");
         }
 
-        // --- 2. Vérification des permissions ---
         boolean isAdminOrManager = CentralAccess.isAdminOrManagerOfEntreprise(user, entreprise.getId());
         boolean hasPermission = user.getRole().hasPermission(PermissionType.GERER_MARKETING);
         
@@ -209,18 +194,14 @@ public class ProspectService {
             throw new RuntimeException("Accès refusé : Vous n'avez pas les permissions nécessaires pour voir les prospects");
         }
 
-        // --- 3. Validation des paramètres de pagination ---
         if (page < 0) page = 0;
-        if (size <= 0) size = 20; // Taille par défaut
-        if (size > 100) size = 100; // Limite maximale
+        if (size <= 0) size = 20; 
+        if (size > 100) size = 100;
 
-        // --- 4. Créer le Pageable avec tri par date de création décroissante ---
         Pageable pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
 
-        // --- 5. Récupérer les prospects avec pagination et filtrage par entreprise ---
         Page<Prospect> prospectsPage = prospectRepository.findByEntrepriseId(entreprise.getId(), pageable);
 
-        // --- 6. Créer la réponse paginée ---
         Page<ProspectDTO> prospectDTOPage = prospectsPage.map(this::convertToDTO);
         return ProspectPaginatedResponseDTO.fromPage(prospectDTOPage);
     }
@@ -231,7 +212,6 @@ public class ProspectService {
      * Mettre à jour un prospect
      */
     public ProspectDTO updateProspect(Long id, UpdateProspectRequestDTO request, HttpServletRequest httpRequest) {
-        // --- 1. Extraction et validation du token JWT ---
         String token = httpRequest.getHeader("Authorization");
         if (token == null || !token.startsWith("Bearer ")) {
             throw new RuntimeException("Token JWT manquant ou mal formaté");
@@ -243,7 +223,6 @@ public class ProspectService {
             throw new RuntimeException("L'utilisateur n'est associé à aucune entreprise");
         }
 
-        // --- 2. Vérification des permissions ---
         boolean isAdminOrManager = CentralAccess.isAdminOrManagerOfEntreprise(user, entreprise.getId());
         boolean hasPermission = user.getRole().hasPermission(PermissionType.GERER_MARKETING);
         
@@ -251,16 +230,13 @@ public class ProspectService {
             throw new RuntimeException("Accès refusé : Vous n'avez pas les permissions nécessaires pour modifier ce prospect");
         }
 
-        // --- 3. Récupérer le prospect avec vérification d'appartenance ---
         Prospect prospect = prospectRepository.findByIdAndEntrepriseId(id, entreprise.getId())
                 .orElseThrow(() -> new IllegalArgumentException("Prospect non trouvé avec l'ID: " + id));
 
-        // --- 4. Validation des données ---
         if (request.getType() == null) {
             throw new IllegalArgumentException("Le type de prospect est obligatoire (PARTICULIER ou ENTREPRISE)");
         }
 
-        // Validation selon le type
         if (request.getType() == ProspectType.ENTREPRISE) {
             if (request.getNom() == null || request.getNom().trim().isEmpty()) {
                 throw new IllegalArgumentException("Le nom de l'entreprise est obligatoire pour un prospect ENTREPRISE");
@@ -272,7 +248,6 @@ public class ProspectService {
             
         }
 
-        // --- 5. Vérifier si un autre prospect avec le même email ou téléphone existe déjà dans l'entreprise ---
         if (request.getEmail() != null && !request.getEmail().trim().isEmpty()) {
             Optional<Prospect> existingProspect = prospectRepository.findByEmailAndEntrepriseId(request.getEmail(), entreprise.getId());
             if (existingProspect.isPresent() && !existingProspect.get().getId().equals(id)) {
@@ -287,10 +262,8 @@ public class ProspectService {
             }
         }
 
-        // --- 6. Mettre à jour les champs ---
         prospect.setType(request.getType());
         
-        // Remplir les champs selon le type
         if (request.getType() == ProspectType.ENTREPRISE) {
             prospect.setNom(request.getNom().trim());
             prospect.setSecteur(request.getSecteur() != null ? request.getSecteur().trim() : null);
@@ -311,7 +284,6 @@ public class ProspectService {
             prospect.setSecteur(null);
         }
         
-        // Champs communs
         prospect.setEmail(request.getEmail() != null ? request.getEmail().trim() : null);
         prospect.setTelephone(request.getTelephone() != null ? request.getTelephone().trim() : null);
         prospect.setNotes(request.getNotes() != null ? request.getNotes().trim() : null);
@@ -324,7 +296,6 @@ public class ProspectService {
      * Supprimer un prospect
      */
     public void deleteProspect(Long id, HttpServletRequest httpRequest) {
-        // --- 1. Extraction et validation du token JWT ---
         String token = httpRequest.getHeader("Authorization");
         if (token == null || !token.startsWith("Bearer ")) {
             throw new RuntimeException("Token JWT manquant ou mal formaté");
@@ -336,14 +307,12 @@ public class ProspectService {
             throw new RuntimeException("L'utilisateur n'est associé à aucune entreprise");
         }
 
-        // --- 2. Vérification des permissions (seuls les admins peuvent supprimer) ---
         boolean isAdmin = CentralAccess.isAdminOfEntreprise(user, entreprise.getId());
         
         if (!isAdmin) {
             throw new RuntimeException("Accès refusé : Seuls les administrateurs peuvent supprimer un prospect");
         }
 
-        // --- 3. Récupérer le prospect avec vérification d'appartenance ---
         Prospect prospect = prospectRepository.findByIdAndEntrepriseId(id, entreprise.getId())
                 .orElseThrow(() -> new IllegalArgumentException("Prospect non trouvé avec l'ID: " + id));
 
@@ -354,7 +323,6 @@ public class ProspectService {
      * Ajouter une interaction à un prospect
      */
     public InteractionDTO addInteraction(Long prospectId, CreateInteractionRequestDTO request, HttpServletRequest httpRequest) {
-        // --- 1. Extraction et validation du token JWT ---
         String token = httpRequest.getHeader("Authorization");
         if (token == null || !token.startsWith("Bearer ")) {
             throw new RuntimeException("Token JWT manquant ou mal formaté");
@@ -366,7 +334,6 @@ public class ProspectService {
             throw new RuntimeException("L'utilisateur n'est associé à aucune entreprise");
         }
 
-        // --- 2. Vérification des permissions ---
         boolean isAdminOrManager = CentralAccess.isAdminOrManagerOfEntreprise(user, entreprise.getId());
         boolean hasPermission = user.getRole().hasPermission(PermissionType.GERER_MARKETING);
         
@@ -374,19 +341,13 @@ public class ProspectService {
             throw new RuntimeException("Accès refusé : Vous n'avez pas les permissions nécessaires pour ajouter une interaction");
         }
 
-        // --- 3. Récupérer le prospect avec vérification d'appartenance ---
         Prospect prospect = prospectRepository.findByIdAndEntrepriseId(prospectId, entreprise.getId())
                 .orElseThrow(() -> new IllegalArgumentException("Prospect non trouvé avec l'ID: " + prospectId));
 
-        // --- 4. Validation des données ---
         if (request.getType() == null) {
             throw new IllegalArgumentException("Le type d'interaction est obligatoire");
         }
-        // if (request.getAssignedTo() == null || request.getAssignedTo().trim().isEmpty()) {
-        //     throw new IllegalArgumentException("L'assigné est obligatoire");
-        // }
-
-        // --- 5. Créer l'interaction ---
+      
         Interaction interaction = new Interaction();
         interaction.setType(request.getType());
         interaction.setNotes(request.getNotes());
@@ -396,7 +357,6 @@ public class ProspectService {
         interaction.setNextFollowUp(request.getNextFollowUp());
         interaction.setProspect(prospect);
 
-        // Lier un produit si fourni (optionnel), avec vérification d'appartenance à l'entreprise
         if (request.getProduitId() != null) {
             Produit produit = produitRepository.findById(request.getProduitId())
                 .orElseThrow(() -> new IllegalArgumentException("Produit/service non trouvé avec l'ID: " + request.getProduitId()));
@@ -416,7 +376,6 @@ public class ProspectService {
      * Récupérer les interactions d'un prospect avec pagination
      */
     public List<InteractionDTO> getProspectInteractions(Long prospectId, HttpServletRequest httpRequest) {
-        // --- 1. Extraction et validation du token JWT ---
         String token = httpRequest.getHeader("Authorization");
         if (token == null || !token.startsWith("Bearer ")) {
             throw new RuntimeException("Token JWT manquant ou mal formaté");
@@ -428,7 +387,6 @@ public class ProspectService {
             throw new RuntimeException("L'utilisateur n'est associé à aucune entreprise");
         }
 
-        // --- 2. Vérification des permissions ---
         boolean isAdminOrManager = CentralAccess.isAdminOrManagerOfEntreprise(user, entreprise.getId());
         boolean hasPermission = user.getRole().hasPermission(PermissionType.GERER_MARKETING);
         
@@ -436,11 +394,9 @@ public class ProspectService {
             throw new RuntimeException("Accès refusé : Vous n'avez pas les permissions nécessaires pour voir les interactions");
         }
 
-        // --- 3. Vérifier que le prospect existe et appartient à l'entreprise ---
         prospectRepository.findByIdAndEntrepriseId(prospectId, entreprise.getId())
                 .orElseThrow(() -> new IllegalArgumentException("Prospect non trouvé avec l'ID: " + prospectId));
 
-        // --- 4. Récupérer les interactions triées par date décroissante ---
         List<Interaction> interactions = interactionRepository.findByProspectIdOrderByOccurredAtDesc(prospectId);
 
         return interactions.stream()
@@ -452,7 +408,6 @@ public class ProspectService {
      * Supprimer une interaction
      */
     public void deleteInteraction(Long interactionId, HttpServletRequest httpRequest) {
-        // --- 1. Extraction et validation du token JWT ---
         String token = httpRequest.getHeader("Authorization");
         if (token == null || !token.startsWith("Bearer ")) {
             throw new RuntimeException("Token JWT manquant ou mal formaté");
@@ -464,14 +419,12 @@ public class ProspectService {
             throw new RuntimeException("L'utilisateur n'est associé à aucune entreprise");
         }
 
-        // --- 2. Vérification des permissions (seuls les admins peuvent supprimer) ---
         boolean isAdmin = CentralAccess.isAdminOfEntreprise(user, entreprise.getId());
         
         if (!isAdmin) {
             throw new RuntimeException("Accès refusé : Seuls les administrateurs peuvent supprimer une interaction");
         }
 
-        // --- 3. Récupérer l'interaction avec vérification d'appartenance ---
         Interaction interaction = interactionRepository.findByIdAndProspectEntrepriseId(interactionId, entreprise.getId())
                 .orElseThrow(() -> new IllegalArgumentException("Interaction non trouvée avec l'ID: " + interactionId));
 
@@ -484,7 +437,6 @@ public class ProspectService {
     public Map<String, Object> convertProspectToClient(Long prospectId, ConvertProspectRequestDTO conversionRequest, HttpServletRequest httpRequest) {
         Map<String, Object> response = new HashMap<>();
         
-        // --- 1. Extraction et validation du token JWT ---
         String token = httpRequest.getHeader("Authorization");
         if (token == null || !token.startsWith("Bearer ")) {
             throw new RuntimeException("Token JWT manquant ou mal formaté");
@@ -496,7 +448,6 @@ public class ProspectService {
             throw new RuntimeException("L'utilisateur n'est associé à aucune entreprise");
         }
 
-        // --- 2. Vérification des permissions ---
         boolean isAdminOrManager = CentralAccess.isAdminOrManagerOfEntreprise(user, entreprise.getId());
         boolean hasPermission = user.getRole().hasPermission(PermissionType.GERER_CLIENTS);
         
@@ -504,11 +455,9 @@ public class ProspectService {
             throw new RuntimeException("Accès refusé : Vous n'avez pas les permissions nécessaires pour convertir un prospect en client");
         }
 
-        // --- 3. Récupérer le prospect avec vérification d'appartenance ---
         Prospect prospect = prospectRepository.findByIdAndEntrepriseId(prospectId, entreprise.getId())
                 .orElseThrow(() -> new IllegalArgumentException("Prospect non trouvé avec l'ID: " + prospectId));
 
-        // --- 4. Vérifier le produit/service acheté ---
         if (conversionRequest.getProduitId() == null) {
             throw new IllegalArgumentException("L'ID du produit/service acheté est obligatoire");
         }
@@ -516,21 +465,17 @@ public class ProspectService {
         Produit produit = produitRepository.findById(conversionRequest.getProduitId())
                 .orElseThrow(() -> new IllegalArgumentException("Produit/service non trouvé avec l'ID: " + conversionRequest.getProduitId()));
         
-        // Vérifier que le produit appartient à l'entreprise
         if (!produit.getBoutique().getEntreprise().getId().equals(entreprise.getId())) {
             throw new IllegalArgumentException("Ce produit/service n'appartient pas à votre entreprise");
         }
         
-        // Vérifier la quantité pour les produits physiques
         Integer quantiteAchetee = conversionRequest.getQuantite() != null ? conversionRequest.getQuantite() : 1;
         
         if (produit.getTypeProduit().name().equals("PHYSIQUE")) {
-            // Pour les produits physiques, la quantité est obligatoire
             if (conversionRequest.getQuantite() == null || conversionRequest.getQuantite() <= 0) {
                 throw new IllegalArgumentException("La quantité est obligatoire pour les produits physiques");
             }
             
-            // Vérifier le stock (informatif seulement, pas bloquant)
             if (!produit.getEnStock()) {
                 response.put("warning", "Attention: Le produit physique '" + produit.getNom() + "' n'est pas en stock");
             }
@@ -541,12 +486,10 @@ public class ProspectService {
             }
         }
         
-        // Calculer le montant final
         Double montantFinal;
         if (conversionRequest.getMontantAchat() != null) {
             montantFinal = conversionRequest.getMontantAchat();
         } else {
-            // Calculer le montant total basé sur le prix unitaire et la quantité
             Double prixVente = produit.getPrixVente();
             if (prixVente == null) {
                 throw new RuntimeException("Impossible de convertir le prospect car le produit '" + produit.getNom() + "' n'a pas de prix de vente défini.");
@@ -554,22 +497,18 @@ public class ProspectService {
             montantFinal = prixVente * quantiteAchetee;
         }
 
-        // --- 5. Gérer le cas où le prospect est déjà converti ---
         boolean alreadyConverted = prospect.getConvertedToClient() != null && prospect.getConvertedToClient();
 
-        // --- 6. Conversion selon le type (ou réutilisation si déjà converti) ---
         Long clientId = null;
         String clientType = null;
 
         if (alreadyConverted) {
-            // Réutiliser le client existant
             clientId = prospect.getClientId();
             clientType = prospect.getClientType();
             response.put("message", "Prospect déjà converti : ajout d'un nouvel achat");
             response.put("type", prospect.getType() == ProspectType.ENTREPRISE ? "ENTREPRISE" : "PARTICULIER");
         } else {
             if (prospect.getType() == ProspectType.ENTREPRISE) {
-                // Convertir directement en EntrepriseClient (pas de Client associé)
                 EntrepriseClient entrepriseClient = new EntrepriseClient();
                 entrepriseClient.setNom(prospect.getNom());
                 entrepriseClient.setEmail(prospect.getEmail());
@@ -589,7 +528,6 @@ public class ProspectService {
                 response.put("type", "ENTREPRISE");
 
             } else if (prospect.getType() == ProspectType.PARTICULIER) {
-                // Convertir en Client particulier
                 Client client = new Client();
                 client.setNomComplet(prospect.getNomComplet());
                 client.setEmail(prospect.getEmail());
@@ -609,7 +547,6 @@ public class ProspectService {
             }
         }
         
-        // Informations complètes sur le produit/service acheté
         response.put("produitAchete", produit.getNom());
         response.put("produitId", produit.getId());
         response.put("typeProduit", produit.getTypeProduit().name());
@@ -620,11 +557,7 @@ public class ProspectService {
         response.put("notesAchat", conversionRequest.getNotesAchat());
         response.put("dateAchat", LocalDateTime.now().toString());
 
-        // --- 7. IMPORTANT: Ne pas décrémenter le stock ici ---
-        // Le stock sera décrémenté lors de la vente réelle par un vendeur autorisé
-        // Cette conversion prospect → client ne fait que créer l'historique d'achat
-
-        // --- 8. Enregistrer l'achat dans l'historique ---
+   
         ProspectAchat achat = new ProspectAchat();
         achat.setProspect(prospect);
         achat.setProduit(produit);
@@ -638,7 +571,6 @@ public class ProspectService {
         
         prospectAchatRepository.save(achat);
 
-        // --- 9. Marquer le prospect comme converti (si ce n'est pas déjà fait) ---
         if (!alreadyConverted) {
             prospect.setConvertedToClient(true);
             prospect.setConvertedAt(LocalDateTime.now());
@@ -658,7 +590,6 @@ public class ProspectService {
     public Map<String, Object> addAchatToConvertedProspect(Long prospectId, ConvertProspectRequestDTO conversionRequest, HttpServletRequest httpRequest) {
         Map<String, Object> response = new HashMap<>();
         
-        // --- 1. Extraction et validation du token JWT ---
         String token = httpRequest.getHeader("Authorization");
         if (token == null || !token.startsWith("Bearer ")) {
             throw new RuntimeException("Token JWT manquant ou mal formaté");
@@ -670,7 +601,6 @@ public class ProspectService {
             throw new RuntimeException("L'utilisateur n'est associé à aucune entreprise");
         }
 
-        // --- 2. Vérification des permissions ---
         boolean isAdminOrManager = CentralAccess.isAdminOrManagerOfEntreprise(user, entreprise.getId());
         boolean hasPermission = user.getRole().hasPermission(PermissionType.GERER_CLIENTS);
 
@@ -678,7 +608,6 @@ public class ProspectService {
             throw new RuntimeException("Accès refusé : Vous n'avez pas les permissions nécessaires pour ajouter un achat");
         }
 
-        // --- 3. Récupérer le prospect converti ---
         Prospect prospect = prospectRepository.findByIdAndEntrepriseId(prospectId, entreprise.getId())
                 .orElseThrow(() -> new IllegalArgumentException("Prospect non trouvé avec l'ID: " + prospectId));
 
@@ -686,7 +615,6 @@ public class ProspectService {
             throw new IllegalArgumentException("Ce prospect n'est pas encore converti en client");
         }
 
-        // --- 4. Vérifier le produit/service ---
         if (conversionRequest.getProduitId() == null) {
             throw new IllegalArgumentException("L'ID du produit/service acheté est obligatoire");
         }
@@ -698,7 +626,6 @@ public class ProspectService {
             throw new IllegalArgumentException("Ce produit/service n'appartient pas à votre entreprise");
         }
         
-        // --- 5. Vérifier la quantité pour les produits physiques ---
         Integer quantiteAchetee = conversionRequest.getQuantite() != null ? conversionRequest.getQuantite() : 1;
         
         if (produit.getTypeProduit().name().equals("PHYSIQUE")) {
@@ -706,7 +633,6 @@ public class ProspectService {
                 throw new IllegalArgumentException("La quantité est obligatoire pour les produits physiques");
             }
             
-            // Vérifier le stock (informatif seulement, pas bloquant)
             if (!produit.getEnStock()) {
                 response.put("warning", "Attention: Le produit physique '" + produit.getNom() + "' n'est pas en stock");
             }
@@ -717,7 +643,6 @@ public class ProspectService {
             }
         }
         
-        // --- 6. Calculer le montant final ---
         Double montantFinal;
         if (conversionRequest.getMontantAchat() != null) {
             montantFinal = conversionRequest.getMontantAchat();
@@ -729,11 +654,6 @@ public class ProspectService {
             montantFinal = prixVente * quantiteAchetee;
         }
 
-        // --- 7. IMPORTANT: Ne pas décrémenter le stock ici ---
-        // Le stock sera décrémenté lors de la vente réelle par un vendeur autorisé
-        // Cette conversion prospect → client ne fait que créer l'historique d'achat
-
-        // --- 8. Enregistrer le nouvel achat ---
         ProspectAchat achat = new ProspectAchat();
         achat.setProspect(prospect);
         achat.setProduit(produit);
@@ -826,9 +746,7 @@ public class ProspectService {
         return dto;
     }
 
-    /**
-     * Convertir une entité ProspectAchat en DTO
-     */
+ 
     private ProspectAchatDTO convertAchatToDTO(ProspectAchat achat) {
         ProspectAchatDTO dto = new ProspectAchatDTO();
         dto.id = achat.getId();

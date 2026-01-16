@@ -98,7 +98,7 @@ public class MailTestController {
             Transport transport = session.getTransport("smtp");
             logger.info("Tentative de connexion au serveur SMTP...");
             transport.connect(host, port, username, password);
-            logger.info("✅ Connexion SMTP réussie !");
+            logger.info(" Connexion SMTP réussie !");
             transport.close();
             
             // Si la connexion réussit, tester l'envoi d'un email
@@ -112,7 +112,7 @@ public class MailTestController {
                           "Si vous recevez cet email, la configuration est correcte !");
             
             Transport.send(message);
-            logger.info("✅ Email de test envoyé avec succès à {}", recipientEmail);
+            logger.info(" Email de test envoyé avec succès à {}", recipientEmail);
             
             response.put("success", true);
             response.put("message", "Connexion SMTP réussie et email envoyé avec succès !");
@@ -125,7 +125,7 @@ public class MailTestController {
             return ResponseEntity.ok(response);
             
         } catch (AuthenticationFailedException e) {
-            logger.error("❌ ÉCHEC D'AUTHENTIFICATION SMTP [{}] - Host: {}, Port: {}, User: {}", 
+            logger.error(" ÉCHEC D'AUTHENTIFICATION SMTP [{}] - Host: {}, Port: {}, User: {}", 
                 accountType, host, port, username, e);
             
             // Détection automatique du type de problème
@@ -157,7 +157,7 @@ public class MailTestController {
             return ResponseEntity.status(401).body(response);
             
         } catch (MessagingException e) {
-            logger.error("❌ Erreur lors du test SMTP [{}]: {}", accountType, e.getMessage(), e);
+            logger.error(" Erreur lors du test SMTP [{}]: {}", accountType, e.getMessage(), e);
             
             // Détecter si c'est un problème de mot de passe (timeout peut être causé par mauvais mot de passe)
             String errorMsg = e.getMessage() != null ? e.getMessage().toLowerCase() : "";
@@ -181,7 +181,7 @@ public class MailTestController {
             }
             
             String passwordIssue = isPasswordIssue 
-                ? " ⚠️ PROBLÈME DE MOT DE PASSE PROBABLE (timeout/authentification) - " 
+                ? "  PROBLÈME DE MOT DE PASSE PROBABLE (timeout/authentification) - " 
                 : "";
             
             String errorMessage = String.format(
@@ -190,7 +190,7 @@ public class MailTestController {
             );
             
             String suggestions = isPasswordIssue
-                ? "⚠️ PROBLÈME DE MOT DE PASSE DÉTECTÉ (timeout peut indiquer authentification échouée): 1) "
+                ? " PROBLÈME DE MOT DE PASSE DÉTECTÉ (timeout peut indiquer authentification échouée): 1) "
                 : "))";
             
             response.put("success", false);
@@ -217,7 +217,7 @@ public class MailTestController {
             return ResponseEntity.status(500).body(response);
             
         } catch (Exception e) {
-            logger.error("❌ Erreur inattendue lors du test SMTP [{}]: {}", accountType, e.getMessage(), e);
+            logger.error(" Erreur inattendue lors du test SMTP [{}]: {}", accountType, e.getMessage(), e);
             
             String errorMessage = String.format(
                 "Erreur inattendue lors du test SMTP. Détails: Host=%s, Port=%d, Username=%s, Erreur=%s",
@@ -281,7 +281,7 @@ public class MailTestController {
         // Détection spécifique des codes d'erreur SMTP liés au mot de passe
         if (lowerError.contains("535") || lowerError.contains("535-5.7.8") || 
             lowerError.contains("535-5.7.1") || lowerError.contains("invalid login")) {
-            return "⚠️ MOT DE PASSE INCORRECT (Code SMTP 535)";
+            return " MOT DE PASSE INCORRECT (Code SMTP 535)";
         }
         
         // Détection des messages d'authentification explicites
@@ -290,7 +290,7 @@ public class MailTestController {
             lowerError.contains("login failed") ||
             lowerError.contains("wrong password") ||
             lowerError.contains("incorrect password")) {
-            return "⚠️ MOT DE PASSE INCORRECT (Authentification échouée)";
+            return " MOT DE PASSE INCORRECT (Authentification échouée)";
         }
         
         // Détection des timeouts qui peuvent indiquer un problème de mot de passe
@@ -299,16 +299,16 @@ public class MailTestController {
             lowerError.contains("socket timeout")) {
             // Vérifier si le mot de passe semble valide
             if (password == null || password.isEmpty() || password.length() < 4) {
-                return "⚠️ MOT DE PASSE MANQUANT OU TROP COURT";
+                return " MOT DE PASSE MANQUANT OU TROP COURT";
             }
-            return "⚠️ TIMEOUT (probablement mot de passe incorrect)";
+            return " TIMEOUT (probablement mot de passe incorrect)";
         }
         
         // Détection générique
         if (lowerError.contains("password") || 
             lowerError.contains("mot de passe") ||
             lowerError.contains("auth") && lowerError.contains("fail")) {
-            return "⚠️ PROBLÈME D'AUTHENTIFICATION (possiblement mot de passe)";
+            return " PROBLÈME D'AUTHENTIFICATION (possiblement mot de passe)";
         }
         
         return "";

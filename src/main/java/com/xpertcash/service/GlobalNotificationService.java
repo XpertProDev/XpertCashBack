@@ -1,5 +1,4 @@
 package com.xpertcash.service;
-
 // WebSocket désactivé - import commenté
 // import com.xpertcash.DTOs.GlobalNotificationDto;
 import com.xpertcash.entity.GlobalNotification;
@@ -50,9 +49,8 @@ public class GlobalNotificationService {
     }
 
 
-    /**
-     * Récupère toutes les notifications pour un utilisateur, les plus récentes d'abord.
-     */
+     //Récupère toutes les notifications pour un utilisateur, les plus récentes d'abord.
+    
     public List<GlobalNotification> getUserNotifications(Long userId) {
         return notificationRepo.findByRecipientIdOrderByCreatedAtDesc(userId);
     }

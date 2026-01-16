@@ -22,7 +22,7 @@ public class AuthorizationService {
         // Vérifier si le rôle contient la permission requise
         boolean hasPermission = role.getPermissions()
                 .stream()
-                .anyMatch(permission -> permission.getType().equals(requiredPermission));  // Comparer directement les types PermissionType
+                .anyMatch(permission -> permission.getType().equals(requiredPermission));
 
         if (!hasPermission) {
             throw new RuntimeException("Vous n'avez pas la permission pour cette action.");

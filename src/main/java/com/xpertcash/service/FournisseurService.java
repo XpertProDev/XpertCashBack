@@ -59,7 +59,6 @@ public class FournisseurService {
 
     User user = authHelper.getAuthenticatedUserWithFallback(request);
 
-    // Vérifier que l'utilisateur a une entreprise associée (entreprise créatrice de la facture)
     Entreprise entrepriseUtilisateur = user.getEntreprise();
     if (entrepriseUtilisateur == null) {
         throw new RuntimeException("L'utilisateur n'a pas d'entreprise associée.");
@@ -71,11 +70,10 @@ public class FournisseurService {
 
         checkFournisseurExists(fournisseur);
 
-        // Gestion de l'image si présente
         if (imageFournisseurFile != null && !imageFournisseurFile.isEmpty()) {
             String imageUrl = imageStorageService.saveFournisseurImage(imageFournisseurFile);
             fournisseur.setPhoto(imageUrl);
-            System.out.println("📸 Photo du fournisseur enregistrée : " + imageUrl);
+            System.out.println(" Photo du fournisseur enregistrée : " + imageUrl);
         }
 
         return fournisseurRepository.save(fournisseur);
@@ -103,18 +101,15 @@ public class FournisseurService {
         }
     }
 
-    // Get fournisseur dune entreprise de l utilisateur 
     public List<Fournisseur> getFournisseursByEntreprise(HttpServletRequest request) {
         
     User user = authHelper.getAuthenticatedUserWithFallback(request);
 
-    // Vérifier la présence d'une entreprise liée à l'utilisateur
     Entreprise entreprise = user.getEntreprise();
     if (entreprise == null) {
         throw new RuntimeException("L'utilisateur n'a pas d'entreprise associée.");
     }
 
-    // Retourner tous les fournisseurs liés à cette entreprise (isolé par entreprise)
     return fournisseurRepository.findByEntrepriseId(entreprise.getId());
 }
 
@@ -122,13 +117,11 @@ public class FournisseurService {
   public Fournisseur getFournisseurById(Long fournisseurId, HttpServletRequest request) {
     User user = getUserFromRequest(request);
 
-    // Vérifier que l'utilisateur a une entreprise associée
     Entreprise entrepriseUtilisateur = user.getEntreprise();
     if (entrepriseUtilisateur == null) {
         throw new RuntimeException("L'utilisateur n'a pas d'entreprise associée.");
     }
 
-    // Récupérer le fournisseur (isolé par entreprise)
     Fournisseur fournisseur = fournisseurRepository.findByIdAndEntrepriseId(
             fournisseurId, entrepriseUtilisateur.getId())
             .orElseThrow(() -> new RuntimeException("Fournisseur introuvable ou n'appartient pas à votre entreprise !"));
@@ -150,15 +143,12 @@ private User getUserFromRequest(HttpServletRequest request) {
         throw new RuntimeException("L'utilisateur n'a pas d'entreprise associée.");
     }
 
-    // 3. Récupérer le fournisseur existant (isolé par entreprise)
     Fournisseur existingFournisseur = fournisseurRepository.findByIdAndEntrepriseId(
             id, entrepriseUtilisateur.getId())
             .orElseThrow(() -> new RuntimeException("Fournisseur introuvable ou n'appartient pas à votre entreprise !"));
 
 
-    // 4. Vérifications des doublons
 
-    // Vérifier email unique dans l'entreprise (hors du fournisseur qu'on modifie)
     if (updatedData.getEmail() != null && !updatedData.getEmail().isBlank()) {
         boolean emailExiste = fournisseurRepository.existsByEntrepriseIdAndEmailAndIdNot(
                 entrepriseUtilisateur.getId(), updatedData.getEmail(), existingFournisseur.getId());
@@ -167,7 +157,6 @@ private User getUserFromRequest(HttpServletRequest request) {
         }
     }
 
-        // Vérifier téléphone unique par pays dans l'entreprise (hors du fournisseur qu'on modifie)
     if (updatedData.getTelephone() != null && !updatedData.getTelephone().isBlank()
             && updatedData.getPays() != null && !updatedData.getPays().isBlank()) {
 
@@ -179,7 +168,6 @@ private User getUserFromRequest(HttpServletRequest request) {
         }
     }
 
-    // 5. Mettre à jour les champs
     existingFournisseur.setNomComplet(updatedData.getNomComplet());
     existingFournisseur.setNomSociete(updatedData.getNomSociete());
     existingFournisseur.setDescription(updatedData.getDescription());
@@ -189,26 +177,24 @@ private User getUserFromRequest(HttpServletRequest request) {
     existingFournisseur.setVille(updatedData.getVille());
     existingFournisseur.setAdresse(updatedData.getAdresse());
 
-     // Mise à jour de la photo si image présente
         if (imageFournisseurFile != null && !imageFournisseurFile.isEmpty()) {
-            String oldImagePath = existingFournisseur.getPhoto(); // ✅ Prendre depuis l'objet actuel en base
+            String oldImagePath = existingFournisseur.getPhoto();
             if (oldImagePath != null && !oldImagePath.isBlank()) {
                 Path oldPath = Paths.get("src/main/resources/static" + oldImagePath);
                 try {
                     Files.deleteIfExists(oldPath);
-                    System.out.println("🗑️ Ancienne photo profil supprimée : " + oldImagePath);
+                    System.out.println(" Ancienne photo profil supprimée : " + oldImagePath);
                 } catch (IOException e) {
-                    System.out.println("⚠️ Impossible de supprimer l'ancienne photo : " + e.getMessage());
+                    System.out.println(" Impossible de supprimer l'ancienne photo : " + e.getMessage());
                 }
             }
 
             String newImageUrl = imageStorageService.saveFournisseurImage(imageFournisseurFile);
             existingFournisseur.setPhoto(newImageUrl);
-            System.out.println("📸 Nouvelle photo enregistrée : " + newImageUrl);
+            System.out.println(" Nouvelle photo enregistrée : " + newImageUrl);
         }
 
     
-    // Enregistrer les modifications et retourner l'entité mise à jour
     Fournisseur savedFournisseur = fournisseurRepository.save(existingFournisseur);
     return savedFournisseur;
 }
@@ -219,7 +205,6 @@ private User getUserFromRequest(HttpServletRequest request) {
     HttpServletRequest request) {
     User user = authHelper.getAuthenticatedUserWithFallback(request);
 
-    // 2. Vérifier que le fournisseur appartient à la même entreprise (isolé par entreprise)
     Fournisseur fournisseur = fournisseurRepository.findByIdAndEntrepriseId(
             fournisseurId, user.getEntreprise().getId())
             .orElseThrow(() -> new RuntimeException("Fournisseur introuvable ou n'appartient pas à votre entreprise !"));
@@ -242,7 +227,6 @@ private User getUserFromRequest(HttpServletRequest request) {
   public void supprimerFournisseur(Long fournisseurId, HttpServletRequest request) {
     User user = getUserFromRequest(request);
 
-    // 🔒 Vérification rôle ou permission
     RoleType role = user.getRole().getName();
     boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
 
@@ -250,19 +234,16 @@ private User getUserFromRequest(HttpServletRequest request) {
         throw new RuntimeException("Action non autorisée : permissions insuffisantes");
     }
 
-    // 🔍 Récupération fournisseur (isolé par entreprise)
     Fournisseur fournisseur = fournisseurRepository.findByIdAndEntrepriseId(
             fournisseurId, user.getEntreprise().getId())
         .orElseThrow(() -> new RuntimeException("Fournisseur introuvable ou n'appartient pas à votre entreprise !"));
 
-    // 📄 Vérification d'utilisation dans facture (isolé par entreprise)
     boolean fournisseurUtilise = factureRepository.existsByFournisseurIdAndEntrepriseId(
             fournisseurId, user.getEntreprise().getId());
     if (fournisseurUtilise) {
         throw new RuntimeException("Impossible de supprimer ce fournisseur : il est lié à une ou plusieurs factures.");
     }
 
-    // ✅ Suppression
     fournisseurRepository.delete(fournisseur);
 }
 

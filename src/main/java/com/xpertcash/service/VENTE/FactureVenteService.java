@@ -43,7 +43,6 @@ private FactureVenteResponseDTO toResponse(FactureVente facture) {
 
     List<ProduitFactureResponse> produits = vente.getProduits().stream()
             .map(ligne -> {
-                // Pour les remboursements, afficher la quantité remboursée si elle existe
                 Integer quantiteAffichee;
                 if (ligne.isEstRemboursee() && ligne.getQuantiteRemboursee() != null && ligne.getQuantiteRemboursee() > 0) {
                     quantiteAffichee = ligne.getQuantiteRemboursee();
@@ -62,19 +61,16 @@ private FactureVenteResponseDTO toResponse(FactureVente facture) {
             })
             .collect(Collectors.toList());
 
-    // Calculer le statut de remboursement
     String statutRemboursement = calculerStatutRemboursement(vente);
 
-    // Calculer le montant en dette (pour les ventes à crédit)
     Double montantDette = 0.0;
     Double montantPaye = 0.0;
     if (vente.getModePaiement() != null && vente.getModePaiement().name().equals("CREDIT")) {
         Double montantTotal = vente.getMontantTotal() != null ? vente.getMontantTotal() : 0.0;
         Double montantRembourse = vente.getMontantTotalRembourse() != null ? vente.getMontantTotalRembourse() : 0.0;
         montantDette = Math.max(0.0, montantTotal - montantRembourse);
-        montantPaye = montantRembourse; // Pour les ventes à crédit, montantPaye = montantTotalRembourse
+        montantPaye = montantRembourse;
     } else {
-        // Pour les ventes normales, montantPaye = montantPaye de la vente ou montantTotal si payé
         montantPaye = vente.getMontantPaye() != null ? vente.getMontantPaye() : 
                      (vente.getMontantTotal() != null ? vente.getMontantTotal() : 0.0);
     }
@@ -119,15 +115,12 @@ public FactureVentePaginatedDTO getAllFacturesWithPagination(
 
     Long entrepriseId = user.getEntreprise().getId();
 
-    // Récupérer toutes les factures de l'entreprise
     List<FactureVente> allFactures = factureVenteRepository.findAllByEntrepriseId(entrepriseId);
     
-    // Convertir en DTOs
     List<FactureVenteResponseDTO> allItems = allFactures.stream()
             .map(this::toResponse)
             .collect(Collectors.toList());
     
-    // Trier par date (par défaut)
     allItems.sort((item1, item2) -> {
         if (sortDir.equalsIgnoreCase("desc")) {
             return item2.getDateEmission().compareTo(item1.getDateEmission());
@@ -136,7 +129,6 @@ public FactureVentePaginatedDTO getAllFacturesWithPagination(
         }
     });
     
-    // Calculer les statistiques
     double totalMontantFactures = allItems.stream()
             .mapToDouble(item -> item.getMontantTotal() != null ? item.getMontantTotal() : 0.0)
             .sum();
@@ -153,7 +145,6 @@ public FactureVentePaginatedDTO getAllFacturesWithPagination(
             .filter(item -> "NORMAL".equals(item.getStatutRemboursement()))
             .count();
     
-    // Appliquer la pagination manuelle
     int totalElements = allItems.size();
     int totalPages = (int) Math.ceil((double) totalElements / size);
     int startIndex = page * size;
@@ -162,7 +153,6 @@ public FactureVentePaginatedDTO getAllFacturesWithPagination(
     List<FactureVenteResponseDTO> pagedItems = 
         startIndex < totalElements ? allItems.subList(startIndex, endIndex) : new ArrayList<>();
     
-    // Construire la réponse
     FactureVentePaginatedDTO response = new FactureVentePaginatedDTO();
     response.setPage(page);
     response.setSize(size);
@@ -184,30 +174,25 @@ public FactureVentePaginatedDTO getAllFacturesWithPagination(
 
 
 public String genererNumeroFactureCompact(Vente vente) {
-    // 1️⃣ Ticket ID modulo 1000 → 3 chiffres
+    //  Ticket ID modulo 1000 → 3 chiffres
     long ticketId = vente.getId() % 1000;
 
-    // 2️⃣ POS / caisse modulo 100 → 2 chiffres
+    //  POS / caisse modulo 100 → 2 chiffres
     long posId = vente.getCaisse() != null ? vente.getCaisse().getId() % 100 : 0;
 
-    // 3️⃣ Date : jour + heure + minute → 6 chiffres
+    //  Date : jour + heure + minute → 6 chiffres
     String datePart = LocalDateTime.now().format(DateTimeFormatter.ofPattern("ddHHmm"));
 
-    // 4️⃣ Hash alphanumérique 1 caractère pour réduire collision
+    //  Hash alphanumérique 1 caractère pour réduire collision
     char hashChar = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789".charAt(
             new Random().nextInt(36)
     );
 
-    // 🔢 Combinaison finale = 3 + 2 + 6 + 1 = 12 caractères
     return String.format("%03d%02d%s%c", ticketId, posId, datePart, hashChar);
 }
 
-/**
- * Calcule le statut de remboursement d'une vente
- * Distingue les remboursements réels (retour de produits) des paiements partiels de crédit
- */
+
 private String calculerStatutRemboursement(Vente vente) {
-    // Vérifier s'il y a des lignes remboursées (retour de produits)
     boolean hasRemboursement = false;
     if (vente.getProduits() != null) {
         hasRemboursement = vente.getProduits().stream()
@@ -215,7 +200,6 @@ private String calculerStatutRemboursement(Vente vente) {
                             || ligne.isEstRemboursee());
     }
     
-    // Si c'est un remboursement réel (retour de produits)
     if (hasRemboursement) {
         if (vente.getMontantTotalRembourse() != null && 
             vente.getMontantTotalRembourse().equals(vente.getMontantTotal())) {
@@ -224,8 +208,6 @@ private String calculerStatutRemboursement(Vente vente) {
         return "PARTIELLEMENT_REMBOURSEE";
     }
     
-    // Si montantTotalRembourse > 0 mais pas de remboursement de produits,
-    // c'est un paiement partiel de crédit → reste "NORMAL"
     return "NORMAL";
 }
 
@@ -233,7 +215,6 @@ private String calculerStatutRemboursement(Vente vente) {
  * Récupère les données d'une facture pour l'envoi par email
  */
 public ReceiptEmailRequest getFactureDataForEmail(String venteId, String email, HttpServletRequest request) {
-    // Récupérer l'utilisateur et son entreprise pour l'isolation
     String token = request.getHeader("Authorization");
     if (token == null || !token.startsWith("Bearer ")) {
         throw new RuntimeException("Token JWT manquant ou invalide");
@@ -247,7 +228,6 @@ public ReceiptEmailRequest getFactureDataForEmail(String venteId, String email, 
         throw new RuntimeException("Aucune entreprise associée à cet utilisateur");
     }
     
-    // Récupérer la facture par l'ID de vente (isolé par entreprise)
     Optional<FactureVente> factureOpt = factureVenteRepository.findByVenteIdAndEntrepriseId(
             Long.parseLong(venteId), entrepriseId);
     
@@ -258,7 +238,6 @@ public ReceiptEmailRequest getFactureDataForEmail(String venteId, String email, 
     FactureVente facture = factureOpt.get();
     Vente vente = facture.getVente();
     
-    // Convertir les lignes de vente en VenteLigneResponse et construire la map des remises
     Map<Long, Double> remisesProduits = new HashMap<>();
     List<VenteLigneResponse> lignes = vente.getProduits().stream()
         .map(ligne -> {
@@ -271,7 +250,6 @@ public ReceiptEmailRequest getFactureDataForEmail(String venteId, String email, 
             double remise = ligne.getRemise();
             ligneResponse.setRemise(remise);
             
-            // Ajouter la remise à la map si elle existe
             if (remise > 0) {
                 remisesProduits.put(ligne.getProduit().getId(), remise);
             }
@@ -290,7 +268,6 @@ public ReceiptEmailRequest getFactureDataForEmail(String venteId, String email, 
     receiptRequest.setModePaiement(vente.getModePaiement() != null ? vente.getModePaiement().toString() : "Non spécifié");
     receiptRequest.setMontantPaye(BigDecimal.valueOf(vente.getMontantPaye() != null ? vente.getMontantPaye() : vente.getMontantTotal()));
     
-    // Calculer la monnaie rendue
     BigDecimal changeDue = receiptRequest.getMontantPaye().subtract(receiptRequest.getMontantTotal());
     receiptRequest.setChangeDue(changeDue.max(BigDecimal.ZERO));
     
@@ -298,7 +275,6 @@ public ReceiptEmailRequest getFactureDataForEmail(String venteId, String email, 
     receiptRequest.setNomBoutique(vente.getBoutique().getNomBoutique());
     receiptRequest.setLignes(lignes);
     
-    // Ajouter les remises
     receiptRequest.setRemiseGlobale(vente.getRemiseGlobale() != null ? vente.getRemiseGlobale() : 0.0);
     receiptRequest.setRemisesProduits(remisesProduits.isEmpty() ? null : remisesProduits);
     

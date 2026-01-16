@@ -29,7 +29,7 @@ public class PaiementDTO {
     private String origine; // COMPTABILITE, FACTURE, BOUTIQUE (nom de la boutique)
     private List<LigneFactureDTO> lignesFacture; // Lignes de facture (produits/articles de la facture)
 
-    // ✅ Constructeur de mapping depuis l'entité Paiement
+    //  Constructeur de mapping depuis l'entité Paiement
     public PaiementDTO(Paiement paiement) {
         this.id = paiement.getId();
         this.montant = paiement.getMontant();

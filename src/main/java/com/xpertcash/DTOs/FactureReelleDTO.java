@@ -54,7 +54,7 @@ public class FactureReelleDTO {
     private String nomClient;
     private String nomEntrepriseClient; 
 
-    // ✅ Constructeur qui transforme une FactureReelle en FactureReelleDTO
+    //  Constructeur qui transforme une FactureReelle en FactureReelleDTO
     public FactureReelleDTO(FactureReelle facture, BigDecimal montantRestant) {
         this.id = facture.getId();
         this.numeroFacture = facture.getNumeroFacture();

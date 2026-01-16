@@ -31,14 +31,12 @@ public class NotificationService {
 
     // tâche planifiée : Vérifie tous les jours à 08h00 quelles factures doivent être relancées
     @Scheduled(cron = "0 0 8 * * ?")
-    //@Scheduled(cron = "0 * * * * ?")  // Tâche planifiée toutes les minutes mode Dev
     @Transactional
     public void verifierFacturesAEnvoyer() {
         LocalDateTime maintenant = LocalDateTime.now().withSecond(0).withNano(0);
     
-        System.out.println("🔍 Vérification des factures à relancer à " + maintenant);
+        System.out.println(" Vérification des factures à relancer à " + maintenant);
     
-        // Itérer sur toutes les entreprises pour respecter l'isolation des données
         List<Entreprise> entreprises = entrepriseRepository.findAll();
         int totalFacturesAEnvoyer = 0;
         
@@ -48,7 +46,7 @@ public class NotificationService {
             totalFacturesAEnvoyer += facturesAEnvoyer.size();
             
             for (FactureProForma facture : facturesAEnvoyer) {
-            System.out.println("📢 Facture à relancer : " + facture.getNumeroFacture() +
+            System.out.println("Facture à relancer : " + facture.getNumeroFacture() +
                                ", Date Relance : " + facture.getDateRelance() +
                                ", Dernier Rappel Envoyé : " + facture.getDernierRappelEnvoye() +
                                ", Notifiée : " + facture.isNotifie());
@@ -56,7 +54,7 @@ public class NotificationService {
                                try {
                                 User utilisateurRelanceur = facture.getUtilisateurRelanceur();
                                 if (utilisateurRelanceur == null || utilisateurRelanceur.getEmail() == null) {
-                                    System.err.println("⚠️ Impossible d'envoyer l'email : Aucun utilisateur relanceur défini pour la facture " + facture.getNumeroFacture());
+                                    System.err.println(" Impossible d'envoyer l'email : Aucun utilisateur relanceur défini pour la facture " + facture.getNumeroFacture());
                                     continue;
                                 }
                             
@@ -78,14 +76,14 @@ public class NotificationService {
                                 facture.setDernierRappelEnvoye(maintenant);
                                 factureProformaRepository.save(facture);
                             
-                                System.out.println("✅ Notification envoyée pour la facture " + facture.getNumeroFacture());
+                                System.out.println(" Notification envoyée pour la facture " + facture.getNumeroFacture());
                             } catch (Exception e) {
-                                System.err.println("❌ Erreur lors de l'envoi de la notification pour la facture " + facture.getNumeroFacture() + " : " + e.getMessage());
+                                System.err.println(" Erreur lors de l'envoi de la notification pour la facture " + facture.getNumeroFacture() + " : " + e.getMessage());
                             }
                         }
         }
         
-        System.out.println("📊 Nombre total de factures à relancer : " + totalFacturesAEnvoyer);
+        System.out.println(" Nombre total de factures à relancer : " + totalFacturesAEnvoyer);
     }
    
 

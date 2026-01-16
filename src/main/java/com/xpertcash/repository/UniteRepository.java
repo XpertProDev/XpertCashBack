@@ -12,7 +12,7 @@ import com.xpertcash.entity.Unite;
 @Repository
 public interface UniteRepository extends JpaRepository<Unite, Long>{
     
-    // ⚠️ ATTENTION: Ces méthodes ne filtrent PAS par entreprise - dépréciées
+    //  ATTENTION: Ces méthodes ne filtrent PAS par entreprise - dépréciées
     // Utiliser findByNomAndEntrepriseId ou existsByNomAndEntrepriseId à la place
     @Deprecated
     Optional<Unite> findByNom(String nom);

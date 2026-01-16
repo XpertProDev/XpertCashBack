@@ -42,7 +42,6 @@ public class VersementComptableService {
             throw new RuntimeException("L'utilisateur connecté n'appartient à aucune entreprise.");
         }
 
-        // Vérification des rôles
         RoleType role = user.getRole().getName();
         boolean isAdminManagerOrComptable = 
             role == RoleType.ADMIN || role == RoleType.MANAGER || role == RoleType.COMPTABLE;
@@ -51,14 +50,12 @@ public class VersementComptableService {
             throw new RuntimeException("Vous n'avez pas les droits pour voir les versements.");
         }
 
-        // Vérification que la boutique appartient à l'entreprise de l'utilisateur
         Boutique boutique = boutiqueRepository.findById(boutiqueId)
                 .orElseThrow(() -> new RuntimeException("Boutique introuvable"));
         if (!boutique.getEntreprise().getId().equals(user.getEntreprise().getId())) {
             throw new RuntimeException("Cette boutique n'appartient pas à votre entreprise.");
         }
 
-        // 📥 Récupérer tous les versements de cette boutique
        return versementComptableRepository.findByCaisse_BoutiqueId(boutiqueId).stream()
         .map(v -> {
             VersementComptableDTO dto = new VersementComptableDTO();
@@ -73,12 +70,10 @@ public class VersementComptableService {
             dto.setNomBoutique(v.getCaisse().getBoutique().getNomBoutique());
             dto.setNomVendeur(v.getCreePar().getNomComplet());
 
-            // Gérer le cas où ValidePar est null
             if (v.getValidePar() != null) {
                 dto.setNomComptable(v.getValidePar().getNomComplet());
                 dto.setDateValidation(v.getDateValidation());
             } else {
-                // Valeur par défaut pour "NomComptable" si ValidePar est null
                 dto.setNomComptable("Non validé");
                 dto.setDateValidation(null);
             }
@@ -93,7 +88,6 @@ public class VersementComptableService {
 
     @Transactional
     public VersementComptableDTO validerVersement(Long versementId, boolean valide, HttpServletRequest request) {
-        // 🔐 Vérification du token JWT
         String token = request.getHeader("Authorization");
         if (token == null || !token.startsWith("Bearer ")) {
             throw new RuntimeException("Token JWT manquant ou mal formaté");
@@ -105,7 +99,6 @@ public class VersementComptableService {
             throw new RuntimeException("L'utilisateur connecté n'appartient à aucune entreprise.");
         }
 
-        // 🔐 Vérification des rôles
         RoleType role = user.getRole().getName();
         boolean isAdminOrManagerOrComptable =
                 role == RoleType.ADMIN || role == RoleType.MANAGER || role == RoleType.COMPTABLE;
@@ -113,23 +106,19 @@ public class VersementComptableService {
             throw new RuntimeException("Vous n'avez pas les droits nécessaires pour valider ou refuser un versement.");
         }
 
-        // 🔍 Récupération du versement
         VersementComptable versement = versementComptableRepository.findById(versementId)
                 .orElseThrow(() -> new RuntimeException("Versement introuvable"));
 
-        // 🔍 Vérification que la boutique appartient bien à l'entreprise de l'utilisateur
         if (!versement.getCaisse().getBoutique().getEntreprise().getId().equals(user.getEntreprise().getId())) {
             throw new RuntimeException("Ce versement n'appartient pas à votre entreprise.");
         }
 
-        // ✅ Mise à jour du statut et des infos de validation
         versement.setStatut(valide ? StatutVersement.VALIDE : StatutVersement.REFUSE);
         versement.setDateValidation(LocalDateTime.now());
         versement.setValidePar(user);
 
         VersementComptable saved = versementComptableRepository.save(versement);
 
-        // 📝 Construction du DTO
         VersementComptableDTO dto = new VersementComptableDTO();
         dto.setId(saved.getId());
         dto.setMontantInitialCaisse(saved.getCaisse().getMontantInitial());
@@ -151,7 +140,6 @@ public class VersementComptableService {
 
     @Transactional
 public List<VersementComptableDTO> getVersementsParStatut(Long boutiqueId, StatutVersement statut, HttpServletRequest request) {
-    // 🔐 Vérification JWT
     String token = request.getHeader("Authorization");
     if (token == null || !token.startsWith("Bearer ")) {
         throw new RuntimeException("Token JWT manquant ou mal formaté");
@@ -162,7 +150,6 @@ public List<VersementComptableDTO> getVersementsParStatut(Long boutiqueId, Statu
         throw new RuntimeException("L'utilisateur connecté n'appartient à aucune entreprise.");
     }
 
-    // Vérification des droits
     RoleType role = user.getRole().getName();
     boolean isAdminManagerOrComptable = 
         role == RoleType.ADMIN || role == RoleType.MANAGER || role == RoleType.COMPTABLE;
@@ -170,18 +157,15 @@ public List<VersementComptableDTO> getVersementsParStatut(Long boutiqueId, Statu
         throw new RuntimeException("Vous n'avez pas les droits pour voir ces versements.");
     }
 
-    // 🔍 Vérification que la boutique appartient à l’entreprise
     Boutique boutique = boutiqueRepository.findById(boutiqueId)
             .orElseThrow(() -> new RuntimeException("Boutique introuvable"));
     if (!boutique.getEntreprise().getId().equals(user.getEntreprise().getId())) {
         throw new RuntimeException("Cette boutique n'appartient pas à votre entreprise.");
     }
 
-    // 📥 Récupération filtrée
     List<VersementComptable> versements = versementComptableRepository
             .findByCaisse_BoutiqueIdAndStatut(boutiqueId, statut);
 
-    // 📝 Conversion en DTO
     return versements.stream().map(v -> {
         VersementComptableDTO dto = new VersementComptableDTO();
         dto.setId(v.getId());

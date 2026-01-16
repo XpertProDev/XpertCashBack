@@ -74,7 +74,6 @@ public boolean isModuleActifPourEntreprise(Entreprise entreprise, String codeMod
         return moduleAchete;
     }
 
-    // Cas module payant : vérifie abonnement actif
     Optional<EntrepriseModuleAbonnement> abonnementOpt = entrepriseModuleAbonnementRepository
             .findByEntrepriseAndModuleAndActifTrue(entreprise, module);
 
@@ -82,12 +81,10 @@ public boolean isModuleActifPourEntreprise(Entreprise entreprise, String codeMod
             abonnementOpt.get().getDateFin() != null &&
             abonnementOpt.get().getDateFin().isAfter(LocalDateTime.now());
 
-    // Si le module est acheté mais que l'abonnement est expiré, on le désactive du Set
     if (moduleAchete && !abonnementValide) {
         entreprise.getModulesActifs().remove(module);
         entrepriseRepository.save(entreprise);
 
-        // On désactive aussi l'abonnement
         abonnementOpt.ifPresent(abonnement -> {
             abonnement.setActif(false);
             entrepriseModuleAbonnementRepository.save(abonnement);
@@ -96,7 +93,6 @@ public boolean isModuleActifPourEntreprise(Entreprise entreprise, String codeMod
         moduleAchete = false;
     }
 
-    // Vérification essai individuel
     Optional<EntrepriseModuleEssai> essaiOpt = entrepriseModuleEssaiRepository.findByEntrepriseAndModule(entreprise, module);
 
     boolean essaiValide = essaiOpt.isPresent() &&
@@ -107,11 +103,10 @@ public boolean isModuleActifPourEntreprise(Entreprise entreprise, String codeMod
 }
 
  
-    //Module de verification reutilisable
     public void verifierAccesModulePourEntreprise(Entreprise entreprise, String codeModule) {
 
         if (isModuleActifPourEntreprise(entreprise, codeModule)) {
-            return; // Tout est ok, accès autorisé
+            return;
         }
 
         Map<String, String> tempsRestantParModule = consulterTempsRestantEssaiParModule(entreprise);
@@ -124,13 +119,11 @@ public boolean isModuleActifPourEntreprise(Entreprise entreprise, String codeMod
         }
     }
 
-    // Vérifie tous les abonnements expirés et désactive proprement tous les jours à minuit
 
     @Scheduled(cron = "0 0 0 * * ?")
     @Transactional
     public void synchroniserAbonnementsExpirés() {
 
-        // Récupérer tous les abonnements dont la date de fin est dépassée ET qui sont encore marqués actifs
         List<EntrepriseModuleAbonnement> abonnementsExpirés = entrepriseModuleAbonnementRepository
                 .findByActifTrueAndDateFinBefore(LocalDateTime.now());
 
@@ -138,14 +131,14 @@ public boolean isModuleActifPourEntreprise(Entreprise entreprise, String codeMod
 
         for (EntrepriseModuleAbonnement abo : abonnementsExpirés) {
 
-            abo.setActif(false);  // Désactivation de l'abonnement
+            abo.setActif(false);
             entrepriseModuleAbonnementRepository.save(abo);
 
             Entreprise entreprise = abo.getEntreprise();
             AppModule module = abo.getModule();
 
             if (entreprise.getModulesActifs().contains(module)) {
-                entreprise.getModulesActifs().remove(module);  // Retrait du module actif
+                entreprise.getModulesActifs().remove(module);
                 entrepriseRepository.save(entreprise);
 
                 System.out.println("Module '" + module.getNom() + "' retiré de l'entreprise '" 
@@ -161,7 +154,6 @@ public boolean isModuleActifPourEntreprise(Entreprise entreprise, String codeMod
 
 
 
-    // Liste centralisée des sous-modules à masquer
     private static final List<String> SOUS_MODULES_MASQUES = List.of(
         "FACTURE_PROFORMA",
         "FACTURE_REELLE"
@@ -170,7 +162,6 @@ public boolean isModuleActifPourEntreprise(Entreprise entreprise, String codeMod
 
 
 
-    // Initialiser les essais pour les modules payants
     public void initialiserEssaisModulesPayants(Entreprise entreprise) {
 
     List<AppModule> modulesPayants = moduleRepository.findByPayantTrue();
@@ -180,7 +171,6 @@ public boolean isModuleActifPourEntreprise(Entreprise entreprise, String codeMod
 
     for (AppModule module : modulesPayants) {
         
-        // Évite les doublons si un essai existe déjà
         if (entrepriseModuleEssaiRepository.existsByEntrepriseAndModule(entreprise, module)) {
             continue; 
         }
@@ -483,10 +473,10 @@ public List<Map<String, Object>> consulterAbonnementsActifs(Entreprise entrepris
 
 // Calculer les jours restants avant expiration
 private long calculerJoursRestants(LocalDateTime dateFin) {
-    if (dateFin == null) return -1; // Abonnement permanent
+    if (dateFin == null) return -1; 
     
     LocalDateTime maintenant = LocalDateTime.now();
-    if (dateFin.isBefore(maintenant)) return 0; // Expiré
+    if (dateFin.isBefore(maintenant)) return 0;
     
     return java.time.Duration.between(maintenant, dateFin).toDays();
 }
@@ -496,15 +486,13 @@ private long calculerJoursRestants(LocalDateTime dateFin) {
 public boolean desactiverModulePourEntreprise(Entreprise entreprise, String codeModule) {
     Optional<AppModule> moduleOpt = moduleRepository.findByCode(codeModule);
     if (moduleOpt.isEmpty()) {
-        return false; // Module non trouvé
+        return false; 
     }
     
     AppModule module = moduleOpt.get();
     
-    // Retirer le module de la liste des modules actifs
     boolean moduleRetire = entreprise.getModulesActifs().remove(module);
     
-    // Désactiver l'abonnement s'il existe
     Optional<EntrepriseModuleAbonnement> abonnementOpt = entrepriseModuleAbonnementRepository
             .findByEntrepriseAndModuleAndActifTrue(entreprise, module);
     
@@ -514,7 +502,6 @@ public boolean desactiverModulePourEntreprise(Entreprise entreprise, String code
         entrepriseModuleAbonnementRepository.save(abonnement);
     }
     
-    // Sauvegarder l'entreprise si le module a été retiré
     if (moduleRetire) {
         entrepriseRepository.save(entreprise);
     }

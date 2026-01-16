@@ -107,7 +107,7 @@ public class FactureProformaController {
         try {
             factureProformaService.supprimerFactureProforma(factureId, request);
 
-            // ✅ Retourner un objet JSON
+            //  Retourner un objet JSON
             Map<String, String> response = new HashMap<>();
             response.put("message", "Facture supprimée avec succès.");
             return ResponseEntity.ok(response);

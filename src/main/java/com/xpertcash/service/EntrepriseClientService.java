@@ -48,7 +48,7 @@ public class EntrepriseClientService {
             throw new RuntimeException("Aucune entreprise associée à cet utilisateur");
         }
 
-        // 🔒 Vérifier les droits
+        //  Vérifier les droits
         // boolean isAdminOrManager = CentralAccess.isAdminOrManagerOfEntreprise(user, entreprise.getId());
         // boolean hasPermissionGestionClient = user.getRole().hasPermission(PermissionType.GERER_CLIENTS);
         // boolean hasPermissionGestionFacturation = user.getRole().hasPermission(PermissionType.GESTION_FACTURATION);
@@ -58,12 +58,11 @@ public class EntrepriseClientService {
         //     throw new RuntimeException("Accès refusé : vous n'avez pas les permissions pour créer une entreprise cliente.");
         // }
 
-        // ✅ Vérification du nom
         if (entrepriseClient.getNom() == null || entrepriseClient.getNom().trim().isEmpty()) {
             throw new RuntimeException("Le nom de l'entreprise est obligatoire !");
         }
 
-        // ✅ Unicité email / téléphone
+        //  Unicité email / téléphone
         String email = entrepriseClient.getEmail();
         String telephone = entrepriseClient.getTelephone();
 
@@ -88,11 +87,9 @@ public class EntrepriseClientService {
             throw new RuntimeException("Une entreprise avec ce téléphone existe déjà !");
         }
 
-        // 🔗 Lier l’entreprise cliente à l’entreprise de l’utilisateur
         entrepriseClient.setEntreprise(entreprise);
         entrepriseClient.setCreatedAt(LocalDateTime.now());
 
-        // 💾 Enregistrement
         return entrepriseClientRepository.save(entrepriseClient);
     }
 
@@ -109,7 +106,6 @@ public class EntrepriseClientService {
         throw new RuntimeException("Aucune entreprise associée à cet utilisateur");
     }
 
-    // 🔎 Rechercher l'entreprise cliente
     Optional<EntrepriseClient> entrepriseClientOpt = entrepriseClientRepository.findById(id);
     if (entrepriseClientOpt.isEmpty()) {
         throw new EntityNotFoundException("Entreprise cliente introuvable avec l'ID : " + id);
@@ -117,7 +113,6 @@ public class EntrepriseClientService {
 
     EntrepriseClient entrepriseClient = entrepriseClientOpt.get();
 
-    // 🔐 Vérifier que l’entreprise cliente appartient à la même entreprise
     if (entrepriseClient.getEntreprise() == null ||
         !entrepriseClient.getEntreprise().getId().equals(entreprise.getId())) {
         throw new RuntimeException("Accès refusé : cette entreprise cliente ne vous appartient pas.");
@@ -139,7 +134,7 @@ public class EntrepriseClientService {
         throw new RuntimeException("Aucune entreprise associée à cet utilisateur");
     }
  
-    // 🔒 Autorisation
+    //  Autorisation
     // boolean isAdminOrManager = CentralAccess.isAdminOrManagerOfEntreprise(user, entreprise.getId());
     // boolean hasPermissionGestionClient = user.getRole().hasPermission(PermissionType.GERER_CLIENTS);
     // boolean hasPermissionGestionFacturation = user.getRole().hasPermission(PermissionType.GESTION_FACTURATION);
@@ -149,7 +144,7 @@ public class EntrepriseClientService {
     //     throw new RuntimeException("Accès refusé : vous n'avez pas les droits pour voir les entreprises clientes.");
     // }
 
-    // 🔎 Récupération filtrée
+    //  Récupération filtrée
     return entrepriseClientRepository.findByEntrepriseId(entreprise.getId());
 }
 
@@ -160,7 +155,6 @@ public class EntrepriseClientService {
             throw new IllegalArgumentException("L'ID d'entreprise est obligatoire !");
         }
     
-        //  si l'entreprise client existe
         Optional<EntrepriseClient> existingEntrepriseClient = entrepriseClientRepository.findById(entrepriseClient.getId());
         if (existingEntrepriseClient.isEmpty()) {
             throw new EntityNotFoundException("L'entreprise avec cet ID n'existe pas !");
@@ -168,7 +162,6 @@ public class EntrepriseClientService {
     
         EntrepriseClient updateEntrepriseClient = existingEntrepriseClient.get();
     
-        // Utilisation de la réflexion pour mettre à jour seulement les champs non null
         for (Field field : EntrepriseClient.class.getDeclaredFields()) {
             field.setAccessible(true);
             try {
@@ -181,13 +174,11 @@ public class EntrepriseClientService {
             }
         }
     
-        // Enregistrer les modifications
         return entrepriseClientRepository.save(updateEntrepriseClient);
     }
 
 
  //Methode pour  supprimer un client qui n'as pas de facture et de commande
-
  @Transactional
 public void deleteEntrepriseClientIfNoOrdersOrInvoices(Long entrepriseClientId, HttpServletRequest request) {
     if (entrepriseClientId == null) {
@@ -204,13 +195,11 @@ public void deleteEntrepriseClientIfNoOrdersOrInvoices(Long entrepriseClientId, 
         throw new RuntimeException("Aucune entreprise associée à cet utilisateur");
     }
 
-    // 🔒 Vérifier que le client entreprise appartient bien à cette entreprise
     if (entrepriseClient.getEntreprise() == null ||
         !entrepriseClient.getEntreprise().getId().equals(entreprise.getId())) {
         throw new RuntimeException("Accès refusé : ce client entreprise ne vous appartient pas.");
     }
 
-    // 🔒 Vérifier que l'utilisateur a les droits
     boolean isAdminOrManager = CentralAccess.isAdminOrManagerOfEntreprise(user, entreprise.getId());
     boolean hasPermissionGestionClient = user.getRole().hasPermission(PermissionType.GERER_CLIENTS);
 
@@ -218,7 +207,6 @@ public void deleteEntrepriseClientIfNoOrdersOrInvoices(Long entrepriseClientId, 
         throw new RuntimeException("Accès refusé : vous n'avez pas les permissions pour supprimer un client entreprise.");
     }
 
-    // ❌ Vérifier qu'il n'a pas de commandes ni de factures (isolé par entreprise)
     boolean hasFactures = factureProformaRepository.existsByEntrepriseClientIdAndEntrepriseId(entrepriseClientId, entreprise.getId());
     boolean hasFacturesReel = factureReelleRepository.existsByEntrepriseClientIdAndEntrepriseId(entrepriseClientId, entreprise.getId());
 
@@ -226,9 +214,8 @@ public void deleteEntrepriseClientIfNoOrdersOrInvoices(Long entrepriseClientId, 
         throw new RuntimeException("Ce client entreprise ne peut pas être supprimé car il a des factures.");
     }
 
-    // ✅ Suppression
     entrepriseClientRepository.delete(entrepriseClient);
-    System.out.println("✅ Client entreprise supprimé avec succès : " + entrepriseClientId);
+    System.out.println(" Client entreprise supprimé avec succès : " + entrepriseClientId);
 }
 
   
