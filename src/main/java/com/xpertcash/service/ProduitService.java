@@ -1072,12 +1072,36 @@ public class ProduitService {
 }
 
     //Methode Total des Produit:
-    public Map<String, Integer> getTotalQuantitesParStock(Long boutiqueId) {
+    public Map<String, Integer> getTotalQuantitesParStock(Long boutiqueId, HttpServletRequest request) {
+        String token = request.getHeader("Authorization");
+        if (token == null || !token.startsWith("Bearer ")) {
+            throw new RuntimeException("Token JWT manquant ou mal formaté");
+        }
+
+        User user = authHelper.getAuthenticatedUserWithFallback(request);
+        Entreprise entreprise = user.getEntreprise();
+        if (entreprise == null) {
+            throw new RuntimeException("Aucune entreprise associée à cet utilisateur");
+        }
+
+        Boutique boutique = boutiqueRepository.findById(boutiqueId)
+                .orElseThrow(() -> new RuntimeException("Boutique introuvable"));
+
+        if (!boutique.getEntreprise().getId().equals(entreprise.getId())) {
+            throw new RuntimeException("Accès interdit : cette boutique ne vous appartient pas");
+        }
+
         List<Produit> produitsEnStock = produitRepository.findByBoutiqueIdAndEnStockTrue(boutiqueId);
         List<Produit> produitsNonEnStock = produitRepository.findByBoutiqueIdAndEnStockFalse(boutiqueId);
 
-        int totalEnStock = produitsEnStock.stream().mapToInt(Produit::getQuantite).sum();
-        int totalNonEnStock = produitsNonEnStock.stream().mapToInt(Produit::getQuantite).sum();
+        int totalEnStock = produitsEnStock.stream()
+                .filter(p -> !Boolean.TRUE.equals(p.getDeleted()))
+                .mapToInt(Produit::getQuantite)
+                .sum();
+        int totalNonEnStock = produitsNonEnStock.stream()
+                .filter(p -> !Boolean.TRUE.equals(p.getDeleted()))
+                .mapToInt(Produit::getQuantite)
+                .sum();
 
         Map<String, Integer> totals = new HashMap<>();
         totals.put("totalEnStock", totalEnStock);

@@ -283,10 +283,14 @@ public ResponseEntity<?> updateProduit(
 
         //Get Total Produit
         @GetMapping("/produits/{boutiqueId}/totaux-stock")
-        public ResponseEntity<Map<String, Integer>> getTotalQuantitesParStock(@PathVariable Long boutiqueId) {
+        public ResponseEntity<Map<String, Integer>> getTotalQuantitesParStock(@PathVariable Long boutiqueId, HttpServletRequest request) {
             try {
-                Map<String, Integer> totals = produitService.getTotalQuantitesParStock(boutiqueId);
+                Map<String, Integer> totals = produitService.getTotalQuantitesParStock(boutiqueId, request);
                 return ResponseEntity.ok(totals);
+            } catch (RuntimeException e) {
+                Map<String, String> errorResponse = new HashMap<>();
+                errorResponse.put("error", e.getMessage());
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(new HashMap<>());
             } catch (Exception e) {
                 Map<String, Integer> errorResponse = new HashMap<>();
                 errorResponse.put("totalEnStock", 0);
