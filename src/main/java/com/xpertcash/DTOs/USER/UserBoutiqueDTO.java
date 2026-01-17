@@ -1,27 +1,17 @@
-package com.xpertcash.DTOs.Boutique;
-
-
-
-import java.time.LocalDateTime;
+package com.xpertcash.DTOs.USER;
 
 import com.xpertcash.entity.Enum.TypeBoutique;
-
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+
 @Data
-@AllArgsConstructor
 @NoArgsConstructor
-public class BoutiqueResponse {
+@AllArgsConstructor
+public class UserBoutiqueDTO {
     private Long id;
     private String nomBoutique;
-    private String adresse;
-    private String telephone;
-    private String email;
-    private LocalDateTime createdAt;
-    private boolean actif = true;
+    private Boolean actif;
     private TypeBoutique typeBoutique;
     private Boolean isGestionnaireStock;
-    
-    
 }

@@ -1233,8 +1233,9 @@ public class ProduitService {
         boolean isAdminOrManager = CentralAccess.isAdminOrManagerOfEntreprise(user, entreprise.getId());
         boolean hasPermissionGestionProduits = user.getRole().hasPermission(PermissionType.GERER_PRODUITS);
         boolean hasPermissionGestionFacturation = user.getRole().hasPermission(PermissionType.GESTION_FACTURATION);
+        boolean hasPermissionApprovisionnerStock = user.getRole().hasPermission(PermissionType.APPROVISIONNER_STOCK);
 
-        if (!isAdminOrManager && !hasPermissionGestionProduits && !hasPermissionGestionFacturation) {
+        if (!isAdminOrManager && !hasPermissionGestionProduits && !hasPermissionGestionFacturation && !hasPermissionApprovisionnerStock) {
             throw new RuntimeException("Accès refusé : vous n'avez pas les droits nécessaires pour consulter les produits.");
         }
 
@@ -1603,7 +1604,9 @@ public class ProduitService {
 
         RoleType role = user.getRole().getName();
         boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
-        if (!isAdminOrManager) {
+        boolean hasPermission = user.getRole().hasPermission(PermissionType.GERER_PRODUITS)
+                       || user.getRole().hasPermission(PermissionType.APPROVISIONNER_STOCK);
+        if (!isAdminOrManager && !hasPermission) {
             throw new RuntimeException("Vous n'avez pas les droits nécessaires pour accéder à cette information.");
         }
 

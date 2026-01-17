@@ -1,11 +1,11 @@
 package com.xpertcash.controller;
 import com.xpertcash.DTOs.UpdateUserRequest;
+import com.xpertcash.DTOs.USER.AssignPermissionsRequest;
 import com.xpertcash.DTOs.USER.RegisterResponse;
 import com.xpertcash.DTOs.USER.ResendActivationRequest;
 import com.xpertcash.DTOs.USER.UserDTO;
 import com.xpertcash.DTOs.USER.UserRequest;
 import com.xpertcash.DTOs.UserOptimalDTO;
-import com.xpertcash.entity.PermissionType;
 import com.xpertcash.entity.User;
 import com.xpertcash.DTOs.EntrepriseDTO;
 import com.xpertcash.DTOs.LoginRequest;
@@ -269,10 +269,10 @@ public ResponseEntity<RegisterResponse> register(@RequestBody RegistrationReques
  @PostMapping("/{userId}/permissions")
 public ResponseEntity<UserDTO> assignPermissionsToUser(
         @PathVariable Long userId,
-        @RequestBody Map<PermissionType, Boolean> permissions,
-        HttpServletRequest request) {
+        @RequestBody AssignPermissionsRequest request,
+        HttpServletRequest httpRequest) {
 
-    UserDTO updatedUserDTO = usersService.assignPermissionsToUser(userId, permissions, request);
+    UserDTO updatedUserDTO = usersService.assignPermissionsToUser(userId, request, httpRequest);
     return ResponseEntity.ok(updatedUserDTO);
 }
 

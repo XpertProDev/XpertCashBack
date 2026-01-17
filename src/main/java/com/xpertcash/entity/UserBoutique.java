@@ -29,6 +29,9 @@ public class UserBoutique {
     @JoinColumn(name = "boutique_id", nullable = false)
     private Boutique boutique;
 
-    private LocalDateTime assignedAt; 
+    private LocalDateTime assignedAt;
+    
+    @Column(nullable = false)
+    private boolean canGestionStock = false;
 }
 

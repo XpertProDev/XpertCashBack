@@ -3,9 +3,11 @@ package com.xpertcash.service;
 import com.xpertcash.DTOs.EntrepriseDTO;
 import com.xpertcash.DTOs.UpdateUserRequest;
 import com.xpertcash.DTOs.Boutique.BoutiqueResponse;
+import com.xpertcash.DTOs.USER.AssignPermissionsRequest;
 import com.xpertcash.DTOs.USER.PermissionDTO;
 import com.xpertcash.DTOs.USER.RegisterResponse;
 import com.xpertcash.DTOs.USER.RoleDTO;
+import com.xpertcash.DTOs.USER.UserBoutiqueDTO;
 import com.xpertcash.DTOs.USER.UserDTO;
 import com.xpertcash.DTOs.USER.UserRequest;
 import com.xpertcash.DTOs.UserOptimalDTO;
@@ -28,6 +30,7 @@ import com.xpertcash.repository.EntrepriseRepository;
 import com.xpertcash.repository.FactureProformaRepository;
 import com.xpertcash.repository.PermissionRepository;
 import com.xpertcash.repository.RoleRepository;
+import com.xpertcash.repository.UserBoutiqueRepository;
 import com.xpertcash.repository.UsersRepository;
 import com.xpertcash.repository.Module.ModuleRepository;
 import com.xpertcash.repository.UserSessionRepository;
@@ -136,7 +139,11 @@ public class UsersService {
 
     @Autowired
     private PermissionRepository permissionRepository;
-     @Autowired
+    
+    @Autowired
+    private UserBoutiqueRepository userBoutiqueRepository;
+    
+    @Autowired
     private ImageStorageService imageStorageService;
 
     @Autowired
@@ -857,8 +864,8 @@ public class UsersService {
 
     //Attribution des permissions à un utilisateur
     @Transactional
-    public UserDTO assignPermissionsToUser(Long userId, Map<PermissionType, Boolean> permissions, HttpServletRequest request) {
-        User currentUser = authHelper.getAuthenticatedUserWithFallback(request);
+    public UserDTO assignPermissionsToUser(Long userId, AssignPermissionsRequest request, HttpServletRequest httpRequest) {
+        User currentUser = authHelper.getAuthenticatedUserWithFallback(httpRequest);
 
         User targetUser = usersRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("Utilisateur cible non trouvé"));
@@ -889,6 +896,11 @@ public class UsersService {
             throw new RuntimeException("L'utilisateur cible n'a pas de rôle attribué.");
         }
 
+        Map<PermissionType, Boolean> permissions = request.getPermissions();
+        if (permissions == null || permissions.isEmpty()) {
+            throw new RuntimeException("Aucune permission spécifiée.");
+        }
+
         Role targetRole = targetUser.getRole();
         List<User> usersWithSameRole = usersRepository.findByRole(targetRole);
 
@@ -915,29 +927,110 @@ public class UsersService {
             targetRole.setPermissions(existingPermissions);
         }
 
+        // Gérer les permissions générales
         for (Map.Entry<PermissionType, Boolean> entry : permissions.entrySet()) {
             PermissionType permissionType = entry.getKey();
             Boolean isEnabled = entry.getValue();
 
-            Permission permission = permissionRepository.findByType(permissionType)
-                    .orElseThrow(() -> new RuntimeException("Permission non trouvée : " + permissionType));
+            // Traitement spécial pour APPROVISIONNER_STOCK
+            if (permissionType == PermissionType.APPROVISIONNER_STOCK) {
+                if (Boolean.TRUE.equals(isEnabled)) {
+                    // Vérifier que les boutiques sont spécifiées
+                    List<Long> boutiqueIds = request.getBoutiqueIdsForStockManagement();
+                    if (boutiqueIds == null || boutiqueIds.isEmpty()) {
+                        throw new RuntimeException("Pour activer la permission APPROVISIONNER_STOCK, vous devez spécifier au moins une boutique dans 'boutiqueIdsForStockManagement'.");
+                    }
 
-            if (Boolean.TRUE.equals(isEnabled)) {
-                if (!existingPermissions.contains(permission)) {
-                    existingPermissions.add(permission);
+                    // Vérifier que toutes les boutiques appartiennent à l'entreprise
+                    Long entrepriseId = currentUser.getEntreprise().getId();
+                    List<Boutique> boutiques = boutiqueRepository.findAllById(boutiqueIds);
+                    if (boutiques.size() != boutiqueIds.size()) {
+                        throw new RuntimeException("Certaines boutiques spécifiées n'existent pas.");
+                    }
+                    for (Boutique boutique : boutiques) {
+                        if (!boutique.getEntreprise().getId().equals(entrepriseId)) {
+                            throw new RuntimeException("La boutique '" + boutique.getNomBoutique() + "' n'appartient pas à votre entreprise.");
+                        }
+                    }
+
+                    // Ajouter la permission au rôle si elle n'existe pas déjà
+                    Permission stockPermission = permissionRepository.findByType(PermissionType.APPROVISIONNER_STOCK)
+                            .orElseThrow(() -> new RuntimeException("Permission APPROVISIONNER_STOCK non trouvée"));
+                    if (!existingPermissions.contains(stockPermission)) {
+                        existingPermissions.add(stockPermission);
+                    }
+
+                    // Assigner la permission de gestion de stock aux boutiques spécifiées
+                    for (Boutique boutique : boutiques) {
+                        Optional<UserBoutique> userBoutiqueOpt = userBoutiqueRepository
+                                .findByUserIdAndBoutiqueId(userId, boutique.getId());
+                        
+                        UserBoutique userBoutique;
+                        if (userBoutiqueOpt.isPresent()) {
+                            userBoutique = userBoutiqueOpt.get();
+                        } else {
+                            // Créer une nouvelle relation UserBoutique
+                            userBoutique = new UserBoutique();
+                            userBoutique.setUser(targetUser);
+                            userBoutique.setBoutique(boutique);
+                            userBoutique.setAssignedAt(LocalDateTime.now());
+                        }
+                        userBoutique.setCanGestionStock(true);
+                        userBoutiqueRepository.save(userBoutique);
+                    }
+
+                    // Retirer la permission de gestion de stock des boutiques non spécifiées
+                    List<UserBoutique> allUserBoutiques = userBoutiqueRepository.findByUserId(userId);
+                    for (UserBoutique ub : allUserBoutiques) {
+                        if (!boutiqueIds.contains(ub.getBoutique().getId())) {
+                            ub.setCanGestionStock(false);
+                            userBoutiqueRepository.save(ub);
+                        }
+                    }
+                } else {
+                    // Retirer la permission APPROVISIONNER_STOCK du rôle
+                    Permission stockPermission = permissionRepository.findByType(PermissionType.APPROVISIONNER_STOCK)
+                            .orElse(null);
+                    if (stockPermission != null) {
+                        existingPermissions.remove(stockPermission);
+                    }
+
+                    // Retirer la permission de gestion de stock de toutes les boutiques
+                    List<UserBoutique> allUserBoutiques = userBoutiqueRepository.findByUserId(userId);
+                    for (UserBoutique ub : allUserBoutiques) {
+                        ub.setCanGestionStock(false);
+                        userBoutiqueRepository.save(ub);
+                    }
                 }
             } else {
-                existingPermissions.remove(permission);
+                // Traitement normal pour les autres permissions
+                Permission permission = permissionRepository.findByType(permissionType)
+                        .orElseThrow(() -> new RuntimeException("Permission non trouvée : " + permissionType));
+
+                if (Boolean.TRUE.equals(isEnabled)) {
+                    if (!existingPermissions.contains(permission)) {
+                        existingPermissions.add(permission);
+                    }
+                } else {
+                    existingPermissions.remove(permission);
+                }
             }
         }
 
         roleRepository.save(targetRole);
+
+        // Recharger l'utilisateur pour avoir les UserBoutiques à jour
+        targetUser = usersRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("Utilisateur cible non trouvé"));
 
         List<PermissionDTO> permissionsDTO = targetUser.getRole().getPermissions().stream()
                 .map(permission -> new PermissionDTO(permission.getId(), permission.getType().toString()))
                 .collect(Collectors.toList());
 
         RoleDTO roleDTO = new RoleDTO(targetUser.getRole().getId(), targetUser.getRole().getName().toString(), permissionsDTO);
+
+        // Convertir les UserBoutiques en DTO
+        List<UserBoutiqueDTO> userBoutiquesDTO = convertUserBoutiquesToDTO(targetUser);
 
         return new UserDTO(
             targetUser.getId(),
@@ -955,8 +1048,49 @@ public class UsersService {
             targetUser.getLastActivity() != null ? targetUser.getLastActivity().toString() : null,
             targetUser.isLocked(),
             roleDTO,
-            targetUser.getUserBoutiques().stream().map(UserBoutique::getId).collect(Collectors.toList()) // Adapté si tu veux juste les IDs des userBoutiques
+            userBoutiquesDTO
         );
+    }
+
+    /**
+     * Convertit une liste de UserBoutique en liste de UserBoutiqueDTO.
+     * Pour ADMIN et MANAGER, retourne toutes les boutiques de l'entreprise avec isGestionnaireStock = true.
+     * Pour les autres rôles, retourne uniquement les UserBoutiques de l'utilisateur.
+     */
+    private List<UserBoutiqueDTO> convertUserBoutiquesToDTO(User user) {
+        if (user == null || user.getRole() == null || user.getEntreprise() == null) {
+            return new ArrayList<>();
+        }
+
+        RoleType roleType = user.getRole().getName();
+        
+        // ADMIN et MANAGER: toutes les boutiques de l'entreprise avec isGestionnaireStock = true
+        if (roleType == RoleType.ADMIN || roleType == RoleType.MANAGER) {
+            List<Boutique> boutiques = boutiqueRepository.findByEntrepriseId(user.getEntreprise().getId());
+            return boutiques.stream()
+                    .map(boutique -> new UserBoutiqueDTO(
+                            boutique.getId(),
+                            boutique.getNomBoutique(),
+                            boutique.isActif(),
+                            boutique.getTypeBoutique(),
+                            true // ADMIN et MANAGER sont toujours gestionnaires de stock
+                    ))
+                    .collect(Collectors.toList());
+        }
+
+        // Pour les autres rôles, retourner uniquement les UserBoutiques de l'utilisateur
+        return user.getUserBoutiques().stream()
+                .map(ub -> {
+                    Boutique boutique = ub.getBoutique();
+                    return new UserBoutiqueDTO(
+                            boutique.getId(),
+                            boutique.getNomBoutique(),
+                            boutique.isActif(),
+                            boutique.getTypeBoutique(),
+                            ub.isCanGestionStock()
+                    );
+                })
+                .collect(Collectors.toList());
     }
 
     //Suprim UserToEntreprise 
@@ -1114,6 +1248,7 @@ public class UsersService {
 
     List<BoutiqueResponse> boutiqueResponses;
     String roleType = user.getRole().getName().name();
+    RoleType roleTypeEnum = user.getRole().getName();
 
     if ("VENDEUR".equals(roleType)) {
         // Boutiques assignées au vendeur
@@ -1121,6 +1256,50 @@ public class UsersService {
                 .stream()
                 .map(ub -> {
                     Boutique b = ub.getBoutique();
+                    BoutiqueResponse response = new BoutiqueResponse(
+                            b.getId(),
+                            b.getNomBoutique(),
+                            b.getAdresse(),
+                            b.getTelephone(),
+                            b.getEmail(),
+                            b.getCreatedAt(),
+                            b.isActif(),
+                            b.getTypeBoutique(),
+                            ub.isCanGestionStock()
+                    );
+                    return response;
+                })
+                .collect(Collectors.toList());
+    } else {
+        // ADMIN ou MANAGER : toutes les boutiques de l'entreprise
+        // Pour ADMIN et MANAGER, isGestionnaireStock = true pour toutes les boutiques (selon spécifications)
+        boolean isAdminOrManager = (roleTypeEnum == RoleType.ADMIN || roleTypeEnum == RoleType.MANAGER);
+        
+        boutiqueResponses = entreprise.getBoutiques()
+                .stream()
+                .map(b -> {
+                    Boolean isGestionnaire = null;
+                    
+                    if (isAdminOrManager) {
+                        // ADMIN et MANAGER sont toujours gestionnaires de stock dans toutes les boutiques
+                        isGestionnaire = true;
+                    } else {
+                        // Pour les autres rôles, vérifier dans UserBoutiques
+                        boolean hasStockPermission = user.getRole().hasPermission(PermissionType.APPROVISIONNER_STOCK);
+                        if (hasStockPermission) {
+                            Optional<UserBoutique> userBoutiqueOpt = user.getUserBoutiques().stream()
+                                    .filter(ub -> ub.getBoutique().getId().equals(b.getId()))
+                                    .findFirst();
+                            if (userBoutiqueOpt.isPresent()) {
+                                isGestionnaire = userBoutiqueOpt.get().isCanGestionStock();
+                            } else {
+                                isGestionnaire = false;
+                            }
+                        } else {
+                            isGestionnaire = false;
+                        }
+                    }
+                    
                     return new BoutiqueResponse(
                             b.getId(),
                             b.getNomBoutique(),
@@ -1129,24 +1308,10 @@ public class UsersService {
                             b.getEmail(),
                             b.getCreatedAt(),
                             b.isActif(),
-                            b.getTypeBoutique()
+                            b.getTypeBoutique(),
+                            isGestionnaire
                     );
                 })
-                .collect(Collectors.toList());
-    } else {
-        // ADMIN ou MANAGER : toutes les boutiques de l'entreprise
-        boutiqueResponses = entreprise.getBoutiques()
-                .stream()
-                .map(b -> new BoutiqueResponse(
-                        b.getId(),
-                        b.getNomBoutique(),
-                        b.getAdresse(),
-                        b.getTelephone(),
-                        b.getEmail(),
-                        b.getCreatedAt(),
-                        b.isActif(),
-                        b.getTypeBoutique()
-                ))
                 .collect(Collectors.toList());
     }
 
@@ -1195,9 +1360,8 @@ public class UsersService {
 
         RoleDTO roleDTO = new RoleDTO(userEntity.getRole().getId(), userEntity.getRole().getName().toString(), permissionsDTO);
 
-        List<Long> userBoutiques = userEntity.getUserBoutiques().stream()
-                .map(userBoutique -> userBoutique.getId())
-                .collect(Collectors.toList());
+        // Convertir les UserBoutiques en DTO
+        List<UserBoutiqueDTO> userBoutiquesDTO = convertUserBoutiquesToDTO(userEntity);
 
         return new UserDTO(
             userEntity.getId(),
@@ -1215,7 +1379,7 @@ public class UsersService {
             userEntity.getLastActivity() != null ? userEntity.getLastActivity().toString() : null,
             userEntity.isLocked(),
             roleDTO,
-            userBoutiques
+            userBoutiquesDTO
         );
     }).collect(Collectors.toList());
 }
@@ -1249,12 +1413,11 @@ public class UsersService {
             .collect(Collectors.toList());
 
     RoleDTO roleDTO = new RoleDTO(targetUser.getRole().getId(), targetUser.getRole().getName().toString(), permissionsDTO);
-    
-    List<Long> userBoutiquesIds = targetUser.getUserBoutiques().stream()
-            .map(userBoutique -> userBoutique.getBoutique().getId())
-            .collect(Collectors.toList());
 
-    UserDTO userDTO = new UserDTO(
+        // Convertir les UserBoutiques en DTO
+        List<UserBoutiqueDTO> userBoutiquesDTO = convertUserBoutiquesToDTO(targetUser);
+
+        UserDTO userDTO = new UserDTO(
         targetUser.getId(),
         targetUser.getUuid(),
         targetUser.getPersonalCode(),
@@ -1270,7 +1433,7 @@ public class UsersService {
         targetUser.getLastActivity() != null ? targetUser.getLastActivity().toString() : null,
         targetUser.isLocked(),
         roleDTO,
-        userBoutiquesIds
+        userBoutiquesDTO
     );
 
     return userDTO;

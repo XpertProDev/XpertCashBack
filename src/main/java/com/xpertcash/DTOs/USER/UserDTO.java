@@ -25,14 +25,14 @@ public class UserDTO {
     private String lastActivity;
     private Boolean locked;
     private RoleDTO role;
-    private List<Long> userBoutiques;
+    private List<UserBoutiqueDTO> userBoutiques;
 
     // Constructeurs, getters, setters...
 
     public UserDTO(Long id, String uuid, String personalCode, String nomComplet, String email, String phone, 
                    String pays, String photo, String createdAt, String activationCode, 
                    Boolean activatedLien, Boolean enabledLien, String lastActivity, 
-                   Boolean locked, RoleDTO role, List<Long> userBoutiques) {
+                   Boolean locked, RoleDTO role, List<UserBoutiqueDTO> userBoutiques) {
         this.id = id;
         this.uuid = uuid;
         this.personalCode = personalCode;
@@ -51,5 +51,4 @@ public class UserDTO {
         this.userBoutiques = userBoutiques;
     }
 
-    // Getters et setters
 }
