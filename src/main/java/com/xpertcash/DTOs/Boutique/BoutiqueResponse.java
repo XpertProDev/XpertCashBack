@@ -22,6 +22,7 @@ public class BoutiqueResponse {
     private boolean actif = true;
     private TypeBoutique typeBoutique;
     private Boolean isGestionnaireStock;
+    private Boolean isGererProduits;
     
     
 }

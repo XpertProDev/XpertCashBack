@@ -15,4 +15,5 @@ public class AssignPermissionsRequest {
  
     private Map<PermissionType, Boolean> permissions;
     private List<Long> boutiqueIdsForStockManagement;
+    private List<Long> boutiqueIdsForProductManagement;
 }

@@ -1002,6 +1002,76 @@ public class UsersService {
                         userBoutiqueRepository.save(ub);
                     }
                 }
+            } else if (permissionType == PermissionType.GERER_PRODUITS) {
+                // Traitement spécial pour GERER_PRODUITS
+                if (Boolean.TRUE.equals(isEnabled)) {
+                    // Vérifier que les boutiques sont spécifiées
+                    List<Long> boutiqueIds = request.getBoutiqueIdsForProductManagement();
+                    if (boutiqueIds == null || boutiqueIds.isEmpty()) {
+                        throw new RuntimeException("Pour activer la permission GERER_PRODUITS, vous devez spécifier au moins une boutique dans 'boutiqueIdsForProductManagement'.");
+                    }
+
+                    // Vérifier que toutes les boutiques appartiennent à l'entreprise
+                    Long entrepriseId = currentUser.getEntreprise().getId();
+                    List<Boutique> boutiques = boutiqueRepository.findAllById(boutiqueIds);
+                    if (boutiques.size() != boutiqueIds.size()) {
+                        throw new RuntimeException("Certaines boutiques spécifiées n'existent pas.");
+                    }
+                    for (Boutique boutique : boutiques) {
+                        if (!boutique.getEntreprise().getId().equals(entrepriseId)) {
+                            throw new RuntimeException("La boutique '" + boutique.getNomBoutique() + "' n'appartient pas à votre entreprise.");
+                        }
+                    }
+
+                    // Ajouter la permission au rôle si elle n'existe pas déjà
+                    Permission productPermission = permissionRepository.findByType(PermissionType.GERER_PRODUITS)
+                            .orElseThrow(() -> new RuntimeException("Permission GERER_PRODUITS non trouvée"));
+                    if (!existingPermissions.contains(productPermission)) {
+                        existingPermissions.add(productPermission);
+                    }
+
+                    // Assigner la permission de gestion de produits aux boutiques spécifiées
+                    for (Boutique boutique : boutiques) {
+                        Optional<UserBoutique> userBoutiqueOpt = userBoutiqueRepository
+                                .findByUserIdAndBoutiqueId(userId, boutique.getId());
+                        
+                        UserBoutique userBoutique;
+                        if (userBoutiqueOpt.isPresent()) {
+                            userBoutique = userBoutiqueOpt.get();
+                        } else {
+                            // Créer une nouvelle relation UserBoutique
+                            userBoutique = new UserBoutique();
+                            userBoutique.setUser(targetUser);
+                            userBoutique.setBoutique(boutique);
+                            userBoutique.setAssignedAt(LocalDateTime.now());
+                        }
+                        userBoutique.setCanGererProduits(true);
+                        userBoutiqueRepository.save(userBoutique);
+                    }
+
+                    // Retirer la permission de gestion de produits des boutiques non spécifiées
+                    List<UserBoutique> allUserBoutiques = userBoutiqueRepository.findByUserId(userId);
+                    for (UserBoutique ub : allUserBoutiques) {
+                        if (!boutiqueIds.contains(ub.getBoutique().getId())) {
+                            ub.setCanGererProduits(false);
+                            userBoutiqueRepository.save(ub);
+                        }
+                    }
+                } else {
+                    // Retirer la permission GERER_PRODUITS du rôle
+                    Permission productPermission = permissionRepository.findByType(PermissionType.GERER_PRODUITS)
+                            .orElse(null);
+                    if (productPermission != null) {
+                        existingPermissions.remove(productPermission);
+                    }
+
+                    // Retirer la permission de gestion de produits de toutes les boutiques
+                    List<UserBoutique> allUserBoutiques = userBoutiqueRepository.findByUserId(userId);
+                    for (UserBoutique ub : allUserBoutiques) {
+                        ub.setCanGererProduits(false);
+                        userBoutiqueRepository.save(ub);
+                    }
+                }
             } else {
                 // Traitement normal pour les autres permissions
                 Permission permission = permissionRepository.findByType(permissionType)
@@ -1064,16 +1134,20 @@ public class UsersService {
 
         RoleType roleType = user.getRole().getName();
         
-        // ADMIN et MANAGER: toutes les boutiques de l'entreprise avec isGestionnaireStock = true
+        // ADMIN et MANAGER: toutes les boutiques de l'entreprise
         if (roleType == RoleType.ADMIN || roleType == RoleType.MANAGER) {
             List<Boutique> boutiques = boutiqueRepository.findByEntrepriseId(user.getEntreprise().getId());
+            boolean hasStockPermission = user.getRole().hasPermission(PermissionType.APPROVISIONNER_STOCK);
+            boolean hasProductPermission = user.getRole().hasPermission(PermissionType.GERER_PRODUITS);
+            
             return boutiques.stream()
                     .map(boutique -> new UserBoutiqueDTO(
                             boutique.getId(),
                             boutique.getNomBoutique(),
                             boutique.isActif(),
                             boutique.getTypeBoutique(),
-                            true // ADMIN et MANAGER sont toujours gestionnaires de stock
+                            hasStockPermission, // ADMIN et MANAGER avec permission sont gestionnaires de stock
+                            hasProductPermission // ADMIN et MANAGER avec permission peuvent gérer les produits
                     ))
                     .collect(Collectors.toList());
         }
@@ -1087,7 +1161,8 @@ public class UsersService {
                             boutique.getNomBoutique(),
                             boutique.isActif(),
                             boutique.getTypeBoutique(),
-                            ub.isCanGestionStock()
+                            ub.isCanGestionStock(),
+                            ub.isCanGererProduits()
                     );
                 })
                 .collect(Collectors.toList());
@@ -1265,27 +1340,30 @@ public class UsersService {
                             b.getCreatedAt(),
                             b.isActif(),
                             b.getTypeBoutique(),
-                            ub.isCanGestionStock()
+                            ub.isCanGestionStock(),
+                            ub.isCanGererProduits()
                     );
                     return response;
                 })
                 .collect(Collectors.toList());
     } else {
         // ADMIN ou MANAGER : toutes les boutiques de l'entreprise
-        // Pour ADMIN et MANAGER, isGestionnaireStock = true pour toutes les boutiques (selon spécifications)
         boolean isAdminOrManager = (roleTypeEnum == RoleType.ADMIN || roleTypeEnum == RoleType.MANAGER);
+        boolean hasStockPermission = user.getRole().hasPermission(PermissionType.APPROVISIONNER_STOCK);
+        boolean hasProductPermission = user.getRole().hasPermission(PermissionType.GERER_PRODUITS);
         
         boutiqueResponses = entreprise.getBoutiques()
                 .stream()
                 .map(b -> {
                     Boolean isGestionnaire = null;
+                    Boolean isGererProduits = null;
                     
                     if (isAdminOrManager) {
                         // ADMIN et MANAGER sont toujours gestionnaires de stock dans toutes les boutiques
-                        isGestionnaire = true;
+                        isGestionnaire = hasStockPermission;
+                        isGererProduits = hasProductPermission;
                     } else {
                         // Pour les autres rôles, vérifier dans UserBoutiques
-                        boolean hasStockPermission = user.getRole().hasPermission(PermissionType.APPROVISIONNER_STOCK);
                         if (hasStockPermission) {
                             Optional<UserBoutique> userBoutiqueOpt = user.getUserBoutiques().stream()
                                     .filter(ub -> ub.getBoutique().getId().equals(b.getId()))
@@ -1298,6 +1376,19 @@ public class UsersService {
                         } else {
                             isGestionnaire = false;
                         }
+                        
+                        if (hasProductPermission) {
+                            Optional<UserBoutique> userBoutiqueOpt = user.getUserBoutiques().stream()
+                                    .filter(ub -> ub.getBoutique().getId().equals(b.getId()))
+                                    .findFirst();
+                            if (userBoutiqueOpt.isPresent()) {
+                                isGererProduits = userBoutiqueOpt.get().isCanGererProduits();
+                            } else {
+                                isGererProduits = false;
+                            }
+                        } else {
+                            isGererProduits = false;
+                        }
                     }
                     
                     return new BoutiqueResponse(
@@ -1309,7 +1400,8 @@ public class UsersService {
                             b.getCreatedAt(),
                             b.isActif(),
                             b.getTypeBoutique(),
-                            isGestionnaire
+                            isGestionnaire,
+                            isGererProduits
                     );
                 })
                 .collect(Collectors.toList());

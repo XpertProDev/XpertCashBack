@@ -108,7 +108,8 @@ public class BoutiqueController {
                 boutique.getCreatedAt(),
                 boutique.isActif(),
                 boutique.getTypeBoutique(),
-                null // isGestionnaireStock non applicable dans ce contexte
+                null,
+                null
                 
             ))
             .toList();
@@ -130,7 +131,8 @@ public class BoutiqueController {
                 boutique.getCreatedAt(),
                 boutique.isActif(),
                 boutique.getTypeBoutique(),
-                null 
+                null,
+                null
 
 
             );

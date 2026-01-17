@@ -14,4 +14,5 @@ public class UserBoutiqueDTO {
     private Boolean actif;
     private TypeBoutique typeBoutique;
     private Boolean isGestionnaireStock;
+    private Boolean isGererProduits;
 }

@@ -33,5 +33,8 @@ public class UserBoutique {
     
     @Column(nullable = false)
     private boolean canGestionStock = false;
+    
+    @Column(nullable = false)
+    private boolean canGererProduits = false;
 }
 
