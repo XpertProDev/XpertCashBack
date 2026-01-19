@@ -233,8 +233,6 @@ public class UsersService {
            isUnique = !usersRepository.existsByPersonalCode(personalCode);
        } while (!isUnique);
 
-    
-        // Générer le code PIN d'activation
         String activationCode = String.format("%04d", new Random().nextInt(10000));
     
 
@@ -360,7 +358,6 @@ public class UsersService {
 
     }
 
-    //Admin name
     public String getNomCompletAdminDeEntreprise(Long entrepriseId) {
         Entreprise entreprise = entrepriseRepository.findById(entrepriseId)
                 .orElseThrow(() -> new RuntimeException("Entreprise non trouvée"));
@@ -1146,8 +1143,8 @@ public class UsersService {
                             boutique.getNomBoutique(),
                             boutique.isActif(),
                             boutique.getTypeBoutique(),
-                            hasStockPermission, // ADMIN et MANAGER avec permission sont gestionnaires de stock
-                            hasProductPermission // ADMIN et MANAGER avec permission peuvent gérer les produits
+                            hasStockPermission,
+                            hasProductPermission
                     ))
                     .collect(Collectors.toList());
         }
@@ -1359,7 +1356,6 @@ public class UsersService {
                     Boolean isGererProduits = null;
                     
                     if (isAdminOrManager) {
-                        // ADMIN et MANAGER sont toujours gestionnaires de stock dans toutes les boutiques
                         isGestionnaire = hasStockPermission;
                         isGererProduits = hasProductPermission;
                     } else {
