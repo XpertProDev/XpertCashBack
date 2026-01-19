@@ -30,10 +30,8 @@ public class EntrepriseService {
     private ImageStorageService imageStorageService;
 
 
-    /**
-     * Récupérer une entreprise par son id.
-     * (Méthode générique pouvant être utilisée par plusieurs services.)
-     */
+    // Méthode pour  Récupérer une entreprise par son id.
+     
     public Entreprise getEntrepriseById(Long id) {
         return entrepriseRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Entreprise non trouvée"));
@@ -114,16 +112,15 @@ public class EntrepriseService {
             Path oldPath = Paths.get("src/main/resources/static" + oldLogoPath);
             try {
                 Files.deleteIfExists(oldPath);
-                System.out.println("🗑️ Ancien logo supprimé : " + oldLogoPath);
+                System.out.println(" Ancien logo supprimé : " + oldLogoPath);
             } catch (IOException e) {
-                System.out.println("⚠️ Impossible de supprimer l'ancien logo : " + e.getMessage());
+                System.out.println(" Impossible de supprimer l'ancien logo : " + e.getMessage());
             }
         }
 
-        // Sauvegarde du nouveau logo
         String newLogoUrl = imageStorageService.saveLogoImage(logoFile);
         entreprise.setLogo(newLogoUrl);
-        System.out.println("📸 Nouveau logo enregistré : " + newLogoUrl);
+        System.out.println(" Nouveau logo enregistré : " + newLogoUrl);
     }
 
 
@@ -133,16 +130,15 @@ public class EntrepriseService {
             Path oldPath = Paths.get("src/main/resources/static" + oldLogoPath);
             try {
                 Files.deleteIfExists(oldPath);
-                System.out.println("🗑️ Ancien signature supprimé : " + oldLogoPath);
+                System.out.println(" Ancien signature supprimé : " + oldLogoPath);
             } catch (IOException e) {
-                System.out.println("⚠️ Impossible de supprimer l'ancien signature : " + e.getMessage());
+                System.out.println(" Impossible de supprimer l'ancien signature : " + e.getMessage());
             }
         }
 
-        // Sauvegarde du nouveau signature
         String newSignatureUrl = imageStorageService.SavesignatureNum(imageSignatureFile);
         entreprise.setSignaturNum(newSignatureUrl);
-        System.out.println("📸 Nouveau signature enregistré : " + newSignatureUrl);
+        System.out.println(" Nouveau signature enregistré : " + newSignatureUrl);
     }
 
 
@@ -152,16 +148,15 @@ public class EntrepriseService {
             Path oldPath = Paths.get("src/main/resources/static" + oldLogoPath);
             try {
                 Files.deleteIfExists(oldPath);
-                System.out.println("🗑️ Ancien signature supprimé : " + oldLogoPath);
+                System.out.println(" Ancien signature supprimé : " + oldLogoPath);
             } catch (IOException e) {
-                System.out.println("⚠️ Impossible de supprimer l'ancien cachet : " + e.getMessage());
+                System.out.println(" Impossible de supprimer l'ancien cachet : " + e.getMessage());
             }
         }
 
-        // Sauvegarde du nouveau signature
         String newCachetUrl = imageStorageService.SaveCachetNum(imageCachetFile);
         entreprise.setCachetNum(newCachetUrl);
-        System.out.println("📸 Nouveau cachet enregistré : " + newCachetUrl);
+        System.out.println(" Nouveau cachet enregistré : " + newCachetUrl);
     }
 
 

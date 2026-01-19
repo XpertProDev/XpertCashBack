@@ -20,12 +20,12 @@ public class VersementComptable {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // 🔗 Caisse concernée
+    //  Caisse concernée
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "caisse_id", nullable = false)
     private Caisse caisse;
 
-    // 💰 Montant à verser
+    //  Montant à verser
     @Column(nullable = false)
     private Double montant;
 
@@ -41,12 +41,12 @@ public class VersementComptable {
     @JoinColumn(name = "cree_par_id", nullable = false)
     private User creePar;
 
-    // ✅ Nouveau : utilisateur qui valide le versement
+    //  Nouveau : utilisateur qui valide le versement
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "valide_par_id")
     private User validePar;
 
-    // ✅ Nouveau : date de validation
+    //  Nouveau : date de validation
     private LocalDateTime dateValidation;
 }
 

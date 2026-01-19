@@ -17,7 +17,6 @@ public class PermissionService {
 
     private final PermissionRepository permissionRepository;
 
-    // Ajouter une permission
     public Permission addPermission(PermissionType permissionType) {
         if (permissionRepository.existsByType(permissionType)) {
             throw new RuntimeException("Cette permission existe déjà !");
@@ -27,7 +26,6 @@ public class PermissionService {
         return permissionRepository.save(newPermission);
     }
 
-    // Récupérer toutes les permissions
     public List<Permission> getAllPermissions() {
         return permissionRepository.findAll();
     }

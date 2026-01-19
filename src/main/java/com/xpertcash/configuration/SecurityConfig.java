@@ -30,15 +30,11 @@ public class SecurityConfig {
                                 new AntPathRequestMatcher("/api/v1/api/auth/**")
                         )
                 )
-                // 3) Autorisations
                 .authorizeHttpRequests(auth -> auth
-                        // Autoriser les requêtes OPTIONS (preflight) pour toutes les routes
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                        // on autorise ces endpoints sans auth
                         .requestMatchers("/csrf").permitAll()
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers("/api/v1/api/auth/**").permitAll()
-                        // tout le reste est ouvert (ou vous pouvez restreindre)
                         .anyRequest().permitAll()
                 );
 
@@ -72,16 +68,13 @@ public class SecurityConfig {
                 "Access-Control-Request-Headers"
         ));
         configuration.setAllowCredentials(true);
-        // Important: définir maxAge pour éviter les requêtes preflight répétées
         configuration.setMaxAge(3600L);
-        // Exposer les headers nécessaires
         configuration.setExposedHeaders(List.of(
                 "Access-Control-Allow-Origin",
                 "Access-Control-Allow-Credentials"
         ));
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        // appliqué à toutes les routes
         source.registerCorsConfiguration("/**", configuration);
         return source;
     }

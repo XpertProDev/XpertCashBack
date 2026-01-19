@@ -1,7 +1,6 @@
 package com.xpertcash.repository;
 
 import com.xpertcash.entity.FactureVente;
-import com.xpertcash.entity.VENTE.Vente;
 
 import java.util.List;
 import java.util.Optional;
@@ -11,12 +10,24 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface FactureVenteRepository extends JpaRepository<FactureVente, Long> {
-    @Query("SELECT f FROM FactureVente f WHERE f.vente.boutique.entreprise.id = :entrepriseId")
+    
+    // Récupérer toutes les factures de vente d'une entreprise (optimisé avec JOIN FETCH)
+    @Query("SELECT DISTINCT f FROM FactureVente f " +
+           "LEFT JOIN FETCH f.vente v " +
+           "LEFT JOIN FETCH v.boutique b " +
+           "LEFT JOIN FETCH b.entreprise e " +
+           "WHERE e.id = :entrepriseId")
     List<FactureVente> findAllByEntrepriseId(@Param("entrepriseId") Long entrepriseId);
 
-    Optional<FactureVente> findByVente(Vente vente);
-    
-    @Query("SELECT f FROM FactureVente f WHERE f.vente.id = :venteId")
-    Optional<FactureVente> findByVenteId(@Param("venteId") Long venteId);
+    // Recherche par vente et entreprise (pour isolation)
+    @Query("SELECT DISTINCT f FROM FactureVente f " +
+           "LEFT JOIN FETCH f.vente v " +
+           "LEFT JOIN FETCH v.boutique b " +
+           "LEFT JOIN FETCH b.entreprise e " +
+           "WHERE v.id = :venteId " +
+           "AND e.id = :entrepriseId")
+    Optional<FactureVente> findByVenteIdAndEntrepriseId(
+            @Param("venteId") Long venteId,
+            @Param("entrepriseId") Long entrepriseId);
 
 }

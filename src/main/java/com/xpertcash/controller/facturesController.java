@@ -14,8 +14,14 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.PathVariable;
 
 import com.xpertcash.DTOs.FactureDTO;
+import com.xpertcash.entity.Entreprise;
 import com.xpertcash.entity.Facture;
+import com.xpertcash.entity.User;
+import com.xpertcash.repository.BoutiqueRepository;
 import com.xpertcash.repository.FactureRepository;
+import com.xpertcash.service.AuthenticationHelper;
+
+import jakarta.servlet.http.HttpServletRequest;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -24,10 +30,21 @@ public class facturesController {
     @Autowired
     private FactureRepository factureRepository;
 
+    @Autowired
+    private BoutiqueRepository boutiqueRepository;
+
+    @Autowired
+    private AuthenticationHelper authHelper;
 
     @GetMapping("/factures")
-    public ResponseEntity<?> getAllFactures() {
-        List<Facture> factures = factureRepository.findAll();
+    public ResponseEntity<?> getAllFactures(HttpServletRequest request) {
+        User user = authHelper.getAuthenticatedUserWithFallback(request);
+        Entreprise entreprise = user.getEntreprise();
+        if (entreprise == null) {
+            throw new RuntimeException("Aucune entreprise associée à cet utilisateur");
+        }
+
+        List<Facture> factures = factureRepository.findAllByEntrepriseId(entreprise.getId());
 
         if (factures.isEmpty()) {
             Map<String, String> response = new HashMap<>();
@@ -43,8 +60,17 @@ public class facturesController {
     }
 
     @GetMapping("/factures/{boutiqueId}")
-    public ResponseEntity<?> getFacturesByBoutique(@PathVariable Long boutiqueId) {
-        List<Facture> factures = factureRepository.findByBoutiqueId(boutiqueId);
+    public ResponseEntity<?> getFacturesByBoutique(@PathVariable Long boutiqueId, HttpServletRequest request) {
+        User user = authHelper.getAuthenticatedUserWithFallback(request);
+        Entreprise entreprise = user.getEntreprise();
+        if (entreprise == null) {
+            throw new RuntimeException("Aucune entreprise associée à cet utilisateur");
+        }
+
+        boutiqueRepository.findByIdAndEntrepriseId(boutiqueId, entreprise.getId())
+                .orElseThrow(() -> new RuntimeException("Boutique introuvable ou n'appartient pas à votre entreprise"));
+
+        List<Facture> factures = factureRepository.findByBoutiqueIdAndEntrepriseId(boutiqueId, entreprise.getId());
 
         System.out.println("Nombre de factures trouvées pour la boutique " + boutiqueId + " : " + factures.size());
 

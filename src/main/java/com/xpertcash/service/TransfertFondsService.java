@@ -52,11 +52,7 @@ public class TransfertFondsService {
     @Autowired
     private ObjectMapper objectMapper;
 
-    /**
-     * Gère un transfert à partir d'un formulaire multipart (JSON + fichier).
-     * Cette méthode encapsule le parsing JSON et la sauvegarde de la pièce jointe
-     * pour garder le contrôleur le plus léger possible.
-     */
+  
     @Transactional
     public TransfertFondsResponseDTO effectuerTransfertMultipart(String transfertJson,
                                                                  MultipartFile pieceJointeFile,
@@ -80,9 +76,6 @@ public class TransfertFondsService {
             throw new BusinessException("La source et la destination doivent être différentes.");
         }
 
-        // ⚠️ IMPORTANT : On ne valide plus les caisses fermées car les transferts
-        // ne modifient plus les caisses de boutiques. Ils passent uniquement
-        // par la comptabilité centralisée (DepenseGenerale/EntreeGenerale)
         validerMontantDisponible(user.getEntreprise().getId(), source, request.getMontant());
 
         TransfertFonds transfert = creerTransfert(request, user, source, destination);
@@ -234,18 +227,8 @@ public class TransfertFondsService {
         return transfert;
     }
 
-    /**
-     * Enregistre les mouvements comptables pour un transfert de fonds.
-     * 
-     * 🏗️ Architecture : Les transferts ne modifient PAS les caisses de boutiques.
-     * Ils créent uniquement des écritures comptables (DepenseGenerale/EntreeGenerale)
-     * qui alimentent la "Grande Caisse" virtuelle calculée par TresorerieService.
-     * 
-     * Cette approche garantit :
-     * - Séparation entre caisses opérationnelles (boutiques) et trésorerie centralisée (comptabilité)
-     * - Cohérence avec les paiements de factures qui ne modifient pas non plus les caisses
-     * - Traçabilité complète via la comptabilité
-     */
+     // Enregistre les mouvements comptables pour un transfert de fonds.
+
     private void enregistrerMouvements(Long entrepriseId,
                                        SourceTresorerie source,
                                        SourceTresorerie destination,
@@ -259,19 +242,14 @@ public class TransfertFondsService {
         SourceDepense sourceDepenseSortie = convertirVersSourceDepense(source);
         SourceDepense sourceDepenseEntree = convertirVersSourceDepense(destination);
 
-        // Créer les écritures comptables (sortie depuis la source)
         DepenseGenerale depenseSortie = creerDepenseGenerale(entrepriseId, montant, sourceDepenseSortie, descriptionSortie, pieceJointe, user);
         depenseGeneraleRepository.save(depenseSortie);
 
-        // Créer les écritures comptables (entrée vers la destination)
-        // Utiliser EntreeGenerale pour les entrées (plus cohérent que DepenseGenerale avec montant négatif)
+
         EntreeGenerale entreeDestination = creerEntreeGenerale(entrepriseId, montant, sourceDepenseEntree, descriptionEntree, pieceJointe, user);
         entreeGeneraleRepository.save(entreeDestination);
 
-        // ⚠️ IMPORTANT : On ne modifie plus les caisses de boutiques
-        // Les transferts passent uniquement par la comptabilité centralisée
-        // La "Grande Caisse" est calculée virtuellement par TresorerieService
-        // qui agrège : caisses fermées + entrées générales + paiements - dépenses générales
+
     }
 
     private SourceDepense convertirVersSourceDepense(SourceTresorerie source) {
@@ -311,10 +289,8 @@ public class TransfertFondsService {
         return depense;
     }
 
-    /**
-     * Crée une entrée générale pour enregistrer une entrée de trésorerie.
-     * Utilisé pour les transferts vers une source (CAISSE, BANQUE, MOBILE_MONEY).
-     */
+     // Crée une entrée générale pour enregistrer une entrée de trésorerie.
+    
     private EntreeGenerale creerEntreeGenerale(Long entrepriseId,
                                                Double montant,
                                                SourceDepense source,
@@ -329,7 +305,7 @@ public class TransfertFondsService {
         entree.setSource(source);
         entree.setEntreprise(user.getEntreprise());
         entree.setCreePar(user);
-        entree.setResponsable(user); // Le responsable est l'utilisateur qui effectue le transfert
+        entree.setResponsable(user);
         entree.setPieceJointe(pieceJointe);
         entree.setNumero(null);
         // Mode d'entrée selon la source
@@ -353,7 +329,7 @@ public class TransfertFondsService {
         dto.setVers(transfert.getDestination().name());
         dto.setMontant(transfert.getMontant());
         dto.setPersonneALivrer(transfert.getPersonneALivrer());
-        dto.setPieceJointe(transfert.getPieceJointe()); // Mapper la pièce jointe
+        dto.setPieceJointe(transfert.getPieceJointe());
         dto.setEntrepriseId(transfert.getEntreprise().getId());
         dto.setEntrepriseNom(transfert.getEntreprise().getNomEntreprise());
         dto.setTypeTransaction("TRANSFERT");

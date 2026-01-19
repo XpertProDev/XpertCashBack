@@ -58,7 +58,6 @@ public class TransactionSummaryService {
     public TransactionSummaryDTO getTransactionSummary(HttpServletRequest request) {
         User user = authHelper.getAuthenticatedUserWithFallback(request);
         
-        // Vérification des droits
         RoleType role = user.getRole().getName();
         boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
         boolean hasPermission = user.getRole().hasPermission(PermissionType.GESTION_FACTURATION);
@@ -69,7 +68,6 @@ public class TransactionSummaryService {
         
         Long entrepriseId = user.getEntreprise().getId();
         
-        // Période par défaut : du début de l'année à maintenant
         LocalDate today = LocalDate.now();
         LocalDateTime startOfYear = today.withDayOfYear(1).atStartOfDay();
         LocalDateTime endOfYear = LocalDateTime.now();
@@ -139,11 +137,9 @@ public class TransactionSummaryService {
                     transaction.setId(paiement.getId());
                     transaction.setType("PAIEMENT_FACTURE");
                     
-                    // Améliorer la description avec le statut de paiement
                     String statutFacture = facture.getStatutPaiement() != null ? facture.getStatutPaiement().name() : "INCONNU";
                     String description = "Paiement facture " + facture.getNumeroFacture();
                     
-                    // Ajouter des détails sur le statut de paiement
                     if ("PARTIELLEMENT_PAYEE".equals(statutFacture)) {
                         double montantRestant = facture.getTotalFacture() - paiementRepository.sumMontantsByFactureReelle(facture.getId()).doubleValue();
                         description += " (Montant restant: " + montantRestant + ")";
@@ -155,7 +151,6 @@ public class TransactionSummaryService {
                     transaction.setBoutique("N/A");
                     transaction.setUtilisateur(paiement.getEncaissePar().getNomComplet());
                     transaction.setModePaiement(paiement.getModePaiement());
-                    // Utiliser le statut réel de la facture au lieu de "PAYE" fixe
                     transaction.setStatut(statutFacture);
                     allTransactions.add(transaction);
                 }
@@ -279,7 +274,6 @@ public class TransactionSummaryService {
         
         double totalTransferts = 0.0;
         for (Transfert transfert : transferts) {
-            // Calculer la valeur du transfert basée sur le prix d'achat des produits
             double valeurTransfert = transfert.getQuantite() * transfert.getProduit().getPrixAchat();
             totalTransferts += valeurTransfert;
             
@@ -299,7 +293,6 @@ public class TransactionSummaryService {
         }
         summary.setTotalTransferts(totalTransferts);
         
-        // Calculs des totaux
         double totalEntrees = totalVentes + totalPaiementsFactures + totalAjoutsCaisse + totalVersementsComptables;
         double totalSorties = totalRemboursements + totalDepenses + totalRetraitsCaisse + totalTransferts;
         double soldeNet = totalEntrees - totalSorties;
@@ -308,7 +301,6 @@ public class TransactionSummaryService {
         summary.setTotalSorties(totalSorties);
         summary.setSoldeNet(soldeNet);
         
-        // Trier les transactions par date (plus récentes en premier)
         allTransactions.sort((t1, t2) -> t2.getDate().compareTo(t1.getDate()));
         summary.setTransactions(allTransactions);
         
@@ -322,7 +314,6 @@ public class TransactionSummaryService {
     public TransactionSummaryDTO getTransactionSummaryDuJour(HttpServletRequest request) {
         User user = authHelper.getAuthenticatedUserWithFallback(request);
         
-        // Vérification des droits
         RoleType role = user.getRole().getName();
         boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
         boolean hasPermission = user.getRole().hasPermission(PermissionType.GESTION_FACTURATION);
@@ -347,7 +338,6 @@ public class TransactionSummaryService {
     public TransactionSummaryDTO getTransactionSummaryDuMois(HttpServletRequest request) {
         User user = authHelper.getAuthenticatedUserWithFallback(request);
         
-        // Vérification des droits
         RoleType role = user.getRole().getName();
         boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
         boolean hasPermission = user.getRole().hasPermission(PermissionType.GESTION_FACTURATION);

@@ -7,13 +7,11 @@ public class PermissionDTO {
     private Long id;
     private String type;
 
-    // Constructeur
     public PermissionDTO(Long id, String type) {
         this.id = id;
         this.type = type;
     }
 
-    // Getters et setters
     public Long getId() {
         return id;
     }

@@ -37,31 +37,57 @@ public interface FactureProformaRepository extends JpaRepository<FactureProForma
            "WHERE f.id = :id")
     Optional<FactureProForma> findByIdWithRelations(@Param("id") Long id);
 
+    // Recherche de factures existantes par entreprise (pour isolation)
     @Query("SELECT f FROM FactureProForma f " +
-           "WHERE f.statut = :statut " +
+           "LEFT JOIN FETCH f.entreprise e " +
+           "WHERE e.id = :entrepriseId " +
+           "AND f.statut = :statut " +
            "AND (:clientId IS NULL OR f.client.id = :clientId) " +
            "AND (:entrepriseClientId IS NULL OR f.entrepriseClient.id = :entrepriseClientId)")
-    List<FactureProForma> findExistingFactures(@Param("clientId") Long clientId, 
-                                               @Param("entrepriseClientId") Long entrepriseClientId,
-                                               @Param("statut") StatutFactureProForma statut);
+    List<FactureProForma> findExistingFacturesByEntrepriseId(@Param("entrepriseId") Long entrepriseId,
+                                                             @Param("clientId") Long clientId, 
+                                                             @Param("entrepriseClientId") Long entrepriseClientId,
+                                                             @Param("statut") StatutFactureProForma statut);
 
-    Optional<FactureProForma> findTopByDateCreationOrderByNumeroFactureDesc(LocalDate dateCreation);
+    // Recherche de la dernière facture par date et entreprise (pour isolation)
+    @Query("SELECT f FROM FactureProForma f " +
+           "LEFT JOIN FETCH f.entreprise e " +
+           "WHERE e.id = :entrepriseId " +
+           "AND FUNCTION('DATE', f.dateCreation) = :dateCreation " +
+           "ORDER BY f.numeroFacture DESC")
+    Optional<FactureProForma> findTopByDateCreationAndEntrepriseIdOrderByNumeroFactureDesc(
+            @Param("dateCreation") LocalDate dateCreation,
+            @Param("entrepriseId") Long entrepriseId);
 
-     // Trouver les factures à relancer qui n'ont jamais reçu de rappel
-    // ou dont le dernier rappel a été envoyé avant aujourd'hui
-    @Query("SELECT f FROM FactureProForma f WHERE f.dateRelance < :now AND (f.dernierRappelEnvoye IS NULL OR f.dernierRappelEnvoye < :now)")
-    List<FactureProForma> findByDateRelanceBeforeAndDernierRappelEnvoyeIsNullOrDernierRappelEnvoyeBefore(@Param("now") LocalDateTime now);
+     // Trouver les factures à relancer par entreprise (pour isolation)
+    @Query("SELECT DISTINCT f FROM FactureProForma f " +
+           "LEFT JOIN FETCH f.entreprise e " +
+           "WHERE e.id = :entrepriseId " +
+           "AND f.dateRelance < :now " +
+           "AND (f.dernierRappelEnvoye IS NULL OR f.dernierRappelEnvoye < :now)")
+    List<FactureProForma> findByDateRelanceBeforeAndDernierRappelEnvoyeIsNullOrDernierRappelEnvoyeBeforeByEntrepriseId(
+            @Param("entrepriseId") Long entrepriseId,
+            @Param("now") LocalDateTime now);
 
-    @Query("SELECT f FROM FactureProForma f WHERE f.dateRelance <= :now AND f.dernierRappelEnvoye IS NULL AND f.notifie = false")
-    List<FactureProForma> findFacturesAEnvoyer(@Param("now") LocalDateTime now);
-
-    @Query("SELECT f FROM FactureProForma f WHERE FUNCTION('YEAR', f.dateCreation) = :year ORDER BY f.numeroFacture DESC")
-    List<FactureProForma> findFacturesDeLAnnee(@Param("year") int year);
+    // Trouver les factures à envoyer par entreprise (pour isolation)
+    @Query("SELECT DISTINCT f FROM FactureProForma f " +
+           "LEFT JOIN FETCH f.entreprise e " +
+           "WHERE e.id = :entrepriseId " +
+           "AND f.dateRelance <= :now " +
+           "AND f.dernierRappelEnvoye IS NULL " +
+           "AND f.notifie = false")
+    List<FactureProForma> findFacturesAEnvoyerByEntrepriseId(@Param("entrepriseId") Long entrepriseId, @Param("now") LocalDateTime now);
 
     @Query("SELECT f FROM FactureProForma f WHERE f.entreprise.id = :entrepriseId AND FUNCTION('YEAR', f.dateCreation) = :year ORDER BY f.numeroFacture DESC")
     List<FactureProForma> findFacturesDeLAnneeParEntreprise(@Param("entrepriseId") Long entrepriseId, @Param("year") int year);
 
-    @Query("SELECT f FROM FactureProForma f WHERE f.entreprise.id = :entrepriseId ORDER BY f.dateCreation DESC, f.id DESC")
+    // Récupérer toutes les factures d'une entreprise (optimisé avec JOIN FETCH)
+    @Query("SELECT DISTINCT f FROM FactureProForma f " +
+           "LEFT JOIN FETCH f.entreprise e " +
+           "LEFT JOIN FETCH f.client c " +
+           "LEFT JOIN FETCH f.entrepriseClient ec " +
+           "WHERE e.id = :entrepriseId " +
+           "ORDER BY f.dateCreation DESC, f.id DESC")
     List<FactureProForma> findByEntrepriseId(@Param("entrepriseId") Long entrepriseId);
 
     @Query("""
@@ -76,20 +102,51 @@ public interface FactureProformaRepository extends JpaRepository<FactureProForma
     """)
     List<FactureProForma> findByEntrepriseIdAndUtilisateur(@Param("userId") Long userId, @Param("entrepriseId") Long entrepriseId);
 
+    // Recherche par client ou entreprise client et entreprise (pour isolation)
+    @Query("SELECT DISTINCT f FROM FactureProForma f " +
+           "LEFT JOIN FETCH f.entreprise e " +
+           "LEFT JOIN FETCH f.client c " +
+           "LEFT JOIN FETCH f.entrepriseClient ec " +
+           "WHERE e.id = :entrepriseId " +
+           "AND ((:clientId IS NOT NULL AND c.id = :clientId) OR " +
+           "     (:entrepriseClientId IS NOT NULL AND ec.id = :entrepriseClientId))")
+    List<FactureProForma> findByClientIdOrEntrepriseClientIdAndEntrepriseId(
+            @Param("entrepriseId") Long entrepriseId,
+            @Param("clientId") Long clientId,
+            @Param("entrepriseClientId") Long entrepriseClientId);
 
-    @Query("SELECT f FROM FactureProForma f WHERE " +
-       "(:clientId IS NOT NULL AND f.client.id = :clientId) OR " +
-       "(:entrepriseClientId IS NOT NULL AND f.entrepriseClient.id = :entrepriseClientId)")
-    List<FactureProForma> findByClientIdOrEntrepriseClientId(@Param("clientId") Long clientId,
-                                                         @Param("entrepriseClientId") Long entrepriseClientId);
+    // Vérifier l'existence par client et entreprise (pour isolation)
+    @Query("SELECT CASE WHEN COUNT(f) > 0 THEN true ELSE false END FROM FactureProForma f " +
+           "INNER JOIN f.entreprise e " +
+           "WHERE e.id = :entrepriseId AND f.client.id = :clientId")
+    boolean existsByClientIdAndEntrepriseId(@Param("clientId") Long clientId, @Param("entrepriseId") Long entrepriseId);
 
-    boolean existsByClientId(Long clientId);
-    boolean existsByEntrepriseClientId(Long entrepriseClientId);
+    // Vérifier l'existence par entreprise client et entreprise (pour isolation)
+    @Query("SELECT CASE WHEN COUNT(f) > 0 THEN true ELSE false END FROM FactureProForma f " +
+           "INNER JOIN f.entreprise e " +
+           "WHERE e.id = :entrepriseId AND f.entrepriseClient.id = :entrepriseClientId")
+    boolean existsByEntrepriseClientIdAndEntrepriseId(@Param("entrepriseClientId") Long entrepriseClientId, @Param("entrepriseId") Long entrepriseId);
 
-    List<FactureProForma> findByEntrepriseIdAndDateCreationBetween(Long entrepriseId, LocalDateTime start, LocalDateTime end);
+    // Récupérer les factures par entreprise et période (optimisé avec JOIN FETCH)
+    @Query("SELECT DISTINCT f FROM FactureProForma f " +
+           "LEFT JOIN FETCH f.entreprise e " +
+           "LEFT JOIN FETCH f.client c " +
+           "LEFT JOIN FETCH f.entrepriseClient ec " +
+           "WHERE e.id = :entrepriseId " +
+           "AND f.dateCreation >= :start AND f.dateCreation <= :end")
+    List<FactureProForma> findByEntrepriseIdAndDateCreationBetween(
+            @Param("entrepriseId") Long entrepriseId, 
+            @Param("start") LocalDateTime start, 
+            @Param("end") LocalDateTime end);
 
-
-    List<FactureProForma> findByUtilisateurCreateur_Id(Long userId);
+    // Recherche par utilisateur créateur et entreprise (pour isolation)
+    @Query("SELECT DISTINCT f FROM FactureProForma f " +
+           "LEFT JOIN FETCH f.entreprise e " +
+           "LEFT JOIN FETCH f.utilisateurCreateur u " +
+           "WHERE e.id = :entrepriseId AND u.id = :userId")
+    List<FactureProForma> findByUtilisateurCreateurIdAndEntrepriseId(
+            @Param("userId") Long userId,
+            @Param("entrepriseId") Long entrepriseId);
 
 
      boolean existsByApprobateursAndEntrepriseId(User approbateur, Long entrepriseId);
@@ -171,8 +228,5 @@ long countFacturesByEntrepriseIdAndUtilisateur(@Param("entrepriseId") Long entre
 @Query("SELECT f FROM FactureProForma f WHERE f.entreprise.id = :entrepriseId " +
        "AND (f.statut = 'BROUILLON' OR f.statut = 'EN_ATTENTE_VALIDATION') " +
        "ORDER BY f.dateCreation DESC")
-List<FactureProForma> findFacturesProformaEnAttenteByEntrepriseId(@Param("entrepriseId") Long entrepriseId);
-    
+    List<FactureProForma> findFacturesProformaEnAttenteByEntrepriseId(@Param("entrepriseId") Long entrepriseId);
 }
-
-

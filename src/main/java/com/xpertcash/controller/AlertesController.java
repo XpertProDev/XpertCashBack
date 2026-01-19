@@ -20,10 +20,8 @@ public class AlertesController {
     @Autowired
     private AlertesService alertesService;
 
-    /**
-     * Endpoint pour récupérer les alertes de stock faible
-     * Retourne les produits dont le stock actuel est inférieur ou égal au seuil d'alerte
-     */
+     // Endpoint pour récupérer les alertes de stock faible
+ 
     @GetMapping("/alertes/stock-faible")
     public ResponseEntity<?> getAlertesStockFaible(HttpServletRequest request) {
         try {

@@ -22,10 +22,10 @@ public class JwtUtil {
         try {
             return extractClaim(token, Claims::getSubject);
         } catch (ExpiredJwtException e) {
-            System.out.println("⚠️ Token expiré : impossible d'extraire l'UUID utilisateur.");
+            System.out.println(" Token expiré : impossible d'extraire l'UUID utilisateur.");
             return null;
         } catch (JwtException | IllegalArgumentException e) {
-            System.out.println("⚠️ Token invalide ou mal formé : " + e.getMessage());
+            System.out.println(" Token invalide ou mal formé : " + e.getMessage());
             return null;
         }
     }
@@ -36,10 +36,10 @@ public class JwtUtil {
         try {
             return Long.parseLong(extractClaim(token, Claims::getSubject));
         } catch (ExpiredJwtException e) {
-            System.out.println("⚠️ Token expiré");
+            System.out.println(" Token expiré");
             return null;
         } catch (JwtException | IllegalArgumentException e) {
-            System.out.println("⚠️ Token invalide : " + e.getMessage());
+            System.out.println(" Token invalide : " + e.getMessage());
             return null;
         }
     }
@@ -52,7 +52,7 @@ public class JwtUtil {
                     .parseClaimsJws(token)
                     .getBody();
         } catch (JwtException | IllegalArgumentException e) {
-            System.out.println("⚠️ Erreur lors de l'extraction des claims : " + e.getMessage());
+            System.out.println(" Erreur lors de l'extraction des claims : " + e.getMessage());
             return null;
         }
     }
@@ -64,7 +64,7 @@ public class JwtUtil {
         return claimsResolver.apply(claims);
     }
 
-    // Méthode pour extraire toutes les informations du token (claims)
+    // Méthode pour extraire toutes les informations du token 
     private Claims extractAllClaims(String token) {
         return Jwts.parserBuilder()
                 .setSigningKey(jwtConfig.getSecretKey()) 

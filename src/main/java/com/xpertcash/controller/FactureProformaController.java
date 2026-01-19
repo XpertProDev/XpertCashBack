@@ -107,7 +107,7 @@ public class FactureProformaController {
         try {
             factureProformaService.supprimerFactureProforma(factureId, request);
 
-            // ✅ Retourner un objet JSON
+            //  Retourner un objet JSON
             Map<String, String> response = new HashMap<>();
             response.put("message", "Facture supprimée avec succès.");
             return ResponseEntity.ok(response);
@@ -223,8 +223,13 @@ public class FactureProformaController {
         }
 
 
-        // Récupération et simplification des notes
-        List<NoteFactureProForma> notes = noteFactureProFormaRepository.findByFacture(facture);
+        // Récupération et simplification des notes (isolé par entreprise)
+        Long entrepriseId = user.getEntreprise() != null ? user.getEntreprise().getId() : null;
+        if (entrepriseId == null) {
+            throw new RuntimeException("L'utilisateur n'a pas d'entreprise associée.");
+        }
+        List<NoteFactureProForma> notes = noteFactureProFormaRepository.findByFactureProFormaIdAndEntrepriseId(
+                facture.getId(), entrepriseId);
 
            if (notes.isEmpty()) {
                 Map<String, Object> response = new HashMap<>();
@@ -299,9 +304,10 @@ public class FactureProformaController {
    @GetMapping("/factures/client")
     public ResponseEntity<List<Map<String, Object>>> getFacturesClient(
             @RequestParam(required = false) Long clientId,
-            @RequestParam(required = false) Long entrepriseClientId) {
+            @RequestParam(required = false) Long entrepriseClientId,
+            HttpServletRequest request) {
         
-        List<FactureProForma> factures = factureProformaService.getFacturesParClient(clientId, entrepriseClientId);
+        List<FactureProForma> factures = factureProformaService.getFacturesParClient(clientId, entrepriseClientId, request);
 
         List<Map<String, Object>> result = factures.stream().map(f -> {
             Map<String, Object> map = new HashMap<>();
@@ -380,10 +386,8 @@ public ResponseEntity<?> getFacturesParPeriode(
         }
     }
 
-    /**
-     * Endpoint pour récupérer les factures proforma en attente
-     * @param limit Nombre de factures à retourner (par défaut 10)
-     */
+    // Endpoint pour récupérer les factures proforma en attente
+   
     @GetMapping("/factureProforma/en-attente")
     public ResponseEntity<?> getFacturesProformaEnAttente(
             @RequestParam(defaultValue = "10") int limit,

@@ -213,7 +213,6 @@ public class CaisseController {
         Optional<CaisseResponseDTO> caisseOpt = caisseService.getDerniereCaisseVendeur(boutiqueId, request);
 
         if (caisseOpt.isEmpty()) {
-            // Message clair si aucune caisse n'a été trouvée
             return ResponseEntity.ok("Aucune caisse trouvée pour ce vendeur dans cette boutique.");
         }
         
@@ -232,10 +231,8 @@ public class CaisseController {
         return ResponseEntity.ok(dto);
     }
 
-    /**
-     * Endpoint pour enregistrer une dépense depuis la caisse
-     * Permet au vendeur de faire des dépenses comme réparation de chaise, achat de matériel, etc.
-     */
+     // Endpoint pour enregistrer une dépense depuis la caisse
+    
     @PostMapping("/depense")
     public ResponseEntity<?> enregistrerDepense(
             @RequestBody DepenseRequest request,
@@ -251,9 +248,7 @@ public class CaisseController {
         }
     }
 
-    /**
-     * Endpoint pour lister toutes les dépenses d'une caisse spécifique
-     */
+     // Endpoint pour lister toutes les dépenses d'une caisse spécifique
     @GetMapping("/depenses/caisse/{caisseId}")
     public ResponseEntity<?> listerDepensesCaisse(
             @PathVariable Long caisseId,
@@ -268,9 +263,7 @@ public class CaisseController {
         }
     }
 
-    /**
-     * Endpoint pour lister toutes les dépenses d'un vendeur dans une boutique
-     */
+     // Endpoint pour lister toutes les dépenses d'un vendeur dans une boutique
     @GetMapping("/depenses/boutique/{boutiqueId}")
     public ResponseEntity<?> listerDepensesVendeur(
             @PathVariable Long boutiqueId,

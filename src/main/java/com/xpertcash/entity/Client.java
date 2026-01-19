@@ -29,7 +29,6 @@ public class Client {
     private LocalDateTime createdAt;
     
    @ManyToOne
-    // @JsonBackReference
     @JoinColumn(name = "entreprise_client_id")
    @JsonIgnoreProperties("clientts")
     private EntrepriseClient entrepriseClient;

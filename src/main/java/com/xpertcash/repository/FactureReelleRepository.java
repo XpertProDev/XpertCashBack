@@ -11,70 +11,163 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
-import com.xpertcash.entity.Entreprise;
-import com.xpertcash.entity.FactureProForma;
 import com.xpertcash.entity.FactureReelle;
-import com.xpertcash.entity.User;
 import com.xpertcash.entity.Enum.StatutPaiementFacture;
 
 @Repository
 public interface FactureReelleRepository extends JpaRepository<FactureReelle, Long> {
 
-    Optional<FactureReelle> findTopByDateCreationOrderByNumeroFactureDesc(LocalDate dateCreation);
+    // Recherche de la dernière facture réelle par date et entreprise (pour isolation)
+    @Query("SELECT f FROM FactureReelle f " +
+           "LEFT JOIN FETCH f.entreprise e " +
+           "WHERE e.id = :entrepriseId " +
+           "AND FUNCTION('DATE', f.dateCreation) = :dateCreation " +
+           "ORDER BY f.numeroFacture DESC")
+    Optional<FactureReelle> findTopByDateCreationAndEntrepriseIdOrderByNumeroFactureDesc(
+            @Param("dateCreation") LocalDate dateCreation,
+            @Param("entrepriseId") Long entrepriseId);
 
-    @Query("SELECT f FROM FactureReelle f WHERE FUNCTION('YEAR', f.dateCreation) = :year ORDER BY f.numeroFacture DESC")
-    List<FactureReelle> findFacturesDeLAnnee(@Param("year") int year);
-
-    @Query("SELECT f FROM FactureReelle f WHERE f.entreprise.id = :entrepriseId AND FUNCTION('YEAR', f.dateCreation) = :year ORDER BY f.numeroFacture DESC")
+    @Query("SELECT DISTINCT f FROM FactureReelle f " +
+           "LEFT JOIN FETCH f.entreprise e " +
+           "WHERE e.id = :entrepriseId " +
+           "AND FUNCTION('YEAR', f.dateCreation) = :year " +
+           "ORDER BY f.numeroFacture DESC")
     List<FactureReelle> findFacturesDeLAnneeParEntreprise(@Param("entrepriseId") Long entrepriseId, @Param("year") int year);
     
+    // Récupérer les factures par entreprise (optimisé avec JOIN FETCH)
+    @Query("SELECT DISTINCT f FROM FactureReelle f " +
+           "LEFT JOIN FETCH f.entreprise e " +
+           "WHERE e.id = :entrepriseId")
+    List<FactureReelle> findByEntrepriseId(@Param("entrepriseId") Long entrepriseId);
 
-    List<FactureReelle> findByEntreprise(Entreprise entreprise);
-
-    // Trie
-
-    @Query("SELECT f FROM FactureReelle f WHERE MONTH(f.dateCreation) = :mois AND YEAR(f.dateCreation) = :annee AND f.entreprise.id = :entrepriseId")
-    List<FactureReelle> findByMonthAndYearAndEntreprise(@Param("mois") Integer mois, @Param("annee") Integer annee, @Param("entrepriseId") Long entrepriseId);
+    // Tri par mois et année (optimisé avec JOIN FETCH)
+    @Query("SELECT DISTINCT f FROM FactureReelle f " +
+           "LEFT JOIN FETCH f.entreprise e " +
+           "WHERE e.id = :entrepriseId " +
+           "AND MONTH(f.dateCreation) = :mois " +
+           "AND YEAR(f.dateCreation) = :annee")
+    List<FactureReelle> findByMonthAndYearAndEntreprise(
+            @Param("mois") Integer mois, 
+            @Param("annee") Integer annee, 
+            @Param("entrepriseId") Long entrepriseId);
     
-    @Query("SELECT f FROM FactureReelle f WHERE MONTH(f.dateCreation) = :mois AND f.entreprise.id = :entrepriseId")
+    // Tri par mois (optimisé avec JOIN FETCH)
+    @Query("SELECT DISTINCT f FROM FactureReelle f " +
+           "LEFT JOIN FETCH f.entreprise e " +
+           "WHERE e.id = :entrepriseId " +
+           "AND MONTH(f.dateCreation) = :mois")
     List<FactureReelle> findByMonthAndEntreprise(@Param("mois") Integer mois, @Param("entrepriseId") Long entrepriseId);
     
-    @Query("SELECT f FROM FactureReelle f WHERE YEAR(f.dateCreation) = :annee AND f.entreprise.id = :entrepriseId")
+    // Tri par année (optimisé avec JOIN FETCH)
+    @Query("SELECT DISTINCT f FROM FactureReelle f " +
+           "LEFT JOIN FETCH f.entreprise e " +
+           "WHERE e.id = :entrepriseId " +
+           "AND YEAR(f.dateCreation) = :annee")
     List<FactureReelle> findByYearAndEntreprise(@Param("annee") Integer annee, @Param("entrepriseId") Long entrepriseId);
     
-    List<FactureReelle> findByEntrepriseId(Long entrepriseId);
-
-    // Récupère les factures réelles récentes d'une entreprise (triées par date de création décroissante)
-    @Query("SELECT f FROM FactureReelle f WHERE f.entreprise.id = :entrepriseId ORDER BY f.dateCreationPro DESC")
+    // Récupère les factures réelles récentes d'une entreprise (triées par date de création décroissante, optimisé)
+    @Query("SELECT DISTINCT f FROM FactureReelle f " +
+           "LEFT JOIN FETCH f.entreprise e " +
+           "WHERE e.id = :entrepriseId " +
+           "ORDER BY f.dateCreationPro DESC")
     List<FactureReelle> findRecentFacturesReellesByEntrepriseId(@Param("entrepriseId") Long entrepriseId);
 
-   Optional<FactureReelle> findByFactureProForma(FactureProForma factureProForma);
+    // Recherche par facture proforma et entreprise (pour isolation)
+    @Query("SELECT DISTINCT f FROM FactureReelle f " +
+           "LEFT JOIN FETCH f.entreprise e " +
+           "LEFT JOIN FETCH f.factureProForma fp " +
+           "WHERE fp.id = :factureProFormaId " +
+           "AND e.id = :entrepriseId")
+    Optional<FactureReelle> findByFactureProFormaIdAndEntrepriseId(
+            @Param("factureProFormaId") Long factureProFormaId,
+            @Param("entrepriseId") Long entrepriseId);
 
-    @Query("SELECT fr FROM FactureReelle fr WHERE fr.entreprise = :entreprise ORDER BY fr.dateCreation DESC, fr.id DESC")
-    List<FactureReelle> findByEntrepriseOrderByDateCreationDesc(@Param("entreprise") Entreprise entreprise);
+    @Query("SELECT DISTINCT fr FROM FactureReelle fr " +
+           "LEFT JOIN FETCH fr.entreprise e " +
+           "WHERE e.id = :entrepriseId " +
+           "ORDER BY fr.dateCreation DESC, fr.id DESC")
+    List<FactureReelle> findByEntrepriseOrderByDateCreationDesc(@Param("entrepriseId") Long entrepriseId);
 
-    // Méthode paginée pour récupérer les factures par entreprise
-    @Query("SELECT fr FROM FactureReelle fr WHERE fr.entreprise = :entreprise ORDER BY fr.dateCreation DESC, fr.id DESC")
-    Page<FactureReelle> findByEntrepriseOrderByDateCreationDescPaginated(@Param("entreprise") Entreprise entreprise, Pageable pageable);
+    // Méthode paginée pour récupérer les factures par entreprise (optimisé avec JOIN FETCH)
+    @Query("SELECT DISTINCT fr FROM FactureReelle fr " +
+           "LEFT JOIN FETCH fr.entreprise e " +
+           "WHERE e.id = :entrepriseId " +
+           "ORDER BY fr.dateCreation DESC, fr.id DESC")
+    Page<FactureReelle> findByEntrepriseOrderByDateCreationDescPaginated(
+            @Param("entrepriseId") Long entrepriseId, 
+            Pageable pageable);
 
 
-    List<FactureReelle> findByEntrepriseIdAndStatutPaiementIn(Long entrepriseId, List<StatutPaiementFacture> statuts);
+    // Recherche par entreprise et statuts de paiement (optimisé avec JOIN FETCH)
+    @Query("SELECT DISTINCT f FROM FactureReelle f " +
+           "LEFT JOIN FETCH f.entreprise e " +
+           "WHERE e.id = :entrepriseId " +
+           "AND f.statutPaiement IN :statuts")
+    List<FactureReelle> findByEntrepriseIdAndStatutPaiementIn(
+            @Param("entrepriseId") Long entrepriseId, 
+            @Param("statuts") List<StatutPaiementFacture> statuts);
 
+    // Recherche par entreprise, utilisateur et statuts de paiement (optimisé avec JOIN FETCH)
+    @Query("SELECT DISTINCT f FROM FactureReelle f " +
+           "LEFT JOIN FETCH f.entreprise e " +
+           "LEFT JOIN FETCH f.utilisateurCreateur u " +
+           "WHERE e.id = :entrepriseId " +
+           "AND u.id = :utilisateurId " +
+           "AND f.statutPaiement IN :statuts")
     List<FactureReelle> findByEntrepriseIdAndUtilisateurCreateurIdAndStatutPaiementIn(
-        Long entrepriseId, Long utilisateurId, List<StatutPaiementFacture> statuts
-    );
+            @Param("entrepriseId") Long entrepriseId, 
+            @Param("utilisateurId") Long utilisateurId, 
+            @Param("statuts") List<StatutPaiementFacture> statuts);
 
-    List<FactureReelle> findAllByFactureProForma(FactureProForma factureProForma);
+    // Recherche toutes les factures réelles par facture proforma et entreprise (pour isolation)
+    @Query("SELECT DISTINCT f FROM FactureReelle f " +
+           "LEFT JOIN FETCH f.entreprise e " +
+           "LEFT JOIN FETCH f.factureProForma fp " +
+           "WHERE fp.id = :factureProFormaId " +
+           "AND e.id = :entrepriseId")
+    List<FactureReelle> findAllByFactureProFormaIdAndEntrepriseId(
+            @Param("factureProFormaId") Long factureProFormaId,
+            @Param("entrepriseId") Long entrepriseId);
 
-    List<FactureReelle> findByEntrepriseAndUtilisateurCreateurOrderByDateCreationDesc(Entreprise entreprise, User utilisateurCreateur);
+    // Recherche par entreprise et utilisateur créateur (optimisé avec JOIN FETCH)
+    @Query("SELECT DISTINCT f FROM FactureReelle f " +
+           "LEFT JOIN FETCH f.entreprise e " +
+           "LEFT JOIN FETCH f.utilisateurCreateur u " +
+           "WHERE e.id = :entrepriseId " +
+           "AND u.id = :utilisateurCreateurId " +
+           "ORDER BY f.dateCreation DESC, f.id DESC")
+    List<FactureReelle> findByEntrepriseAndUtilisateurCreateurOrderByDateCreationDesc(
+            @Param("entrepriseId") Long entrepriseId,
+            @Param("utilisateurCreateurId") Long utilisateurCreateurId);
 
-    boolean existsByClientId(Long clientId);
-    boolean existsByEntrepriseClientId(Long entrepriseClientId);
+    // Vérifier l'existence par client et entreprise (pour isolation)
+    @Query("SELECT CASE WHEN COUNT(f) > 0 THEN true ELSE false END FROM FactureReelle f " +
+           "INNER JOIN f.entreprise e " +
+           "WHERE e.id = :entrepriseId AND f.client.id = :clientId")
+    boolean existsByClientIdAndEntrepriseId(@Param("clientId") Long clientId, @Param("entrepriseId") Long entrepriseId);
 
-    List<FactureReelle> findByEntrepriseIdAndDateCreationBetween(Long entrepriseId, LocalDate start, LocalDate end);
+    // Vérifier l'existence par entreprise client et entreprise (pour isolation)
+    @Query("SELECT CASE WHEN COUNT(f) > 0 THEN true ELSE false END FROM FactureReelle f " +
+           "INNER JOIN f.entreprise e " +
+           "WHERE e.id = :entrepriseId AND f.entrepriseClient.id = :entrepriseClientId")
+    boolean existsByEntrepriseClientIdAndEntrepriseId(@Param("entrepriseClientId") Long entrepriseClientId, @Param("entrepriseId") Long entrepriseId);
 
-    // Compter toutes les factures réelles d'une entreprise
-    long countByEntrepriseId(Long entrepriseId);
+    // Récupérer les factures par entreprise et période (optimisé avec JOIN FETCH)
+    @Query("SELECT DISTINCT f FROM FactureReelle f " +
+           "LEFT JOIN FETCH f.entreprise e " +
+           "WHERE e.id = :entrepriseId " +
+           "AND FUNCTION('DATE', f.dateCreation) >= :start " +
+           "AND FUNCTION('DATE', f.dateCreation) <= :end")
+    List<FactureReelle> findByEntrepriseIdAndDateCreationBetween(
+            @Param("entrepriseId") Long entrepriseId, 
+            @Param("start") LocalDate start, 
+            @Param("end") LocalDate end);
+
+    // Compter toutes les factures réelles d'une entreprise (optimisé avec INNER JOIN)
+    @Query("SELECT COUNT(f) FROM FactureReelle f " +
+           "INNER JOIN f.entreprise e " +
+           "WHERE e.id = :entrepriseId")
+    long countByEntrepriseId(@Param("entrepriseId") Long entrepriseId);
 
 
 

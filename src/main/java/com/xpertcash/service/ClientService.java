@@ -9,7 +9,6 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
-import java.util.stream.Collectors;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -21,7 +20,6 @@ import com.xpertcash.entity.Entreprise;
 import com.xpertcash.entity.EntrepriseClient;
 import com.xpertcash.entity.PermissionType;
 import com.xpertcash.entity.User;
-import com.xpertcash.entity.Enum.RoleType;
 import com.xpertcash.entity.PROSPECT.Interaction;
 import com.xpertcash.repository.ClientRepository;
 import com.xpertcash.repository.EntrepriseClientRepository;
@@ -70,13 +68,12 @@ public class ClientService {
 
     User user = authHelper.getAuthenticatedUserWithFallback(request);
 
-    // 🔐 Vérifier que l'utilisateur est lié à une entreprise
     Entreprise entrepriseUtilisateur = user.getEntreprise();
     if (entrepriseUtilisateur == null) {
         throw new RuntimeException("L'utilisateur n'a pas d'entreprise associée.");
     }
 
-    // 🔐 Vérifier que l'utilisateur a le rôle ou la permission appropriée
+    //  Vérifier que l'utilisateur a le rôle ou la permission appropriée
     // RoleType role = user.getRole().getName();
     // boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
     // boolean hasPermission = user.getRole().hasPermission(PermissionType.GERER_CLIENTS);
@@ -96,6 +93,10 @@ public class ClientService {
         client.setCreatedAt(now);
 
         if (client.getEntrepriseClient() != null) {
+            if (client.getEntrepriseClient().getEntreprise() == null) {
+                client.getEntrepriseClient().setEntreprise(entrepriseUtilisateur);
+            }
+            
             checkEntrepriseExists(client.getEntrepriseClient());
 
             if (client.getEntrepriseClient().getId() != null) {
@@ -109,6 +110,11 @@ public class ClientService {
     }
 
     private void checkClientExists(Client client) {
+        Long entrepriseId = client.getEntreprise() != null ? client.getEntreprise().getId() : null;
+        if (entrepriseId == null) {
+            throw new RuntimeException("Le client doit être associé à une entreprise pour vérifier l'unicité.");
+        }
+
         String email = client.getEmail();
         String telephone = client.getTelephone();
 
@@ -116,46 +122,49 @@ public class ClientService {
         Optional<Client> existingByTelephone = Optional.empty();
 
         if (email != null && !email.isEmpty()) {
-            existingByEmail = clientRepository.findByEmail(email);
+            existingByEmail = clientRepository.findByEmailAndEntrepriseId(email, entrepriseId);
         }
 
         if (telephone != null && !telephone.isEmpty()) {
-            existingByTelephone = clientRepository.findByTelephone(telephone);
+            existingByTelephone = clientRepository.findByTelephoneAndEntrepriseId(telephone, entrepriseId);
         }
 
         if (existingByEmail.isPresent() && existingByTelephone.isPresent()) {
-            throw new RuntimeException("Un client avec cet email et ce téléphone existe déjà !");
+            throw new RuntimeException("Un client avec cet email et ce téléphone existe déjà dans votre entreprise !");
         } else if (existingByEmail.isPresent()) {
-            throw new RuntimeException("Un client avec cet email existe déjà !");
+            throw new RuntimeException("Un client avec cet email existe déjà dans votre entreprise !");
         } else if (existingByTelephone.isPresent()) {
-            throw new RuntimeException("Un client avec ce téléphone existe déjà !");
+            throw new RuntimeException("Un client avec ce téléphone existe déjà dans votre entreprise !");
         }
     }
 
     private void checkEntrepriseExists(EntrepriseClient entrepriseClient) {
+        Long entrepriseId = entrepriseClient.getEntreprise() != null ? entrepriseClient.getEntreprise().getId() : null;
+        
+        if (entrepriseId == null) {
+            throw new RuntimeException("L'entreprise cliente doit être associée à une entreprise pour vérifier l'unicité.");
+        }
+
         String email = entrepriseClient.getEmail();
         String telephone = entrepriseClient.getTelephone();
 
         Optional<EntrepriseClient> existingByEmail = Optional.empty();
         Optional<EntrepriseClient> existingByTelephone = Optional.empty();
 
-        // Vérifier si l'email est renseigné et existe déjà
         if (email != null && !email.isEmpty()) {
-            existingByEmail = entrepriseClientRepository.findByEmail(email);
+            existingByEmail = entrepriseClientRepository.findByEmailAndEntrepriseId(email, entrepriseId);
         }
 
-        // Vérifier si le téléphone est renseigné et existe déjà
         if (telephone != null && !telephone.isEmpty()) {
-            existingByTelephone = entrepriseClientRepository.findByTelephone(telephone);
+            existingByTelephone = entrepriseClientRepository.findByTelephoneAndEntrepriseId(telephone, entrepriseId);
         }
 
-        // Construire un message d'erreur précis
         if (existingByEmail.isPresent() && existingByTelephone.isPresent()) {
-            throw new RuntimeException("Une entreprise avec cet email et ce téléphone existe déjà !");
+            throw new RuntimeException("Une entreprise cliente avec cet email et ce téléphone existe déjà dans votre entreprise !");
         } else if (existingByEmail.isPresent()) {
-            throw new RuntimeException("Une entreprise avec cet email existe déjà !");
+            throw new RuntimeException("Une entreprise cliente avec cet email existe déjà dans votre entreprise !");
         } else if (existingByTelephone.isPresent()) {
-            throw new RuntimeException("Une entreprise avec ce téléphone existe déjà !");
+            throw new RuntimeException("Une entreprise cliente avec ce téléphone existe déjà dans votre entreprise !");
         }
     }
 
@@ -182,12 +191,10 @@ public class ClientService {
         return clientRepository.findById(id);
     }
     
-    //Methode pour recuperer les interactions d'un client (entities)
     public List<Interaction> getClientInteractions(Long id) {
         return interactionRepository.findByProspectClientIdAndProspectClientTypeOrderByOccurredAtDesc(id, "CLIENT");
     }
 
-    //Methode pour recuperer les interactions d'un client en DTO (inclut produitId)
     public List<InteractionDTO> getClientInteractionDTOs(Long id) {
         List<Interaction> interactions = getClientInteractions(id);
         return interactions.stream().map(this::convertInteractionToDTO).collect(java.util.stream.Collectors.toList());
@@ -232,26 +239,30 @@ public class ClientService {
     //     throw new RuntimeException("Accès refusé : vous n'avez pas les droits nécessaires pour consulter les clients.");
     // }
 
-    // 3. Vérification que l'utilisateur est bien associé à l'entreprise
     if (!entreprise.getId().equals(user.getEntreprise().getId())) {
         throw new RuntimeException("Accès refusé : vous ne pouvez pas accéder aux clients d'une autre entreprise.");
     }
 
-    // 4. Récupérer tous les clients
-    List<Client> allClients = clientRepository.findAll();
-
-    // 5. Filtrer les clients associés à l'entreprise de l'utilisateur
-    return allClients.stream()
-            .filter(c ->
-                (c.getEntreprise() != null && c.getEntreprise().getId().equals(entreprise.getId())) ||
-                (c.getEntrepriseClient() != null &&
-                 c.getEntrepriseClient().getEntreprise() != null &&
-                 c.getEntrepriseClient().getEntreprise().getId().equals(entreprise.getId()))
-            )
-            .collect(Collectors.toList());
+    List<Client> clients = clientRepository.findClientsByEntrepriseOrEntrepriseClient(entreprise.getId());
+    
+    
+    // if (clients.isEmpty()) {
+        
+    //     List<Client> clientsSansEntreprise = clientRepository.findAll().stream()
+    //             .filter(c -> c.getEntreprise() == null && 
+    //                        (c.getEntrepriseClient() == null || c.getEntrepriseClient().getEntreprise() == null))
+    //             .collect(java.util.stream.Collectors.toList());
+        
+    //     if (!clientsSansEntreprise.isEmpty()) {
+    //         System.out.println(" ATTENTION: " + clientsSansEntreprise.size() + 
+    //                          " clients sans entreprise détectés dans la base !");
+    //         System.out.println(" Ces clients doivent être associés à une entreprise pour être visibles.");
+    //     }
+    // }
+    
+    return clients;
 }
 
-    //Methode pour recuperer seulement les entreprise client
     public List<EntrepriseClient> getAllEntrepriseClients(HttpServletRequest request) {
     User user = authHelper.getAuthenticatedUserWithFallback(request);
 
@@ -268,22 +279,26 @@ public class ClientService {
     //     throw new RuntimeException("Accès refusé : vous n'avez pas les droits nécessaires pour consulter les clients.");
     // }
 
-    // 2. Retourner uniquement les EntrepriseClient liés à cette entreprise
     return entrepriseClientRepository.findByEntrepriseId(entreprise.getId());
 }
 
 
     // Méthode pour récupérer tous les clients (personnes) et entreprises sans leurs clients associés
-    public List<Object> getAllClientsAndEntreprises() {
+    public List<Object> getAllClientsAndEntreprises(HttpServletRequest request) {
+        User user = authHelper.getAuthenticatedUserWithFallback(request);
+
+        Entreprise entreprise = user.getEntreprise();
+        if (entreprise == null) {
+            throw new RuntimeException("Aucune entreprise associée à cet utilisateur");
+        }
+
         List<Object> clientsAndEntreprises = new ArrayList<>();
 
-        // 1. Récupérer tous les clients (personnes)
-        List<Client> clients = clientRepository.findAll();
-        clientsAndEntreprises.addAll(clients);  // Ajouter les clients individuels
+        List<Client> clients = clientRepository.findClientsByEntrepriseOrEntrepriseClient(entreprise.getId());
+        clientsAndEntreprises.addAll(clients);
 
-        // 2. Récupérer toutes les entreprises (en tant que clients) mais sans leurs clients associés
-        List<EntrepriseClient> entreprises = entrepriseClientRepository.findAll();
-        clientsAndEntreprises.addAll(entreprises);  // Ajouter les entreprises comme clients sans leurs clients
+        List<EntrepriseClient> entreprises = entrepriseClientRepository.findByEntrepriseId(entreprise.getId());
+        clientsAndEntreprises.addAll(entreprises); 
 
         return clientsAndEntreprises;
     }
@@ -309,7 +324,6 @@ public class ClientService {
             throw new RuntimeException("Aucune entreprise associée à cet utilisateur");
         }
 
-        // 🔒 Vérifier que le client appartient à cette entreprise
         boolean appartientEntreprise = (existingClient.getEntreprise() != null &&
                 existingClient.getEntreprise().getId().equals(entreprise.getId())) ||
                 (existingClient.getEntrepriseClient() != null &&
@@ -320,7 +334,6 @@ public class ClientService {
             throw new RuntimeException("Accès refusé : ce client ne vous appartient pas.");
         }
 
-        // 🔒 Vérifier que l'utilisateur a les droits
         boolean isAdminOrManager = CentralAccess.isAdminOrManagerOfEntreprise(user, entreprise.getId());
         boolean hasPermissionGestionClient = user.getRole().hasPermission(PermissionType.GERER_CLIENTS);
 
@@ -329,21 +342,19 @@ public class ClientService {
         }
 
 
-        // Vérifier unicité de l'email (hors lui-même)
         String email = client.getEmail();
         if (email != null && !email.isEmpty()) {
-            Optional<Client> clientWithEmail = clientRepository.findByEmail(email);
+            Optional<Client> clientWithEmail = clientRepository.findByEmailAndEntrepriseId(email, entreprise.getId());
             if (clientWithEmail.isPresent() && !clientWithEmail.get().getId().equals(client.getId())) {
-                throw new RuntimeException("Un autre client utilise déjà cet email !");
+                throw new RuntimeException("Un autre client utilise déjà cet email dans votre entreprise !");
             }
         }
 
-        // Vérifier unicité du téléphone (hors lui-même)
         String telephone = client.getTelephone();
         if (telephone != null && !telephone.isEmpty()) {
-            Optional<Client> clientWithTelephone = clientRepository.findByTelephone(telephone);
+            Optional<Client> clientWithTelephone = clientRepository.findByTelephoneAndEntrepriseId(telephone, entreprise.getId());
             if (clientWithTelephone.isPresent() && !clientWithTelephone.get().getId().equals(client.getId())) {
-                throw new RuntimeException("Un autre client utilise déjà ce téléphone !");
+                throw new RuntimeException("Un autre client utilise déjà ce téléphone dans votre entreprise !");
             }
         }
 
@@ -361,27 +372,25 @@ public class ClientService {
             }
         }
 
-        //  Nouveau bloc : détacher l'entreprise si elle est explicitement mise à null
         if (client.getEntrepriseClient() == null && existingClient.getEntrepriseClient() != null) {
             existingClient.setEntrepriseClient(null);
         }
 
-        // Mise à jour de la photo si image présente
         if (imageClientFile != null && !imageClientFile.isEmpty()) {
-            String oldImagePath = existingClient.getPhoto(); // ✅ Prendre depuis l'objet actuel en base
+            String oldImagePath = existingClient.getPhoto(); 
             if (oldImagePath != null && !oldImagePath.isBlank()) {
                 Path oldPath = Paths.get("src/main/resources/static" + oldImagePath);
                 try {
                     Files.deleteIfExists(oldPath);
-                    System.out.println("🗑️ Ancienne photo profil supprimée : " + oldImagePath);
+                    System.out.println(" Ancienne photo profil supprimée : " + oldImagePath);
                 } catch (IOException e) {
-                    System.out.println("⚠️ Impossible de supprimer l'ancienne photo : " + e.getMessage());
+                    System.out.println(" Impossible de supprimer l'ancienne photo : " + e.getMessage());
                 }
             }
 
             String newImageUrl = imageStorageService.saveClientImage(imageClientFile);
             existingClient.setPhoto(newImageUrl);
-            System.out.println("📸 Nouvelle photo enregistrée : " + newImageUrl);
+            System.out.println(" Nouvelle photo enregistrée : " + newImageUrl);
         }
 
 
@@ -406,7 +415,6 @@ public class ClientService {
             throw new RuntimeException("Aucune entreprise associée à cet utilisateur");
         }
 
-        // 🔒 Vérification que le client appartient bien à cette entreprise
         boolean appartientEntreprise = (client.getEntreprise() != null &&
                 client.getEntreprise().getId().equals(entreprise.getId())) ||
                 (client.getEntrepriseClient() != null &&
@@ -417,7 +425,6 @@ public class ClientService {
             throw new RuntimeException("Accès refusé : ce client ne vous appartient pas.");
         }
 
-        // 🔒 Vérifier que l'utilisateur a les droits
         boolean isAdminOrManager = CentralAccess.isAdminOrManagerOfEntreprise(user, entreprise.getId());
         boolean hasPermissionGestionClient = user.getRole().hasPermission(PermissionType.GERER_CLIENTS);
 
@@ -425,9 +432,8 @@ public class ClientService {
             throw new RuntimeException("Accès refusé : vous n'avez pas les permissions pour supprimer un client.");
         }
 
-        // ❌ Vérifier que le client n’a pas de commandes ou de factures
-        boolean hasFactures = factureProformaRepository.existsByClientId(clientId);
-        boolean hasFacturesReel = factureReelleRepository.existsByClientId(clientId);
+        boolean hasFactures = factureProformaRepository.existsByClientIdAndEntrepriseId(clientId, entreprise.getId());
+        boolean hasFacturesReel = factureReelleRepository.existsByClientIdAndEntrepriseId(clientId, entreprise.getId());
         boolean hasVentes = !venteRepository.findByClientId(clientId).isEmpty();
 
 
@@ -435,23 +441,21 @@ public class ClientService {
             throw new RuntimeException("Ce client ne peut pas être supprimé car il est lié à des ventes ou des factures.");
         }
 
-        // 🗑️ Supprimer l’image si elle existe
         String imagePath = client.getPhoto();
         if (imagePath != null && !imagePath.isBlank()) {
             Path path = Paths.get("src/main/resources/static" + imagePath);
             try {
                 Files.deleteIfExists(path);
-                System.out.println("🗑️ Photo supprimée : " + imagePath);
+                System.out.println(" Photo supprimée : " + imagePath);
             } catch (IOException e) {
-                System.out.println("⚠️ Erreur lors de la suppression de la photo : " + e.getMessage());
+                System.out.println(" Erreur lors de la suppression de la photo : " + e.getMessage());
             }
         }
 
         clientRepository.delete(client);
-        System.out.println("✅ Client supprimé avec succès : " + clientId);
+        System.out.println(" Client supprimé avec succès : " + clientId);
     }
 
   
-  // Pour cas special de permission
             
 }

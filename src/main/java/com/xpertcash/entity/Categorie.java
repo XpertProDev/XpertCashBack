@@ -27,5 +27,5 @@ public class Categorie {
     private Entreprise entreprise;
 
     @Column(name = "origine_creation", length = 50)
-    private String origineCreation; // "PRODUIT" ou "COMPTABILITE"
+    private String origineCreation;
 }

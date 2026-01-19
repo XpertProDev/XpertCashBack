@@ -52,7 +52,7 @@ public class ModuleDataInitializer implements CommandLineRunner {
             creerModule("FACTURE_REELLE", "Factures Réelles", "Émission de factures définitives", false, false, null)
         );
 
-        // Création des modules s'ils n'existent pas
+        // creat des modules if not exists
         for (AppModule module : modules) {
             Optional<AppModule> moduleExistantOpt = moduleRepository.findByCode(module.getCode());
 
@@ -69,7 +69,7 @@ public class ModuleDataInitializer implements CommandLineRunner {
             }
         }
 
-        // Mise à jour des entreprises existantes
+        // update existing entreprises
         List<Entreprise> entreprises = entrepriseRepository.findAll();
 
         Set<AppModule> modulesParDefaut = new HashSet<>(moduleRepository.findByActifParDefautTrue());
@@ -77,7 +77,6 @@ public class ModuleDataInitializer implements CommandLineRunner {
 
         for (Entreprise entreprise : entreprises) {
 
-            // Initialiser la liste des modules actifs si nécessaire
             if (entreprise.getModulesActifs() == null) {
                 entreprise.setModulesActifs(new HashSet<>());
             }

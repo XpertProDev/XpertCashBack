@@ -24,7 +24,7 @@ public class LigneFactureDTO {
     private double montantTotal;
     private List<LigneFactureDTO> ligneFactureProforma;
 
-    // ✅ Constructeur depuis l'entité LigneFactureReelle
+    //  Constructeur depuis l'entité LigneFactureReelle
     public LigneFactureDTO(LigneFactureReelle ligneFacture) {
         this.id = ligneFacture.getId();
        this.produit = (ligneFacture.getProduit() != null) 
@@ -37,7 +37,7 @@ public class LigneFactureDTO {
         this.montantTotal = ligneFacture.getMontantTotal();
     }
 
-    // ✅ Constructeur depuis l'entité LigneFactureProforma
+    //  Constructeur depuis l'entité LigneFactureProforma
 public LigneFactureDTO(LigneFactureProforma ligneFacture) {
     this.id = ligneFacture.getId();
     this.produit = ligneFacture.getProduit() != null ? new ProduitDTO(ligneFacture.getProduit()) : null;

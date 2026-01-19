@@ -104,7 +104,6 @@ public class FactureProformaService {
 
     @Autowired
     private GlobalNotificationService globalNotificationService;
-//    private NotificationService notificationService;
     
     @Autowired
     private MailService mailService;
@@ -117,13 +116,11 @@ public class FactureProformaService {
 
     User user = authHelper.getAuthenticatedUserWithFallback(request);
 
-    // 🏢 Vérifier que l'utilisateur est bien associé à une entreprise
     Entreprise entrepriseUtilisateur = user.getEntreprise();
     if (entrepriseUtilisateur == null) {
         throw new RuntimeException("L'utilisateur n'a pas d'entreprise associée.");
     }
 
-    // 🔐 Vérification des droits d'accès
     boolean isAdmin = CentralAccess.isAdminOfEntreprise(user, entrepriseUtilisateur.getId());
     boolean hasPermission = user.getRole().hasPermission(PermissionType.GESTION_FACTURATION);
 
@@ -132,23 +129,19 @@ public class FactureProformaService {
     }
 
 
-    // 🔒 Vérification d'accès au module Gestion Facturation
     moduleActivationService.verifierAccesModulePourEntreprise(entrepriseUtilisateur, "GESTION_FACTURATION");
 
     facture.setEntreprise(entrepriseUtilisateur);
 
 
-    // Vérifier la présence d'un client ou entreprise destinataire pour la facture
     if ((facture.getClient() == null || facture.getClient().getId() == null) &&
         (facture.getEntrepriseClient() == null || facture.getEntrepriseClient().getId() == null)) {
         throw new RuntimeException("Un client ou une entreprise doit être spécifié pour la facture !");
     }
 
-    // Génération du numéro de la facture automatiquement
     facture.setNumeroFacture(generateNumeroFacture(entrepriseUtilisateur));
 
 
-    // Vérifier que la remise est comprise entre 0 et 100%
     if (remisePourcentage == null) {
         remisePourcentage = 0.0;
     } else if (remisePourcentage < 0 || remisePourcentage > 100) {
@@ -158,8 +151,8 @@ public class FactureProformaService {
     Long clientId = (facture.getClient() != null) ? facture.getClient().getId() : null;
     Long entrepriseClientId = (facture.getEntrepriseClient() != null) ? facture.getEntrepriseClient().getId() : null;
 
-    // Vérifier si une facture similaire existe déjà
-    List<FactureProForma> facturesExistantes = factureProformaRepository.findExistingFactures(clientId, entrepriseClientId, StatutFactureProForma.BROUILLON);
+    List<FactureProForma> facturesExistantes = factureProformaRepository.findExistingFacturesByEntrepriseId(
+            entrepriseUtilisateur.getId(), clientId, entrepriseClientId, StatutFactureProForma.BROUILLON);
 
     for (FactureProForma fExistante : facturesExistantes) {
         List<Long> produitsExistants = fExistante.getLignesFacture()
@@ -177,7 +170,6 @@ public class FactureProformaService {
         }
     }
 
-    // Associer le Client ou l'Entreprise destinataire à la facture
     if (clientId != null) {
         Client client = clientRepository.findById(clientId)
                 .orElseThrow(() -> new RuntimeException("Client introuvable !"));
@@ -187,10 +179,9 @@ public class FactureProformaService {
     if (entrepriseClientId != null) {
         EntrepriseClient entrepriseClient = entrepriseClientRepository.findById(entrepriseClientId)
                 .orElseThrow(() -> new RuntimeException("Entreprise destinataire introuvable !"));
-        facture.setEntrepriseClient(entrepriseClient);  // C'est ici que nous associons l'entreprise destinataire
+        facture.setEntrepriseClient(entrepriseClient);
     }
 
-    // Initialisation des valeurs
     facture.setStatut(StatutFactureProForma.BROUILLON);
     facture.setDateCreation(LocalDateTime.now());
 
@@ -207,12 +198,9 @@ public class FactureProformaService {
                 ligne.setFactureProForma(facture);
                 ligne.setProduit(produit);
 
-                // Traitement du prix unitaire comme la ligneDescription
                 if (ligne.getPrixUnitaire() != null) {
-                    // Si un prix unitaire est fourni, l'utiliser directement
                     ligne.setPrixUnitaire(ligne.getPrixUnitaire());
                 } else {
-                    // Sinon, utiliser le prix du produit
                     Double prixVente = produit.getPrixVente();
                     if (prixVente == null) {
                         throw new RuntimeException("Impossible de créer la facture proforma car le produit '" + produit.getNom() + "' n'a pas de prix de vente défini.");
@@ -220,13 +208,11 @@ public class FactureProformaService {
                     ligne.setPrixUnitaire(prixVente);
                 }
 
-                // Pour les produits de type SERVICE, mettre à jour le prix global du produit
                 if ("SERVICE".equals(produit.getTypeProduit()) &&
                         ligne.getPrixUnitaire() != null &&
                         produit.getPrixVente() != null &&
                         !ligne.getPrixUnitaire().equals(produit.getPrixVente())) {
 
-                    // Mettre à jour le prix du produit global
                     produit.setPrixVente(ligne.getPrixUnitaire());
                     produit.setLastUpdated(LocalDateTime.now());
                     produitRepository.save(produit);
@@ -234,22 +220,18 @@ public class FactureProformaService {
 
                 ligne.setMontantTotal(ligne.getQuantite() * ligne.getPrixUnitaire());
 
-                // Traitement de la description (comme avant)
                 if (ligne.getLigneDescription() != null) {
                     ligne.setLigneDescription(ligne.getLigneDescription());
                 } else {
                     ligne.setLigneDescription(produit.getDescription());
                 }
 
-                // Ajout au montant total HT
                 montantTotalHT += ligne.getMontantTotal();
             }
         }
 
-    // Calcul de la remise
     double remiseMontant = (remisePourcentage > 0) ? montantTotalHT * (remisePourcentage / 100) : 0;
 
-    // Appliquer la TVA uniquement si elle est activée
     boolean tvaActive = appliquerTVA != null && appliquerTVA;
     double montantTVA = 0;
     if (tvaActive) {
@@ -261,7 +243,6 @@ public class FactureProformaService {
     }
 
 
-    // Calcul du montant total à payer
     double montantTotalAPayer = (montantTotalHT - remiseMontant) + montantTVA;
 
     // Assigner les montants calculés à la facture
@@ -274,15 +255,13 @@ public class FactureProformaService {
 
     facture.setUtilisateurCreateur(user);
 
-    // Sauvegarder la facture d'abord pour avoir un ID
-    System.out.println("🔄 Sauvegarde de la facture...");
+    System.out.println(" Sauvegarde de la facture...");
     FactureProForma factureSauvegardee = factureProformaRepository.save(facture);
-    System.out.println("✅ Facture sauvegardée avec ID: " + factureSauvegardee.getId());
+    System.out.println(" Facture sauvegardée avec ID: " + factureSauvegardee.getId());
 
     // Enregistrer l'action "Création" dans l'historique
     try {
-        System.out.println("🔄 Enregistrement de l'historique...");
-        // Formater les montants (avec point comme séparateur de milliers)
+        System.out.println(" Enregistrement de l'historique...");
         String montantHTFormate = String.format(Locale.GERMAN, "%,.0f", factureSauvegardee.getTotalHT());
         String montantTTCFormate = String.format(Locale.GERMAN, "%,.0f", factureSauvegardee.getTotalFacture());
         
@@ -293,10 +272,9 @@ public class FactureProformaService {
                 "Facture proforma cré   e avec un montant total HT de " + montantHTFormate + "\n" +
                 "montant total TTC à payer de " + montantTTCFormate
         );
-        System.out.println("✅ Historique enregistré avec succès");
+        System.out.println(" Historique enregistré avec succès");
     } catch (Exception e) {
-        // Log l'erreur mais ne pas faire échouer la création de facture
-        System.err.println("❌ Erreur lors de l'enregistrement de l'historique de création: " + e.getMessage());
+        System.err.println(" Erreur lors de l'enregistrement de l'historique de création: " + e.getMessage());
         e.printStackTrace();
     }
 
@@ -309,7 +287,6 @@ public class FactureProformaService {
     int year = currentDate.getYear();
     String formattedDate = currentDate.format(DateTimeFormatter.ofPattern("MM-yyyy"));
 
-    // Filtrer par entreprise pour que chaque entreprise ait son propre compteur
     List<FactureProForma> facturesDeLAnnee = factureProformaRepository.findFacturesDeLAnneeParEntreprise(entreprise.getId(), year);
 
     long newIndex = 1;
@@ -347,7 +324,6 @@ public class FactureProformaService {
         numeroFacture.append(formattedDate).append("-");
         numeroFacture.append(suffixe);
     } else if (!prefixe.isEmpty() && !suffixe.isEmpty()) {
-        // Choix : on garde uniquement prefixe ici
         numeroFacture.append(prefixe).append("-");
         numeroFacture.append(indexFormatte).append("-");
         numeroFacture.append(formattedDate);
@@ -363,16 +339,13 @@ public class FactureProformaService {
     // Méthode pour modifier une facture pro forma
     @Transactional
     public FactureProFormaDTO modifierFacture(Long factureId, Double remisePourcentage, Boolean appliquerTVA, FactureProForma modifications, List<Long> idsApprobateurs, HttpServletRequest request) {
-        // 🔐 Récupération de la facture
         FactureProForma facture = factureProformaRepository.findById(factureId)
                 .orElseThrow(() -> new RuntimeException("Facture non trouvée !"));
 
-        // Stocker l'ancien montant total HT avant toute modification
         double ancienTotalHT = facture.getTotalHT();
 
         User user = authHelper.getAuthenticatedUserWithFallback(request);
 
-         // --- Vérification que la facture appartient à la même entreprise que l'utilisateur ---
         Entreprise entrepriseFacture = facture.getEntreprise();
         Entreprise entrepriseUtilisateur = user.getEntreprise();
 
@@ -380,8 +353,6 @@ public class FactureProformaService {
             throw new RuntimeException("Accès refusé : vous ne pouvez modifier que les factures de votre entreprise.");
         }
 
-        // --- Optionnel : Vérification des droits via CentralAccess et permission ---
-        // 🔐 Vérification des droits d'accès
         boolean isAdmin = CentralAccess.isAdminOfEntreprise(user, entrepriseUtilisateur.getId());
         boolean hasPermission = user.getRole().hasPermission(PermissionType.GESTION_FACTURATION);
 
@@ -390,7 +361,7 @@ public class FactureProformaService {
         }
 
 
-        // 🔒 Blocage total si facture annulée
+        //  Blocage total si facture annulée
         if (facture.getStatut() == StatutFactureProForma.ANNULE) {
             throw new RuntimeException("Cette facture est annulée. Elle ne peut plus être modifiée.");
         }
@@ -400,7 +371,7 @@ public class FactureProformaService {
         //     throw new RuntimeException("Cette facture est déjà VALIDÉE. Vous ne pouvez pas la valider une seconde fois.");
         // }
 
-        // 🔒 Traitement spécial si facture VALIDÉE
+        //  Traitement spécial si facture VALIDÉE
         if (facture.getStatut() == StatutFactureProForma.VALIDE) {
             boolean tentativeModification = modifications.getLignesFacture() != null
                     || remisePourcentage != null
@@ -412,17 +383,21 @@ public class FactureProformaService {
             }
         }
 
-        // Si demande d’annulation
+        // Si demande d'annulation
         if (modifications.getStatut() == StatutFactureProForma.ANNULE) {
+            Entreprise entreprise = facture.getEntreprise();
+            if (entreprise == null) {
+                throw new RuntimeException("La facture n'est associée à aucune entreprise.");
+            }
 
-                // si paiements existants
-            Optional<FactureReelle> factureReelleOpt = factureReelleRepository.findByFactureProForma(facture);
+            Optional<FactureReelle> factureReelleOpt = factureReelleRepository.findByFactureProFormaIdAndEntrepriseId(
+                    facture.getId(), entreprise.getId());
             if (factureReelleOpt.isPresent()) {
                 FactureReelle factureReelle = factureReelleOpt.get();
                 BigDecimal totalPaye = paiementRepository.sumMontantsByFactureReelle(factureReelle.getId());
 
                 if (totalPaye != null && totalPaye.compareTo(BigDecimal.ZERO) > 0) {
-                    throw new RuntimeException("Impossible d’annuler : des paiements ont déjà été effectués sur la facture.");
+                    throw new RuntimeException("Impossible d'annuler : des paiements ont déjà été effectués sur la facture.");
                 }
             }
 
@@ -434,10 +409,12 @@ public class FactureProformaService {
             facture.setDernierRappelEnvoye(null);
             facture.setNotifie(false);
 
-            factureReelleRepository.findByFactureProForma(facture).ifPresent(factureReelle -> {
-                factureReelleRepository.delete(factureReelle);
-                System.out.println("🗑️ Facture réelle supprimée.");
-            });
+            // Supprimer la facture réelle associée
+            factureReelleRepository.findByFactureProFormaIdAndEntrepriseId(facture.getId(), entreprise.getId())
+                    .ifPresent(factureReelle -> {
+                        factureReelleRepository.delete(factureReelle);
+                        System.out.println(" Facture réelle supprimée.");
+                    });
 
             factProHistoriqueService.enregistrerActionHistorique(
                     facture,
@@ -449,21 +426,14 @@ public class FactureProformaService {
             return new FactureProFormaDTO(facture);
         }
 
-        // 🔁 Application des modifications normales
         facture.setUtilisateurModificateur(user);
-        System.out.println("Modification effectuée par l'utilisateur ID: " + user.getId());
-        System.out.println("Modifications reçues: " + modifications);
-
-        // 💡 Génération de facture réelle si passage à VALIDE
         if (modifications.getStatut() == StatutFactureProForma.VALIDE && facture.getStatut() != StatutFactureProForma.VALIDE) {
-            // On récupère et enregistre le validateur
             facture.setUtilisateurValidateur(user);
             
-            // Mettre à jour le statut à VALIDE
             facture.setStatut(StatutFactureProForma.VALIDE);
 
             FactureReelle factureReelle = factureReelleService.genererFactureReelle(facture);
-            System.out.println("✅ Facture Réelle générée avec succès : " + factureReelle.getNumeroFacture());
+            System.out.println(" Facture Réelle générée avec succès : " + factureReelle.getNumeroFacture());
 
             factProHistoriqueService.enregistrerActionHistorique(
                     facture,
@@ -473,7 +443,7 @@ public class FactureProformaService {
             );
         }
 
-        // ✅ Approbation de la facture
+        //  Approbation de la facture
         if (modifications.getStatut() == StatutFactureProForma.APPROUVE) {
             boolean dejaApprouvee = facture.getDateApprobation() != null;
 
@@ -521,7 +491,7 @@ public class FactureProformaService {
                     "Facture approuvée par " + user.getNomComplet()
             );
 
-            // 📧 Envoi d'email au créateur/modificateur pour notification d'approbation
+            //  Envoi d'email au créateur/modificateur pour notification d'approbation
             User destinataireEmail = facture.getUtilisateurModificateur() != null 
                     ? facture.getUtilisateurModificateur() 
                     : facture.getUtilisateurCreateur();
@@ -550,9 +520,9 @@ public class FactureProformaService {
                                 montantTotalFormate,
                                 objetFacture
                         );
-                        log.info("✅ Email d'approbation envoyé au créateur/modificateur : {}", destinataireEmail.getEmail());
+                        log.info(" Email d'approbation envoyé au créateur/modificateur : {}", destinataireEmail.getEmail());
                     } catch (Exception e) {
-                        log.error("❌ Erreur lors de l'envoi de l'email d'approbation à {} : {}", 
+                        log.error(" Erreur lors de l'envoi de l'email d'approbation à {} : {}", 
                                 destinataireEmail.getEmail(), e.getMessage());
                         e.printStackTrace();
                     }
@@ -581,7 +551,7 @@ public class FactureProformaService {
 
 
         /*
-        // 💡 Bloc de retour automatique en brouillon (trop permissif)
+        //  Bloc de retour automatique en brouillon (trop permissif)
         if (modifications.getStatut() == StatutFactureProForma.BROUILLON
                 && !facture.getStatut().equals(StatutFactureProForma.BROUILLON)) {
             facture.setStatut(StatutFactureProForma.BROUILLON);
@@ -594,7 +564,7 @@ public class FactureProformaService {
         }
          */
 
-        // ✅ Ajout des approbateurs
+        //  Ajout des approbateurs
         // === Ajout des approbateurs et notifications ===
         if (modifications.getStatut() == StatutFactureProForma.APPROBATION) {
             if (idsApprobateurs == null || idsApprobateurs.isEmpty()) {
@@ -607,7 +577,7 @@ public class FactureProformaService {
 
             // Persistance des approbateurs sur la facture
             facture.setApprobateurs(approbateurs);
-            System.out.println("👥 Approbateurs ajoutés : " + approbateurs.stream()
+            System.out.println(" Approbateurs ajoutés : " + approbateurs.stream()
                     .map(User::getId).toList());
 
             // Construction des messages
@@ -636,7 +606,7 @@ public class FactureProformaService {
             globalNotificationService.notifyRecipients(approbateurs, msgAppro);
             globalNotificationService.notifySingle(user, msgSender);
 
-            // 📧 Envoi d'emails aux approbateurs
+            //  Envoi d'emails aux approbateurs
             String montantTotalFormate = String.format(Locale.GERMAN, "%,.0f", facture.getTotalFacture());
             String objetFacture = facture.getDescription() != null ? facture.getDescription() : "";
             for (User approbateur : approbateurs) {
@@ -652,17 +622,17 @@ public class FactureProformaService {
                                 createur,
                                 montantTotalFormate,
                                 objetFacture,
-                                facture.getId()
+                                facture.getId(),
+                                request
                         );
-                        log.info("✅ Email d'approbation envoyé à : {}", approbateur.getEmail());
+                        log.info(" Email d'approbation envoyé à : {}", approbateur.getEmail());
                     } catch (Exception e) {
-                        // Log l'erreur mais ne fait pas échouer le processus
-                        log.error("❌ Erreur lors de l'envoi de l'email d'approbation à {} : {}", 
+                        log.error(" Erreur lors de l'envoi de l'email d'approbation à {} : {}", 
                                 approbateur.getEmail(), e.getMessage());
                         e.printStackTrace();
                     }
                 } else {
-                    log.warn("⚠️ L'approbateur {} n'a pas d'email configuré, email non envoyé", 
+                    log.warn(" L'approbateur {} n'a pas d'email configuré, email non envoyé", 
                             approbateur.getNomComplet() != null ? approbateur.getNomComplet() : approbateur.getId());
                 }
             }
@@ -679,7 +649,7 @@ public class FactureProformaService {
             );
         }
         
-        // 🔁 Mise à jour de la date de relance
+        //  Mise à jour de la date de relance
         if (modifications.getDateRelance() != null) {
             if (modifications.getDateRelance().isBefore(facture.getDateCreation())) {
                 throw new RuntimeException("La date de relance ne peut pas être antérieure à la date de création de la facture !");
@@ -699,7 +669,7 @@ public class FactureProformaService {
             facture.setUtilisateurAnnulateur(null);
         }
 
-        // 📩 Passage au statut ENVOYÉ
+        //  Passage au statut ENVOYÉ
         if (modifications.getStatut() == StatutFactureProForma.ENVOYE) {
             if (modifications.getMethodeEnvoi() == null) {
                 throw new IllegalArgumentException("Veuillez spécifier la méthode d’envoi : PHYSIQUE, EMAIL ou AUTRE.");
@@ -726,12 +696,6 @@ public class FactureProformaService {
                     details += " : " + modifications.getJustification();
                 }
 
-                        /*
-                            if (facture.getDateRelance() != null) {
-                            details += " | Date de relance prévue : " + facture.getDateRelance();
-                        }
-
-                        */
                 factProHistoriqueService.enregistrerActionHistorique(
                     facture,
                     user,
@@ -740,19 +704,16 @@ public class FactureProformaService {
                 );
         }
 
-        // 🧾 Mise à jour des lignes de facture
+        //  Mise à jour des lignes de facture
         if (modifications.getLignesFacture() != null) {
             facture.getLignesFacture().clear();
             for (LigneFactureProforma ligne : modifications.getLignesFacture()) {
                 Produit produit = produitRepository.findById(ligne.getProduit().getId())
                         .orElseThrow(() -> new RuntimeException("Produit introuvable !"));
 
-                // ✅ Traitement du prix unitaire comme dans ajouterFacture
                 if (ligne.getPrixUnitaire() != null) {
-                    // Si un prix unitaire est fourni, l'utiliser directement (prix modifié pour les services)
                     ligne.setPrixUnitaire(ligne.getPrixUnitaire());
                 } else {
-                    // Sinon, utiliser le prix du produit
                     Double prixVente = produit.getPrixVente();
                     if (prixVente == null) {
                         throw new RuntimeException("Le prix de vente du produit avec l'ID " + produit.getId() + " est nul.");
@@ -760,13 +721,11 @@ public class FactureProformaService {
                     ligne.setPrixUnitaire(prixVente);
                 }
 
-                // Pour les produits de type SERVICE, mettre à jour le prix global du produit si modifié
                 if ("SERVICE".equals(produit.getTypeProduit()) &&
                         ligne.getPrixUnitaire() != null &&
                         produit.getPrixVente() != null &&
                         !ligne.getPrixUnitaire().equals(produit.getPrixVente())) {
 
-                    // Mettre à jour le prix du produit global
                     produit.setPrixVente(ligne.getPrixUnitaire());
                     produit.setLastUpdated(LocalDateTime.now());
                     produitRepository.save(produit);
@@ -781,12 +740,10 @@ public class FactureProformaService {
             }
         }
 
-        // ✏️ Description
         if (modifications.getDescription() != null) {
             facture.setDescription(modifications.getDescription());
         }
 
-        // 💰 Calcul des totaux
         remisePourcentage = (remisePourcentage == null) ? 0.0 : remisePourcentage;
         if (remisePourcentage < 0 || remisePourcentage > 100) {
             throw new RuntimeException("Le pourcentage de remise doit être compris entre 0 et 100 !");
@@ -804,7 +761,6 @@ public class FactureProformaService {
         facture.setTva(tvaActive);
         facture.setTotalFacture(montantTotalAPayer);
 
-        // ✅ Mise à jour du statut (hors VALIDÉ et autres statuts déjà traités ci-dessus)
      
         if (modifications.getStatut() != null 
                 && facture.getStatut() != StatutFactureProForma.VALIDE
@@ -814,11 +770,9 @@ public class FactureProformaService {
                 && modifications.getStatut() != StatutFactureProForma.ENVOYE
                 && modifications.getStatut() != StatutFactureProForma.BROUILLON
                 && modifications.getStatut() != StatutFactureProForma.ANNULE) {
-            // Pour les autres statuts non gérés ci-dessus, on change le statut normalement
                 facture.setStatut(modifications.getStatut());
         }
 
-        // 📝 Enregistrement de l'action "Modification" uniquement si le montant a changé
         if (montantTotalHT != ancienTotalHT) {
             // Formater le montant
             String montantFormate = String.format(Locale.GERMAN, "%,.0f", montantTotalHT);
@@ -830,7 +784,6 @@ public class FactureProformaService {
                     "La facture a été modifiée (montant: " + montantFormate + ")"
             );
 
-            // 📧 Envoi d'emails aux approbateurs et au créateur pour notification de modification
             String numero = Optional.ofNullable(facture.getNumeroFacture())
                     .filter(s -> !s.isBlank())
                     .orElseGet(() -> "Facture #" + facture.getId());
@@ -844,7 +797,6 @@ public class FactureProformaService {
             List<User> approbateurs = facture.getApprobateurs();
             if (approbateurs != null && !approbateurs.isEmpty()) {
                 for (User approbateur : approbateurs) {
-                    // Ne pas envoyer d'email si c'est le même utilisateur qui modifie
                     if (!approbateur.getId().equals(user.getId()) && 
                         approbateur.getEmail() != null && !approbateur.getEmail().isBlank()) {
                         try {
@@ -859,9 +811,9 @@ public class FactureProformaService {
                                     montantTotalFormate,
                                     objetFacture
                             );
-                            log.info("✅ Email de modification envoyé à l'approbateur : {}", approbateur.getEmail());
+                            log.info(" Email de modification envoyé à l'approbateur : {}", approbateur.getEmail());
                         } catch (Exception e) {
-                            log.error("❌ Erreur lors de l'envoi de l'email de modification à {} : {}", 
+                            log.error(" Erreur lors de l'envoi de l'email de modification à {} : {}", 
                                     approbateur.getEmail(), e.getMessage());
                             e.printStackTrace();
                         }
@@ -885,9 +837,9 @@ public class FactureProformaService {
                             montantTotalFormate,
                             objetFacture
                     );
-                    log.info("✅ Email de modification envoyé au créateur : {}", createur.getEmail());
+                    log.info(" Email de modification envoyé au créateur : {}", createur.getEmail());
                 } catch (Exception e) {
-                    log.error("❌ Erreur lors de l'envoi de l'email de modification au créateur {} : {}", 
+                    log.error(" Erreur lors de l'envoi de l'email de modification au créateur {} : {}", 
                             createur.getEmail(), e.getMessage());
                     e.printStackTrace();
                 }
@@ -905,7 +857,7 @@ public class FactureProformaService {
 
             noteFactureProFormaRepository.save(note);
 
-            System.out.println("📝 Note ajoutée à la facture : " + modifications.getNoteModification());
+            System.out.println(" Note ajoutée à la facture : " + modifications.getNoteModification());
 
         }
 
@@ -937,16 +889,17 @@ public class FactureProformaService {
             throw new RuntimeException("Accès refusé : vous n'avez pas les droits pour supprimer une facture.");
         }
 
-        // 🔥 Supprimer d'abord les lignes de facture
-        ligneFactureProformaRepository.deleteByFactureProForma(facture);
+        Long entrepriseId = facture.getEntreprise() != null ? facture.getEntreprise().getId() : null;
+        if (entrepriseId != null) {
+            ligneFactureProformaRepository.deleteByFactureProFormaIdAndEntrepriseId(facture.getId(), entrepriseId);
+        }
 
-        // 🔥 Supprimer les historiques liés à la facture
         factProHistoriqueActionRepository.deleteByFacture(facture);
 
-        // Suprimer les note
-        noteFactureProFormaRepository.deleteByFacture(facture);
+        if (entrepriseId != null) {
+            noteFactureProFormaRepository.deleteByFactureProFormaIdAndEntrepriseId(facture.getId(), entrepriseId);
+        }
 
-        // ✅ Ensuite on peut supprimer la facture
         factureProformaRepository.delete(facture);
     }
 
@@ -971,41 +924,32 @@ public class FactureProformaService {
         if (size <= 0) size = 20;
         if (size > 100) size = 100;
         
-        // --- 2. Récupération et validation de l'utilisateur ---
         User currentUser = authHelper.getAuthenticatedUserWithFallback(request);
-        User targetUser = usersRepository.findById(userIdRequete)
-                .orElseThrow(() -> new RuntimeException("Utilisateur cible non trouvé"));
-
         Entreprise entrepriseCourante = currentUser.getEntreprise();
-        Entreprise entrepriseCible = targetUser.getEntreprise();
-
-        if (entrepriseCourante == null || entrepriseCible == null
-            || !entrepriseCourante.getId().equals(entrepriseCible.getId())) {
-            throw new RuntimeException("Opération interdite : utilisateurs de différentes entreprises.");
+        if (entrepriseCourante == null) {
+            throw new RuntimeException("L'utilisateur connecté n'a pas d'entreprise associée.");
         }
+        Long entrepriseId = entrepriseCourante.getId();
 
-        // --- 3. Vérification des droits d'accès ---
+        usersRepository.findByIdAndEntrepriseId(userIdRequete, entrepriseId)
+                .orElseThrow(() -> new RuntimeException("Utilisateur cible non trouvé ou n'appartient pas à votre entreprise."));
+
         boolean isAdmin = currentUser.getRole().getName() == RoleType.ADMIN;
         boolean isManager = currentUser.getRole().getName() == RoleType.MANAGER;
         boolean hasPermission = currentUser.getRole().hasPermission(PermissionType.GESTION_FACTURATION);
         boolean isApprover = factureProformaRepository.existsByApprobateursAndEntrepriseId(currentUser, entrepriseCourante.getId());
 
-        // --- 4. Créer le Pageable avec tri optimisé ---
         Pageable pageable = PageRequest.of(page, size, Sort.by("dateCreation").descending().and(Sort.by("id").descending()));
 
-        // --- 5. Récupérer les factures avec pagination selon les droits ---
         Page<FactureProForma> facturesPage;
         
         if (isAdmin || isManager) {
-            // Admins et managers voient toutes les factures de l'entreprise
             facturesPage = factureProformaRepository.findFacturesAvecRelationsParEntreprisePaginated(
                     entrepriseCourante.getId(), pageable);
         } else if (hasPermission || isApprover) {
-            // Utilisateurs avec permissions voient leurs factures + celles où ils sont approbateurs
             facturesPage = factureProformaRepository.findFacturesAvecRelationsParEntrepriseEtUtilisateurPaginated(
                     entrepriseCourante.getId(), currentUser.getId(), pageable);
         } else {
-            // Utilisateurs normaux ne voient que leurs propres factures
             if (!Objects.equals(currentUser.getId(), userIdRequete)) {
                 throw new RuntimeException("Vous ne pouvez voir que vos propres factures.");
             }
@@ -1013,7 +957,6 @@ public class FactureProformaService {
                     entrepriseCourante.getId(), currentUser.getId(), pageable);
         }
 
-        // --- 6. Récupérer les statistiques globales (une seule fois) ---
         long totalFactures = factureProformaRepository.countFacturesByEntrepriseId(entrepriseCourante.getId());
         long totalFacturesBrouillon = factureProformaRepository.countFacturesByEntrepriseIdAndStatut(
                 entrepriseCourante.getId(), StatutFactureProForma.BROUILLON);
@@ -1024,7 +967,6 @@ public class FactureProformaService {
         long totalFacturesAnnulees = factureProformaRepository.countFacturesByEntrepriseIdAndStatut(
                 entrepriseCourante.getId(), StatutFactureProForma.ANNULE);
 
-        // --- 7. Transformer les factures de la page courante en Map ---
         List<Map<String, Object>> facturesMap = facturesPage.getContent().stream()
                 .map(facture -> {
                     Map<String, Object> map = new HashMap<>();
@@ -1044,35 +986,29 @@ public class FactureProformaService {
                     map.put("dateRelance", facture.getDateRelance());
                     map.put("notifie", facture.isNotifie());
                     
-                    // Ajouter le nom du créateur
                     map.put("createur", facture.getUtilisateurCreateur() != null ? facture.getUtilisateurCreateur().getNomComplet() : null);
                     
                     return map;
                 })
                 .collect(Collectors.toList());
 
-        // --- 8. Créer la page de DTOs ---
         Page<Map<String, Object>> dtoPage = new PageImpl<>(
                 facturesMap,
                 pageable,
                 facturesPage.getTotalElements()
         );
 
-        // --- 9. Retourner la réponse paginée ---
         return FactureProformaPaginatedResponseDTO.fromPage(dtoPage, totalFactures, totalFacturesBrouillon, 
                 totalFacturesEnAttente, totalFacturesValidees, totalFacturesAnnulees);
     }
 
 
 
-//Trie:
    
-    // Methode pour recuperer une facture pro forma par son id
     // Méthode privée pour récupérer l'entité FactureProForma avec contrôle d'accès
     public FactureProForma getFactureProformaEntityById(Long id, HttpServletRequest request) {
         User utilisateur = authHelper.getAuthenticatedUserWithFallback(request);
 
-        // Utiliser la méthode optimisée avec FETCH JOIN pour charger toutes les relations en une seule requête
         FactureProForma facture = factureProformaRepository.findByIdWithRelations(id)
             .orElseThrow(() -> new RuntimeException("Facture Proforma introuvable avec l'ID : " + id));
 
@@ -1088,7 +1024,7 @@ public class FactureProformaService {
         boolean hasPermission = utilisateur.getRole().hasPermission(PermissionType.GESTION_FACTURATION);
         boolean isCreateurFacture = facture.getUtilisateurCreateur() != null &&
                                     facture.getUtilisateurCreateur().getId().equals(utilisateur.getId());
-        
+
         // Vérifier si l'utilisateur est un approbateur de la facture
         boolean isApprobateur = facture.getApprobateurs() != null &&
                                facture.getApprobateurs().stream()
@@ -1110,27 +1046,27 @@ public FactureProFormaDTO getFactureProformaById(Long id, HttpServletRequest req
     //Methode pour modifier note d'une facture pro forma que user lui meme a creer
         @Transactional
         public FactureProFormaDTO modifierNoteFacture(Long factureId, Long noteId, String nouveauContenu, HttpServletRequest request) {
-            // Récupération de la facture
             FactureProForma facture = factureProformaRepository.findById(factureId)
                     .orElseThrow(() -> new RuntimeException("Facture non trouvée !"));
 
             User user = authHelper.getAuthenticatedUserWithFallback(request);
 
-            // Récupération de la note à modifier
-            NoteFactureProForma note = noteFactureProFormaRepository.findById(noteId)
-                    .orElseThrow(() -> new RuntimeException("Note introuvable avec l'ID : " + noteId));
+            Long entrepriseId = user.getEntreprise() != null ? user.getEntreprise().getId() : null;
+            if (entrepriseId == null) {
+                throw new RuntimeException("L'utilisateur n'a pas d'entreprise associée.");
+            }
 
-            // Vérification que la note appartient bien à la facture
+            NoteFactureProForma note = noteFactureProFormaRepository.findByIdAndEntrepriseId(noteId, entrepriseId)
+                    .orElseThrow(() -> new RuntimeException("Note introuvable avec l'ID : " + noteId + " ou n'appartient pas à votre entreprise"));
+
             if (!note.getFacture().getId().equals(factureId)) {
                 throw new RuntimeException("Cette note n'appartient pas à la facture spécifiée !");
             }
 
-            // Vérification que l'utilisateur est le créateur de la note
             if (!note.getAuteur().getId().equals(user.getId())) {
                 throw new RuntimeException("Vous n'êtes pas autorisé à modifier cette note !");
             }
 
-            // Mise à jour du contenu de la note
             note.setContenu(nouveauContenu);
             note.setDateDerniereModification(LocalDateTime.now());
             note.setModifiee(true);
@@ -1142,15 +1078,20 @@ public FactureProFormaDTO getFactureProformaById(Long id, HttpServletRequest req
 
     //Generate
     private String genererNumeroNotePourFacture(FactureProForma facture) {
+        Long entrepriseId = facture.getEntreprise() != null ? facture.getEntreprise().getId() : null;
+        if (entrepriseId == null) {
+            throw new RuntimeException("La facture n'a pas d'entreprise associée.");
+        }
+        
         int maxNumero = noteFactureProFormaRepository
-            .findByFacture(facture).stream()
+            .findByFactureProFormaIdAndEntrepriseId(facture.getId(), entrepriseId).stream()
             .map(NoteFactureProForma::getNumeroIdentifiant)
             .filter(Objects::nonNull)
             .map(numero -> {
                 try {
                     return Integer.parseInt(numero.replace("N ", ""));
                 } catch (NumberFormatException e) {
-                    return 0; // Si le format ne correspond pas
+                    return 0;
                 }
             })
             .max(Integer::compareTo)
@@ -1168,27 +1109,27 @@ public FactureProFormaDTO getFactureProformaById(Long id, HttpServletRequest req
 
         User user = authHelper.getAuthenticatedUserWithFallback(request);
 
-        // Détermination du rôle
+        Long entrepriseId = user.getEntreprise() != null ? user.getEntreprise().getId() : null;
+        if (entrepriseId == null) {
+            throw new RuntimeException("L'utilisateur n'a pas d'entreprise associée.");
+        }
+
         RoleType role = user.getRole().getName();
         boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
 
-        // Récupération de la note à supprimer
-        NoteFactureProForma note = noteFactureProFormaRepository.findById(noteId)
-                .orElseThrow(() -> new RuntimeException("Note introuvable avec l'ID : " + noteId));
+        NoteFactureProForma note = noteFactureProFormaRepository.findByIdAndEntrepriseId(noteId, entrepriseId)
+                .orElseThrow(() -> new RuntimeException("Note introuvable avec l'ID : " + noteId + " ou n'appartient pas à votre entreprise"));
 
-        // Vérification que la note appartient bien à la facture
         if (!note.getFacture().getId().equals(factureId)) {
             throw new RuntimeException("Cette note n'appartient pas à la facture spécifiée !");
         }
 
-        // Vérification que l'utilisateur est le créateur de la note
         if (!note.getAuteur().getId().equals(user.getId()) && !isAdminOrManager) {
             throw new RuntimeException("Vous n'êtes pas autorisé à supprimer cette note !");
         }
 
         String numeroNote = note.getNumeroIdentifiant();
 
-        // Suppression de la note
         noteFactureProFormaRepository.delete(note);
 
         // Enregistrement de l'historique de suppression
@@ -1199,8 +1140,7 @@ public FactureProFormaDTO getFactureProformaById(Long id, HttpServletRequest req
                 "La note " + numeroNote + " a été supprimée."
         );
 
-        // Retourner la facture mise à jour
-        // return factureProformaRepository.save(facture);
+
         return new FactureProFormaDTO(facture);
 
     }
@@ -1208,54 +1148,55 @@ public FactureProFormaDTO getFactureProformaById(Long id, HttpServletRequest req
     //Methode get note dune facture by id
     public NoteFactureProForma getNotesByFactureId(Long factureId, Long noteId, HttpServletRequest request) {
         User user = authHelper.getAuthenticatedUserWithFallback(request);
-        // Récupération de la facture
         FactureProForma facture = factureProformaRepository.findById(factureId)
                 .orElseThrow(() -> new RuntimeException("Facture non trouvée avec l'ID : " + factureId));
-        // Vérification que l'utilisateur a accès à la facture
-        if (!facture.getEntreprise().getId().equals(user.getEntreprise().getId())) {
+        Long entrepriseId = user.getEntreprise() != null ? user.getEntreprise().getId() : null;
+        if (entrepriseId == null || !facture.getEntreprise().getId().equals(entrepriseId)) {
             throw new RuntimeException("Accès refusé : Cette facture ne vous appartient pas !");
         }
-        // Récupération de la note
-        NoteFactureProForma note = noteFactureProFormaRepository.findById(noteId)
-                .orElseThrow(() -> new RuntimeException("Note introuvable avec l'ID : " + noteId));
-        // Vérification que la note appartient à la facture
+        NoteFactureProForma note = noteFactureProFormaRepository.findByIdAndEntrepriseId(noteId, entrepriseId)
+                .orElseThrow(() -> new RuntimeException("Note introuvable avec l'ID : " + noteId + " ou n'appartient pas à votre entreprise"));
         if (!note.getFacture().getId().equals(factureId)) {
             throw new RuntimeException("Cette note n'appartient pas à la facture spécifiée !");
         }
-        // Retourner la note
         return note;
     }
 
-    //Methode pour connaitre tout les facture lier a un client
-    public List<FactureProForma> getFacturesParClient(Long clientId, Long entrepriseClientId) {
-    if (clientId == null && entrepriseClientId == null) {
-        throw new RuntimeException("Veuillez spécifier un client ou une entreprise cliente.");
-    }
+    //Methode pour connaitre tout les facture lier a un client (isolée par entreprise)
+    public List<FactureProForma> getFacturesParClient(Long clientId, Long entrepriseClientId, HttpServletRequest request) {
+        if (clientId == null && entrepriseClientId == null) {
+            throw new RuntimeException("Veuillez spécifier un client ou une entreprise cliente.");
+        }
 
-    return factureProformaRepository.findByClientIdOrEntrepriseClientId(clientId, entrepriseClientId);
-}
+        User user = authHelper.getAuthenticatedUserWithFallback(request);
+        Entreprise entreprise = user.getEntreprise();
+        if (entreprise == null) {
+            throw new RuntimeException("L'utilisateur n'a pas d'entreprise associée.");
+        }
+
+        return factureProformaRepository.findByClientIdOrEntrepriseClientIdAndEntrepriseId(
+                entreprise.getId(), clientId, entrepriseClientId);
+    }
 
  
     //Trier
 public List<FactureProFormaDTO> getFacturesParPeriode(Long userIdRequete, HttpServletRequest request,
                                                       String typePeriode, LocalDate dateDebut, LocalDate dateFin) {
     User currentUser = authHelper.getAuthenticatedUserWithFallback(request);
-    User targetUser = usersRepository.findById(userIdRequete)
-            .orElseThrow(() -> new RuntimeException("Utilisateur cible non trouvé"));
-
     Entreprise entrepriseCourante = currentUser.getEntreprise();
-    Entreprise entrepriseCible = targetUser.getEntreprise();
-
-    if (entrepriseCourante == null || entrepriseCible == null
-        || !entrepriseCourante.getId().equals(entrepriseCible.getId())) {
-        throw new RuntimeException("Opération interdite : utilisateurs de différentes entreprises.");
+    if (entrepriseCourante == null) {
+        throw new RuntimeException("L'utilisateur connecté n'a pas d'entreprise associée.");
     }
+    Long entrepriseId = entrepriseCourante.getId();
+
+    usersRepository.findByIdAndEntrepriseId(userIdRequete, entrepriseId)
+            .orElseThrow(() -> new RuntimeException("Utilisateur cible non trouvé ou n'appartient pas à votre entreprise."));
 
     boolean isAdmin = currentUser.getRole().getName() == RoleType.ADMIN;
     boolean isManager = currentUser.getRole().getName() == RoleType.MANAGER;
     boolean hasPermission = currentUser.getRole().hasPermission(PermissionType.GESTION_FACTURATION);
 
-    // 🔹 Calcul période
+    //  Calcul période
     LocalDateTime dateStart;
     LocalDateTime dateEnd;
 
@@ -1281,17 +1222,14 @@ public List<FactureProFormaDTO> getFacturesParPeriode(Long userIdRequete, HttpSe
             throw new RuntimeException("Type de période invalide.");
     }
 
-    // 🔹 Récupérer toutes les factures de l'entreprise dans la période avec les relations nécessaires
     List<FactureProForma> factures = factureProformaRepository
             .findFacturesAvecRelationsParEntrepriseEtPeriode(entrepriseCourante.getId(), dateStart, dateEnd);
 
-    // 🔹 Charger les lignesFacture pour chaque facture (évite MultipleBagFetchException)
     for (FactureProForma facture : factures) {
-        // Force le chargement des lignesFacture
         facture.getLignesFacture().size();
     }
 
-    // 🔹 Filtrage selon les rôles et permissions
+    //  Filtrage selon les rôles et permissions
             if (!(isAdmin || isManager)) {
             if (hasPermission) {
                 factures = factures.stream()
@@ -1305,7 +1243,6 @@ public List<FactureProFormaDTO> getFacturesParPeriode(Long userIdRequete, HttpSe
             }
         }
 
-    // 🔹 Transformation en DTO et tri
     return factures.stream()
             .sorted(Comparator.comparing(FactureProForma::getDateCreation).reversed())
             .map(f -> {
@@ -1343,17 +1280,14 @@ public List<FactureProFormaDTO> getFacturesParPeriode(Long userIdRequete, HttpSe
 
         Long entrepriseId = user.getEntreprise().getId();
 
-        // Vérification des droits
         RoleType role = user.getRole().getName();
         boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
         if (!isAdminOrManager) {
             throw new RuntimeException("Vous n'avez pas les droits nécessaires pour accéder à cette information.");
         }
 
-        // Récupérer les factures proforma en attente
         List<FactureProForma> factures = factureProformaRepository.findFacturesProformaEnAttenteByEntrepriseId(entrepriseId);
 
-        // Limiter et convertir en DTO
         return factures.stream()
                 .limit(limit)
                 .map(f -> {

@@ -65,11 +65,9 @@ public class FournisseurController {
         Map<String, Object> response = new HashMap<>();
 
         try {
-            // Convertir JSON vers DTO d'entrée
             ObjectMapper objectMapper = new ObjectMapper();
             FournisseurDTO fournisseurDTO = objectMapper.readValue(fournisseurJson, FournisseurDTO.class);
 
-            // Mapping DTO vers entité
             Fournisseur fournisseur = new Fournisseur();
             fournisseur.setNomComplet(fournisseurDTO.getNomComplet());
             fournisseur.setNomSociete(fournisseurDTO.getNomSociete());
@@ -80,10 +78,8 @@ public class FournisseurController {
             fournisseur.setVille(fournisseurDTO.getVille());
             fournisseur.setDescription(fournisseurDTO.getDescription());
 
-            // Sauvegarde
             Fournisseur savedFournisseur = fournisseurService.saveFournisseur(fournisseur, imageFournisseurFile, request);
 
-            // Construction du DTO de réponse
             FournisseurResponseDTO responseDTO = new FournisseurResponseDTO();
             responseDTO.setId(savedFournisseur.getId());
             responseDTO.setNomComplet(savedFournisseur.getNomComplet());
@@ -100,7 +96,6 @@ public class FournisseurController {
                 responseDTO.setEntrepriseNom(savedFournisseur.getEntreprise().getNomEntreprise());
             }
 
-            // Réponse propre
             response.put("message", "Fournisseur enregistré avec succès !");
             response.put("fournisseur", responseDTO);
             return ResponseEntity.ok(response);
@@ -196,12 +191,12 @@ public ResponseEntity<?> getFournisseurById(@PathVariable Long id, HttpServletRe
 
     } catch (RuntimeException e) {
         response.put("message", "Erreur : " + e.getMessage());
-        e.printStackTrace(); // Optionnel pour debug
+        e.printStackTrace();
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
 
     } catch (Exception e) {
         response.put("message", "Une erreur interne est survenue.");
-        e.printStackTrace(); // Pour afficher la vraie erreur serveur dans les logs
+        e.printStackTrace();
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
     }
 }
@@ -239,7 +234,6 @@ public ResponseEntity<?> getFournisseurById(@PathVariable Long id, HttpServletRe
 
         User user = authHelper.getAuthenticatedUserWithFallback(request);
 
-    // 2. Vérifier que le fournisseur appartient à la même entreprise que l'utilisateur
     Fournisseur fournisseur = fournisseurRepository.findById(fournisseurId)
             .orElseThrow(() -> new RuntimeException("Fournisseur introuvable !"));
 
@@ -248,7 +242,8 @@ public ResponseEntity<?> getFournisseurById(@PathVariable Long id, HttpServletRe
     }
 
          DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
-        List<Facture> factures = factureRepository.findByFournisseur_Id(fournisseurId);
+        List<Facture> factures = factureRepository.findByFournisseurIdAndEntrepriseId(
+                fournisseurId, user.getEntreprise().getId());
 
         List<Map<String, Object>> factureDTOs = factures.stream().map(facture -> {
             Map<String, Object> map = new HashMap<>();

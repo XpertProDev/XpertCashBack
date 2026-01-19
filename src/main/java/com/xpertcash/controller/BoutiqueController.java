@@ -48,18 +48,16 @@ public class BoutiqueController {
         Map<String, String> response = new HashMap<>();
 
         try {
-            // Extraire les données depuis la requête 
             String nomBoutique = boutiqueDetails.get("nomBoutique");
             String adresse = boutiqueDetails.get("adresse");
             String telephone = boutiqueDetails.get("telephone");
             String email = boutiqueDetails.get("email");
-            String typeString = boutiqueDetails.get("type"); // Nouveau champ attendu
+            String typeString = boutiqueDetails.get("type");
 
             if (typeString == null || typeString.isEmpty()) {
                 throw new RuntimeException("Le type de boutique est requis (BOUTIQUE ou ENTREPOT).");
             }
 
-            // Convertir le type en enum
             TypeBoutique typeBoutique;
             try {
                 typeBoutique = TypeBoutique.valueOf(typeString.toUpperCase());
@@ -73,7 +71,7 @@ public class BoutiqueController {
             return ResponseEntity.ok(response);
 
         } catch (RuntimeException e) {
-            System.err.println("🔴 ERREUR : " + e.getMessage());
+            System.err.println(" ERREUR : " + e.getMessage());
 
             if (e.getMessage().contains("Token JWT")) {
                 response.put("error", "Votre session a expiré. Veuillez vous reconnecter.");
@@ -109,7 +107,9 @@ public class BoutiqueController {
                 boutique.getEmail(),
                 boutique.getCreatedAt(),
                 boutique.isActif(),
-                boutique.getTypeBoutique()
+                boutique.getTypeBoutique(),
+                null,
+                null
                 
             ))
             .toList();
@@ -130,7 +130,9 @@ public class BoutiqueController {
                 boutique.getEmail(),
                 boutique.getCreatedAt(),
                 boutique.isActif(),
-                boutique.getTypeBoutique()
+                boutique.getTypeBoutique(),
+                null,
+                null
 
 
             );
@@ -165,11 +167,9 @@ public class BoutiqueController {
     
     } catch (RuntimeException e) {
 
-        // Cas ou le problème vient du token
         if (e.getMessage().contains("Token JWT")) {
             response.put("error", "Votre session a expiré. Veuillez vous reconnecter.");
         } 
-        // Cas ou l'utilisateur n'est pas admin
         else if (e.getMessage().contains("Seul un ADMIN peut modifier une boutique")) {
             response.put("error", "Accès refusé : Vous n'avez pas les droits nécessaires.");
         } 

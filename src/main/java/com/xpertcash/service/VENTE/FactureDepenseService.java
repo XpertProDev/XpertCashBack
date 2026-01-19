@@ -52,12 +52,11 @@ public class FactureDepenseService {
             String sortDir,
             LocalDateTime dateDebut,
             LocalDateTime dateFin,
-            String typeFilter, // "FACTURE_VENTE", "DEPENSE", ou "ALL"
+            String typeFilter, 
             HttpServletRequest request) {
         
         User user = authHelper.getAuthenticatedUserWithFallback(request);
         
-        // Vérification des droits
         RoleType role = user.getRole().getName();
         boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
         boolean hasPermission = user.getRole().hasPermission(PermissionType.GESTION_FACTURATION) || 
@@ -84,15 +83,12 @@ public class FactureDepenseService {
         
         List<FactureDepensePaginatedDTO.FactureDepenseItemDTO> allItems = new ArrayList<>();
         
-        // 1. RÉCUPÉRER LES FACTURES DE VENTE
         if (typeFilter == null || typeFilter.equals("ALL") || typeFilter.equals("FACTURE_VENTE")) {
             List<Vente> ventes;
             
-            // Si c'est un vendeur, ne récupérer que ses ventes
             if (!isAdminOrManager) {
                 ventes = venteRepository.findByVendeur_IdAndDateVenteBetween(user.getId(), dateDebut, dateFin);
             } else {
-                // Admin/Manager : toutes les ventes de l'entreprise
                 ventes = venteRepository.findByBoutique_Entreprise_IdAndDateVenteBetween(
                     entrepriseId, dateDebut, dateFin);
             }
@@ -113,13 +109,15 @@ public class FactureDepenseService {
                 item.setClientNumero(vente.getClientNumero());
                 item.setRemiseGlobale(vente.getRemiseGlobale());
                 
-                // Récupérer le numéro de facture de vente
-                Optional<FactureVente> factureVente = factureVenteRepository.findByVente(vente);
+                Long venteEntrepriseId = vente.getBoutique() != null && vente.getBoutique().getEntreprise() != null 
+                        ? vente.getBoutique().getEntreprise().getId() : null;
+                Optional<FactureVente> factureVente = venteEntrepriseId != null 
+                        ? factureVenteRepository.findByVenteIdAndEntrepriseId(vente.getId(), venteEntrepriseId)
+                        : Optional.empty();
                 if (factureVente.isPresent()) {
                     item.setNumeroFactureVente(factureVente.get().getNumeroFacture());
                 }
                 
-                // Récupérer les produits de la vente
                 if (vente.getProduits() != null) {
                     List<FactureDepensePaginatedDTO.FactureDepenseItemDTO.VenteProduitDTO> produitsDTO = 
                         vente.getProduits().stream().map(vp -> {
@@ -127,7 +125,6 @@ public class FactureDepenseService {
                                 new FactureDepensePaginatedDTO.FactureDepenseItemDTO.VenteProduitDTO();
                             produitDTO.setProduitId(vp.getProduit().getId());
                             produitDTO.setNomProduit(vp.getProduit().getNom());
-                            // Pour les remboursements, afficher la quantité remboursée si elle existe
                             if (vp.isEstRemboursee() && vp.getQuantiteRemboursee() != null && vp.getQuantiteRemboursee() > 0) {
                                 produitDTO.setQuantite(vp.getQuantiteRemboursee());
                             } else {
@@ -145,13 +142,10 @@ public class FactureDepenseService {
             }
         }
         
-        // 2. RÉCUPÉRER LES DÉPENSES (MOUVEMENTS DE CAISSE)
         if (typeFilter == null || typeFilter.equals("ALL") || typeFilter.equals("DEPENSE")) {
             List<MouvementCaisse> depenses;
             
-            // Si c'est un vendeur, ne récupérer que ses dépenses
             if (!isAdminOrManager) {
-                // Récupérer les caisses de l'utilisateur
                 List<Caisse> userCaisses = caisseRepository.findByVendeur_Id(user.getId());
                 List<Long> caisseIds = userCaisses.stream().map(Caisse::getId).collect(Collectors.toList());
                 
@@ -162,7 +156,6 @@ public class FactureDepenseService {
                     depenses = new ArrayList<>();
                 }
             } else {
-                // Admin/Manager : toutes les dépenses de l'entreprise
                 depenses = mouvementCaisseRepository.findByCaisse_Boutique_Entreprise_IdAndTypeMouvementAndDateMouvementBetween(
                     entrepriseId, TypeMouvementCaisse.DEPENSE, dateDebut, dateFin);
             }
@@ -186,7 +179,6 @@ public class FactureDepenseService {
             }
         }
         
-        // 3. RÉCUPÉRER LES AUTRES MOUVEMENTS DE CAISSE (AJOUTS, RETRAITS, REMBOURSEMENTS)
         if (typeFilter == null || typeFilter.equals("ALL")) {
             List<TypeMouvementCaisse> autresTypes = Arrays.asList(
                 TypeMouvementCaisse.AJOUT, 
@@ -217,7 +209,6 @@ public class FactureDepenseService {
             }
         }
         
-        // 4. TRIER TOUS LES ÉLÉMENTS PAR DATE
         allItems.sort((item1, item2) -> {
             if (sortDir.equalsIgnoreCase("desc")) {
                 return item2.getDate().compareTo(item1.getDate());
@@ -226,7 +217,6 @@ public class FactureDepenseService {
             }
         });
         
-        // 5. CALCULER LES TOTAUX
         double totalFacturesVente = allItems.stream()
             .filter(item -> "FACTURE_VENTE".equals(item.getType()))
             .mapToDouble(item -> item.getMontant() != null ? item.getMontant() : 0.0)
@@ -245,7 +235,6 @@ public class FactureDepenseService {
             .filter(item -> "DEPENSE".equals(item.getType()) || "MOUVEMENT_CAISSE".equals(item.getType()))
             .count();
         
-        // 6. APPLIQUER LA PAGINATION MANUELLE
         int totalElements = allItems.size();
         int totalPages = (int) Math.ceil((double) totalElements / size);
         int startIndex = page * size;
@@ -254,7 +243,6 @@ public class FactureDepenseService {
         List<FactureDepensePaginatedDTO.FactureDepenseItemDTO> pagedItems = 
             startIndex < totalElements ? allItems.subList(startIndex, endIndex) : new ArrayList<>();
         
-        // 7. CONSTRUIRE LA RÉPONSE
         FactureDepensePaginatedDTO response = new FactureDepensePaginatedDTO();
         response.setPage(page);
         response.setSize(size);
@@ -329,7 +317,6 @@ public class FactureDepenseService {
         
         User user = authHelper.getAuthenticatedUserWithFallback(request);
         
-        // Vérification des droits
         RoleType role = user.getRole().getName();
         boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
         boolean hasPermission = user.getRole().hasPermission(PermissionType.GESTION_FACTURATION) || 
@@ -341,9 +328,7 @@ public class FactureDepenseService {
         
         Long entrepriseId = user.getEntreprise().getId();
         
-        // Vérification spécifique pour les vendeurs : ils ne peuvent voir que leur boutique
         if (!isAdminOrManager) {
-            // Vérifier que l'utilisateur appartient à cette boutique via UserBoutique
             boolean userBelongsToBoutique = user.getUserBoutiques().stream()
                 .anyMatch(ub -> ub.getBoutique().getId().equals(boutiqueId));
             if (!userBelongsToBoutique) {
@@ -362,12 +347,10 @@ public class FactureDepenseService {
         
         List<FactureDepensePaginatedDTO.FactureDepenseItemDTO> allItems = new ArrayList<>();
         
-        // 1. RÉCUPÉRER LES FACTURES DE VENTE POUR CETTE BOUTIQUE
         if (typeFilter == null || typeFilter.equals("ALL") || typeFilter.equals("FACTURE_VENTE")) {
             List<Vente> ventes = venteRepository.findByBoutiqueIdAndDateRange(boutiqueId, dateDebut, dateFin);
             
             for (Vente vente : ventes) {
-                // Vérifier que la vente appartient à l'entreprise de l'utilisateur
                 if (!vente.getBoutique().getEntreprise().getId().equals(entrepriseId)) {
                     continue;
                 }
@@ -387,13 +370,15 @@ public class FactureDepenseService {
                 item.setClientNumero(vente.getClientNumero());
                 item.setRemiseGlobale(vente.getRemiseGlobale());
                 
-                // Récupérer le numéro de facture de vente
-                Optional<FactureVente> factureVente = factureVenteRepository.findByVente(vente);
+                Long venteEntrepriseId = vente.getBoutique() != null && vente.getBoutique().getEntreprise() != null 
+                        ? vente.getBoutique().getEntreprise().getId() : null;
+                Optional<FactureVente> factureVente = venteEntrepriseId != null 
+                        ? factureVenteRepository.findByVenteIdAndEntrepriseId(vente.getId(), venteEntrepriseId)
+                        : Optional.empty();
                 if (factureVente.isPresent()) {
                     item.setNumeroFactureVente(factureVente.get().getNumeroFacture());
                 }
                 
-                // Récupérer les produits de la vente
                 if (vente.getProduits() != null) {
                     List<FactureDepensePaginatedDTO.FactureDepenseItemDTO.VenteProduitDTO> produitsDTO = 
                         vente.getProduits().stream().map(vp -> {
@@ -401,7 +386,6 @@ public class FactureDepenseService {
                                 new FactureDepensePaginatedDTO.FactureDepenseItemDTO.VenteProduitDTO();
                             produitDTO.setProduitId(vp.getProduit().getId());
                             produitDTO.setNomProduit(vp.getProduit().getNom());
-                            // Pour les remboursements, afficher la quantité remboursée si elle existe
                             if (vp.isEstRemboursee() && vp.getQuantiteRemboursee() != null && vp.getQuantiteRemboursee() > 0) {
                                 produitDTO.setQuantite(vp.getQuantiteRemboursee());
                             } else {
@@ -419,12 +403,10 @@ public class FactureDepenseService {
             }
         }
         
-        // 2. RÉCUPÉRER LES MOUVEMENTS DE CAISSE POUR CETTE BOUTIQUE
         if (typeFilter == null || typeFilter.equals("ALL") || typeFilter.equals("DEPENSE")) {
             List<Caisse> caisses = caisseRepository.findByBoutiqueId(boutiqueId);
             
             for (Caisse caisse : caisses) {
-                // Vérifier que la caisse appartient à l'entreprise de l'utilisateur
                 if (!caisse.getBoutique().getEntreprise().getId().equals(entrepriseId)) {
                     continue;
                 }
@@ -455,7 +437,6 @@ public class FactureDepenseService {
             }
         }
         
-        // Appliquer la pagination et retourner le résultat
         return buildPaginatedResponse(allItems, page, size, sortDir);
     }
 
@@ -476,7 +457,6 @@ public class FactureDepenseService {
         
         User user = authHelper.getAuthenticatedUserWithFallback(request);
         
-        // Vérification des droits
         RoleType role = user.getRole().getName();
         boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
         boolean hasPermission = user.getRole().hasPermission(PermissionType.GESTION_FACTURATION) || 
@@ -488,13 +468,10 @@ public class FactureDepenseService {
         
         Long entrepriseId = user.getEntreprise().getId();
         
-        // Vérification spécifique pour les vendeurs : ils ne peuvent voir que leur caisse
         if (!isAdminOrManager) {
-            // Récupérer la caisse pour vérifier l'appartenance
             Caisse caisse = caisseRepository.findById(caisseId)
                 .orElseThrow(() -> new RuntimeException("Caisse introuvable"));
             
-            // Vérifier que l'utilisateur est le vendeur de cette caisse
             boolean userOwnsCaisse = caisse.getVendeur() != null && 
                                    caisse.getVendeur().getId().equals(user.getId());
             if (!userOwnsCaisse) {
@@ -502,7 +479,6 @@ public class FactureDepenseService {
             }
         }
         
-        // Si pas de dates spécifiées, prendre l'année en cours
         if (dateDebut == null) {
             LocalDate today = LocalDate.now();
             dateDebut = today.withDayOfYear(1).atStartOfDay();
@@ -513,14 +489,12 @@ public class FactureDepenseService {
         
         List<FactureDepensePaginatedDTO.FactureDepenseItemDTO> allItems = new ArrayList<>();
         
-        // 1. RÉCUPÉRER LES VENTES POUR CETTE CAISSE
         if (typeFilter == null || typeFilter.equals("ALL") || typeFilter.equals("FACTURE_VENTE")) {
             List<Vente> ventes = venteRepository.findByBoutiqueIdAndDateRange(
                 caisseRepository.findById(caisseId).orElseThrow(() -> new RuntimeException("Caisse introuvable")).getBoutique().getId(), 
                 dateDebut, dateFin);
             
             for (Vente vente : ventes) {
-                // Vérifier que la vente appartient à cette caisse et à l'entreprise
                 if (vente.getCaisse() == null || !vente.getCaisse().getId().equals(caisseId) ||
                     !vente.getBoutique().getEntreprise().getId().equals(entrepriseId)) {
                     continue;
@@ -541,13 +515,15 @@ public class FactureDepenseService {
                 item.setClientNumero(vente.getClientNumero());
                 item.setRemiseGlobale(vente.getRemiseGlobale());
                 
-                // Récupérer le numéro de facture de vente
-                Optional<FactureVente> factureVente = factureVenteRepository.findByVente(vente);
+                Long venteEntrepriseId = vente.getBoutique() != null && vente.getBoutique().getEntreprise() != null 
+                        ? vente.getBoutique().getEntreprise().getId() : null;
+                Optional<FactureVente> factureVente = venteEntrepriseId != null 
+                        ? factureVenteRepository.findByVenteIdAndEntrepriseId(vente.getId(), venteEntrepriseId)
+                        : Optional.empty();
                 if (factureVente.isPresent()) {
                     item.setNumeroFactureVente(factureVente.get().getNumeroFacture());
                 }
                 
-                // Récupérer les produits de la vente
                 if (vente.getProduits() != null) {
                     List<FactureDepensePaginatedDTO.FactureDepenseItemDTO.VenteProduitDTO> produitsDTO = 
                         vente.getProduits().stream().map(vp -> {
@@ -555,7 +531,6 @@ public class FactureDepenseService {
                                 new FactureDepensePaginatedDTO.FactureDepenseItemDTO.VenteProduitDTO();
                             produitDTO.setProduitId(vp.getProduit().getId());
                             produitDTO.setNomProduit(vp.getProduit().getNom());
-                            // Pour les remboursements, afficher la quantité remboursée si elle existe
                             if (vp.isEstRemboursee() && vp.getQuantiteRemboursee() != null && vp.getQuantiteRemboursee() > 0) {
                                 produitDTO.setQuantite(vp.getQuantiteRemboursee());
                             } else {
@@ -573,7 +548,6 @@ public class FactureDepenseService {
             }
         }
         
-        // 2. RÉCUPÉRER LES MOUVEMENTS DE CETTE CAISSE
         if (typeFilter == null || typeFilter.equals("ALL") || typeFilter.equals("DEPENSE")) {
             List<MouvementCaisse> mouvements = mouvementCaisseRepository.findByCaisseIdAndTypeMouvement(
                 caisseId, TypeMouvementCaisse.DEPENSE);
@@ -601,7 +575,6 @@ public class FactureDepenseService {
             }
         }
         
-        // Appliquer la pagination et retourner le résultat
         return buildPaginatedResponse(allItems, page, size, sortDir);
     }
 
@@ -614,7 +587,6 @@ public class FactureDepenseService {
             int size, 
             String sortDir) {
         
-        // Trier tous les éléments par date
         allItems.sort((item1, item2) -> {
             if (sortDir.equalsIgnoreCase("desc")) {
                 return item2.getDate().compareTo(item1.getDate());
@@ -623,7 +595,6 @@ public class FactureDepenseService {
             }
         });
         
-        // Calculer les totaux
         double totalFacturesVente = allItems.stream()
             .filter(item -> "FACTURE_VENTE".equals(item.getType()))
             .mapToDouble(item -> item.getMontant() != null ? item.getMontant() : 0.0)
@@ -642,7 +613,6 @@ public class FactureDepenseService {
             .filter(item -> "DEPENSE".equals(item.getType()) || "MOUVEMENT_CAISSE".equals(item.getType()))
             .count();
         
-        // Appliquer la pagination manuelle
         int totalElements = allItems.size();
         int totalPages = (int) Math.ceil((double) totalElements / size);
         int startIndex = page * size;
@@ -651,7 +621,6 @@ public class FactureDepenseService {
         List<FactureDepensePaginatedDTO.FactureDepenseItemDTO> pagedItems = 
             startIndex < totalElements ? allItems.subList(startIndex, endIndex) : new ArrayList<>();
         
-        // Construire la réponse
         FactureDepensePaginatedDTO response = new FactureDepensePaginatedDTO();
         response.setPage(page);
         response.setSize(size);
@@ -686,7 +655,6 @@ public class FactureDepenseService {
         
         User user = authHelper.getAuthenticatedUserWithFallback(request);
         
-        // Vérification des droits
         RoleType role = user.getRole().getName();
         boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
         boolean hasPermission = user.getRole().hasPermission(PermissionType.COMPTABILITE) || 
@@ -698,7 +666,6 @@ public class FactureDepenseService {
         
         Long entrepriseId = user.getEntreprise().getId();
         
-        // Si pas de dates spécifiées, prendre l'année en cours
         if (dateDebut == null) {
             LocalDate today = LocalDate.now();
             dateDebut = today.withDayOfYear(1).atStartOfDay();
@@ -709,14 +676,11 @@ public class FactureDepenseService {
         
         List<FactureDepensePaginatedDTO.FactureDepenseItemDTO> allItems = new ArrayList<>();
         
-        // RÉCUPÉRER UNIQUEMENT LES FACTURES DE VENTE
         List<Vente> ventes;
         
-        // Si c'est un vendeur, ne récupérer que ses ventes
         if (!isAdminOrManager) {
             ventes = venteRepository.findByVendeur_IdAndDateVenteBetween(user.getId(), dateDebut, dateFin);
         } else {
-            // Admin/Manager : toutes les ventes de l'entreprise
             ventes = venteRepository.findByBoutique_Entreprise_IdAndDateVenteBetween(
                 entrepriseId, dateDebut, dateFin);
         }
@@ -737,8 +701,11 @@ public class FactureDepenseService {
             item.setClientNumero(vente.getClientNumero());
             item.setRemiseGlobale(vente.getRemiseGlobale());
             
-            // Récupérer le numéro de facture de vente
-            Optional<FactureVente> factureVente = factureVenteRepository.findByVente(vente);
+            Long venteEntrepriseId = vente.getBoutique() != null && vente.getBoutique().getEntreprise() != null 
+                    ? vente.getBoutique().getEntreprise().getId() : null;
+            Optional<FactureVente> factureVente = venteEntrepriseId != null 
+                    ? factureVenteRepository.findByVenteIdAndEntrepriseId(vente.getId(), venteEntrepriseId)
+                    : Optional.empty();
             if (factureVente.isPresent()) {
                 item.setNumeroFactureVente(factureVente.get().getNumeroFacture());
             }
@@ -763,7 +730,6 @@ public class FactureDepenseService {
             allItems.add(item);
         }
         
-        // Appliquer la pagination et retourner le résultat
         return buildPaginatedResponseFacturesVente(allItems, page, size, sortDir);
     }
 
@@ -783,7 +749,6 @@ public class FactureDepenseService {
         
         User user = authHelper.getAuthenticatedUserWithFallback(request);
         
-        // Vérification des droits
         RoleType role = user.getRole().getName();
         boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
         boolean hasPermission = user.getRole().hasPermission(PermissionType.GESTION_FACTURATION) || 
@@ -795,9 +760,7 @@ public class FactureDepenseService {
         
         Long entrepriseId = user.getEntreprise().getId();
         
-        // Vérification spécifique pour les vendeurs : ils ne peuvent voir que leur boutique
         if (!isAdminOrManager) {
-            // Vérifier que l'utilisateur appartient à cette boutique via UserBoutique
             boolean userBelongsToBoutique = user.getUserBoutiques().stream()
                 .anyMatch(ub -> ub.getBoutique().getId().equals(boutiqueId));
             if (!userBelongsToBoutique) {
@@ -805,7 +768,6 @@ public class FactureDepenseService {
             }
         }
         
-        // Si pas de dates spécifiées, prendre l'année en cours
         if (dateDebut == null) {
             LocalDate today = LocalDate.now();
             dateDebut = today.withDayOfYear(1).atStartOfDay();
@@ -816,11 +778,9 @@ public class FactureDepenseService {
         
         List<FactureDepensePaginatedDTO.FactureDepenseItemDTO> allItems = new ArrayList<>();
         
-        // RÉCUPÉRER LES FACTURES DE VENTE POUR CETTE BOUTIQUE
         List<Vente> ventes = venteRepository.findByBoutiqueIdAndDateRange(boutiqueId, dateDebut, dateFin);
         
         for (Vente vente : ventes) {
-            // Vérifier que la vente appartient à l'entreprise de l'utilisateur
             if (!vente.getBoutique().getEntreprise().getId().equals(entrepriseId)) {
                 continue;
             }
@@ -840,13 +800,15 @@ public class FactureDepenseService {
             item.setClientNumero(vente.getClientNumero());
             item.setRemiseGlobale(vente.getRemiseGlobale());
             
-            // Récupérer le numéro de facture de vente
-            Optional<FactureVente> factureVente = factureVenteRepository.findByVente(vente);
+            Long venteEntrepriseId = vente.getBoutique() != null && vente.getBoutique().getEntreprise() != null 
+                    ? vente.getBoutique().getEntreprise().getId() : null;
+            Optional<FactureVente> factureVente = venteEntrepriseId != null 
+                    ? factureVenteRepository.findByVenteIdAndEntrepriseId(vente.getId(), venteEntrepriseId)
+                    : Optional.empty();
             if (factureVente.isPresent()) {
                 item.setNumeroFactureVente(factureVente.get().getNumeroFacture());
             }
             
-            // Récupérer les produits de la vente
             if (vente.getProduits() != null) {
                 List<FactureDepensePaginatedDTO.FactureDepenseItemDTO.VenteProduitDTO> produitsDTO = 
                     vente.getProduits().stream().map(vp -> {
@@ -866,7 +828,6 @@ public class FactureDepenseService {
             allItems.add(item);
         }
         
-        // Appliquer la pagination et retourner le résultat
         return buildPaginatedResponseFacturesVente(allItems, page, size, sortDir);
     }
 
@@ -879,7 +840,6 @@ public class FactureDepenseService {
             int size, 
             String sortDir) {
         
-        // Trier tous les éléments par date
         allItems.sort((item1, item2) -> {
             if (sortDir.equalsIgnoreCase("desc")) {
                 return item2.getDate().compareTo(item1.getDate());
@@ -888,16 +848,14 @@ public class FactureDepenseService {
             }
         });
         
-        // Calculer les totaux (seulement les factures de vente)
         double totalFacturesVente = allItems.stream()
             .mapToDouble(item -> item.getMontant() != null ? item.getMontant() : 0.0)
             .sum();
         
-        double totalDepenses = 0.0; // Pas de dépenses dans cette vue
+        double totalDepenses = 0.0;
         int nombreFacturesVente = allItems.size();
-        int nombreDepenses = 0; // Pas de dépenses dans cette vue
+        int nombreDepenses = 0; 
         
-        // Appliquer la pagination manuelle
         int totalElements = allItems.size();
         int totalPages = (int) Math.ceil((double) totalElements / size);
         int startIndex = page * size;
@@ -906,7 +864,6 @@ public class FactureDepenseService {
         List<FactureDepensePaginatedDTO.FactureDepenseItemDTO> pagedItems = 
             startIndex < totalElements ? allItems.subList(startIndex, endIndex) : new ArrayList<>();
         
-        // Construire la réponse
         FactureDepensePaginatedDTO response = new FactureDepensePaginatedDTO();
         response.setPage(page);
         response.setSize(size);

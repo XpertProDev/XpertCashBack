@@ -17,10 +17,32 @@ import com.xpertcash.entity.FactureProForma;
 @Repository
 public interface FactProHistoriqueActionRepository extends JpaRepository<FactProHistoriqueAction, Long> {
 
-    List<FactProHistoriqueAction> findByFactureIdOrderByDateActionAsc(Long factureId);
+    // Récupérer l'historique d'une facture trié par date croissante (optimisé avec JOIN FETCH)
+    @Query("SELECT DISTINCT h FROM FactProHistoriqueAction h " +
+           "LEFT JOIN FETCH h.facture f " +
+           "LEFT JOIN FETCH f.entreprise e " +
+           "LEFT JOIN FETCH h.utilisateur u " +
+           "WHERE h.facture.id = :factureId " +
+           "ORDER BY h.dateAction ASC")
+    List<FactProHistoriqueAction> findByFactureIdOrderByDateActionAsc(@Param("factureId") Long factureId);
 
-    // Tri descendant (nouvelle méthode)
-    List<FactProHistoriqueAction> findByFactureIdOrderByDateActionDesc(Long factureId);
+    // Récupérer l'historique d'une facture trié par date décroissante (optimisé avec JOIN FETCH)
+    @Query("SELECT DISTINCT h FROM FactProHistoriqueAction h " +
+           "LEFT JOIN FETCH h.facture f " +
+           "LEFT JOIN FETCH f.entreprise e " +
+           "LEFT JOIN FETCH h.utilisateur u " +
+           "WHERE h.facture.id = :factureId " +
+           "ORDER BY h.dateAction DESC")
+    List<FactProHistoriqueAction> findByFactureIdOrderByDateActionDesc(@Param("factureId") Long factureId);
+
+    // Récupérer l'historique d'une entreprise (pour isolation)
+    @Query("SELECT DISTINCT h FROM FactProHistoriqueAction h " +
+           "LEFT JOIN FETCH h.facture f " +
+           "LEFT JOIN FETCH f.entreprise e " +
+           "LEFT JOIN FETCH h.utilisateur u " +
+           "WHERE e.id = :entrepriseId " +
+           "ORDER BY h.dateAction DESC")
+    List<FactProHistoriqueAction> findByEntrepriseIdOrderByDateActionDesc(@Param("entrepriseId") Long entrepriseId);
 
    void deleteByFacture(FactureProForma facture);
 

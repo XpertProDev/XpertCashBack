@@ -26,10 +26,8 @@ public class GlobalNotificationController {
         this.authHelper = authHelper;
     }
 
-    /**
-     * Récupère toutes les notifications pour l'utilisateur authentifié,
-     * triées par date décroissante.
-     */
+    // Récupère toutes les notifications pour l'utilisateur authentifié,
+   
     @GetMapping("/list/global/notifications")
     public ResponseEntity<List<GlobalNotificationDto>> getUserNotifications(
             HttpServletRequest request
@@ -37,10 +35,8 @@ public class GlobalNotificationController {
         try {
             User user = authHelper.getAuthenticatedUserWithFallback(request);
             
-            // 3️⃣ Récupérer les notifications
             List<GlobalNotification> notifs = globalNotificationService.getUserNotifications(user.getId());
 
-            // 4️⃣ Mapper vers le DTO
             List<GlobalNotificationDto> dtoList = notifs.stream()
                     .map(notif -> new GlobalNotificationDto(
                             notif.getId(),
@@ -57,9 +53,7 @@ public class GlobalNotificationController {
         }
     }
 
-    /**
-     * (Optionnel) Exemple de point pour marquer une notification comme lue.
-     */
+    // (Optionnel) Exemple de point pour marquer une notification comme lue. 
     @PutMapping("/notifications/{id}/read")
     public ResponseEntity<Void> markAsRead(
             @PathVariable Long id,

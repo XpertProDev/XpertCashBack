@@ -51,7 +51,7 @@ public class VersementComptableController {
             return ResponseEntity.ok(versement);
         }
 
-    // 📌 DTO interne juste pour cette requête
+    //  DTO interne juste pour cette requête
     public static class ValidationVersementRequest {
         private boolean valide;
 
@@ -77,7 +77,7 @@ public ResponseEntity<?> getVersementsParStatut(
         statutEnum = StatutVersement.valueOf(filtre.getStatut().toUpperCase());
     } catch (IllegalArgumentException e) {
         return ResponseEntity.badRequest().body(
-                Map.of("message", "❌ Statut invalide. Valeurs possibles : EN_ATTENTE, VALIDE, REFUSE")
+                Map.of("message", " Statut invalide. Valeurs possibles : EN_ATTENTE, VALIDE, REFUSE")
         );
     }
 
@@ -101,7 +101,7 @@ public ResponseEntity<?> getVersementsParStatut(
 
     @Data
     static class FiltreVersementRequest {
-        private String statut; // "EN_ATTENTE", "VALIDE", "REFUSE"
+        private String statut;
     }
 
 

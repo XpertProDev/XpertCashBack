@@ -1,11 +1,11 @@
 package com.xpertcash.controller;
 import com.xpertcash.DTOs.UpdateUserRequest;
+import com.xpertcash.DTOs.USER.AssignPermissionsRequest;
 import com.xpertcash.DTOs.USER.RegisterResponse;
 import com.xpertcash.DTOs.USER.ResendActivationRequest;
 import com.xpertcash.DTOs.USER.UserDTO;
 import com.xpertcash.DTOs.USER.UserRequest;
 import com.xpertcash.DTOs.UserOptimalDTO;
-import com.xpertcash.entity.PermissionType;
 import com.xpertcash.entity.User;
 import com.xpertcash.DTOs.EntrepriseDTO;
 import com.xpertcash.DTOs.LoginRequest;
@@ -52,10 +52,8 @@ public ResponseEntity<RegisterResponse> register(@RequestBody RegistrationReques
             request.getNomEntreprise(),
             request.getNomBoutique()
         );
-        // Ici, response.success est déjà true ou false selon l'envoi de l'email
         return ResponseEntity.ok(response);
     } catch (RuntimeException e) {
-        // Erreurs métier (email, téléphone, entreprise déjà existants, rôle manquant, etc.)
         response.setSuccess(false);
         response.setMessage(e.getMessage());
         response.setUser(null);
@@ -68,41 +66,35 @@ public ResponseEntity<RegisterResponse> register(@RequestBody RegistrationReques
     @PostMapping("/login")
     public ResponseEntity<Map<String, Object>> login(@RequestBody LoginRequest request, HttpServletRequest httpRequest) {
         try {
-            // Extraire les informations de la requête HTTP pour la session
             String ipAddress = getClientIpAddress(httpRequest);
             String userAgent = httpRequest.getHeader("User-Agent");
             
             Map<String, String> tokens = usersService.login(
                 request.getEmail(), 
                 request.getPassword(),
-                request.getDeviceId(),      // deviceId optionnel
-                request.getDeviceName(),    // deviceName optionnel
-                ipAddress,                  // IP de connexion
-                userAgent                   // User-Agent
+                request.getDeviceId(), 
+                request.getDeviceName(),
+                ipAddress,
+                userAgent 
             );
             tokens.put("message", "Connexion réussie");
             return ResponseEntity.ok(new HashMap<>(tokens));
         } catch (RuntimeException e) {
-            // Cas spécial : l'utilisateur a atteint la limite de sessions
             if ("SESSION_LIMIT_REACHED".equals(e.getMessage())) {
                 Map<String, Object> response = new HashMap<>();
                 response.put("error", "SESSION_LIMIT_REACHED");
                 response.put("message", "Vous avez déjà 2 sessions actives. Veuillez fermer une session avant de vous connecter.");
-                // Récupérer les sessions actives pour les afficher à l'utilisateur
-                // IMPORTANT : On vérifie d'abord le mot de passe pour des raisons de sécurité
+
                 try {
                     User user = usersService.findUserByEmail(request.getEmail());
                     if (user != null && usersService.verifyPassword(request.getPassword(), user.getPassword())) {
-                        // Le mot de passe est correct, on peut récupérer les sessions
                         List<com.xpertcash.DTOs.UserSessionDTO> sessions = usersService.getActiveSessionsByUserUuid(user.getUuid());
                         response.put("sessions", sessions);
                     }
                 } catch (Exception ex) {
-                    // Si on ne peut pas récupérer les sessions, on continue quand même
                 }
                 return ResponseEntity.status(HttpStatus.CONFLICT).body(response);
             }
-            // Autres erreurs
             Map<String, Object> errorResponse = new HashMap<>();
             errorResponse.put("error", e.getMessage() != null ? e.getMessage() : "Erreur inconnue");
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(errorResponse);
@@ -117,7 +109,6 @@ public ResponseEntity<RegisterResponse> register(@RequestBody RegistrationReques
     private String getClientIpAddress(HttpServletRequest request) {
         String xForwardedFor = request.getHeader("X-Forwarded-For");
         if (xForwardedFor != null && !xForwardedFor.isEmpty() && !"unknown".equalsIgnoreCase(xForwardedFor)) {
-            // Prendre la première IP de la chaîne
             return xForwardedFor.split(",")[0].trim();
         }
         
@@ -177,7 +168,6 @@ public ResponseEntity<RegisterResponse> register(@RequestBody RegistrationReques
         try {
             usersService.activateAccount(email, code);
 
-            // Redirection vers la page de connexion du frontend après activation réussie
             HttpHeaders headers = new HttpHeaders();
             headers.setLocation(URI.create("https://fere.tchakeda.com/connexion?message=Compte%20activ%C3%A9%20avec%20succ%C3%A8s"));
             return ResponseEntity.status(HttpStatus.FOUND).headers(headers).build();
@@ -262,7 +252,6 @@ public ResponseEntity<RegisterResponse> register(@RequestBody RegistrationReques
     @GetMapping("/user/info")
     public ResponseEntity<Object> getUserInfo(HttpServletRequest request) {
         try {
-            // Utiliser AuthenticationHelper avec fallback pour transition douce
             User user = authHelper.getAuthenticatedUserWithFallback(request);
             UserRequest userInfo = usersService.getInfo(user.getId());
             return ResponseEntity.ok(userInfo);
@@ -280,10 +269,10 @@ public ResponseEntity<RegisterResponse> register(@RequestBody RegistrationReques
  @PostMapping("/{userId}/permissions")
 public ResponseEntity<UserDTO> assignPermissionsToUser(
         @PathVariable Long userId,
-        @RequestBody Map<PermissionType, Boolean> permissions,
-        HttpServletRequest request) {
+        @RequestBody AssignPermissionsRequest request,
+        HttpServletRequest httpRequest) {
 
-    UserDTO updatedUserDTO = usersService.assignPermissionsToUser(userId, permissions, request);
+    UserDTO updatedUserDTO = usersService.assignPermissionsToUser(userId, request, httpRequest);
     return ResponseEntity.ok(updatedUserDTO);
 }
 
@@ -293,19 +282,15 @@ public ResponseEntity<UserDTO> assignPermissionsToUser(
  @GetMapping("/entreprise/{entrepriseId}/allusers")
     public ResponseEntity<List<UserDTO>> getAllUsersOfEntreprise(@PathVariable Long entrepriseId, HttpServletRequest request) {
         try {
-            // Appel du service pour récupérer la liste des utilisateurs transformée en UserDTO
             List<UserDTO> users = usersService.getAllUsersOfEntreprise(request);
             
-            // Si la liste est vide
             if (users.isEmpty()) {
                 return ResponseEntity.noContent().build();
             }
             
-            // Retour de la liste des utilisateurs avec un statut HTTP 200 OK
             return ResponseEntity.ok(users);
         } catch (RuntimeException e) {
-            // Si une exception est levée dans le service (ex : token invalide, permissions manquantes)
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(List.of()); // Retourner une erreur claire ici si nécessaire
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(List.of());
         }
     }
 

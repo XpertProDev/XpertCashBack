@@ -34,34 +34,30 @@ public class PasswordService {
     @Autowired
     private com.xpertcash.repository.PASSWORD.InitialPasswordTokenRepository initialPasswordTokenRepository;
 
-    // Générer un code OTP (6 chiffres)
     private String generateOTP() {
         return String.format("%06d", new Random().nextInt(1000000));
     }
 
-    // Étape 1 : Générer et envoyer le code de réinitialisation
-@Transactional
-public void generateResetToken(String email) {
-    User user = usersRepository.findByEmail(email)
-            .orElseThrow(() -> new RuntimeException("Aucun compte associé à cet email."));
+    // Générer et envoyer le code de réinitialisation
+    @Transactional
+    public void generateResetToken(String email) {
+        User user = usersRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("Aucun compte associé à cet email."));
 
-    String otp = generateOTP();
-    LocalDateTime expirationDate = LocalDateTime.now().plusMinutes(10);
+        String otp = generateOTP();
+        LocalDateTime expirationDate = LocalDateTime.now().plusMinutes(10);
 
-    // Vérifier si un token existe déjà pour cet utilisateur
-    PasswordResetToken resetToken = passwordResetTokenRepository.findByUser(user)
-            .orElse(new PasswordResetToken());
+        PasswordResetToken resetToken = passwordResetTokenRepository.findByUser(user)
+                .orElse(new PasswordResetToken());
 
-    // Mettre à jour ou créer un nouveau token
-    resetToken.setUser(user);
-    resetToken.setToken(otp);
-    resetToken.setExpirationDate(expirationDate);
+        resetToken.setUser(user);
+        resetToken.setToken(otp);
+        resetToken.setExpirationDate(expirationDate);
 
-    passwordResetTokenRepository.save(resetToken);
+        passwordResetTokenRepository.save(resetToken);
 
-    // Envoyer l'email à partir de l'utilisateur
-    sendResetEmail(user, otp);
-}
+        sendResetEmail(user, otp);
+    }
 
     // Envoi de l'email avec le code OTP
 private void sendResetEmail(User user, String otp) {
@@ -73,7 +69,7 @@ private void sendResetEmail(User user, String otp) {
 }
 
 
-    // Étape 2 : Réinitialiser le mot de passe
+    // Réinitialiser le mot de passe
     @Transactional
     public void resetPassword(String token, String newPassword) {
     PasswordResetToken resetToken = passwordResetTokenRepository.findByToken(token)
@@ -89,7 +85,6 @@ private void sendResetEmail(User user, String otp) {
     }
 
     user.setPassword(passwordEncoder.encode(newPassword));
-    // Supprimer le token d'initialisation après la réinitialisation
     initialPasswordTokenRepository.deleteByUser(user);
     usersRepository.save(user);
 

@@ -34,19 +34,17 @@ public class UserBoutiqueController {
         try {
             List<String> resultMessages = userBoutiqueService.assignerVendeurAuxBoutiques(httpServletRequest, request.getUserId(), request.getBoutiqueIds());
 
-            // Si aucune affectation n'a eu lieu
             if (resultMessages.isEmpty()) {
                 response.put("message", "Aucune boutique n'a été affectée.");
                 return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
             }
 
-            // En cas de succès ou de boutiques déjà affectées
             response.put("status", "success");
             response.put("messages", resultMessages);
             return ResponseEntity.ok(response);
 
         } catch (RuntimeException e) {
-            e.printStackTrace(); // voir dans la console l'origine exacte
+            e.printStackTrace(); 
             response.put("status", "error");
             response.put("message", e.getMessage() != null ? e.getMessage() : e.toString());
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);

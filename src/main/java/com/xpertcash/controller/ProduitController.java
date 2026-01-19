@@ -59,24 +59,21 @@ public class ProduitController {
     @RequestParam boolean addToStock,
     HttpServletRequest request) {
     try {
-        // Vérification de l'image reçue
         if (imageFile != null) {
-            System.out.println("📸 Image reçue : " + imageFile.getOriginalFilename());
+            System.out.println(" Image reçue : " + imageFile.getOriginalFilename());
         } else {
-            System.out.println("🚫 Aucune image reçue !");
+            System.out.println(" Aucune image reçue !");
         }
 
         ObjectMapper objectMapper = new ObjectMapper();
         objectMapper.registerModule(new JavaTimeModule());
         objectMapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
 
-        // Conversion des JSON reçus en listes ou objets
         List<Long> boutiqueIds = objectMapper.readValue(boutiqueIdsJson, new TypeReference<List<Long>>() {});
         List<Integer> quantites = objectMapper.readValue(quantitesJson, new TypeReference<List<Integer>>() {});
         List<Integer> seuilAlert = objectMapper.readValue(seuilAlertJson, new TypeReference<List<Integer>>() {});
         ProduitRequest produitRequest = objectMapper.readValue(produitJson, ProduitRequest.class);
 
-        // Validation que les quantités et les boutiques ont le même nombre d'éléments
         if (boutiqueIds.size() != quantites.size()) {
             throw new RuntimeException("Le nombre de boutiques ne correspond pas au nombre de quantités.");
         }
@@ -85,29 +82,24 @@ public class ProduitController {
             throw new RuntimeException("Le nombre de boutiques ne correspond pas au nombre de seuils.");
         }
 
-        // Sauvegarde de l'image si elle est présente
         String photo = null;
         if (imageFile != null && !imageFile.isEmpty()) {
             photo = imageStorageService.saveImage(imageFile);
-            System.out.println("✅ URL enregistrée : " + photo);
+            System.out.println(" URL enregistrée : " + photo);
         }
-        produitRequest.setPhoto(photo); // Ajouter l'URL de l'image au produit
+        produitRequest.setPhoto(photo);
 
-        // Creation de produit pour toutes les boutiques spécifiées
         List<ProduitDTO> produitsAjoutes = produitService.createProduit(request, boutiqueIds, quantites, seuilAlert, produitRequest, addToStock, photo);
 
-        // Retourner la liste des produits ajoutés
         return ResponseEntity.status(HttpStatus.CREATED).body(produitsAjoutes);
 
     } catch (DuplicateProductException e) {
-        // Gestion des erreurs de duplication de produit
-        System.out.println("⚠️ Produit déjà existant : " + e.getMessage());
+        System.out.println(" Produit déjà existant : " + e.getMessage());
         Map<String, String> errorResponse = new HashMap<>();
         errorResponse.put("error", e.getMessage());
         return ResponseEntity.status(HttpStatus.CONFLICT).body(errorResponse);
 
     } catch (Exception e) {
-        // Gestion des autres erreurs 
         e.printStackTrace();
         Map<String, String> errorResponse = new HashMap<>();
         errorResponse.put("error", "Une erreur est survenue : " + e.getMessage());
@@ -125,18 +117,14 @@ public ResponseEntity<?> updateProduit(
         @RequestParam boolean addToStock,
         HttpServletRequest request) {
     try {
-        // ✅ Créer l'ObjectMapper et activer le module JavaTime pour LocalDate/LocalDateTime
         ObjectMapper objectMapper = new ObjectMapper();
         objectMapper.registerModule(new JavaTimeModule());
         objectMapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
 
-        // Désérialiser l'objet produit JSON reçu
         ProduitRequest produitRequest = objectMapper.readValue(produitJson, ProduitRequest.class);
 
-        // Appel à la méthode du service pour mettre à jour le produit
         ProduitDTO produitDTO = produitService.updateProduct(produitId, produitRequest, imageFile, addToStock, request);
 
-        // Retourner la réponse avec le produit mis à jour
         return ResponseEntity.ok(produitDTO);
     } catch (Exception e) {
         e.printStackTrace();
@@ -295,11 +283,14 @@ public ResponseEntity<?> updateProduit(
 
         //Get Total Produit
         @GetMapping("/produits/{boutiqueId}/totaux-stock")
-        public ResponseEntity<Map<String, Integer>> getTotalQuantitesParStock(@PathVariable Long boutiqueId) {
+        public ResponseEntity<Map<String, Integer>> getTotalQuantitesParStock(@PathVariable Long boutiqueId, HttpServletRequest request) {
             try {
-                // Récupérer les totaux des quantités en stock et non en stock
-                Map<String, Integer> totals = produitService.getTotalQuantitesParStock(boutiqueId);
+                Map<String, Integer> totals = produitService.getTotalQuantitesParStock(boutiqueId, request);
                 return ResponseEntity.ok(totals);
+            } catch (RuntimeException e) {
+                Map<String, String> errorResponse = new HashMap<>();
+                errorResponse.put("error", e.getMessage());
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(new HashMap<>());
             } catch (Exception e) {
                 Map<String, Integer> errorResponse = new HashMap<>();
                 errorResponse.put("totalEnStock", 0);
@@ -318,58 +309,57 @@ public ResponseEntity<?> updateProduit(
         
 
         //Endpoint pour ajuster la quantiter du produit en stock
-               //Endpoint pour ajuster la quantiter du produit en stock
-               @PatchMapping(value = "/ajouterStock", consumes = MediaType.APPLICATION_JSON_VALUE)
-               public ResponseEntity<?> ajouterStock(
-                       @RequestBody AjouterStockRequest request,
-                       @RequestHeader("Authorization") String token,
-                       HttpServletRequest httpRequest
-               ) {
-                   System.out.println("➡️ Boutique ID: " + request.getBoutiqueId());
-                   System.out.println("➡️ Produits et quantités: " + request.getProduitsQuantites());
-                   System.out.println("➡️ Fournisseur ID: " + request.getFournisseurId());
-       
-                   if (request.getBoutiqueId() == null) {
-                       return ResponseEntity.badRequest().body("Le champ 'boutiqueId' est obligatoire.");
-                   }
-       
-                   try {
-                       Facture facture = produitService.ajouterStock(
-                               request.getBoutiqueId(),
-                               request.getProduitsQuantites(),
-                               request.getDescription(),
-                               request.getCodeFournisseur(),
-                               request.getFournisseurId(),
-                               httpRequest
-                       );
-       
-                       return ResponseEntity.ok(new FactureDTO(facture));
-                   } catch (Exception e) {
-                       return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                               .body("Erreur lors de l'ajout du stock : " + e.getMessage());
-                   }
-               }
-       
-      
-            
-            // Endpoint Stock Historique
-            @GetMapping("/stockhistorique/{produitId}")
-                    public ResponseEntity<List<StockHistoryDTO>> getStockHistory(@PathVariable Long produitId, HttpServletRequest request) {
-                List<StockHistoryDTO> history = produitService.getStockHistory(produitId, request);
-                return ResponseEntity.ok(history);
-            }
-            
+        @PatchMapping(value = "/ajouterStock", consumes = MediaType.APPLICATION_JSON_VALUE)
+        public ResponseEntity<?> ajouterStock(
+                @RequestBody AjouterStockRequest request,
+                @RequestHeader("Authorization") String token,
+                HttpServletRequest httpRequest
+        ) {
+            System.out.println("➡️ Boutique ID: " + request.getBoutiqueId());
+            System.out.println("➡️ Produits et quantités: " + request.getProduitsQuantites());
+            System.out.println("➡️ Fournisseur ID: " + request.getFournisseurId());
 
-            // Endpoint pour récupérer l'historique général des mouvements de stock
-           @GetMapping("/stockhistorique")
-            public ResponseEntity<?> getAllStockHistory(HttpServletRequest request) {
-                try {
-                    List<StockHistoryDTO> historique = produitService.getAllStockHistory(request);
-                    return ResponseEntity.ok(historique);
-                } catch (RuntimeException e) {
-                    return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
-                }
+            if (request.getBoutiqueId() == null) {
+                return ResponseEntity.badRequest().body("Le champ 'boutiqueId' est obligatoire.");
             }
+
+            try {
+                Facture facture = produitService.ajouterStock(
+                        request.getBoutiqueId(),
+                        request.getProduitsQuantites(),
+                        request.getDescription(),
+                        request.getCodeFournisseur(),
+                        request.getFournisseurId(),
+                        httpRequest
+                );
+
+                return ResponseEntity.ok(new FactureDTO(facture));
+            } catch (Exception e) {
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                        .body("Erreur lors de l'ajout du stock : " + e.getMessage());
+            }
+        }
+
+
+    
+    // Endpoint Stock Historique
+    @GetMapping("/stockhistorique/{produitId}")
+            public ResponseEntity<List<StockHistoryDTO>> getStockHistory(@PathVariable Long produitId, HttpServletRequest request) {
+        List<StockHistoryDTO> history = produitService.getStockHistory(produitId, request);
+        return ResponseEntity.ok(history);
+    }
+    
+
+    // Endpoint pour récupérer l'historique général des mouvements de stock
+    @GetMapping("/stockhistorique")
+    public ResponseEntity<?> getAllStockHistory(HttpServletRequest request) {
+        try {
+            List<StockHistoryDTO> historique = produitService.getAllStockHistory(request);
+            return ResponseEntity.ok(historique);
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
+        }
+    }
 
             
 
@@ -389,7 +379,6 @@ public ResponseEntity<?> updateProduit(
         
                 FactureDTO factureDTO = produitService.retirerStock(boutiqueId, retirerStockRequest.getProduitsQuantites(), descriptionRetire, request);
         
-                // Retourner la factureDTO dans la réponse
                 return ResponseEntity.status(HttpStatus.OK).body(factureDTO);
         
             } catch (Exception e) {
@@ -440,24 +429,21 @@ public ResponseEntity<?> updateProduit(
                 HttpServletRequest request) {
 
             try {
-                // Validation du token JWT
                 String token = request.getHeader("Authorization");
                 if (token == null || !token.startsWith("Bearer ")) {
                     throw new RuntimeException("Token JWT manquant ou mal formaté");
                 }
 
-                // Vérification du type de fichier
                 String contentType = file.getContentType();
                 if (!Arrays.asList(
-                        "application/vnd.ms-excel",          // .xls
-                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" // .xlsx
+                        "application/vnd.ms-excel",
+                        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 ).contains(contentType)) {
                     return ResponseEntity.badRequest().body(
                             Collections.singletonMap("error", "Format de fichier non supporté: " + contentType)
                     );
                 }
 
-                // Vérification de la signature magique du fichier
                 byte[] fileBytes = file.getBytes();
                 if (!isExcelFile(fileBytes)) {
                     return ResponseEntity.badRequest().body(
@@ -465,26 +451,23 @@ public ResponseEntity<?> updateProduit(
                     );
                 }
 
-                // Vérification de la taille du fichier
                 if (file.getSize() > 5 * 1024 * 1024) {
                     return ResponseEntity.badRequest().body(
                             Collections.singletonMap("error", "Le fichier est trop volumineux (max 5MB)")
                     );
                 }
 
-                // Désérialiser les IDs des boutiques
                 List<Long> boutiqueIds = new ArrayList<>();
                 if (boutiqueIdsJson != null && !boutiqueIdsJson.isEmpty()) {
                     ObjectMapper objectMapper = new ObjectMapper();
                     boutiqueIds = objectMapper.readValue(boutiqueIdsJson, new TypeReference<List<Long>>() {});
                 }
 
-                // Passer le token COMPLET au service
                 Map<String, Object> result = produitService.importProduitsFromExcel(
                         file.getInputStream(),
                         entrepriseId,
                         boutiqueIds,
-                        token, // Token complet avec "Bearer"
+                        token,
                         request
                 );
 
@@ -514,10 +497,8 @@ public ResponseEntity<?> updateProduit(
         }
 
     private boolean isExcelFile(byte[] bytes) {
-        // Vérifier la signature pour .xlsx (PK header)
         boolean isXlsx = bytes[0] == 0x50 && bytes[1] == 0x4B && bytes[2] == 0x03 && bytes[3] == 0x04;
 
-        // Vérifier la signature pour .xls (OLE header)
         boolean isXls = bytes[0] == 0xD0 && bytes[1] == 0xCF && bytes[2] == 0x11 && bytes[3] == 0xE0;
 
         return isXlsx || isXls;
@@ -531,14 +512,12 @@ public ResponseEntity<?> updateProduit(
         try (Workbook workbook = new XSSFWorkbook()) {
             Sheet sheet = workbook.createSheet("Produits");
 
-            // En-têtes
             Row headerRow = sheet.createRow(0);
             String[] headers = {"Nom produit", "Description", "Catégorie", "Prix Vente", "Prix Achat", "Quantité", "Unité", "Code Barre", "Type Produit", "Date Preemption", "Seuil Alert"};
             for (int i = 0; i < headers.length; i++) {
                 headerRow.createCell(i).setCellValue(headers[i]);
             }
 
-            // Données de test
             Row dataRow = sheet.createRow(1);
             dataRow.createCell(0).setCellValue("Produit Test");
             dataRow.createCell(1).setCellValue("Description test");
@@ -556,7 +535,7 @@ public ResponseEntity<?> updateProduit(
         }
     }
 
-    // Endpoint scalable avec pagination pour récupérer les produits d'une entreprise
+    // Endpoint  pagination pour récupérer les produits d'une entreprise
     @GetMapping("/entreprise/{entrepriseId}/produits/paginated")
     public ResponseEntity<ProduitEntreprisePaginatedResponseDTO> getProduitsParEntreprisePaginated(
             @PathVariable Long entrepriseId,
@@ -565,10 +544,9 @@ public ResponseEntity<?> updateProduit(
             HttpServletRequest request) {
         
         try {
-            // Validation des paramètres
             if (page < 0) page = 0;
             if (size <= 0) size = 10;
-            if (size > 100) size = 100; // Limite maximale
+            if (size > 100) size = 100;
             
             ProduitEntreprisePaginatedResponseDTO response = produitService.getProduitsParEntreprisePaginated(
                     entrepriseId, page, size, request);
@@ -581,7 +559,7 @@ public ResponseEntity<?> updateProduit(
         }
     }
 
-    // Endpoint scalable avec pagination pour récupérer les produits d'une boutique
+    // Endpoint  avec pagination pour récupérer les produits d'une boutique
     @GetMapping("/boutique/{boutiqueId}/produits/paginated")
     public ResponseEntity<ProduitStockPaginatedResponseDTO> getProduitsParStockPaginated(
             @PathVariable Long boutiqueId,
@@ -590,10 +568,9 @@ public ResponseEntity<?> updateProduit(
             HttpServletRequest request) {
         
         try {
-            // Validation des paramètres
             if (page < 0) page = 0;
             if (size <= 0) size = 10;
-            if (size > 100) size = 100; // Limite maximale
+            if (size > 100) size = 100; 
             
             ProduitStockPaginatedResponseDTO response = produitService.getProduitsParStockPaginated(
                     boutiqueId, page, size, request);
@@ -606,9 +583,7 @@ public ResponseEntity<?> updateProduit(
         }
     }
 
-    /**
-     * Endpoint pour récupérer les compteurs de produits par boutique pour l'entreprise de l'utilisateur connecté
-     */
+     // Endpoint pour récupérer les compteurs de produits par boutique pour l'entreprise de l'utilisateur connecté
     @GetMapping("/produits/compteurs-boutiques")
     public ResponseEntity<?> getCompteursBoutiques(HttpServletRequest request) {
         try {

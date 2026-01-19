@@ -36,8 +36,7 @@ public class FactProHistoriqueService {
 
 public void enregistrerActionHistorique(FactureProForma facture, User user, String action, String details) {
     try {
-        System.out.println("🔄 Insertion historique - Action: " + action + ", Facture ID: " + facture.getId() + ", User ID: " + user.getId());
-        // Utiliser la requête SQL native pour éviter les références circulaires
+        System.out.println(" Insertion historique - Action: " + action + ", Facture ID: " + facture.getId() + ", User ID: " + user.getId());
         factProHistoriqueActionRepository.insertHistoriqueAction(
             action,
             LocalDateTime.now(),
@@ -46,10 +45,9 @@ public void enregistrerActionHistorique(FactureProForma facture, User user, Stri
             BigDecimal.valueOf(facture.getTotalHT()),
             user.getId()
         );
-        System.out.println("✅ Insertion historique réussie");
+        System.out.println(" Insertion historique réussie");
     } catch (Exception e) {
-        // Log l'erreur mais ne pas faire échouer la création de facture
-        System.err.println("❌ Erreur lors de l'enregistrement de l'historique: " + e.getMessage());
+        System.err.println(" Erreur lors de l'enregistrement de l'historique: " + e.getMessage());
         e.printStackTrace();
     }
 }
@@ -85,9 +83,8 @@ public void enregistrerActionHistorique(FactureProForma facture, User user, Stri
     historique.put("approuvePar", facture.getUtilisateurApprobateur() != null ?
         facture.getUtilisateurApprobateur().getNomComplet() : "Non approuvé");
 
-      // Récupérer TOUTES les actions historiques sans filtre
       List<FactProHistoriqueAction> actionList = factProHistoriqueActionRepository
-              .findByFactureIdOrderByDateActionDesc(factureId); // Tri décroissant
+              .findByFactureIdOrderByDateActionDesc(factureId);
 
       List<Map<String, Object>> actionsResume = new ArrayList<>();
 
