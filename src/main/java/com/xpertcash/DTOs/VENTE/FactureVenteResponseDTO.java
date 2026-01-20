@@ -25,5 +25,6 @@ public class FactureVenteResponseDTO {
     private String statutRemboursement;
     private Long caisseId;
     private String vendeur;
+    private Double remiseGlobale; // Remise globale appliquée à la vente
 
 }

@@ -2504,12 +2504,23 @@ public class ComptabiliteService {
         response.setBoutiqueId(vente.getBoutique() != null ? vente.getBoutique().getId() : null);
         response.setVendeurId(vente.getVendeur() != null ? vente.getVendeur().getId() : null);
         response.setDateVente(vente.getDateVente());
-        response.setMontantTotal(vente.getMontantTotal());
+        
+        // Arrondir les montants à 2 décimales
+        Double montantTotalArrondi = vente.getMontantTotal() != null ? 
+            Math.round(vente.getMontantTotal() * 100.0) / 100.0 : 0.0;
+        Double montantPayeArrondi = vente.getMontantPaye() != null ? 
+            Math.round(vente.getMontantPaye() * 100.0) / 100.0 : 0.0;
+        
+        response.setMontantTotal(montantTotalArrondi);
         response.setDescription(vente.getDescription());
         response.setClientNom(vente.getClientNom());
         response.setClientNumero(vente.getClientNumero());
         response.setModePaiement(vente.getModePaiement() != null ? vente.getModePaiement().name() : null);
-        response.setMontantPaye(vente.getMontantPaye());
+        response.setMontantPaye(montantPayeArrondi);
+        
+        // Récupérer la remise globale
+        Double remiseGlobale = vente.getRemiseGlobale() != null ? vente.getRemiseGlobale() : 0.0;
+        boolean hasRemiseGlobale = remiseGlobale > 0;
         
         List<VenteResponse.LigneVenteDTO> lignesDTO = new ArrayList<>();
         if (vente.getProduits() != null) {
@@ -2518,16 +2529,44 @@ public class ComptabiliteService {
                 dto.setProduitId(ligne.getProduit().getId());
                 dto.setNomProduit(ligne.getProduit().getNom());
                 dto.setQuantite(ligne.getQuantite());
-                dto.setPrixUnitaire(ligne.getPrixUnitaire());
-                dto.setMontantLigne(ligne.getMontantLigne());
-                dto.setRemise(ligne.getRemise());
+                
+                // Calculer le prix unitaire original si une remise globale a été appliquée
+                Double prixUnitaireAffiche = ligne.getPrixUnitaire();
+                Double montantLigneAffiche = ligne.getMontantLigne();
+                
+                if (hasRemiseGlobale) {
+                    // Calcul inverse : prix_original = prix_actuel / (1 - remise_globale/100)
+                    // Le montant actuel est déjà après remise, donc on recalcule le montant original
+                    double montantLigneOriginal = montantLigneAffiche / (1 - remiseGlobale / 100.0);
+                    prixUnitaireAffiche = montantLigneOriginal / ligne.getQuantite();
+                    montantLigneAffiche = montantLigneOriginal;
+                    
+                    // Arrondir à 2 décimales pour éviter les erreurs de précision
+                    prixUnitaireAffiche = Math.round(prixUnitaireAffiche * 100.0) / 100.0;
+                    montantLigneAffiche = Math.round(montantLigneAffiche * 100.0) / 100.0;
+                }
+                
+                dto.setPrixUnitaire(prixUnitaireAffiche);
+                dto.setMontantLigne(montantLigneAffiche);
+                
+                // Arrondir la remise individuelle à 2 décimales
+                Double remiseArrondie = Math.round(ligne.getRemise() * 100.0) / 100.0;
+                dto.setRemise(remiseArrondie);
+                
                 dto.setQuantiteRemboursee(ligne.getQuantiteRemboursee());
-                dto.setMontantRembourse(ligne.getMontantRembourse());
+                
+                // Arrondir le montant remboursé à 2 décimales
+                Double montantRembourseArrondi = ligne.getMontantRembourse() != null ? 
+                    Math.round(ligne.getMontantRembourse() * 100.0) / 100.0 : 0.0;
+                dto.setMontantRembourse(montantRembourseArrondi);
                 dto.setEstRemboursee(ligne.isEstRemboursee());
                 lignesDTO.add(dto);
             }
         }
-        response.setRemiseGlobale(vente.getRemiseGlobale());
+        
+        // Arrondir la remise globale à 2 décimales
+        Double remiseGlobaleArrondie = Math.round(remiseGlobale * 100.0) / 100.0;
+        response.setRemiseGlobale(remiseGlobaleArrondie);
         response.setLignes(lignesDTO);
         
         Long venteEntrepriseId = vente.getBoutique() != null && vente.getBoutique().getEntreprise() != null 
@@ -2542,7 +2581,11 @@ public class ComptabiliteService {
         response.setNomVendeur(vente.getVendeur() != null ? vente.getVendeur().getNomComplet() : null);
         String nomBoutique = vente.getBoutique() != null ? vente.getBoutique().getNomBoutique() : null;
         response.setNomBoutique(nomBoutique);
-        response.setMontantTotalRembourse(vente.getMontantTotalRembourse());
+        
+        // Arrondir le montant total remboursé à 2 décimales
+        Double montantTotalRembourseArrondi = vente.getMontantTotalRembourse() != null ? 
+            Math.round(vente.getMontantTotalRembourse() * 100.0) / 100.0 : 0.0;
+        response.setMontantTotalRembourse(montantTotalRembourseArrondi);
         response.setDateDernierRemboursement(vente.getDateDernierRemboursement());
         response.setNombreRemboursements(vente.getNombreRemboursements());
         response.setTypeTransaction("ENTREE");

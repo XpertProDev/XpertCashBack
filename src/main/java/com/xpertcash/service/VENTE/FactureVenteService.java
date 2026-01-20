@@ -40,6 +40,10 @@ public class FactureVenteService {
 
 private FactureVenteResponseDTO toResponse(FactureVente facture) {
     Vente vente = facture.getVente();
+    
+    // Récupérer la remise globale
+    Double remiseGlobale = vente.getRemiseGlobale() != null ? vente.getRemiseGlobale() : 0.0;
+    boolean hasRemiseGlobale = remiseGlobale > 0;
 
     List<ProduitFactureResponse> produits = vente.getProduits().stream()
             .map(ligne -> {
@@ -50,13 +54,32 @@ private FactureVenteResponseDTO toResponse(FactureVente facture) {
                     quantiteAffichee = ligne.getQuantite();
                 }
                 
+                // Calculer le prix unitaire original si une remise globale a été appliquée
+                Double prixUnitaireAffiche = ligne.getPrixUnitaire();
+                Double montantLigneAffiche = ligne.getMontantLigne();
+                
+                if (hasRemiseGlobale) {
+                    // Calcul inverse : prix_original = prix_actuel / (1 - remise_globale/100)
+                    // Le montant actuel est déjà après remise, donc on recalcule le montant original
+                    double montantLigneOriginal = montantLigneAffiche / (1 - remiseGlobale / 100.0);
+                    prixUnitaireAffiche = montantLigneOriginal / quantiteAffichee;
+                    montantLigneAffiche = montantLigneOriginal;
+                    
+                    // Arrondir à 2 décimales pour éviter les erreurs de précision
+                    prixUnitaireAffiche = Math.round(prixUnitaireAffiche * 100.0) / 100.0;
+                    montantLigneAffiche = Math.round(montantLigneAffiche * 100.0) / 100.0;
+                }
+                
+                // Arrondir toutes les valeurs monétaires à 2 décimales
+                Double remiseArrondie = Math.round(ligne.getRemise() * 100.0) / 100.0;
+                
                 return new ProduitFactureResponse(
                         ligne.getProduit().getId(),
                         ligne.getProduit().getNom(),
                         quantiteAffichee,
-                        ligne.getPrixUnitaire(),
-                        ligne.getRemise(),
-                        ligne.getMontantLigne()
+                        prixUnitaireAffiche,
+                        remiseArrondie,
+                        montantLigneAffiche
                 );
             })
             .collect(Collectors.toList());
@@ -75,11 +98,18 @@ private FactureVenteResponseDTO toResponse(FactureVente facture) {
                      (vente.getMontantTotal() != null ? vente.getMontantTotal() : 0.0);
     }
 
+    // Arrondir toutes les valeurs monétaires à 2 décimales
+    Double montantTotalArrondi = facture.getMontantTotal() != null ? 
+        Math.round(facture.getMontantTotal() * 100.0) / 100.0 : 0.0;
+    Double montantDetteArrondi = Math.round(montantDette * 100.0) / 100.0;
+    Double montantPayeArrondi = Math.round(montantPaye * 100.0) / 100.0;
+    Double remiseGlobaleArrondie = Math.round(remiseGlobale * 100.0) / 100.0;
+    
     FactureVenteResponseDTO dto = new FactureVenteResponseDTO();
     dto.setId(facture.getId());
     dto.setNumeroFacture(facture.getNumeroFacture());
     dto.setDateEmission(facture.getDateEmission());
-    dto.setMontantTotal(facture.getMontantTotal());
+    dto.setMontantTotal(montantTotalArrondi);
     dto.setClientNom(vente.getClientNom());
     dto.setClientNumero(vente.getClientNumero());
     dto.setBoutiqueNom(vente.getBoutique().getNomBoutique());
@@ -87,8 +117,9 @@ private FactureVenteResponseDTO toResponse(FactureVente facture) {
     dto.setStatutRemboursement(statutRemboursement);
     dto.setCaisseId(vente.getCaisse() != null ? vente.getCaisse().getId() : null);
     dto.setVendeur(vente.getVendeur() != null ? vente.getVendeur().getNomComplet() : null);
-    dto.setMontantDette(montantDette);
-    dto.setMontantPaye(montantPaye);
+    dto.setMontantDette(montantDetteArrondi);
+    dto.setMontantPaye(montantPayeArrondi);
+    dto.setRemiseGlobale(remiseGlobaleArrondie); // Ajouter la remise globale
     
     return dto;
 }
