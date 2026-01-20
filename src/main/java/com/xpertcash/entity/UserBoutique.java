@@ -30,10 +30,13 @@ public class UserBoutique {
     private Boutique boutique;
 
     private LocalDateTime assignedAt;
-    
+
+    // @Column(name = "is_gestionnaire_stock", nullable = false)
+    // private boolean isGestionnaireStock = false;
+
     @Column(nullable = false)
     private boolean canGestionStock = false;
-    
+
     @Column(nullable = false)
     private boolean canGererProduits = false;
 }
