@@ -19,12 +19,15 @@ import com.xpertcash.DTOs.VENTE.FactureVentePaginatedDTO;
 import com.xpertcash.DTOs.VENTE.ProduitFactureResponse;
 import com.xpertcash.DTOs.VENTE.ReceiptEmailRequest;
 import com.xpertcash.DTOs.VENTE.VenteLigneResponse;
+import com.xpertcash.DTOs.VENTE.StatistiquesVenteGlobalesDTO;
+import com.xpertcash.DTOs.VENTE.TopProduitVenduDTO;
 import com.xpertcash.configuration.JwtUtil;
 import com.xpertcash.entity.FactureVente;
 import com.xpertcash.entity.User;
 import com.xpertcash.entity.VENTE.Vente;
 import com.xpertcash.repository.FactureVenteRepository;
 import com.xpertcash.repository.UsersRepository;
+import com.xpertcash.repository.VENTE.VenteProduitRepository;
 
 import jakarta.servlet.http.HttpServletRequest;
 
@@ -37,6 +40,8 @@ public class FactureVenteService {
     private  UsersRepository usersRepository;
     @Autowired
     private  JwtUtil jwtUtil;
+    @Autowired
+    private VenteProduitRepository venteProduitRepository;
 
 private FactureVenteResponseDTO toResponse(FactureVente facture) {
     Vente vente = facture.getVente();
@@ -310,6 +315,43 @@ public ReceiptEmailRequest getFactureDataForEmail(String venteId, String email, 
     receiptRequest.setRemisesProduits(remisesProduits.isEmpty() ? null : remisesProduits);
     
     return receiptRequest;
+}
+
+/**
+ * Récupère les statistiques globales de vente pour l'entreprise de l'utilisateur connecté
+ * Inclut les 3 meilleurs produits vendus
+ */
+public StatistiquesVenteGlobalesDTO getStatistiquesGlobales(HttpServletRequest request) {
+    String token = request.getHeader("Authorization");
+    if (token == null || !token.startsWith("Bearer ")) {
+        throw new RuntimeException("Token JWT manquant ou invalide");
+    }
+    String userUuid = jwtUtil.extractUserUuid(token.substring(7));
+    User user = usersRepository.findByUuid(userUuid)
+            .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+
+    Long entrepriseId = user.getEntreprise() != null ? user.getEntreprise().getId() : null;
+    if (entrepriseId == null) {
+        throw new RuntimeException("Aucune entreprise associée à cet utilisateur");
+    }
+
+    List<Object[]> top3ProduitsData = venteProduitRepository.findTop3ProduitsVendusByEntrepriseId(entrepriseId);
+
+    List<TopProduitVenduDTO> top3Produits = top3ProduitsData.stream()
+            .map(row -> {
+                TopProduitVenduDTO dto = new TopProduitVenduDTO();
+                dto.setProduitId(((Number) row[0]).longValue());
+                dto.setNomProduit((String) row[1]);
+                dto.setTotalQuantite(((Number) row[2]).longValue());
+                dto.setTotalMontant(row[3] != null ? ((Number) row[3]).doubleValue() : 0.0);
+                return dto;
+            })
+            .collect(Collectors.toList());
+
+    StatistiquesVenteGlobalesDTO statistiques = new StatistiquesVenteGlobalesDTO();
+    statistiques.setTop3ProduitsVendus(top3Produits);
+
+    return statistiques;
 }
 
 }

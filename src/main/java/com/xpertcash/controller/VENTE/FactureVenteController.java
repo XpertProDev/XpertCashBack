@@ -17,6 +17,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import com.xpertcash.DTOs.VENTE.FactureVentePaginatedDTO;
 import com.xpertcash.DTOs.VENTE.ReceiptEmailRequest;
+import com.xpertcash.DTOs.VENTE.StatistiquesVenteGlobalesDTO;
 import com.xpertcash.service.MailService;
 import com.xpertcash.service.VENTE.FactureVenteService;
 
@@ -119,6 +120,19 @@ public class FactureVenteController {
         } catch (Exception e) {
             return ResponseEntity.internalServerError()
                 .body("Erreur interne du serveur : " + e.getMessage());
+        }
+    }
+
+    // Endpoint pour récupérer les statistiques globales de vente (top 3 produits vendus)
+    @GetMapping("/vente/statistiques/globales")
+    public ResponseEntity<StatistiquesVenteGlobalesDTO> getStatistiquesGlobales(HttpServletRequest request) {
+        try {
+            StatistiquesVenteGlobalesDTO statistiques = factureVenteService.getStatistiquesGlobales(request);
+            return ResponseEntity.ok(statistiques);
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(org.springframework.http.HttpStatus.FORBIDDEN).body(null);
+        } catch (Exception e) {
+            return ResponseEntity.status(org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR).body(null);
         }
     }
 
