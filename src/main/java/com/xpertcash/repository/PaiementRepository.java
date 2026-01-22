@@ -1,6 +1,7 @@
 package com.xpertcash.repository;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -30,5 +31,14 @@ public interface PaiementRepository extends JpaRepository<Paiement, Long>{
     // Récupère tous les paiements d'une entreprise
     @Query("SELECT p FROM Paiement p WHERE p.factureReelle.entreprise.id = :entrepriseId ORDER BY p.datePaiement DESC")
     List<Paiement> findByEntrepriseId(@Param("entrepriseId") Long entrepriseId);
+
+    // Récupère tous les paiements d'une entreprise dans une période (optimisé)
+    @Query("SELECT p FROM Paiement p WHERE p.factureReelle.entreprise.id = :entrepriseId " +
+           "AND p.datePaiement >= :dateDebut AND p.datePaiement < :dateFin " +
+           "ORDER BY p.datePaiement DESC")
+    List<Paiement> findByEntrepriseIdAndDatePaiementBetween(
+            @Param("entrepriseId") Long entrepriseId,
+            @Param("dateDebut") LocalDateTime dateDebut,
+            @Param("dateFin") LocalDateTime dateFin);
 
 }

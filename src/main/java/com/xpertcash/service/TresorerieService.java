@@ -20,6 +20,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import jakarta.servlet.http.HttpServletRequest;
 import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -68,12 +70,79 @@ public class TresorerieService {
         return calculerTresorerieParEntrepriseId(entrepriseId);
     }
 
+    /**
+     * Calcule la trésorerie avec filtrage par période.
+     * @param request Requête HTTP
+     * @param periode Type de période : "aujourdhui", "hier", "semaine", "mois", "annee", "personnalise"
+     * @param dateDebut Date de début (requis si periode = "personnalise")
+     * @param dateFin Date de fin (requis si periode = "personnalise")
+     * @return TresorerieDTO avec les données filtrées par période
+     */
+    @Transactional(readOnly = true)
+    public TresorerieDTO calculerTresorerie(HttpServletRequest request, String periode, LocalDate dateDebut, LocalDate dateFin) {
+        Long entrepriseId = validerEntrepriseEtPermissions(request);
+        
+        // Calculer les dates selon la période
+        PeriodeDates periodeDates = calculerDatesPeriode(periode, dateDebut, dateFin);
+        
+        return calculerTresorerieParEntrepriseIdAvecPeriode(entrepriseId, periodeDates);
+    }
+
      // Calcule la trésorerie pour une entreprise donnée.
   
     @Transactional(readOnly = true)
     public TresorerieDTO calculerTresorerieParEntrepriseId(Long entrepriseId) {
         try {
             TresorerieData data = chargerDonnees(entrepriseId);
+            return calculerTresorerieDepuisData(data, entrepriseId, null);
+        } catch (BusinessException e) {
+            throw e;
+        } catch (Exception e) {
+            logger.error("Erreur lors du calcul de la trésorerie pour l'entreprise {}", entrepriseId, e);
+            throw new BusinessException("Erreur lors du calcul de la trésorerie : " + e.getMessage());
+        }
+    }
+
+    /**
+     * Calcule la trésorerie pour une entreprise avec filtrage par période.
+     * Les montants globaux (montantCaisse, montantBanque, etc.) sont toujours calculés avec TOUTES les données.
+     * Seuls le solde et le CA sont filtrés par période.
+     */
+    @Transactional(readOnly = true)
+    public TresorerieDTO calculerTresorerieParEntrepriseIdAvecPeriode(Long entrepriseId, PeriodeDates periodeDates) {
+        try {
+            // Charger TOUTES les données pour les montants globaux (montantCaisse, montantBanque, etc.)
+            TresorerieData dataGlobale = chargerDonnees(entrepriseId);
+            
+            // Calculer les montants globaux avec toutes les données
+            TresorerieDTO tresorerie = calculerTresorerieDepuisData(dataGlobale, entrepriseId, null);
+            
+            // Si une période est spécifiée, calculer le solde et CA pour cette période uniquement
+            if (periodeDates != null && periodeDates.filtrerParPeriode) {
+                // Charger les données filtrées UNIQUEMENT pour le calcul du solde et CA de la période
+                TresorerieData dataPeriode = chargerDonneesAvecPeriode(entrepriseId, periodeDates);
+                
+                double caPeriode = calculerCAPeriode(dataPeriode, entrepriseId, periodeDates);
+                double sortiesPeriode = calculerSortiesPeriode(dataPeriode, entrepriseId, periodeDates);
+                double soldePeriode = caPeriode - sortiesPeriode;
+                
+                tresorerie.setCaAujourdhui(caPeriode);
+                tresorerie.setSoldeAujourdhui(soldePeriode);
+            }
+            
+            return tresorerie;
+        } catch (BusinessException e) {
+            throw e;
+        } catch (Exception e) {
+            logger.error("Erreur lors du calcul de la trésorerie pour l'entreprise {} avec période", entrepriseId, e);
+            throw new BusinessException("Erreur lors du calcul de la trésorerie : " + e.getMessage());
+        }
+    }
+
+    /**
+     * Calcule la trésorerie à partir des données chargées.
+     */
+    private TresorerieDTO calculerTresorerieDepuisData(TresorerieData data, Long entrepriseId, PeriodeDates periodeDates) {
             TresorerieDTO tresorerie = new TresorerieDTO();
 
             TresorerieDTO.CaisseDetail caisseDetail = calculerCaisse(data);
@@ -108,13 +177,25 @@ public class TresorerieService {
                 tresorerie.getMontantMobileMoney()
             );
 
-            return tresorerie;
-        } catch (BusinessException e) {
-            throw e;
-        } catch (Exception e) {
-            logger.error("Erreur lors du calcul de la trésorerie pour l'entreprise {}", entrepriseId, e);
-            throw new BusinessException("Erreur lors du calcul de la trésorerie : " + e.getMessage());
+        // Calculer le solde et le CA selon la période
+        if (periodeDates != null && periodeDates.filtrerParPeriode) {
+            double caPeriode = calculerCAPeriode(data, entrepriseId, periodeDates);
+            double sortiesPeriode = calculerSortiesPeriode(data, entrepriseId, periodeDates);
+            double soldePeriode = caPeriode - sortiesPeriode;
+            
+            tresorerie.setCaAujourdhui(caPeriode);
+            tresorerie.setSoldeAujourdhui(soldePeriode);
+        } else {
+            // Par défaut, calculer pour aujourd'hui
+            double caAujourdhui = calculerCAAujourdhui(data, entrepriseId);
+            double sortiesAujourdhui = calculerSortiesAujourdhui(data, entrepriseId);
+            double soldeAujourdhui = caAujourdhui - sortiesAujourdhui;
+            
+            tresorerie.setCaAujourdhui(caAujourdhui);
+            tresorerie.setSoldeAujourdhui(soldeAujourdhui);
         }
+
+            return tresorerie;
     }
 
      // Récupère la liste paginée des dettes (factures impayées, ventes à crédit, dépenses en DETTE)
@@ -229,7 +310,7 @@ public class TresorerieService {
                     ? v.getBoutique().getEntreprise().getId() : null;
             if (venteEntrepriseId != null) {
                 factureVenteRepository.findByVenteIdAndEntrepriseId(v.getId(), venteEntrepriseId)
-                        .ifPresent(f -> dto.setNumero(f.getNumeroFacture()));
+                    .ifPresent(f -> dto.setNumero(f.getNumeroFacture()));
             }
             if (v.getClient() != null) {
                 dto.setClient(v.getClient().getNomComplet());
@@ -294,6 +375,72 @@ public class TresorerieService {
         }
         
         return entrepriseId;
+    }
+
+    /**
+     * Calcule les dates de début et fin selon le type de période.
+     */
+    private PeriodeDates calculerDatesPeriode(String periode, LocalDate dateDebut, LocalDate dateFin) {
+        if (periode == null || periode.trim().isEmpty()) {
+            periode = "aujourdhui";
+        }
+        
+        LocalDateTime dateStart;
+        LocalDateTime dateEnd;
+        boolean filtrerParPeriode = true;
+
+        switch (periode.toLowerCase()) {
+            case "aujourdhui":
+                dateStart = LocalDate.now().atStartOfDay();
+                dateEnd = dateStart.plusDays(1);
+                break;
+            case "hier":
+                dateStart = LocalDate.now().minusDays(1).atStartOfDay();
+                dateEnd = dateStart.plusDays(1);
+                break;
+            case "semaine":
+                LocalDate aujourdhui = LocalDate.now();
+                dateStart = aujourdhui.minusDays(aujourdhui.getDayOfWeek().getValue() - 1).atStartOfDay();
+                dateEnd = dateStart.plusWeeks(1);
+                break;
+            case "mois":
+                dateStart = LocalDate.now().withDayOfMonth(1).atStartOfDay();
+                dateEnd = dateStart.plusMonths(1);
+                break;
+            case "annee":
+                dateStart = LocalDate.now().withDayOfYear(1).atStartOfDay();
+                dateEnd = dateStart.plusYears(1);
+                break;
+            case "personnalise":
+                if (dateDebut == null || dateFin == null) {
+                    throw new BusinessException("Les dates de début et de fin sont requises pour une période personnalisée.");
+                }
+                dateStart = dateDebut.atStartOfDay();
+                dateEnd = dateFin.plusDays(1).atStartOfDay();
+                break;
+            default:
+                // Par défaut, pas de filtre (toutes les données)
+                filtrerParPeriode = false;
+                dateStart = null;
+                dateEnd = null;
+        }
+
+        return new PeriodeDates(dateStart, dateEnd, filtrerParPeriode);
+    }
+
+    /**
+     * Classe pour stocker les dates de début et fin d'une période.
+     */
+    private static class PeriodeDates {
+        final LocalDateTime dateDebut;
+        final LocalDateTime dateFin;
+        final boolean filtrerParPeriode;
+
+        PeriodeDates(LocalDateTime dateDebut, LocalDateTime dateFin, boolean filtrerParPeriode) {
+            this.dateDebut = dateDebut;
+            this.dateFin = dateFin;
+            this.filtrerParPeriode = filtrerParPeriode;
+        }
     }
 
     private static class TresorerieData {
@@ -433,7 +580,7 @@ public class TresorerieService {
                     .sum();
         }
         
-   
+        
         double entreesPaiementsEspeces = calculerEntreesPaiementsFactures(data, ModePaiement.ESPECES, null);
         double entreesGeneralesCaisse = calculerEntreesGeneralesCaisse(data);
         
@@ -786,5 +933,250 @@ public class TresorerieService {
 
     private double getValeurDouble(BigDecimal value) {
         return value != null ? value.doubleValue() : 0.0;
+    }
+
+    /**
+     * Vérifie si une entrée générale provient d'un transfert de fonds.
+     */
+    private boolean estEntreeDeTransfert(String designation) {
+        if (designation == null || designation.trim().isEmpty()) {
+            return false;
+        }
+        return designation.trim().startsWith("Transfert vers") || designation.trim().startsWith("Transfert depuis");
+    }
+
+    /**
+     * Vérifie si une dépense générale provient d'un transfert de fonds.
+     */
+    private boolean estDepenseDeTransfert(String designation) {
+        if (designation == null || designation.trim().isEmpty()) {
+            return false;
+        }
+        return designation.trim().startsWith("Transfert vers") || designation.trim().startsWith("Transfert depuis");
+    }
+
+    /**
+     * Vérifie si une date est aujourd'hui.
+     */
+    private boolean estAujourdhui(LocalDateTime dateTime) {
+        if (dateTime == null) {
+            return false;
+        }
+        return dateTime.toLocalDate().equals(LocalDate.now());
+    }
+
+    /**
+     * Calcule le CA (Chiffre d'Affaires) d'aujourd'hui.
+     * Inclut : ventes d'aujourd'hui + paiements factures d'aujourd'hui + entrées générales d'aujourd'hui
+     * Exclut : les transferts de fonds
+     */
+    private double calculerCAAujourdhui(TresorerieData data, Long entrepriseId) {
+        double ca = 0.0;
+
+        // Ventes d'aujourd'hui (toutes les ventes, pas seulement celles des caisses fermées)
+        List<Vente> ventesAujourdhui = venteRepository.findAllByEntrepriseId(entrepriseId).stream()
+                .filter(v -> estAujourdhui(v.getDateVente()))
+                .filter(v -> v.getStatus() != VenteStatus.REMBOURSEE)
+                .collect(Collectors.toList());
+
+        for (Vente vente : ventesAujourdhui) {
+            ca += getValeurDouble(vente.getMontantTotal());
+        }
+
+        // Paiements factures d'aujourd'hui
+        List<Paiement> paiementsAujourdhui = paiementRepository.findByEntrepriseId(entrepriseId).stream()
+                .filter(p -> estAujourdhui(p.getDatePaiement()))
+                .collect(Collectors.toList());
+
+        for (Paiement paiement : paiementsAujourdhui) {
+            ca += getValeurDouble(paiement.getMontant());
+        }
+
+        // Entrées générales d'aujourd'hui (en excluant les transferts et les paiements de factures)
+        for (EntreeGenerale entree : data.entreesGenerales) {
+            if (estAujourdhui(entree.getDateCreation()) 
+                    && !estEntreeDeTransfert(entree.getDesignation())
+                    && (entree.getDetteType() == null || !"PAIEMENT_FACTURE".equals(entree.getDetteType()))) {
+                ca += getValeurDouble(entree.getMontant());
+            }
+        }
+
+        return ca;
+    }
+
+    /**
+     * Calcule les sorties d'aujourd'hui.
+     * Inclut : dépenses générales d'aujourd'hui + mouvements caisse DEPENSE d'aujourd'hui + retraits d'aujourd'hui
+     * Exclut : les transferts de fonds
+     */
+    private double calculerSortiesAujourdhui(TresorerieData data, Long entrepriseId) {
+        double sorties = 0.0;
+
+        // Dépenses générales d'aujourd'hui (en excluant les transferts)
+        for (DepenseGenerale depense : data.depensesGenerales) {
+            if (estAujourdhui(depense.getDateCreation()) 
+                    && !estDepenseDeTransfert(depense.getDesignation())) {
+                sorties += getValeurDouble(depense.getMontant());
+            }
+        }
+
+        // Mouvements caisse DEPENSE d'aujourd'hui
+        List<MouvementCaisse> mouvementsDepenseAujourdhui = mouvementCaisseRepository
+                .findByCaisse_Boutique_Entreprise_IdAndTypeMouvement(entrepriseId, TypeMouvementCaisse.DEPENSE)
+                .stream()
+                .filter(m -> estAujourdhui(m.getDateMouvement()))
+                .collect(Collectors.toList());
+
+        for (MouvementCaisse mouvement : mouvementsDepenseAujourdhui) {
+            sorties += getValeurDouble(mouvement.getMontant());
+        }
+
+        // Retraits d'aujourd'hui
+        List<MouvementCaisse> mouvementsRetraitAujourdhui = mouvementCaisseRepository
+                .findByCaisse_Boutique_Entreprise_IdAndTypeMouvement(entrepriseId, TypeMouvementCaisse.RETRAIT)
+                .stream()
+                .filter(m -> estAujourdhui(m.getDateMouvement()))
+                .collect(Collectors.toList());
+
+        for (MouvementCaisse mouvement : mouvementsRetraitAujourdhui) {
+            sorties += getValeurDouble(mouvement.getMontant());
+        }
+
+        return sorties;
+    }
+
+    /**
+     * Charge les données avec filtrage par période (optimisé).
+     */
+    private TresorerieData chargerDonneesAvecPeriode(Long entrepriseId, PeriodeDates periodeDates) {
+        List<Boutique> boutiques = boutiqueRepository.findByEntrepriseId(entrepriseId);
+        List<Long> boutiqueIds = boutiques.stream()
+                .map(Boutique::getId)
+                .collect(Collectors.toList());
+
+        List<Caisse> caissesFermees = chargerCaissesFermees(entrepriseId);
+        List<Long> caisseIdsFermees = caissesFermees.stream().map(Caisse::getId).collect(Collectors.toList());
+        
+        // Charger les ventes selon la période
+        List<Vente> toutesVentes;
+        if (periodeDates.filtrerParPeriode) {
+            toutesVentes = venteRepository.findByBoutique_Entreprise_IdAndDateVenteBetween(
+                    entrepriseId, periodeDates.dateDebut, periodeDates.dateFin);
+        } else {
+            toutesVentes = venteRepository.findAllByEntrepriseId(entrepriseId);
+        }
+        
+        List<Vente> ventesCaissesFermees = toutesVentes.stream()
+                .filter(v -> v.getCaisse() != null && caisseIdsFermees.contains(v.getCaisse().getId()))
+                .collect(Collectors.toList());
+        Map<Long, Double> remboursementsParVente = calculerRemboursementsParVente(ventesCaissesFermees);
+        
+        List<FactureReelle> factures = factureReelleRepository.findByEntrepriseId(entrepriseId);
+        Map<Long, BigDecimal> paiementsParFacture = chargerPaiementsParFacture(factures);
+        
+        // Charger les dépenses et entrées selon la période
+        List<DepenseGenerale> depensesGenerales;
+        List<EntreeGenerale> entreesGenerales;
+        if (periodeDates.filtrerParPeriode) {
+            depensesGenerales = depenseGeneraleRepository.findByEntrepriseIdAndDateCreationBetween(
+                    entrepriseId, periodeDates.dateDebut, periodeDates.dateFin);
+            entreesGenerales = entreeGeneraleRepository.findByEntrepriseIdAndDateCreationBetween(
+                    entrepriseId, periodeDates.dateDebut, periodeDates.dateFin);
+        } else {
+            depensesGenerales = depenseGeneraleRepository.findByEntrepriseId(entrepriseId);
+            entreesGenerales = entreeGeneraleRepository.findByEntrepriseId(entrepriseId);
+        }
+        
+        // Charger les mouvements selon la période
+        List<MouvementCaisse> tousMouvementsDepense;
+        List<MouvementCaisse> tousMouvementsRetrait;
+        if (periodeDates.filtrerParPeriode) {
+            tousMouvementsDepense = mouvementCaisseRepository
+                    .findByCaisse_Boutique_Entreprise_IdAndTypeMouvementAndDateMouvementBetween(
+                            entrepriseId, TypeMouvementCaisse.DEPENSE, periodeDates.dateDebut, periodeDates.dateFin);
+            tousMouvementsRetrait = mouvementCaisseRepository
+                    .findByCaisse_Boutique_Entreprise_IdAndTypeMouvementAndDateMouvementBetween(
+                            entrepriseId, TypeMouvementCaisse.RETRAIT, periodeDates.dateDebut, periodeDates.dateFin);
+        } else {
+            tousMouvementsDepense = mouvementCaisseRepository
+                    .findByCaisse_Boutique_Entreprise_IdAndTypeMouvement(entrepriseId, TypeMouvementCaisse.DEPENSE);
+            tousMouvementsRetrait = mouvementCaisseRepository
+                    .findByCaisse_Boutique_Entreprise_IdAndTypeMouvement(entrepriseId, TypeMouvementCaisse.RETRAIT);
+        }
+        
+        List<MouvementCaisse> mouvementsDepense = tousMouvementsDepense.stream()
+                .filter(m -> m.getCaisse() != null && caisseIdsFermees.contains(m.getCaisse().getId()))
+                .collect(Collectors.toList());
+        
+        List<MouvementCaisse> mouvementsRetrait = tousMouvementsRetrait.stream()
+                .filter(m -> m.getCaisse() != null && caisseIdsFermees.contains(m.getCaisse().getId()))
+                .collect(Collectors.toList());
+
+        return new TresorerieData(boutiqueIds, caissesFermees, ventesCaissesFermees,
+                remboursementsParVente, factures, paiementsParFacture, depensesGenerales, entreesGenerales,
+                mouvementsDepense, mouvementsRetrait);
+    }
+
+    /**
+     * Calcule le CA (Chiffre d'Affaires) pour une période donnée.
+     * Inclut : ventes + paiements factures + entrées générales
+     * Exclut : les transferts de fonds
+     */
+    private double calculerCAPeriode(TresorerieData data, Long entrepriseId, PeriodeDates periodeDates) {
+        double ca = 0.0;
+
+        // Ventes de la période (déjà filtrées dans chargerDonneesAvecPeriode)
+        for (Vente vente : data.toutesVentes) {
+            if (vente.getStatus() != VenteStatus.REMBOURSEE) {
+                ca += getValeurDouble(vente.getMontantTotal());
+            }
+        }
+
+        // Paiements factures de la période
+        if (periodeDates.filtrerParPeriode) {
+            List<Paiement> paiementsPeriode = paiementRepository.findByEntrepriseIdAndDatePaiementBetween(
+                    entrepriseId, periodeDates.dateDebut, periodeDates.dateFin);
+            for (Paiement paiement : paiementsPeriode) {
+                ca += getValeurDouble(paiement.getMontant());
+            }
+        }
+
+        // Entrées générales de la période (en excluant les transferts et les paiements de factures)
+        for (EntreeGenerale entree : data.entreesGenerales) {
+            if (!estEntreeDeTransfert(entree.getDesignation())
+                    && (entree.getDetteType() == null || !"PAIEMENT_FACTURE".equals(entree.getDetteType()))) {
+                ca += getValeurDouble(entree.getMontant());
+            }
+        }
+
+        return ca;
+    }
+
+    /**
+     * Calcule les sorties pour une période donnée.
+     * Inclut : dépenses générales + mouvements caisse DEPENSE + retraits
+     * Exclut : les transferts de fonds
+     */
+    private double calculerSortiesPeriode(TresorerieData data, Long entrepriseId, PeriodeDates periodeDates) {
+        double sorties = 0.0;
+
+        // Dépenses générales de la période (en excluant les transferts)
+        for (DepenseGenerale depense : data.depensesGenerales) {
+            if (!estDepenseDeTransfert(depense.getDesignation())) {
+                sorties += getValeurDouble(depense.getMontant());
+            }
+        }
+
+        // Mouvements caisse DEPENSE de la période
+        for (MouvementCaisse mouvement : data.mouvementsDepense) {
+            sorties += getValeurDouble(mouvement.getMontant());
+        }
+
+        // Retraits de la période
+        for (MouvementCaisse mouvement : data.mouvementsRetrait) {
+            sorties += getValeurDouble(mouvement.getMontant());
+        }
+
+        return sorties;
     }
 }

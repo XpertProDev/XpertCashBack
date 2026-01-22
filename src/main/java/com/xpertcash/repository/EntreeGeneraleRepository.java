@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -51,5 +52,17 @@ public interface EntreeGeneraleRepository extends JpaRepository<EntreeGenerale, 
     Optional<EntreeGenerale> findByIdAndEntrepriseId(
             @Param("id") Long id,
             @Param("entrepriseId") Long entrepriseId);
+    
+    // Récupérer les entrées générales d'une entreprise dans une période (optimisé)
+    @Query("SELECT DISTINCT e FROM EntreeGenerale e " +
+           "LEFT JOIN FETCH e.entreprise ent " +
+           "LEFT JOIN FETCH e.categorie " +
+           "WHERE ent.id = :entrepriseId " +
+           "AND e.dateCreation >= :dateDebut AND e.dateCreation < :dateFin " +
+           "ORDER BY e.dateCreation DESC")
+    List<EntreeGenerale> findByEntrepriseIdAndDateCreationBetween(
+            @Param("entrepriseId") Long entrepriseId,
+            @Param("dateDebut") LocalDateTime dateDebut,
+            @Param("dateFin") LocalDateTime dateFin);
 }
 
