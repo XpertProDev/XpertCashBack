@@ -290,7 +290,12 @@ public class TresorerieService {
         }
 
       
-        List<Vente> ventesCredit = venteRepository.findByBoutique_Entreprise_IdAndModePaiement(entrepriseId, ModePaiement.CREDIT);
+        // Filtrer uniquement les ventes à crédit des caisses fermées
+        // data.toutesVentes contient déjà uniquement les ventes des caisses fermées
+        List<Vente> ventesCredit = data.toutesVentes.stream()
+                .filter(v -> v.getModePaiement() == ModePaiement.CREDIT)
+                .collect(Collectors.toList());
+        
         for (Vente v : ventesCredit) {
             double total = getValeurDouble(v.getMontantTotal());
             double rembourse = getValeurDouble(v.getMontantTotalRembourse());
@@ -869,8 +874,12 @@ public class TresorerieService {
                 })
                 .sum();
 
-        List<Vente> ventesCredit = venteRepository.findByBoutique_Entreprise_IdAndModePaiement(entrepriseId, ModePaiement.CREDIT);
-        logger.info("Ventes à crédit trouvées pour l'entreprise {} : {}", entrepriseId, ventesCredit.size());
+        // Filtrer uniquement les ventes à crédit des caisses fermées
+        // data.toutesVentes contient déjà uniquement les ventes des caisses fermées
+        List<Vente> ventesCredit = data.toutesVentes.stream()
+                .filter(v -> v.getModePaiement() == ModePaiement.CREDIT)
+                .collect(Collectors.toList());
+        logger.info("Ventes à crédit trouvées pour l'entreprise {} (caisses fermées uniquement) : {}", entrepriseId, ventesCredit.size());
 
         double montantVentesCredit = 0.0;
         int nombreVentesCredit = 0;
