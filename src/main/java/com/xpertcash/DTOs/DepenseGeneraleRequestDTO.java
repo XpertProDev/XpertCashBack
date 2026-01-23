@@ -14,7 +14,7 @@ public class DepenseGeneraleRequestDTO {
     private Double prixUnitaire;
     private Integer quantite;
     private String source; // CAISSE, BANQUE, MOBILE_MONEY, DETTE
-    private String ordonnateur; // MANAGER, COMPTABLE
+    private Long ordonnateurId; // ID de l'utilisateur ordonnateur
     private String numeroCheque;
     private String typeCharge; // CHARGE_FIXE, CHARGE_VARIABLE
     private Long produitId; // Facultatif (pour compatibilité, mais sera remplacé par categorieLieeId)
