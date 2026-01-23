@@ -173,21 +173,21 @@ public class FactureProformaController {
 
 
     // Endpoint pour recuperer la liste des factures pro forma dune entreprise
-    @GetMapping("/mes-factures")
-    public ResponseEntity<Object> getFacturesParEntreprise(HttpServletRequest request) {
-        User user = authHelper.getAuthenticatedUserWithFallback(request);
+    // @GetMapping("/mes-factures")
+    // public ResponseEntity<Object> getFacturesParEntreprise(HttpServletRequest request) {
+    //     User user = authHelper.getAuthenticatedUserWithFallback(request);
 
-        try {
-            List<Map<String, Object>> factures = factureProformaService
-                    .getFacturesParEntrepriseParUtilisateur(user.getId(), request);
-            return ResponseEntity.ok(factures);
-        } catch (Exception e) {
-            e.printStackTrace(); // Pour loguer l’erreur réelle côté serveur
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("error", "Erreur interne lors de la récupération des factures",
-                                "details", e.getMessage()));
-        }
-    }
+    //     try {
+    //         List<Map<String, Object>> factures = factureProformaService
+    //                 .getFacturesParEntrepriseParUtilisateur(user.getId(), request);
+    //         return ResponseEntity.ok(factures);
+    //     } catch (Exception e) {
+    //         e.printStackTrace(); // Pour loguer l’erreur réelle côté serveur
+    //         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+    //                 .body(Map.of("error", "Erreur interne lors de la récupération des factures",
+    //                             "details", e.getMessage()));
+    //     }
+    // }
 
 
 

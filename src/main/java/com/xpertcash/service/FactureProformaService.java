@@ -907,10 +907,10 @@ public class FactureProformaService {
    
 
     //Methode pour recuperer les factures pro forma dune entreprise
-    @Transactional
-    public List<Map<String, Object>> getFacturesParEntrepriseParUtilisateur(Long userIdRequete, HttpServletRequest request) {
-        return getFacturesParEntrepriseParUtilisateurPaginated(userIdRequete, 0, Integer.MAX_VALUE, request).getContent();
-    }
+    // @Transactional
+    // public List<Map<String, Object>> getFacturesParEntrepriseParUtilisateur(Long userIdRequete, HttpServletRequest request) {
+    //     return getFacturesParEntrepriseParUtilisateurPaginated(userIdRequete, 0, Integer.MAX_VALUE, request).getContent();
+    // }
 
     // Méthode scalable avec pagination pour récupérer les factures proforma d'une entreprise
     @Transactional

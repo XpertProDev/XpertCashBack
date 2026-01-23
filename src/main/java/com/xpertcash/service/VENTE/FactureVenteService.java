@@ -327,7 +327,8 @@ public StatistiquesVenteGlobalesDTO getStatistiquesGlobales(HttpServletRequest r
         throw new RuntimeException("Token JWT manquant ou invalide");
     }
     String userUuid = jwtUtil.extractUserUuid(token.substring(7));
-    User user = usersRepository.findByUuid(userUuid)
+    // Utiliser la méthode optimisée avec JOIN FETCH pour éviter N+1
+    User user = usersRepository.findByUuidWithEntrepriseAndRole(userUuid)
             .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
 
     Long entrepriseId = user.getEntreprise() != null ? user.getEntreprise().getId() : null;
