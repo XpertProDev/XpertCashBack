@@ -3,9 +3,11 @@ package com.xpertcash.controller;
 import com.xpertcash.service.TresorerieService;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Supplier;
@@ -18,8 +20,12 @@ public class TresorerieController {
     private TresorerieService tresorerieService;
 
     @GetMapping("/tresorerie")
-    public ResponseEntity<?> getTresorerie(HttpServletRequest request) {
-        return handleRequest(() -> tresorerieService.calculerTresorerie(request));
+    public ResponseEntity<?> getTresorerie(
+            HttpServletRequest request,
+            @RequestParam(required = false, defaultValue = "aujourdhui") String periode,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateDebut,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateFin) {
+        return handleRequest(() -> tresorerieService.calculerTresorerie(request, periode, dateDebut, dateFin));
     }
 
     @GetMapping("/tresorerie/dettes")

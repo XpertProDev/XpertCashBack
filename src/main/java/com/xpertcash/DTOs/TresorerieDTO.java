@@ -38,6 +38,16 @@ public class TresorerieDTO {
     private Double totalTresorerie;
     
     /**
+     * Solde d'aujourd'hui (entrées d'aujourd'hui - sorties d'aujourd'hui, excluant les transferts)
+     */
+    private Double soldeAujourdhui;
+    
+    /**
+     * CA (Chiffre d'Affaires) d'aujourd'hui (somme de toutes les entrées d'aujourd'hui)
+     */
+    private Double caAujourdhui;
+    
+    /**
      * Détails pour la caisse
      */
     private CaisseDetail caisseDetail;

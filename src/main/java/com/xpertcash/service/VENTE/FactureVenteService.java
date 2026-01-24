@@ -19,12 +19,15 @@ import com.xpertcash.DTOs.VENTE.FactureVentePaginatedDTO;
 import com.xpertcash.DTOs.VENTE.ProduitFactureResponse;
 import com.xpertcash.DTOs.VENTE.ReceiptEmailRequest;
 import com.xpertcash.DTOs.VENTE.VenteLigneResponse;
+import com.xpertcash.DTOs.VENTE.StatistiquesVenteGlobalesDTO;
+import com.xpertcash.DTOs.VENTE.TopProduitVenduDTO;
 import com.xpertcash.configuration.JwtUtil;
 import com.xpertcash.entity.FactureVente;
 import com.xpertcash.entity.User;
 import com.xpertcash.entity.VENTE.Vente;
 import com.xpertcash.repository.FactureVenteRepository;
 import com.xpertcash.repository.UsersRepository;
+import com.xpertcash.repository.VENTE.VenteProduitRepository;
 
 import jakarta.servlet.http.HttpServletRequest;
 
@@ -37,9 +40,15 @@ public class FactureVenteService {
     private  UsersRepository usersRepository;
     @Autowired
     private  JwtUtil jwtUtil;
+    @Autowired
+    private VenteProduitRepository venteProduitRepository;
 
 private FactureVenteResponseDTO toResponse(FactureVente facture) {
     Vente vente = facture.getVente();
+    
+    // Récupérer la remise globale
+    Double remiseGlobale = vente.getRemiseGlobale() != null ? vente.getRemiseGlobale() : 0.0;
+    boolean hasRemiseGlobale = remiseGlobale > 0;
 
     List<ProduitFactureResponse> produits = vente.getProduits().stream()
             .map(ligne -> {
@@ -50,13 +59,32 @@ private FactureVenteResponseDTO toResponse(FactureVente facture) {
                     quantiteAffichee = ligne.getQuantite();
                 }
                 
+                // Calculer le prix unitaire original si une remise globale a été appliquée
+                Double prixUnitaireAffiche = ligne.getPrixUnitaire();
+                Double montantLigneAffiche = ligne.getMontantLigne();
+                
+                if (hasRemiseGlobale) {
+                    // Calcul inverse : prix_original = prix_actuel / (1 - remise_globale/100)
+                    // Le montant actuel est déjà après remise, donc on recalcule le montant original
+                    double montantLigneOriginal = montantLigneAffiche / (1 - remiseGlobale / 100.0);
+                    prixUnitaireAffiche = montantLigneOriginal / quantiteAffichee;
+                    montantLigneAffiche = montantLigneOriginal;
+                    
+                    // Arrondir à 2 décimales pour éviter les erreurs de précision
+                    prixUnitaireAffiche = Math.round(prixUnitaireAffiche * 100.0) / 100.0;
+                    montantLigneAffiche = Math.round(montantLigneAffiche * 100.0) / 100.0;
+                }
+                
+                // Arrondir toutes les valeurs monétaires à 2 décimales
+                Double remiseArrondie = Math.round(ligne.getRemise() * 100.0) / 100.0;
+                
                 return new ProduitFactureResponse(
                         ligne.getProduit().getId(),
                         ligne.getProduit().getNom(),
                         quantiteAffichee,
-                        ligne.getPrixUnitaire(),
-                        ligne.getRemise(),
-                        ligne.getMontantLigne()
+                        prixUnitaireAffiche,
+                        remiseArrondie,
+                        montantLigneAffiche
                 );
             })
             .collect(Collectors.toList());
@@ -75,11 +103,18 @@ private FactureVenteResponseDTO toResponse(FactureVente facture) {
                      (vente.getMontantTotal() != null ? vente.getMontantTotal() : 0.0);
     }
 
+    // Arrondir toutes les valeurs monétaires à 2 décimales
+    Double montantTotalArrondi = facture.getMontantTotal() != null ? 
+        Math.round(facture.getMontantTotal() * 100.0) / 100.0 : 0.0;
+    Double montantDetteArrondi = Math.round(montantDette * 100.0) / 100.0;
+    Double montantPayeArrondi = Math.round(montantPaye * 100.0) / 100.0;
+    Double remiseGlobaleArrondie = Math.round(remiseGlobale * 100.0) / 100.0;
+    
     FactureVenteResponseDTO dto = new FactureVenteResponseDTO();
     dto.setId(facture.getId());
     dto.setNumeroFacture(facture.getNumeroFacture());
     dto.setDateEmission(facture.getDateEmission());
-    dto.setMontantTotal(facture.getMontantTotal());
+    dto.setMontantTotal(montantTotalArrondi);
     dto.setClientNom(vente.getClientNom());
     dto.setClientNumero(vente.getClientNumero());
     dto.setBoutiqueNom(vente.getBoutique().getNomBoutique());
@@ -87,8 +122,9 @@ private FactureVenteResponseDTO toResponse(FactureVente facture) {
     dto.setStatutRemboursement(statutRemboursement);
     dto.setCaisseId(vente.getCaisse() != null ? vente.getCaisse().getId() : null);
     dto.setVendeur(vente.getVendeur() != null ? vente.getVendeur().getNomComplet() : null);
-    dto.setMontantDette(montantDette);
-    dto.setMontantPaye(montantPaye);
+    dto.setMontantDette(montantDetteArrondi);
+    dto.setMontantPaye(montantPayeArrondi);
+    dto.setRemiseGlobale(remiseGlobaleArrondie); // Ajouter la remise globale
     
     return dto;
 }
@@ -279,6 +315,44 @@ public ReceiptEmailRequest getFactureDataForEmail(String venteId, String email, 
     receiptRequest.setRemisesProduits(remisesProduits.isEmpty() ? null : remisesProduits);
     
     return receiptRequest;
+}
+
+/**
+ * Récupère les statistiques globales de vente pour l'entreprise de l'utilisateur connecté
+ * Inclut les 3 meilleurs produits vendus
+ */
+public StatistiquesVenteGlobalesDTO getStatistiquesGlobales(HttpServletRequest request) {
+    String token = request.getHeader("Authorization");
+    if (token == null || !token.startsWith("Bearer ")) {
+        throw new RuntimeException("Token JWT manquant ou invalide");
+    }
+    String userUuid = jwtUtil.extractUserUuid(token.substring(7));
+    // Utiliser la méthode optimisée avec JOIN FETCH pour éviter N+1
+    User user = usersRepository.findByUuidWithEntrepriseAndRole(userUuid)
+            .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+
+    Long entrepriseId = user.getEntreprise() != null ? user.getEntreprise().getId() : null;
+    if (entrepriseId == null) {
+        throw new RuntimeException("Aucune entreprise associée à cet utilisateur");
+    }
+
+    List<Object[]> top3ProduitsData = venteProduitRepository.findTop3ProduitsVendusByEntrepriseId(entrepriseId);
+
+    List<TopProduitVenduDTO> top3Produits = top3ProduitsData.stream()
+            .map(row -> {
+                TopProduitVenduDTO dto = new TopProduitVenduDTO();
+                dto.setProduitId(((Number) row[0]).longValue());
+                dto.setNomProduit((String) row[1]);
+                dto.setTotalQuantite(((Number) row[2]).longValue());
+                dto.setTotalMontant(row[3] != null ? ((Number) row[3]).doubleValue() : 0.0);
+                return dto;
+            })
+            .collect(Collectors.toList());
+
+    StatistiquesVenteGlobalesDTO statistiques = new StatistiquesVenteGlobalesDTO();
+    statistiques.setTop3ProduitsVendus(top3Produits);
+
+    return statistiques;
 }
 
 }

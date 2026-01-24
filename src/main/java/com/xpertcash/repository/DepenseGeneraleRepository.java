@@ -1,5 +1,6 @@
 package com.xpertcash.repository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -43,5 +44,18 @@ public interface DepenseGeneraleRepository extends JpaRepository<DepenseGenerale
         @Param("month") int month,
         @Param("year") int year
     );
+    
+    // Récupérer les dépenses générales d'une entreprise dans une période (optimisé)
+    @Query("SELECT DISTINCT d FROM DepenseGenerale d " +
+           "LEFT JOIN FETCH d.entreprise e " +
+           "LEFT JOIN FETCH d.categorie " +
+           "LEFT JOIN FETCH d.categorieLiee " +
+           "WHERE e.id = :entrepriseId " +
+           "AND d.dateCreation >= :dateDebut AND d.dateCreation < :dateFin " +
+           "ORDER BY d.dateCreation DESC")
+    List<DepenseGenerale> findByEntrepriseIdAndDateCreationBetween(
+            @Param("entrepriseId") Long entrepriseId,
+            @Param("dateDebut") LocalDateTime dateDebut,
+            @Param("dateFin") LocalDateTime dateFin);
 }
 
