@@ -259,9 +259,13 @@ public FactureVentePaginatedDTO getAllFacturesWithPagination(
 
 /**
  * Calcule les dates de début et fin selon le type de période.
- * Même logique que dans TresorerieService.
  */
 private PeriodeDates calculerDatesPeriode(String periode, LocalDate dateDebut, LocalDate dateFin) {
+    // Si dateDebut et dateFin sont fournis, utiliser automatiquement la période personnalisée
+    if (dateDebut != null && dateFin != null) {
+        return new PeriodeDates(dateDebut.atStartOfDay(), dateFin.plusDays(1).atStartOfDay(), true);
+    }
+    
     if (periode == null || periode.trim().isEmpty()) {
         periode = "aujourdhui";
     }
