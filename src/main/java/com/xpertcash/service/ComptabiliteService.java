@@ -18,7 +18,6 @@ import com.xpertcash.DTOs.VENTE.VenteResponse;
 import com.xpertcash.DTOs.VENTE.FermetureCaisseResponseDTO;
 import com.xpertcash.entity.Paiement;
 import com.xpertcash.entity.FactureVente;
-import com.xpertcash.service.TransfertFondsService;
 import com.xpertcash.service.VENTE.TransactionSummaryService;
 import com.xpertcash.entity.*;
 import com.xpertcash.entity.Enum.*;
@@ -926,7 +925,12 @@ public class ComptabiliteService {
         detail.setQuantite(depense.getQuantite());
         detail.setMontant(depense.getMontant());
         detail.setSource(depense.getSource() != null ? depense.getSource().name() : null);
-        detail.setOrdonnateur(depense.getOrdonnateur() != null ? depense.getOrdonnateur().getNomComplet() : null);
+        try {
+            detail.setOrdonnateur(depense.getOrdonnateur() != null ? depense.getOrdonnateur().getNomComplet() : null);
+        } catch (Exception e) {
+            // Gérer le cas où ordonnateur_id est invalide (ex: id = 0)
+            detail.setOrdonnateur(null);
+        }
         detail.setNumeroCheque(depense.getNumeroCheque());
         detail.setTypeCharge(depense.getTypeCharge() != null ? depense.getTypeCharge().name() : null);
         detail.setProduitNom(depense.getProduit() != null ? depense.getProduit().getNom() : null);
@@ -1853,9 +1857,16 @@ public class ComptabiliteService {
         dto.setQuantite(depense.getQuantite());
         dto.setMontant(depense.getMontant());
         dto.setSource(depense.getSource() != null ? depense.getSource().name() : null);
-        if (depense.getOrdonnateur() != null) {
-            dto.setOrdonnateurId(depense.getOrdonnateur().getId());
-            dto.setOrdonnateurNom(depense.getOrdonnateur().getNomComplet());
+        try {
+            if (depense.getOrdonnateur() != null) {
+                dto.setOrdonnateurId(depense.getOrdonnateur().getId());
+                dto.setOrdonnateurNom(depense.getOrdonnateur().getNomComplet());
+            }
+        } catch (Exception e) {
+            // Gérer le cas où ordonnateur_id est invalide (ex: id = 0)
+            // Ne pas bloquer le mapping, juste ne pas définir l'ordonnateur
+            dto.setOrdonnateurId(null);
+            dto.setOrdonnateurNom(null);
         }
         dto.setNumeroCheque(depense.getNumeroCheque());
         dto.setTypeCharge(depense.getTypeCharge() != null ? depense.getTypeCharge().name() : null);

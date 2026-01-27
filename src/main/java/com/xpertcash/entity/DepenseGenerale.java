@@ -7,6 +7,8 @@ import com.xpertcash.entity.Enum.SourceDepense;
 import com.xpertcash.entity.Enum.TypeCharge;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.NotFound;
+import org.hibernate.annotations.NotFoundAction;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -52,6 +54,7 @@ public class DepenseGenerale {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "ordonnateur_id", nullable = false)
+    @NotFound(action = NotFoundAction.IGNORE)
     @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
     private User ordonnateur;
 

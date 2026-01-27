@@ -89,7 +89,7 @@ public class TresorerieService {
     }
 
      // Calcule la trésorerie pour une entreprise donnée.
-  
+
     @Transactional(readOnly = true)
     public TresorerieDTO calculerTresorerieParEntrepriseId(Long entrepriseId) {
         try {
@@ -479,7 +479,7 @@ public class TresorerieService {
     }
 
      // Charge toutes les données nécessaires pour le calcul de la trésorerie.
-    
+
     private TresorerieData chargerDonnees(Long entrepriseId) {
         List<Boutique> boutiques = boutiqueRepository.findByEntrepriseId(entrepriseId);
         List<Long> boutiqueIds = boutiques.stream()
