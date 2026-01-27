@@ -19,7 +19,8 @@ public class DepenseGeneraleResponseDTO {
     private Integer quantite;
     private Double montant;
     private String source;
-    private String ordonnateur;
+    private Long ordonnateurId;
+    private String ordonnateurNom;
     private String numeroCheque;
     private String typeCharge;
     private Long produitId;

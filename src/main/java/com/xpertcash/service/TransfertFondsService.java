@@ -4,7 +4,6 @@ import com.xpertcash.DTOs.TransfertFondsRequestDTO;
 import com.xpertcash.DTOs.TransfertFondsResponseDTO;
 import com.xpertcash.DTOs.TresorerieDTO;
 import com.xpertcash.entity.*;
-import com.xpertcash.entity.Enum.Ordonnateur;
 import com.xpertcash.entity.Enum.RoleType;
 import com.xpertcash.entity.Enum.SourceDepense;
 import com.xpertcash.entity.Enum.SourceTresorerie;
@@ -280,7 +279,7 @@ public class TransfertFondsService {
         depense.setQuantite(montant < 0 ? -1 : 1);
         depense.setMontant(montant);
         depense.setSource(source);
-        depense.setOrdonnateur(Ordonnateur.MANAGER);
+        depense.setOrdonnateur(user); // Utiliser l'utilisateur connecté comme ordonnateur
         depense.setTypeCharge(TypeCharge.CHARGE_FIXE);
         depense.setEntreprise(user.getEntreprise());
         depense.setCreePar(user);

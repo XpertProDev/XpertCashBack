@@ -926,7 +926,7 @@ public class ComptabiliteService {
         detail.setQuantite(depense.getQuantite());
         detail.setMontant(depense.getMontant());
         detail.setSource(depense.getSource() != null ? depense.getSource().name() : null);
-        detail.setOrdonnateur(depense.getOrdonnateur() != null ? depense.getOrdonnateur().name() : null);
+        detail.setOrdonnateur(depense.getOrdonnateur() != null ? depense.getOrdonnateur().getNomComplet() : null);
         detail.setNumeroCheque(depense.getNumeroCheque());
         detail.setTypeCharge(depense.getTypeCharge() != null ? depense.getTypeCharge().name() : null);
         detail.setProduitNom(depense.getProduit() != null ? depense.getProduit().getNom() : null);
@@ -1422,7 +1422,7 @@ public class ComptabiliteService {
         
         CategorieDepense categorie = getOrCreateCategorie(request, user);
         SourceDepense source = parseEnum(SourceDepense.class, request.getSource(), "Source");
-        Ordonnateur ordonnateur = parseEnum(Ordonnateur.class, request.getOrdonnateur(), "Ordonnateur");
+        User ordonnateur = validateOrdonnateur(request.getOrdonnateurId(), user);
         TypeCharge typeCharge = parseEnum(TypeCharge.class, request.getTypeCharge(), "TypeCharge");
         
         Categorie categorieLiee = null;
@@ -1557,8 +1557,8 @@ public class ComptabiliteService {
         if (request.getSource() == null || request.getSource().trim().isEmpty()) {
             throw new RuntimeException("La source est obligatoire.");
         }
-        if (request.getOrdonnateur() == null || request.getOrdonnateur().trim().isEmpty()) {
-            throw new RuntimeException("L'ordonnateur est obligatoire.");
+        if (request.getOrdonnateurId() == null) {
+            throw new RuntimeException("L'ordonnateur (ID utilisateur) est obligatoire.");
         }
         if (request.getTypeCharge() == null || request.getTypeCharge().trim().isEmpty()) {
             throw new RuntimeException("Le type de charge est obligatoire.");
@@ -1696,6 +1696,26 @@ public class ComptabiliteService {
     }
 
     /**
+     * Valide et récupère un ordonnateur
+     */
+    private User validateOrdonnateur(Long ordonnateurId, User user) {
+        if (ordonnateurId == null) {
+            throw new RuntimeException("L'ordonnateur (ID utilisateur) est obligatoire.");
+        }
+        
+        Long entrepriseId = user.getEntreprise() != null ? user.getEntreprise().getId() : null;
+        if (entrepriseId == null) {
+            throw new RuntimeException("L'utilisateur n'a pas d'entreprise associée.");
+        }
+
+        // Récupérer l'ordonnateur (isolé par entreprise)
+        User ordonnateur = usersRepository.findByIdAndEntrepriseId(ordonnateurId, entrepriseId)
+                .orElseThrow(() -> new RuntimeException("Ordonnateur non trouvé ou n'appartient pas à votre entreprise."));
+        
+        return ordonnateur;
+    }
+
+    /**
      * Génère un numéro unique pour une dépense générale au format "DP: 001-11-2025"
      * Le compteur est réinitialisé chaque mois
      */
@@ -1787,7 +1807,7 @@ public class ComptabiliteService {
             User user,
             CategorieDepense categorie,
             SourceDepense source,
-            Ordonnateur ordonnateur,
+            User ordonnateur,
             TypeCharge typeCharge,
             Produit produit,
             Fournisseur fournisseur,
@@ -1833,7 +1853,10 @@ public class ComptabiliteService {
         dto.setQuantite(depense.getQuantite());
         dto.setMontant(depense.getMontant());
         dto.setSource(depense.getSource() != null ? depense.getSource().name() : null);
-        dto.setOrdonnateur(depense.getOrdonnateur() != null ? depense.getOrdonnateur().name() : null);
+        if (depense.getOrdonnateur() != null) {
+            dto.setOrdonnateurId(depense.getOrdonnateur().getId());
+            dto.setOrdonnateurNom(depense.getOrdonnateur().getNomComplet());
+        }
         dto.setNumeroCheque(depense.getNumeroCheque());
         dto.setTypeCharge(depense.getTypeCharge() != null ? depense.getTypeCharge().name() : null);
         if (depense.getProduit() != null) {

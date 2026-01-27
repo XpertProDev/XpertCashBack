@@ -3,7 +3,6 @@ package com.xpertcash.entity;
 import java.time.LocalDateTime;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.xpertcash.entity.Enum.Ordonnateur;
 import com.xpertcash.entity.Enum.SourceDepense;
 import com.xpertcash.entity.Enum.TypeCharge;
 
@@ -51,9 +50,10 @@ public class DepenseGenerale {
     @Column(nullable = false)
     private SourceDepense source;
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
-    private Ordonnateur ordonnateur;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "ordonnateur_id", nullable = false)
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
+    private User ordonnateur;
 
     @Column(name = "numero_cheque")
     private String numeroCheque;
