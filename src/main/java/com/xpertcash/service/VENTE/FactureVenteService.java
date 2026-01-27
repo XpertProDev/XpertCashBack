@@ -1,6 +1,7 @@
 package com.xpertcash.service.VENTE;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -139,6 +140,9 @@ public FactureVentePaginatedDTO getAllFacturesWithPagination(
         int size, 
         String sortBy, 
         String sortDir,
+        String periode,
+        LocalDate dateDebut,
+        LocalDate dateFin,
         HttpServletRequest request) {
     
     String token = request.getHeader("Authorization");
@@ -151,18 +155,63 @@ public FactureVentePaginatedDTO getAllFacturesWithPagination(
 
     Long entrepriseId = user.getEntreprise().getId();
 
-    List<FactureVente> allFactures = factureVenteRepository.findAllByEntrepriseId(entrepriseId);
+    // Calculer les dates selon la période
+    PeriodeDates periodeDates = calculerDatesPeriode(periode, dateDebut, dateFin);
+    
+    // Récupérer les factures selon la période
+    List<FactureVente> allFactures;
+    if (periodeDates.filtrerParPeriode) {
+        allFactures = factureVenteRepository.findAllByEntrepriseIdAndDateEmissionBetween(
+                entrepriseId, periodeDates.dateDebut, periodeDates.dateFin);
+    } else {
+        allFactures = factureVenteRepository.findAllByEntrepriseId(entrepriseId);
+    }
     
     List<FactureVenteResponseDTO> allItems = allFactures.stream()
             .map(this::toResponse)
             .collect(Collectors.toList());
     
+    // Trier selon le critère spécifié
     allItems.sort((item1, item2) -> {
-        if (sortDir.equalsIgnoreCase("desc")) {
-            return item2.getDateEmission().compareTo(item1.getDateEmission());
-        } else {
-            return item1.getDateEmission().compareTo(item2.getDateEmission());
+        int comparison = 0;
+        
+        switch (sortBy.toLowerCase()) {
+            case "dateemission":
+            case "date":
+                if (sortDir.equalsIgnoreCase("desc")) {
+                    comparison = item2.getDateEmission().compareTo(item1.getDateEmission());
+                } else {
+                    comparison = item1.getDateEmission().compareTo(item2.getDateEmission());
+                }
+                break;
+            case "vendeur":
+                String vendeur1 = item1.getVendeur() != null ? item1.getVendeur() : "";
+                String vendeur2 = item2.getVendeur() != null ? item2.getVendeur() : "";
+                comparison = vendeur1.compareToIgnoreCase(vendeur2);
+                if (sortDir.equalsIgnoreCase("desc")) {
+                    comparison = -comparison;
+                }
+                break;
+            case "boutique":
+            case "boutiquenom":
+                String boutique1 = item1.getBoutiqueNom() != null ? item1.getBoutiqueNom() : "";
+                String boutique2 = item2.getBoutiqueNom() != null ? item2.getBoutiqueNom() : "";
+                comparison = boutique1.compareToIgnoreCase(boutique2);
+                if (sortDir.equalsIgnoreCase("desc")) {
+                    comparison = -comparison;
+                }
+                break;
+            default:
+                // Par défaut, trier par dateEmission
+                if (sortDir.equalsIgnoreCase("desc")) {
+                    comparison = item2.getDateEmission().compareTo(item1.getDateEmission());
+                } else {
+                    comparison = item1.getDateEmission().compareTo(item2.getDateEmission());
+                }
+                break;
         }
+        
+        return comparison;
     });
     
     double totalMontantFactures = allItems.stream()
@@ -208,6 +257,76 @@ public FactureVentePaginatedDTO getAllFacturesWithPagination(
     return response;
 }
 
+/**
+ * Calcule les dates de début et fin selon le type de période.
+ */
+private PeriodeDates calculerDatesPeriode(String periode, LocalDate dateDebut, LocalDate dateFin) {
+    // Si dateDebut et dateFin sont fournis, utiliser automatiquement la période personnalisée
+    if (dateDebut != null && dateFin != null) {
+        return new PeriodeDates(dateDebut.atStartOfDay(), dateFin.plusDays(1).atStartOfDay(), true);
+    }
+    
+    if (periode == null || periode.trim().isEmpty()) {
+        periode = "aujourdhui";
+    }
+    
+    LocalDateTime dateStart;
+    LocalDateTime dateEnd;
+    boolean filtrerParPeriode = true;
+
+    switch (periode.toLowerCase()) {
+        case "aujourdhui":
+            dateStart = LocalDate.now().atStartOfDay();
+            dateEnd = dateStart.plusDays(1);
+            break;
+        case "hier":
+            dateStart = LocalDate.now().minusDays(1).atStartOfDay();
+            dateEnd = dateStart.plusDays(1);
+            break;
+        case "semaine":
+            LocalDate aujourdhui = LocalDate.now();
+            dateStart = aujourdhui.minusDays(aujourdhui.getDayOfWeek().getValue() - 1).atStartOfDay();
+            dateEnd = dateStart.plusWeeks(1);
+            break;
+        case "mois":
+            dateStart = LocalDate.now().withDayOfMonth(1).atStartOfDay();
+            dateEnd = dateStart.plusMonths(1);
+            break;
+        case "annee":
+            dateStart = LocalDate.now().withDayOfYear(1).atStartOfDay();
+            dateEnd = dateStart.plusYears(1);
+            break;
+        case "personnalise":
+            if (dateDebut == null || dateFin == null) {
+                throw new RuntimeException("Les dates de début et de fin sont requises pour une période personnalisée.");
+            }
+            dateStart = dateDebut.atStartOfDay();
+            dateEnd = dateFin.plusDays(1).atStartOfDay();
+            break;
+        default:
+            // Par défaut, pas de filtre (toutes les données)
+            filtrerParPeriode = false;
+            dateStart = null;
+            dateEnd = null;
+    }
+
+    return new PeriodeDates(dateStart, dateEnd, filtrerParPeriode);
+}
+
+/**
+ * Classe pour stocker les dates de début et fin d'une période.
+ */
+private static class PeriodeDates {
+    final LocalDateTime dateDebut;
+    final LocalDateTime dateFin;
+    final boolean filtrerParPeriode;
+
+    PeriodeDates(LocalDateTime dateDebut, LocalDateTime dateFin, boolean filtrerParPeriode) {
+        this.dateDebut = dateDebut;
+        this.dateFin = dateFin;
+        this.filtrerParPeriode = filtrerParPeriode;
+    }
+}
 
 public String genererNumeroFactureCompact(Vente vente) {
     //  Ticket ID modulo 1000 → 3 chiffres

@@ -18,6 +18,8 @@ public interface DepenseGeneraleRepository extends JpaRepository<DepenseGenerale
            "LEFT JOIN FETCH d.entreprise e " +
            "LEFT JOIN FETCH d.categorie " +
            "LEFT JOIN FETCH d.categorieLiee " +
+           "LEFT JOIN FETCH d.ordonnateur " +
+           "LEFT JOIN FETCH d.creePar " +
            "WHERE e.id = :entrepriseId")
     List<DepenseGenerale> findByEntrepriseId(@Param("entrepriseId") Long entrepriseId);
     
@@ -26,6 +28,8 @@ public interface DepenseGeneraleRepository extends JpaRepository<DepenseGenerale
            "LEFT JOIN FETCH d.entreprise e " +
            "LEFT JOIN FETCH d.categorie " +
            "LEFT JOIN FETCH d.categorieLiee " +
+           "LEFT JOIN FETCH d.ordonnateur " +
+           "LEFT JOIN FETCH d.creePar " +
            "WHERE e.id = :entrepriseId " +
            "ORDER BY d.dateCreation DESC")
     List<DepenseGenerale> findByEntrepriseIdOrderByDateCreationDesc(@Param("entrepriseId") Long entrepriseId);
@@ -35,6 +39,8 @@ public interface DepenseGeneraleRepository extends JpaRepository<DepenseGenerale
            "LEFT JOIN FETCH d.entreprise e " +
            "LEFT JOIN FETCH d.categorie " +
            "LEFT JOIN FETCH d.categorieLiee " +
+           "LEFT JOIN FETCH d.ordonnateur " +
+           "LEFT JOIN FETCH d.creePar " +
            "WHERE e.id = :entrepriseId " +
            "AND MONTH(d.dateCreation) = :month " +
            "AND YEAR(d.dateCreation) = :year " +
@@ -50,6 +56,8 @@ public interface DepenseGeneraleRepository extends JpaRepository<DepenseGenerale
            "LEFT JOIN FETCH d.entreprise e " +
            "LEFT JOIN FETCH d.categorie " +
            "LEFT JOIN FETCH d.categorieLiee " +
+           "LEFT JOIN FETCH d.ordonnateur " +
+           "LEFT JOIN FETCH d.creePar " +
            "WHERE e.id = :entrepriseId " +
            "AND d.dateCreation >= :dateDebut AND d.dateCreation < :dateFin " +
            "ORDER BY d.dateCreation DESC")

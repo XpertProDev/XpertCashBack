@@ -197,6 +197,9 @@ public VenteResponse enregistrerVente(VenteRequest request, HttpServletRequest h
 
         double prixApresRemise = prixUnitaire * (1 - remisePct / 100.0);
         double montantLigne = prixApresRemise * quantiteVendue;
+        
+        // Arrondir à 2 décimales avant de sauvegarder pour éviter les erreurs de précision
+        montantLigne = Math.round(montantLigne * 100.0) / 100.0;
         montantTotalSansRemise += montantLigne;
 
         VenteProduit ligne = new VenteProduit();
@@ -209,6 +212,8 @@ public VenteResponse enregistrerVente(VenteRequest request, HttpServletRequest h
         lignes.add(ligne);
     }
 
+    // Arrondir le montant total sans remise à 2 décimales
+    montantTotalSansRemise = Math.round(montantTotalSansRemise * 100.0) / 100.0;
     double montantTotal = montantTotalSansRemise;
 
     if (request.getRemiseGlobale() != null && request.getRemiseGlobale() > 0) {
@@ -219,12 +224,20 @@ public VenteResponse enregistrerVente(VenteRequest request, HttpServletRequest h
             double proportion = ligne.getMontantLigne() / montantTotalSansRemise;
             double montantRemiseLigne = montantTotalSansRemise * (remiseGlobalePct / 100.0) * proportion;
             double nouveauMontantLigne = ligne.getMontantLigne() - montantRemiseLigne;
+            
+            // Arrondir à 2 décimales avant de sauvegarder
+            nouveauMontantLigne = Math.round(nouveauMontantLigne * 100.0) / 100.0;
+            double nouveauPrixUnitaire = nouveauMontantLigne / ligne.getQuantite();
+            nouveauPrixUnitaire = Math.round(nouveauPrixUnitaire * 100.0) / 100.0;
+            
             ligne.setMontantLigne(nouveauMontantLigne);
-            ligne.setPrixUnitaire(nouveauMontantLigne / ligne.getQuantite());
+            ligne.setPrixUnitaire(nouveauPrixUnitaire);
             ligne.setRemise(0.0);
         }
 
         montantTotal = lignes.stream().mapToDouble(VenteProduit::getMontantLigne).sum();
+        // Arrondir le montant total à 2 décimales
+        montantTotal = Math.round(montantTotal * 100.0) / 100.0;
     } else {
         vente.setRemiseGlobale(0.0);
     }
@@ -239,13 +252,16 @@ public VenteResponse enregistrerVente(VenteRequest request, HttpServletRequest h
     produitRepository.saveAll(produits.values());
 
     // Historique de vente
-    VenteHistorique historique = new VenteHistorique();
-    historique.setVente(vente);
-    historique.setDateAction(java.time.LocalDateTime.now());
-    historique.setAction("ENREGISTREMENT_VENTE");
-    historique.setDetails("Vente enregistrée par le vendeur " + vendeur.getNomComplet());
-    historique.setMontant(vente.getMontantTotal());
-    venteHistoriqueRepository.save(historique);
+        VenteHistorique historique = new VenteHistorique();
+        historique.setVente(vente);
+        historique.setDateAction(java.time.LocalDateTime.now());
+        historique.setAction("ENREGISTREMENT_VENTE");
+        historique.setDetails("Vente enregistrée par le vendeur " + vendeur.getNomComplet());
+        // Arrondir le montant de l'historique à 2 décimales
+        Double montantHistorique = vente.getMontantTotal() != null ? 
+            Math.round(vente.getMontantTotal() * 100.0) / 100.0 : 0.0;
+        historique.setMontant(montantHistorique);
+        venteHistoriqueRepository.save(historique);
 
     //  Facture (UUID unique)
     String numeroFacture = factureVenteService.genererNumeroFactureCompact(vente); 
@@ -253,9 +269,11 @@ public VenteResponse enregistrerVente(VenteRequest request, HttpServletRequest h
     facture.setVente(vente);
     // facture.setNumeroFacture("FV-" + UUID.randomUUID());
    facture.setNumeroFacture(numeroFacture);   
-    facture.setDateEmission(java.time.LocalDateTime.now());
-    facture.setMontantTotal(montantTotal);
-    factureVenteRepository.save(facture);
+        facture.setDateEmission(java.time.LocalDateTime.now());
+        // Arrondir le montant total de la facture à 2 décimales
+        Double montantTotalFacture = Math.round(montantTotal * 100.0) / 100.0;
+        facture.setMontantTotal(montantTotalFacture);
+        factureVenteRepository.save(facture);
 
     ModePaiement modePaiement = null;
     if (request.getModePaiement() != null) {
@@ -279,8 +297,10 @@ public VenteResponse enregistrerVente(VenteRequest request, HttpServletRequest h
                 throw new RuntimeException("Le montant versé (" + montantVerse + ") ne peut pas dépasser le montant total de la vente (" + montantTotal + ").");
             }
 
-            vente.setMontantPaye(montantVerse);
-            vente.setMontantTotalRembourse(montantVerse);
+            // Arrondir le montant versé à 2 décimales
+            Double montantVerseArrondi = Math.round(montantVerse * 100.0) / 100.0;
+            vente.setMontantPaye(montantVerseArrondi);
+            vente.setMontantTotalRembourse(montantVerseArrondi);
             vente.setDateDernierRemboursement(java.time.LocalDateTime.now());
             vente.setNombreRemboursements(1);
             vente.setStatus(VenteStatus.EN_COURS);
@@ -300,6 +320,7 @@ public VenteResponse enregistrerVente(VenteRequest request, HttpServletRequest h
         }
     } else {
         vente.setModePaiement(modePaiement);
+        // Le montantTotal est déjà arrondi plus haut
         vente.setMontantPaye(montantTotal);
         vente.setStatus(VenteStatus.PAYEE);
 

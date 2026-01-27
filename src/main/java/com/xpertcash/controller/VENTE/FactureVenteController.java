@@ -42,10 +42,13 @@ public class FactureVenteController {
             @RequestParam(defaultValue = "20") int size,
             @RequestParam(defaultValue = "dateEmission") String sortBy,
             @RequestParam(defaultValue = "desc") String sortDir,
+            @RequestParam(required = false, defaultValue = "aujourdhui") String periode,
+            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate dateDebut,
+            @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate dateFin,
             HttpServletRequest request) {
         
         FactureVentePaginatedDTO factures = factureVenteService.getAllFacturesWithPagination(
-            page, size, sortBy, sortDir, request);
+            page, size, sortBy, sortDir, periode, dateDebut, dateFin, request);
         return ResponseEntity.ok(factures);
     }
 
