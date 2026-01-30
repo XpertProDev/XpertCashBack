@@ -14272,3 +14272,8 @@ java.lang.ClassNotFoundException: java.text.ListFormat
 2026-01-27 15:39:36.973 [http-nio-8080-exec-7] DEBUG o.s.w.s.m.m.a.HttpEntityMethodProcessor - Using 'application/json', given [application/json, text/plain, */*] and supported [application/json, application/*+json, application/yaml]
 2026-01-27 15:39:37.125 [http-nio-8080-exec-7] DEBUG o.s.w.s.m.m.a.HttpEntityMethodProcessor - Writing [FactureProformaPaginatedResponseDTO(content=[{dateRelance=null, dateCreation=2026-01-27T15:27:12, no (truncated)...]
 2026-01-27 15:39:37.133 [http-nio-8080-exec-7] DEBUG o.s.web.servlet.DispatcherServlet - Completed 200 OK
+2026-01-27 17:54:42.935 [http-nio-8080-exec-1] DEBUG o.s.web.servlet.DispatcherServlet - POST "/api/auth/logout", parameters={}
+2026-01-27 17:54:42.943 [http-nio-8080-exec-1] DEBUG o.s.w.s.m.m.a.RequestMappingHandlerMapping - Mapped to com.xpertcash.controller.UsersController#logout(HttpServletRequest)
+2026-01-27 17:54:43.414 [http-nio-8080-exec-1] DEBUG o.s.w.s.m.m.a.HttpEntityMethodProcessor - Using 'application/json', given [application/json, text/plain, */*] and supported [application/json, application/*+json, application/yaml]
+2026-01-27 17:54:43.417 [http-nio-8080-exec-1] DEBUG o.s.w.s.m.m.a.HttpEntityMethodProcessor - Writing [{message=Déconnexion réussie. Le token a été invalidé.}]
+2026-01-27 17:54:43.429 [http-nio-8080-exec-1] DEBUG o.s.web.servlet.DispatcherServlet - Completed 200 OK
