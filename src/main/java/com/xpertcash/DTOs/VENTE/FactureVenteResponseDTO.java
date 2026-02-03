@@ -26,5 +26,6 @@ public class FactureVenteResponseDTO {
     private Long caisseId;
     private String vendeur;
     private Double remiseGlobale; // Remise globale appliquée à la vente
+    private String statutCaisse; // Statut de la caisse liée à la vente (OUVERTE, FERMEE, etc.)
 
 }

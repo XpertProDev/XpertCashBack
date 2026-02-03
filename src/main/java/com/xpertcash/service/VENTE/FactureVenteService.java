@@ -22,10 +22,12 @@ import com.xpertcash.DTOs.VENTE.ReceiptEmailRequest;
 import com.xpertcash.DTOs.VENTE.VenteLigneResponse;
 import com.xpertcash.DTOs.VENTE.StatistiquesVenteGlobalesDTO;
 import com.xpertcash.DTOs.VENTE.TopProduitVenduDTO;
+import com.xpertcash.DTOs.VENTE.VendeurFactureDTO;
 import com.xpertcash.configuration.JwtUtil;
 import com.xpertcash.entity.FactureVente;
 import com.xpertcash.entity.User;
 import com.xpertcash.entity.VENTE.Vente;
+import com.xpertcash.entity.Enum.RoleType;
 import com.xpertcash.repository.FactureVenteRepository;
 import com.xpertcash.repository.UsersRepository;
 import com.xpertcash.repository.VENTE.VenteProduitRepository;
@@ -122,6 +124,10 @@ private FactureVenteResponseDTO toResponse(FactureVente facture) {
     dto.setProduits(produits);
     dto.setStatutRemboursement(statutRemboursement);
     dto.setCaisseId(vente.getCaisse() != null ? vente.getCaisse().getId() : null);
+    // Statut de la caisse (peut être utile pour le front pour savoir si la caisse est encore ouverte ou déjà fermée)
+    dto.setStatutCaisse(vente.getCaisse() != null && vente.getCaisse().getStatut() != null
+            ? vente.getCaisse().getStatut().name()
+            : null);
     dto.setVendeur(vente.getVendeur() != null ? vente.getVendeur().getNomComplet() : null);
     dto.setMontantDette(montantDetteArrondi);
     dto.setMontantPaye(montantPayeArrondi);
@@ -154,6 +160,13 @@ public FactureVentePaginatedDTO getAllFacturesWithPagination(
             .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
 
     Long entrepriseId = user.getEntreprise().getId();
+
+    // Récupérer tous les vendeurs de l'entreprise (même ceux qui n'ont pas encore vendu)
+    List<User> allUsersEntreprise = usersRepository.findByEntrepriseId(entrepriseId);
+    List<VendeurFactureDTO> vendeurs = allUsersEntreprise.stream()
+            .filter(u -> u.getRole() != null && u.getRole().getName() == RoleType.VENDEUR)
+            .map(u -> new VendeurFactureDTO(u.getId(), u.getNomComplet()))
+            .collect(Collectors.toList());
 
     // Calculer les dates selon la période
     PeriodeDates periodeDates = calculerDatesPeriode(periode, dateDebut, dateFin);
@@ -253,6 +266,7 @@ public FactureVentePaginatedDTO getAllFacturesWithPagination(
     response.setNombreFacturesRemboursees(nombreFacturesRemboursees);
     response.setNombreFacturesPartiellementRemboursees(nombreFacturesPartiellementRemboursees);
     response.setNombreFacturesNormales(nombreFacturesNormales);
+    response.setVendeurs(vendeurs);
     
     return response;
 }
