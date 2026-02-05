@@ -29,7 +29,6 @@ public class PaiementDTO {
     private String origine;
     private List<LigneFactureDTO> lignesFacture;
     
-    // Informations client
     private String clientNom;
     private String clientNumero;
     
@@ -49,6 +48,6 @@ public class PaiementDTO {
         this.encaissePar = paiement.getEncaissePar() != null
             ? paiement.getEncaissePar().getNomComplet()
             : null;
-        this.boutique = "N/A"; // Par défaut pour les paiements de factures
+        this.boutique = "N/A";
     }
 }
