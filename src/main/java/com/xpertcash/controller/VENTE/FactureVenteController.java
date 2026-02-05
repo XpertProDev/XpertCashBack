@@ -126,16 +126,28 @@ public class FactureVenteController {
         }
     }
 
-    // Endpoint pour récupérer les statistiques globales de vente (top 3 produits vendus)
+    /**
+     * Endpoint pour récupérer les statistiques globales de vente
+     * Inclut : Total ventes, Nombre d'articles, Montant Total, Top 3 produits, Top 3 vendeurs
+     * 
+     * periode Filtre de période : aujourdhui, hier, semaine, mois, annee (défaut: aujourdhui)
+     */
     @GetMapping("/vente/statistiques/globales")
-    public ResponseEntity<StatistiquesVenteGlobalesDTO> getStatistiquesGlobales(HttpServletRequest request) {
+    public ResponseEntity<?> getStatistiquesGlobales(
+            @RequestParam(required = false, defaultValue = "aujourdhui") String periode,
+            HttpServletRequest request) {
         try {
-            StatistiquesVenteGlobalesDTO statistiques = factureVenteService.getStatistiquesGlobales(request);
+            StatistiquesVenteGlobalesDTO statistiques = factureVenteService.getStatistiquesGlobales(periode, request);
             return ResponseEntity.ok(statistiques);
         } catch (RuntimeException e) {
-            return ResponseEntity.status(org.springframework.http.HttpStatus.FORBIDDEN).body(null);
+            e.printStackTrace();
+            return ResponseEntity.badRequest().body(java.util.Map.of(
+                "error", e.getMessage() != null ? e.getMessage() : "Erreur inconnue"
+            ));
         } catch (Exception e) {
-            return ResponseEntity.status(org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR).body(null);
+            e.printStackTrace();
+            return ResponseEntity.status(org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(java.util.Map.of("error", "Erreur serveur: " + e.getMessage()));
         }
     }
 

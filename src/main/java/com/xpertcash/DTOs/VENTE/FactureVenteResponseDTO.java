@@ -20,6 +20,7 @@ public class FactureVenteResponseDTO {
     private Double montantPaye; // Montant déjà payé (pour les ventes à crédit: montantTotalRembourse, sinon montantPaye)
     private String clientNom;
     private String clientNumero;
+    private Long boutiqueId;
     private String boutiqueNom;
     private List<ProduitFactureResponse> produits;
     private String statutRemboursement;

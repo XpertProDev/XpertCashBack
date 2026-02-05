@@ -72,4 +72,31 @@ public interface VenteRepository extends JpaRepository<Vente, Long> {
     // Ventes à crédit (dette clients) pour une entreprise
     List<Vente> findByBoutique_Entreprise_IdAndModePaiement(Long entrepriseId, ModePaiement modePaiement);
 
+    // Statistiques globales combinées (COUNT et SUM en une seule requête)
+    // Retourne une liste avec une seule ligne : [0] = totalVentes (Long), [1] = montantTotal (Double)
+    @Query("SELECT COUNT(v), COALESCE(SUM(v.montantTotal), 0) FROM Vente v " +
+           "WHERE v.boutique.entreprise.id = :entrepriseId " +
+           "AND v.dateVente >= :dateDebut AND v.dateVente < :dateFin")
+    List<Object[]> getStatistiquesGlobalesByEntrepriseIdAndPeriode(
+            @Param("entrepriseId") Long entrepriseId,
+            @Param("dateDebut") LocalDateTime dateDebut,
+            @Param("dateFin") LocalDateTime dateFin);
+
+    // Top 3 vendeurs par entreprise et période
+    @Query(value = "SELECT v.vendeur_id, u.nom_complet, COUNT(v.id) as nombre_ventes, " +
+           "COALESCE(SUM(v.montant_total), 0) as montant_total " +
+           "FROM vente v " +
+           "INNER JOIN boutique b ON v.boutique_id = b.id " +
+           "INNER JOIN user u ON v.vendeur_id = u.id " +
+           "WHERE b.entreprise_id = :entrepriseId " +
+           "AND v.date_vente >= :dateDebut AND v.date_vente < :dateFin " +
+           "AND v.vendeur_id IS NOT NULL " +
+           "GROUP BY v.vendeur_id, u.nom_complet " +
+           "ORDER BY montant_total DESC " +
+           "LIMIT 3", nativeQuery = true)
+    List<Object[]> findTop3VendeursByEntrepriseIdAndPeriode(
+            @Param("entrepriseId") Long entrepriseId,
+            @Param("dateDebut") LocalDateTime dateDebut,
+            @Param("dateFin") LocalDateTime dateFin);
+
 }
