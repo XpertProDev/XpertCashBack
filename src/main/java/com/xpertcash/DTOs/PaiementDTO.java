@@ -29,6 +29,10 @@ public class PaiementDTO {
     private String origine;
     private List<LigneFactureDTO> lignesFacture;
     
+    // Informations client
+    private String clientNom;
+    private String clientNumero;
+    
     // Informations de remise et TVA
     private Double remise;
     private Double tauxRemise;
