@@ -307,7 +307,7 @@ public class MailService {
                 <p>Bonjour <strong>%s</strong>,</p>
                 <p>Vous venez d'être ajouté à l'entreprise <strong>%s</strong> en tant que <strong>%s</strong>.</p>
                 <p>Voici vos identifiants de connexion :</p>
-                <div style="background: #f8f9fa; padding: 10px; border-radius: 5px; display: inline-block; text-align: left;">
+                <div style="padding: 10px; border-radius: 5px; display: inline-block; text-align: left;">
                     <p><strong>Email :</strong> %s</p>
                     <p><strong>Mot de passe :</strong> %s</p>
                     <p><strong>Code PIN :</strong> %s</p>

@@ -501,10 +501,10 @@ public StatistiquesVenteGlobalesDTO getStatistiquesGlobales(String periode, Http
     Long nombreArticles = venteProduitRepository.countTotalArticlesVendusByEntrepriseIdAndPeriode(
             entrepriseId, dateDebut, dateFin);
 
-    // Top 3 produits vendus
-    List<Object[]> top3ProduitsData = venteProduitRepository.findTop3ProduitsVendusByEntrepriseIdAndPeriode(
+    // Tous les produits vendus (triés par quantité décroissante)
+    List<Object[]> produitsData = venteProduitRepository.findAllProduitsVendusByEntrepriseIdAndPeriode(
             entrepriseId, dateDebut, dateFin);
-    List<TopProduitVenduDTO> top3Produits = top3ProduitsData.stream()
+    List<TopProduitVenduDTO> produitsVendus = produitsData.stream()
             .map(row -> {
                 TopProduitVenduDTO dto = new TopProduitVenduDTO();
                 dto.setProduitId(((Number) row[0]).longValue());
@@ -515,10 +515,10 @@ public StatistiquesVenteGlobalesDTO getStatistiquesGlobales(String periode, Http
             })
             .collect(Collectors.toList());
 
-    // Top 3 vendeurs
-    List<Object[]> top3VendeursData = venteRepository.findTop3VendeursByEntrepriseIdAndPeriode(
+    // Tous les vendeurs (triés par montant décroissant)
+    List<Object[]> vendeursData = venteRepository.findAllVendeursByEntrepriseIdAndPeriode(
             entrepriseId, dateDebut, dateFin);
-    List<TopVendeurDTO> top3Vendeurs = top3VendeursData.stream()
+    List<TopVendeurDTO> vendeurs = vendeursData.stream()
             .map(row -> {
                 TopVendeurDTO dto = new TopVendeurDTO();
                 dto.setVendeurId(((Number) row[0]).longValue());
@@ -529,13 +529,26 @@ public StatistiquesVenteGlobalesDTO getStatistiquesGlobales(String periode, Http
             })
             .collect(Collectors.toList());
 
+    // Montants par statut de caisse (une seule requête optimisée)
+    List<Object[]> montantsCaisse = venteRepository.sumMontantParStatutCaisseByEntrepriseIdAndPeriode(
+            entrepriseId, dateDebut, dateFin);
+    Double montantCaisseOuverte = 0.0;
+    Double montantCaisseFermee = 0.0;
+    if (montantsCaisse != null && !montantsCaisse.isEmpty()) {
+        Object[] row = montantsCaisse.get(0);
+        montantCaisseOuverte = row[0] != null ? ((Number) row[0]).doubleValue() : 0.0;
+        montantCaisseFermee = row[1] != null ? ((Number) row[1]).doubleValue() : 0.0;
+    }
+
     // Construire la réponse
     StatistiquesVenteGlobalesDTO statistiques = new StatistiquesVenteGlobalesDTO();
     statistiques.setTotalVentes(totalVentes);
     statistiques.setNombreArticles(nombreArticles != null ? nombreArticles : 0L);
     statistiques.setMontantTotal(Math.round(montantTotal * 100.0) / 100.0);
-    statistiques.setTop3ProduitsVendus(top3Produits);
-    statistiques.setTop3Vendeurs(top3Vendeurs);
+    statistiques.setMontantCaisseOuverte(montantCaisseOuverte != null ? Math.round(montantCaisseOuverte * 100.0) / 100.0 : 0.0);
+    statistiques.setMontantCaisseFermee(montantCaisseFermee != null ? Math.round(montantCaisseFermee * 100.0) / 100.0 : 0.0);
+    statistiques.setProduitsVendus(produitsVendus);
+    statistiques.setVendeurs(vendeurs);
     statistiques.setPeriode(periodeDates.periodeLabel);
 
     return statistiques;

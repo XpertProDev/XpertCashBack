@@ -680,17 +680,14 @@ public class UsersService {
                     throw new BusinessException("L'admin n'a pas d'entreprise associée.");
                 }
 
-                if (usersRepository.findByEmailAndEntrepriseId(userRequest.getEmail(), entrepriseId).isPresent()) {
-                    throw new BusinessException("Un utilisateur avec cet email existe déjà dans votre entreprise.");
+                // Vérification globale de l'email (unique dans toute la base)
+                if (usersRepository.findByEmail(userRequest.getEmail()).isPresent()) {
+                    throw new BusinessException("Cet email est déjà utilisé par un autre compte.");
                 }
 
-                if (usersRepository.findByPhoneAndEntrepriseId(userRequest.getPhone(), entrepriseId).isPresent()) {
-                    throw new BusinessException("Un utilisateur avec ce numéro de téléphone existe déjà dans votre entreprise.");
-                } 
-
-                if (userRequest.getPays() != null && 
-                    usersRepository.findByPhoneAndPaysAndEntrepriseId(userRequest.getPhone(), userRequest.getPays(), entrepriseId).isPresent()) {
-                    throw new BusinessException("Un utilisateur avec ce numéro de téléphone existe déjà dans votre entreprise.");
+                // Vérification globale du téléphone (unique dans toute la base)
+                if (usersRepository.findByPhone(userRequest.getPhone()).isPresent()) {
+                    throw new BusinessException("Ce numéro de téléphone est déjà utilisé par un autre compte.");
                 }
 
       
