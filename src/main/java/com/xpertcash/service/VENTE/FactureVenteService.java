@@ -134,6 +134,7 @@ private FactureVenteResponseDTO toResponse(FactureVente facture) {
     dto.setStatutCaisse(vente.getCaisse() != null && vente.getCaisse().getStatut() != null
             ? vente.getCaisse().getStatut().name()
             : null);
+    dto.setVendeurId(vente.getVendeur() != null ? vente.getVendeur().getId() : null);
     dto.setVendeur(vente.getVendeur() != null ? vente.getVendeur().getNomComplet() : null);
     dto.setMontantDette(montantDetteArrondi);
     dto.setMontantPaye(montantPayeArrondi);
