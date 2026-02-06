@@ -130,4 +130,37 @@ public interface VenteRepository extends JpaRepository<Vente, Long> {
             @Param("dateDebut") LocalDateTime dateDebut,
             @Param("dateFin") LocalDateTime dateFin);
 
+    // ==================== STATISTIQUES PAR VENDEUR ====================
+
+    // Statistiques d'un vendeur spécifique (COUNT et SUM en une seule requête)
+    // Retourne: [0] = totalVentes (Long), [1] = montantTotal (Double)
+    @Query(value = "SELECT COUNT(v.id), COALESCE(SUM(v.montant_total), 0) " +
+           "FROM vente v " +
+           "INNER JOIN boutique b ON v.boutique_id = b.id " +
+           "WHERE b.entreprise_id = :entrepriseId " +
+           "AND v.vendeur_id = :vendeurId " +
+           "AND v.date_vente >= :dateDebut AND v.date_vente < :dateFin", nativeQuery = true)
+    List<Object[]> getStatistiquesVendeurByEntrepriseIdAndPeriode(
+            @Param("entrepriseId") Long entrepriseId,
+            @Param("vendeurId") Long vendeurId,
+            @Param("dateDebut") LocalDateTime dateDebut,
+            @Param("dateFin") LocalDateTime dateFin);
+
+    // Montants des ventes d'un vendeur par statut de caisse (OUVERTE et FERMEE)
+    // Retourne: [0] = montantCaisseOuverte, [1] = montantCaisseFermee
+    @Query(value = "SELECT " +
+           "COALESCE(SUM(CASE WHEN c.statut = 'OUVERTE' THEN v.montant_total ELSE 0 END), 0) as montant_ouverte, " +
+           "COALESCE(SUM(CASE WHEN c.statut = 'FERMEE' THEN v.montant_total ELSE 0 END), 0) as montant_fermee " +
+           "FROM vente v " +
+           "INNER JOIN boutique b ON v.boutique_id = b.id " +
+           "INNER JOIN caisse c ON v.caisse_id = c.id " +
+           "WHERE b.entreprise_id = :entrepriseId " +
+           "AND v.vendeur_id = :vendeurId " +
+           "AND v.date_vente >= :dateDebut AND v.date_vente < :dateFin", nativeQuery = true)
+    List<Object[]> sumMontantParStatutCaisseByVendeurAndPeriode(
+            @Param("entrepriseId") Long entrepriseId,
+            @Param("vendeurId") Long vendeurId,
+            @Param("dateDebut") LocalDateTime dateDebut,
+            @Param("dateFin") LocalDateTime dateFin);
+
 }
