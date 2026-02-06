@@ -2378,21 +2378,21 @@ public class ComptabiliteService {
                         dto.setStatut(statutFacture);
                         dto.setOrigine("FACTURATION");
                         
-                        // Informations client
-                        if (facture.getClient() != null) {
-                            dto.setClientNom(facture.getClient().getNomComplet());
-                            dto.setClientNumero(facture.getClient().getTelephone());
-                        } else if (facture.getEntrepriseClient() != null) {
-                            dto.setClientNom(facture.getEntrepriseClient().getNom());
-                            dto.setClientNumero(facture.getEntrepriseClient().getTelephone());
-                        }
-                        
                         // Informations de remise et TVA
                         dto.setRemise(facture.getRemise());
                         dto.setTauxRemise(facture.getTauxRemise());
                         dto.setTva(facture.isTva());
                         dto.setTotalHT(facture.getTotalHT());
                         dto.setTotalTTC(facture.getTotalFacture());
+                        
+                        // Informations client
+                        if (facture.getClient() != null) {
+                            dto.setClientNom(facture.getClient().getNomComplet());
+                            dto.setClientContact(facture.getClient().getTelephone());
+                        } else if (facture.getEntrepriseClient() != null) {
+                            dto.setClientNom(facture.getEntrepriseClient().getNom());
+                            dto.setClientContact(facture.getEntrepriseClient().getTelephone());
+                        }
                     } else {
                         dto.setDescription("Paiement sans facture associée");
                         dto.setObjet(null);
@@ -2563,21 +2563,8 @@ public class ComptabiliteService {
         
         response.setMontantTotal(montantTotalArrondi);
         response.setDescription(vente.getDescription());
-        
-        // Récupérer les informations client (priorité : champs texte, puis Client, puis EntrepriseClient)
-        String clientNom = vente.getClientNom();
-        String clientNumero = vente.getClientNumero();
-        if ((clientNom == null || clientNom.trim().isEmpty()) && vente.getClient() != null) {
-            clientNom = vente.getClient().getNomComplet();
-            clientNumero = vente.getClient().getTelephone();
-        }
-        if ((clientNom == null || clientNom.trim().isEmpty()) && vente.getEntrepriseClient() != null) {
-            clientNom = vente.getEntrepriseClient().getNom();
-            clientNumero = vente.getEntrepriseClient().getTelephone();
-        }
-        response.setClientNom(clientNom);
-        response.setClientNumero(clientNumero);
-        
+        response.setClientNom(vente.getClientNom());
+        response.setClientNumero(vente.getClientNumero());
         response.setModePaiement(vente.getModePaiement() != null ? vente.getModePaiement().name() : null);
         response.setMontantPaye(montantPayeArrondi);
         

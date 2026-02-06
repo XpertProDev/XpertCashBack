@@ -29,15 +29,16 @@ public class PaiementDTO {
     private String origine;
     private List<LigneFactureDTO> lignesFacture;
     
-    private String clientNom;
-    private String clientNumero;
-    
     // Informations de remise et TVA
     private Double remise;
     private Double tauxRemise;
     private Boolean tva;
     private Double totalHT;
     private Double totalTTC;
+    
+    // Informations client (facturation)
+    private String clientNom;
+    private String clientContact;
 
     //  Constructeur de mapping depuis l'entité Paiement
     public PaiementDTO(Paiement paiement) {
@@ -48,6 +49,6 @@ public class PaiementDTO {
         this.encaissePar = paiement.getEncaissePar() != null
             ? paiement.getEncaissePar().getNomComplet()
             : null;
-        this.boutique = "N/A";
+        this.boutique = "N/A"; // Par défaut pour les paiements de factures
     }
 }
