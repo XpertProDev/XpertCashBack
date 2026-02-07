@@ -404,8 +404,17 @@ public ResponseEntity<?> getFacturesParPeriode(
         }
     }
 
+    // Endpoint pour récupérer l'historique de toutes les notes de factures proforma
+    @GetMapping("/factures/notes/historique")
+    public ResponseEntity<?> getHistoriqueNotesProforma(HttpServletRequest request) {
+        try {
+            return ResponseEntity.ok(factureProformaService.getHistoriqueNotesProforma(request));
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("error", e.getMessage()));
+        }
+    }
+
 }
-    
-   
-    
+
 

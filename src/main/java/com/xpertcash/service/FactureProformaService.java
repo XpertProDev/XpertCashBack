@@ -20,6 +20,7 @@ import org.springframework.stereotype.Service;
 import com.xpertcash.DTOs.EntrepriseClientDTO;
 import com.xpertcash.DTOs.FactureProFormaDTO;
 import com.xpertcash.DTOs.FactureProformaPaginatedResponseDTO;
+import com.xpertcash.DTOs.HistoriqueNoteProformaDTO;
 import com.xpertcash.DTOs.LigneFactureDTO;
 import com.xpertcash.DTOs.CLIENT.ClientDTO;
 import com.xpertcash.configuration.CentralAccess;
@@ -1309,6 +1310,49 @@ public List<FactureProFormaDTO> getFacturesParPeriode(Long userIdRequete, HttpSe
                     dto.setEntrepriseClient(f.getEntrepriseClient() != null ? new EntrepriseClientDTO(f.getEntrepriseClient()) : null);
                     dto.setDateRelance(f.getDateRelance());
                     dto.setNotifie(f.isNotifie());
+                    return dto;
+                })
+                .collect(Collectors.toList());
+    }
+
+    // Récupérer l'historique de toutes les notes de factures proforma de l'entreprise
+    public List<HistoriqueNoteProformaDTO> getHistoriqueNotesProforma(HttpServletRequest request) {
+        User user = authHelper.getAuthenticatedUserWithFallback(request);
+        
+        if (user.getEntreprise() == null) {
+            throw new RuntimeException("Utilisateur non rattaché à une entreprise.");
+        }
+        
+        Long entrepriseId = user.getEntreprise().getId();
+        
+        List<NoteFactureProForma> notes = noteFactureProFormaRepository.findAllByEntrepriseId(entrepriseId);
+        
+        return notes.stream()
+                .map(note -> {
+                    HistoriqueNoteProformaDTO dto = new HistoriqueNoteProformaDTO();
+                    dto.setId(note.getId());
+                    dto.setNumeroIdentifiant(note.getNumeroIdentifiant());
+                    dto.setContenu(note.getContenu());
+                    dto.setDateCreation(note.getDateCreation());
+                    dto.setDateDerniereModification(note.getDateDerniereModification());
+                    dto.setModifiee(note.isModifiee());
+                    
+                    // Infos auteur
+                    if (note.getAuteur() != null) {
+                        dto.setAuteurId(note.getAuteur().getId());
+                        dto.setAuteurNom(note.getAuteur().getNomComplet());
+                        dto.setPhotoAuteur(note.getAuteur().getPhoto());
+                    }
+                    
+                    // Infos facture
+                    if (note.getFacture() != null) {
+                        dto.setFactureId(note.getFacture().getId());
+                        dto.setNumeroFacture(note.getFacture().getNumeroFacture());
+                        dto.setStatutFacture(note.getFacture().getStatut() != null 
+                                ? note.getFacture().getStatut().name() 
+                                : null);
+                    }
+                    
                     return dto;
                 })
                 .collect(Collectors.toList());
