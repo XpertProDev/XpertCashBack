@@ -10,6 +10,7 @@ import com.xpertcash.DTOs.USER.RoleDTO;
 import com.xpertcash.DTOs.USER.UserBoutiqueDTO;
 import com.xpertcash.DTOs.USER.UserDTO;
 import com.xpertcash.DTOs.USER.UserRequest;
+import com.xpertcash.DTOs.USER.VendeurDTO;
 import com.xpertcash.DTOs.UserOptimalDTO;
 import com.xpertcash.configuration.CentralAccess;
 import com.xpertcash.configuration.JwtConfig;
@@ -680,17 +681,14 @@ public class UsersService {
                     throw new BusinessException("L'admin n'a pas d'entreprise associée.");
                 }
 
-                if (usersRepository.findByEmailAndEntrepriseId(userRequest.getEmail(), entrepriseId).isPresent()) {
-                    throw new BusinessException("Un utilisateur avec cet email existe déjà dans votre entreprise.");
+                // Vérification globale de l'email (unique dans toute la base)
+                if (usersRepository.findByEmail(userRequest.getEmail()).isPresent()) {
+                    throw new BusinessException("Cet email est déjà utilisé par un autre compte.");
                 }
 
-                if (usersRepository.findByPhoneAndEntrepriseId(userRequest.getPhone(), entrepriseId).isPresent()) {
-                    throw new BusinessException("Un utilisateur avec ce numéro de téléphone existe déjà dans votre entreprise.");
-                } 
-
-                if (userRequest.getPays() != null && 
-                    usersRepository.findByPhoneAndPaysAndEntrepriseId(userRequest.getPhone(), userRequest.getPays(), entrepriseId).isPresent()) {
-                    throw new BusinessException("Un utilisateur avec ce numéro de téléphone existe déjà dans votre entreprise.");
+                // Vérification globale du téléphone (unique dans toute la base)
+                if (usersRepository.findByPhone(userRequest.getPhone()).isPresent()) {
+                    throw new BusinessException("Ce numéro de téléphone est déjà utilisé par un autre compte.");
                 }
 
       
@@ -1861,6 +1859,55 @@ public class UsersService {
         Long currentSessionId = ((Number) sessionIdClaim).longValue();
         
         userSessionRepository.revokeAllSessionsExcept(user.getUuid(), currentSessionId);
+    }
+
+    // Récupérer les utilisateurs ayant la permission de vendre des produits
+    public List<VendeurDTO> getVendeurs(HttpServletRequest request) {
+        User currentUser = authHelper.getAuthenticatedUserWithFallback(request);
+        
+        Entreprise entreprise = currentUser.getEntreprise();
+        if (entreprise == null) {
+            throw new BusinessException("Vous n'avez pas d'entreprise associée.");
+        }
+
+        List<User> vendeurs = usersRepository.findByEntrepriseIdAndPermission(
+                entreprise.getId(), 
+                PermissionType.VENDRE_PRODUITS
+        );
+
+        return vendeurs.stream()
+                .map(this::convertToVendeurDTO)
+                .collect(Collectors.toList());
+    }
+
+    // Convertir un User en VendeurDTO simplifié
+    private VendeurDTO convertToVendeurDTO(User user) {
+        List<VendeurDTO.BoutiqueSimpleDTO> boutiques = new ArrayList<>();
+        
+        RoleType roleType = user.getRole().getName();
+        
+        // ADMIN et MANAGER: accès à toutes les boutiques de l'entreprise
+        if (roleType == RoleType.ADMIN || roleType == RoleType.MANAGER) {
+            List<Boutique> allBoutiques = boutiqueRepository.findByEntrepriseId(user.getEntreprise().getId());
+            boutiques = allBoutiques.stream()
+                    .map(b -> new VendeurDTO.BoutiqueSimpleDTO(b.getId(), b.getNomBoutique()))
+                    .collect(Collectors.toList());
+        } else {
+            // Autres rôles: uniquement leurs boutiques assignées
+            List<UserBoutique> userBoutiques = userBoutiqueRepository.findByUserId(user.getId());
+            boutiques = userBoutiques.stream()
+                    .map(ub -> new VendeurDTO.BoutiqueSimpleDTO(
+                            ub.getBoutique().getId(), 
+                            ub.getBoutique().getNomBoutique()))
+                    .collect(Collectors.toList());
+        }
+
+        return new VendeurDTO(
+                user.getId(),
+                user.getNomComplet(),
+                "VENDRE_PRODUITS",
+                boutiques
+        );
     }
 
 }

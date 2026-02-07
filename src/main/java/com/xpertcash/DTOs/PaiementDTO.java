@@ -22,12 +22,23 @@ public class PaiementDTO {
     private String encaissePar;
     private String typeTransaction;
     private String description;
-    private String objet; // Description de la facture (facture.getDescription())
-    private String numeroFacture; // Numéro de la facture réelle
+    private String objet;
+    private String numeroFacture;
     private String statut;
     private String boutique;
-    private String origine; // COMPTABILITE, FACTURE, BOUTIQUE (nom de la boutique)
-    private List<LigneFactureDTO> lignesFacture; // Lignes de facture (produits/articles de la facture)
+    private String origine;
+    private List<LigneFactureDTO> lignesFacture;
+    
+    // Informations de remise et TVA
+    private Double remise;
+    private Double tauxRemise;
+    private Boolean tva;
+    private Double totalHT;
+    private Double totalTTC;
+    
+    // Informations client (facturation)
+    private String clientNom;
+    private String clientContact;
 
     //  Constructeur de mapping depuis l'entité Paiement
     public PaiementDTO(Paiement paiement) {

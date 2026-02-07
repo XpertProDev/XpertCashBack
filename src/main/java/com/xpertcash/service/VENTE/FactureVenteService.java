@@ -21,14 +21,19 @@ import com.xpertcash.DTOs.VENTE.ProduitFactureResponse;
 import com.xpertcash.DTOs.VENTE.ReceiptEmailRequest;
 import com.xpertcash.DTOs.VENTE.VenteLigneResponse;
 import com.xpertcash.DTOs.VENTE.StatistiquesVenteGlobalesDTO;
+import com.xpertcash.DTOs.VENTE.StatistiquesVendeurDTO;
 import com.xpertcash.DTOs.VENTE.TopProduitVenduDTO;
+import com.xpertcash.DTOs.VENTE.TopVendeurDTO;
+import com.xpertcash.DTOs.VENTE.VendeurFactureDTO;
 import com.xpertcash.configuration.JwtUtil;
 import com.xpertcash.entity.FactureVente;
 import com.xpertcash.entity.User;
 import com.xpertcash.entity.VENTE.Vente;
+import com.xpertcash.entity.Enum.RoleType;
 import com.xpertcash.repository.FactureVenteRepository;
 import com.xpertcash.repository.UsersRepository;
 import com.xpertcash.repository.VENTE.VenteProduitRepository;
+import com.xpertcash.repository.VENTE.VenteRepository;
 
 import jakarta.servlet.http.HttpServletRequest;
 
@@ -43,6 +48,8 @@ public class FactureVenteService {
     private  JwtUtil jwtUtil;
     @Autowired
     private VenteProduitRepository venteProduitRepository;
+    @Autowired
+    private VenteRepository venteRepository;
 
 private FactureVenteResponseDTO toResponse(FactureVente facture) {
     Vente vente = facture.getVente();
@@ -119,9 +126,15 @@ private FactureVenteResponseDTO toResponse(FactureVente facture) {
     dto.setClientNom(vente.getClientNom());
     dto.setClientNumero(vente.getClientNumero());
     dto.setBoutiqueNom(vente.getBoutique().getNomBoutique());
+    dto.setBoutiqueId(vente.getBoutique().getId()); 
     dto.setProduits(produits);
     dto.setStatutRemboursement(statutRemboursement);
     dto.setCaisseId(vente.getCaisse() != null ? vente.getCaisse().getId() : null);
+    // Statut de la caisse (peut être utile pour le front pour savoir si la caisse est encore ouverte ou déjà fermée)
+    dto.setStatutCaisse(vente.getCaisse() != null && vente.getCaisse().getStatut() != null
+            ? vente.getCaisse().getStatut().name()
+            : null);
+    dto.setVendeurId(vente.getVendeur() != null ? vente.getVendeur().getId() : null);
     dto.setVendeur(vente.getVendeur() != null ? vente.getVendeur().getNomComplet() : null);
     dto.setMontantDette(montantDetteArrondi);
     dto.setMontantPaye(montantPayeArrondi);
@@ -154,6 +167,13 @@ public FactureVentePaginatedDTO getAllFacturesWithPagination(
             .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
 
     Long entrepriseId = user.getEntreprise().getId();
+
+    // Récupérer tous les vendeurs de l'entreprise (même ceux qui n'ont pas encore vendu)
+    List<User> allUsersEntreprise = usersRepository.findByEntrepriseId(entrepriseId);
+    List<VendeurFactureDTO> vendeurs = allUsersEntreprise.stream()
+            .filter(u -> u.getRole() != null && u.getRole().getName() == RoleType.VENDEUR)
+            .map(u -> new VendeurFactureDTO(u.getId(), u.getNomComplet()))
+            .collect(Collectors.toList());
 
     // Calculer les dates selon la période
     PeriodeDates periodeDates = calculerDatesPeriode(periode, dateDebut, dateFin);
@@ -253,6 +273,7 @@ public FactureVentePaginatedDTO getAllFacturesWithPagination(
     response.setNombreFacturesRemboursees(nombreFacturesRemboursees);
     response.setNombreFacturesPartiellementRemboursees(nombreFacturesPartiellementRemboursees);
     response.setNombreFacturesNormales(nombreFacturesNormales);
+    response.setVendeurs(vendeurs);
     
     return response;
 }
@@ -320,11 +341,17 @@ private static class PeriodeDates {
     final LocalDateTime dateDebut;
     final LocalDateTime dateFin;
     final boolean filtrerParPeriode;
+    final String periodeLabel;
 
     PeriodeDates(LocalDateTime dateDebut, LocalDateTime dateFin, boolean filtrerParPeriode) {
+        this(dateDebut, dateFin, filtrerParPeriode, null);
+    }
+
+    PeriodeDates(LocalDateTime dateDebut, LocalDateTime dateFin, boolean filtrerParPeriode, String periodeLabel) {
         this.dateDebut = dateDebut;
         this.dateFin = dateFin;
         this.filtrerParPeriode = filtrerParPeriode;
+        this.periodeLabel = periodeLabel;
     }
 }
 
@@ -438,9 +465,10 @@ public ReceiptEmailRequest getFactureDataForEmail(String venteId, String email, 
 
 /**
  * Récupère les statistiques globales de vente pour l'entreprise de l'utilisateur connecté
- * Inclut les 3 meilleurs produits vendus
+ * Inclut : Total ventes, Nombre d'articles, Montant Total, Top 3 produits, Top 3 vendeurs
+ * Accepte un filtre de période : aujourdhui, hier, semaine, mois, annee
  */
-public StatistiquesVenteGlobalesDTO getStatistiquesGlobales(HttpServletRequest request) {
+public StatistiquesVenteGlobalesDTO getStatistiquesGlobales(String periode, HttpServletRequest request) {
     String token = request.getHeader("Authorization");
     if (token == null || !token.startsWith("Bearer ")) {
         throw new RuntimeException("Token JWT manquant ou invalide");
@@ -455,9 +483,30 @@ public StatistiquesVenteGlobalesDTO getStatistiquesGlobales(HttpServletRequest r
         throw new RuntimeException("Aucune entreprise associée à cet utilisateur");
     }
 
-    List<Object[]> top3ProduitsData = venteProduitRepository.findTop3ProduitsVendusByEntrepriseId(entrepriseId);
+    // Calculer les dates selon la période
+    PeriodeDates periodeDates = calculerDatesPeriodeStatistiques(periode);
+    LocalDateTime dateDebut = periodeDates.dateDebut;
+    LocalDateTime dateFin = periodeDates.dateFin;
 
-    List<TopProduitVenduDTO> top3Produits = top3ProduitsData.stream()
+    // Statistiques globales combinées (1 requête au lieu de 2)
+    List<Object[]> statsGlobalesList = venteRepository.getStatistiquesGlobalesByEntrepriseIdAndPeriode(
+            entrepriseId, dateDebut, dateFin);
+    Long totalVentes = 0L;
+    Double montantTotal = 0.0;
+    if (statsGlobalesList != null && !statsGlobalesList.isEmpty()) {
+        Object[] row = statsGlobalesList.get(0);
+        totalVentes = row[0] != null ? ((Number) row[0]).longValue() : 0L;
+        montantTotal = row[1] != null ? ((Number) row[1]).doubleValue() : 0.0;
+    }
+    
+    // Nombre d'articles vendus
+    Long nombreArticles = venteProduitRepository.countTotalArticlesVendusByEntrepriseIdAndPeriode(
+            entrepriseId, dateDebut, dateFin);
+
+    // Tous les produits vendus (triés par quantité décroissante)
+    List<Object[]> produitsData = venteProduitRepository.findAllProduitsVendusByEntrepriseIdAndPeriode(
+            entrepriseId, dateDebut, dateFin);
+    List<TopProduitVenduDTO> produitsVendus = produitsData.stream()
             .map(row -> {
                 TopProduitVenduDTO dto = new TopProduitVenduDTO();
                 dto.setProduitId(((Number) row[0]).longValue());
@@ -468,8 +517,180 @@ public StatistiquesVenteGlobalesDTO getStatistiquesGlobales(HttpServletRequest r
             })
             .collect(Collectors.toList());
 
+    // Tous les vendeurs (triés par montant décroissant)
+    List<Object[]> vendeursData = venteRepository.findAllVendeursByEntrepriseIdAndPeriode(
+            entrepriseId, dateDebut, dateFin);
+    List<TopVendeurDTO> vendeurs = vendeursData.stream()
+            .map(row -> {
+                TopVendeurDTO dto = new TopVendeurDTO();
+                dto.setVendeurId(((Number) row[0]).longValue());
+                dto.setNomVendeur((String) row[1]);
+                dto.setNombreVentes(((Number) row[2]).longValue());
+                dto.setMontantTotal(row[3] != null ? ((Number) row[3]).doubleValue() : 0.0);
+                return dto;
+            })
+            .collect(Collectors.toList());
+
+    // Montants par statut de caisse (une seule requête optimisée)
+    List<Object[]> montantsCaisse = venteRepository.sumMontantParStatutCaisseByEntrepriseIdAndPeriode(
+            entrepriseId, dateDebut, dateFin);
+    Double montantCaisseOuverte = 0.0;
+    Double montantCaisseFermee = 0.0;
+    if (montantsCaisse != null && !montantsCaisse.isEmpty()) {
+        Object[] row = montantsCaisse.get(0);
+        montantCaisseOuverte = row[0] != null ? ((Number) row[0]).doubleValue() : 0.0;
+        montantCaisseFermee = row[1] != null ? ((Number) row[1]).doubleValue() : 0.0;
+    }
+
+    // Construire la réponse
     StatistiquesVenteGlobalesDTO statistiques = new StatistiquesVenteGlobalesDTO();
-    statistiques.setTop3ProduitsVendus(top3Produits);
+    statistiques.setTotalVentes(totalVentes);
+    statistiques.setNombreArticles(nombreArticles != null ? nombreArticles : 0L);
+    statistiques.setMontantTotal(Math.round(montantTotal * 100.0) / 100.0);
+    statistiques.setMontantCaisseOuverte(montantCaisseOuverte != null ? Math.round(montantCaisseOuverte * 100.0) / 100.0 : 0.0);
+    statistiques.setMontantCaisseFermee(montantCaisseFermee != null ? Math.round(montantCaisseFermee * 100.0) / 100.0 : 0.0);
+    statistiques.setProduitsVendus(produitsVendus);
+    statistiques.setVendeurs(vendeurs);
+    statistiques.setPeriode(periodeDates.periodeLabel);
+
+    return statistiques;
+}
+
+/**
+ * Calcule les dates de début et fin pour les statistiques selon le type de période.
+ */
+private PeriodeDates calculerDatesPeriodeStatistiques(String periode) {
+    if (periode == null || periode.trim().isEmpty()) {
+        periode = "aujourdhui";
+    }
+    
+    LocalDateTime dateStart;
+    LocalDateTime dateEnd;
+    String periodeLabel;
+
+    switch (periode.toLowerCase()) {
+        case "aujourdhui":
+            dateStart = LocalDate.now().atStartOfDay();
+            dateEnd = dateStart.plusDays(1);
+            periodeLabel = "Aujourd'hui";
+            break;
+        case "hier":
+            dateStart = LocalDate.now().minusDays(1).atStartOfDay();
+            dateEnd = dateStart.plusDays(1);
+            periodeLabel = "Hier";
+            break;
+        case "semaine":
+            LocalDate aujourdhui = LocalDate.now();
+            dateStart = aujourdhui.minusDays(aujourdhui.getDayOfWeek().getValue() - 1).atStartOfDay();
+            dateEnd = dateStart.plusWeeks(1);
+            periodeLabel = "Cette semaine";
+            break;
+        case "mois":
+            dateStart = LocalDate.now().withDayOfMonth(1).atStartOfDay();
+            dateEnd = dateStart.plusMonths(1);
+            periodeLabel = "Ce mois";
+            break;
+        case "annee":
+            dateStart = LocalDate.now().withDayOfYear(1).atStartOfDay();
+            dateEnd = dateStart.plusYears(1);
+            periodeLabel = "Cette année";
+            break;
+        default:
+            // Par défaut : aujourd'hui
+            dateStart = LocalDate.now().atStartOfDay();
+            dateEnd = dateStart.plusDays(1);
+            periodeLabel = "Aujourd'hui";
+    }
+
+    return new PeriodeDates(dateStart, dateEnd, true, periodeLabel);
+}
+
+/**
+ * Récupère les statistiques de vente d'un vendeur spécifique.
+ * 
+ * vendeurId ID du vendeur
+ *  periode Filtre de période (aujourdhui, hier, semaine, mois, annee)
+ *  request HttpServletRequest pour authentification
+ * StatistiquesVendeurDTO avec les stats du vendeur
+ */
+public StatistiquesVendeurDTO getStatistiquesVendeur(Long vendeurId, String periode, HttpServletRequest request) {
+    // Authentification et récupération de l'entreprise
+    String token = request.getHeader("Authorization");
+    if (token == null || !token.startsWith("Bearer ")) {
+        throw new RuntimeException("Token d'authentification manquant ou invalide");
+    }
+    String userUuid = jwtUtil.extractUserUuid(token.substring(7));
+    User currentUser = usersRepository.findByUuid(userUuid)
+            .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
+    
+    Long entrepriseId = currentUser.getEntreprise().getId();
+    
+    // Vérifier que le vendeur existe et appartient à la même entreprise
+    User vendeur = usersRepository.findById(vendeurId)
+            .orElseThrow(() -> new RuntimeException("Vendeur non trouvé avec l'ID: " + vendeurId));
+    
+    if (vendeur.getEntreprise() == null || !vendeur.getEntreprise().getId().equals(entrepriseId)) {
+        throw new RuntimeException("Ce vendeur n'appartient pas à votre entreprise");
+    }
+    
+    // Calculer les dates de période
+    PeriodeDates periodeDates = calculerDatesPeriodeStatistiques(periode);
+    LocalDateTime dateDebut = periodeDates.dateDebut;
+    LocalDateTime dateFin = periodeDates.dateFin;
+    
+    // Statistiques globales du vendeur (COUNT et SUM)
+    Long totalVentes = 0L;
+    Double montantTotal = 0.0;
+    List<Object[]> statsVendeurList = venteRepository.getStatistiquesVendeurByEntrepriseIdAndPeriode(
+            entrepriseId, vendeurId, dateDebut, dateFin);
+    if (statsVendeurList != null && !statsVendeurList.isEmpty()) {
+        Object[] row = statsVendeurList.get(0);
+        totalVentes = row[0] != null ? ((Number) row[0]).longValue() : 0L;
+        montantTotal = row[1] != null ? ((Number) row[1]).doubleValue() : 0.0;
+    }
+    
+    // Nombre d'articles vendus par ce vendeur
+    Long nombreArticles = venteProduitRepository.countTotalArticlesVendusByVendeurAndPeriode(
+            entrepriseId, vendeurId, dateDebut, dateFin);
+
+    // Montants par statut de caisse (une seule requête optimisée)
+    List<Object[]> montantsCaisse = venteRepository.sumMontantParStatutCaisseByVendeurAndPeriode(
+            entrepriseId, vendeurId, dateDebut, dateFin);
+    Double montantCaisseOuverte = 0.0;
+    Double montantCaisseFermee = 0.0;
+    if (montantsCaisse != null && !montantsCaisse.isEmpty()) {
+        Object[] row = montantsCaisse.get(0);
+        montantCaisseOuverte = row[0] != null ? ((Number) row[0]).doubleValue() : 0.0;
+        montantCaisseFermee = row[1] != null ? ((Number) row[1]).doubleValue() : 0.0;
+    }
+
+    // Tous les produits vendus par ce vendeur (triés par quantité décroissante)
+    List<Object[]> produitsData = venteProduitRepository.findAllProduitsVendusByVendeurAndPeriode(
+            entrepriseId, vendeurId, dateDebut, dateFin);
+    List<TopProduitVenduDTO> produitsVendus = produitsData.stream()
+            .map(row -> {
+                TopProduitVenduDTO dto = new TopProduitVenduDTO();
+                dto.setProduitId(((Number) row[0]).longValue());
+                dto.setNomProduit((String) row[1]);
+                dto.setTotalQuantite(((Number) row[2]).longValue());
+                dto.setTotalMontant(row[3] != null ? ((Number) row[3]).doubleValue() : 0.0);
+                return dto;
+            })
+            .collect(Collectors.toList());
+
+    // Construire la réponse
+    StatistiquesVendeurDTO statistiques = new StatistiquesVendeurDTO();
+    statistiques.setVendeurId(vendeur.getId());
+    statistiques.setNomVendeur(vendeur.getNomComplet());
+    statistiques.setEmailVendeur(vendeur.getEmail());
+    statistiques.setTelephoneVendeur(vendeur.getPhone());
+    statistiques.setTotalVentes(totalVentes);
+    statistiques.setNombreArticles(nombreArticles != null ? nombreArticles : 0L);
+    statistiques.setMontantTotal(Math.round(montantTotal * 100.0) / 100.0);
+    statistiques.setMontantCaisseOuverte(montantCaisseOuverte != null ? Math.round(montantCaisseOuverte * 100.0) / 100.0 : 0.0);
+    statistiques.setMontantCaisseFermee(montantCaisseFermee != null ? Math.round(montantCaisseFermee * 100.0) / 100.0 : 0.0);
+    statistiques.setProduitsVendus(produitsVendus);
+    statistiques.setPeriode(periodeDates.periodeLabel);
 
     return statistiques;
 }

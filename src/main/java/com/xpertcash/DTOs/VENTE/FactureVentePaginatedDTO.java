@@ -19,4 +19,5 @@ public class FactureVentePaginatedDTO {
     private int nombreFacturesRemboursees;
     private int nombreFacturesPartiellementRemboursees;
     private int nombreFacturesNormales;
+    private List<VendeurFactureDTO> vendeurs;
 }

@@ -2377,6 +2377,22 @@ public class ComptabiliteService {
                         dto.setDescription(description);
                         dto.setStatut(statutFacture);
                         dto.setOrigine("FACTURATION");
+                        
+                        // Informations de remise et TVA
+                        dto.setRemise(facture.getRemise());
+                        dto.setTauxRemise(facture.getTauxRemise());
+                        dto.setTva(facture.isTva());
+                        dto.setTotalHT(facture.getTotalHT());
+                        dto.setTotalTTC(facture.getTotalFacture());
+                        
+                        // Informations client
+                        if (facture.getClient() != null) {
+                            dto.setClientNom(facture.getClient().getNomComplet());
+                            dto.setClientContact(facture.getClient().getTelephone());
+                        } else if (facture.getEntrepriseClient() != null) {
+                            dto.setClientNom(facture.getEntrepriseClient().getNom());
+                            dto.setClientContact(facture.getEntrepriseClient().getTelephone());
+                        }
                     } else {
                         dto.setDescription("Paiement sans facture associée");
                         dto.setObjet(null);
