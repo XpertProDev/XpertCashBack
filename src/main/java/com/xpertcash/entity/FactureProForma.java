@@ -64,6 +64,9 @@ public class FactureProForma {
      @Transient
     private String justification;
 
+     @Transient
+    private Long destinataireNoteId;
+
      
 
 

@@ -190,8 +190,8 @@ Page<FactureProForma> findFacturesAvecRelationsParEntreprisePaginated(
     @Param("entrepriseId") Long entrepriseId, 
     Pageable pageable);
 
-// Méthode de pagination avec filtrage par utilisateur
-@Query("SELECT f FROM FactureProForma f " +
+// Méthode de pagination avec filtrage par utilisateur (créateur ou approbateur)
+@Query("SELECT DISTINCT f FROM FactureProForma f " +
        "LEFT JOIN FETCH f.approbateurs a " +
        "LEFT JOIN FETCH f.utilisateurCreateur u " +
        "LEFT JOIN FETCH f.client c " +
@@ -203,6 +203,24 @@ Page<FactureProForma> findFacturesAvecRelationsParEntreprisePaginated(
        "     OR :userId IN (SELECT u2.id FROM f.approbateurs u2)) " +
        "ORDER BY f.dateCreation DESC, f.id DESC")
 Page<FactureProForma> findFacturesAvecRelationsParEntrepriseEtUtilisateurPaginated(
+    @Param("entrepriseId") Long entrepriseId,
+    @Param("userId") Long userId,
+    Pageable pageable);
+
+// Méthode de pagination pour utilisateur avec permission facturation (créateur, approbateur ou destinataire de note)
+@Query("SELECT DISTINCT f FROM FactureProForma f " +
+       "LEFT JOIN FETCH f.approbateurs a " +
+       "LEFT JOIN FETCH f.utilisateurCreateur u " +
+       "LEFT JOIN FETCH f.client c " +
+       "LEFT JOIN FETCH f.entrepriseClient ec " +
+       "LEFT JOIN FETCH f.entreprise e " +
+       "WHERE f.entreprise.id = :entrepriseId " +
+       "AND (f.utilisateurCreateur.id = :userId " +
+       "     OR f.utilisateurApprobateur.id = :userId " +
+       "     OR :userId IN (SELECT u2.id FROM f.approbateurs u2) " +
+       "     OR f.id IN (SELECT n.facture.id FROM NoteFactureProForma n WHERE n.destinataire.id = :userId)) " +
+       "ORDER BY f.dateCreation DESC, f.id DESC")
+Page<FactureProForma> findFacturesAvecRelationsParEntrepriseEtUtilisateurAvecNotesPaginated(
     @Param("entrepriseId") Long entrepriseId,
     @Param("userId") Long userId,
     Pageable pageable);
