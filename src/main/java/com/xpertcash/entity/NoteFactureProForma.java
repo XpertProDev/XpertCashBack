@@ -23,6 +23,10 @@ public class NoteFactureProForma {
     @ManyToOne
     private User auteur;
 
+    @ManyToOne
+    @JoinColumn(name = "destinataire_id")
+    private User destinataire;
+
     @Lob
     @Column(name = "contenu", columnDefinition = "TEXT")
     private String contenu;

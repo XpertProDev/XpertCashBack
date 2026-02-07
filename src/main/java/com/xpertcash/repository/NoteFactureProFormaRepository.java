@@ -53,4 +53,16 @@ public interface NoteFactureProFormaRepository extends JpaRepository<NoteFacture
            "ORDER BY n.dateCreation DESC")
     List<NoteFactureProForma> findAllByEntrepriseId(@Param("entrepriseId") Long entrepriseId);
 
+    // Récupérer les notes assignées à un destinataire spécifique dans une entreprise
+    @Query("SELECT DISTINCT n FROM NoteFactureProForma n " +
+           "JOIN FETCH n.facture f " +
+           "JOIN FETCH f.entreprise e " +
+           "LEFT JOIN FETCH n.auteur a " +
+           "LEFT JOIN FETCH n.destinataire d " +
+           "WHERE e.id = :entrepriseId AND d.id = :destinataireId " +
+           "ORDER BY n.dateCreation DESC")
+    List<NoteFactureProForma> findByEntrepriseIdAndDestinataire(
+            @Param("entrepriseId") Long entrepriseId,
+            @Param("destinataireId") Long destinataireId);
+
 }

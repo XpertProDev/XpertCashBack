@@ -16,10 +16,14 @@ public class HistoriqueNoteProformaDTO {
     private LocalDateTime dateDerniereModification;
     private boolean modifiee;
     
-    // Infos auteur
+    // Infos auteur (qui a créé la note)
     private Long auteurId;
     private String auteurNom;
     private String photoAuteur;
+    
+    // Infos destinataire (à qui la note est assignée)
+    private Long destinataireId;
+    private String destinataireNom;
     
     // Infos facture
     private Long factureId;

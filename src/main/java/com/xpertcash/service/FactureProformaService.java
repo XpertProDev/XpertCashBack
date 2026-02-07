@@ -96,10 +96,6 @@ public class FactureProformaService {
     @Autowired 
     private FactProHistoriqueActionRepository factProHistoriqueActionRepository;
 
-
-
-
-
     @Autowired
     private ModuleActivationService moduleActivationService;
 
@@ -855,6 +851,18 @@ public class FactureProformaService {
             note.setDateCreation(LocalDateTime.now());
             note.setNumeroIdentifiant(genererNumeroNotePourFacture(facture));
 
+            // Assigner le destinataire à la note (sans modifier ses permissions)
+            if (modifications.getDestinataireNoteId() != null) {
+                Long noteEntrepriseId = facture.getEntreprise() != null ? facture.getEntreprise().getId() : null;
+                User destinataire = usersRepository.findByIdAndEntrepriseId(
+                        modifications.getDestinataireNoteId(), noteEntrepriseId)
+                        .orElseThrow(() -> new RuntimeException(
+                                "Destinataire non trouvé ou n'appartient pas à votre entreprise."));
+                
+                note.setDestinataire(destinataire);
+            } else {
+                throw new RuntimeException("Vous devez assigner la note à un destinataire de votre entreprise.");
+            }
 
             noteFactureProFormaRepository.save(note);
 
@@ -948,7 +956,8 @@ public class FactureProformaService {
             facturesPage = factureProformaRepository.findFacturesAvecRelationsParEntreprisePaginated(
                     entrepriseCourante.getId(), pageable);
         } else if (hasPermission || isApprover) {
-            facturesPage = factureProformaRepository.findFacturesAvecRelationsParEntrepriseEtUtilisateurPaginated(
+            // Utilisateur avec permission facturation : voit créées + approbées + assignées par note
+            facturesPage = factureProformaRepository.findFacturesAvecRelationsParEntrepriseEtUtilisateurAvecNotesPaginated(
                     entrepriseCourante.getId(), currentUser.getId(), pageable);
         } else {
             if (!Objects.equals(currentUser.getId(), userIdRequete)) {
@@ -1195,7 +1204,6 @@ public List<FactureProFormaDTO> getFacturesParPeriode(Long userIdRequete, HttpSe
 
     boolean isAdmin = currentUser.getRole().getName() == RoleType.ADMIN;
     boolean isManager = currentUser.getRole().getName() == RoleType.MANAGER;
-    boolean hasPermission = currentUser.getRole().hasPermission(PermissionType.GESTION_FACTURATION);
 
     //  Calcul période
     LocalDateTime dateStart;
@@ -1232,14 +1240,26 @@ public List<FactureProFormaDTO> getFacturesParPeriode(Long userIdRequete, HttpSe
 
     //  Filtrage selon les rôles et permissions
             if (!(isAdmin || isManager)) {
-            if (hasPermission) {
+            boolean hasFacturationPermission = currentUser.getRole().hasPermission(PermissionType.GESTION_FACTURATION);
+            
+            if (hasFacturationPermission) {
+                // Avec permission facturation : créées + approbées + assignées par note
+                Set<Long> factureIdsDestinataire = noteFactureProFormaRepository
+                        .findByEntrepriseIdAndDestinataire(entrepriseId, currentUser.getId())
+                        .stream()
+                        .map(n -> n.getFacture().getId())
+                        .collect(Collectors.toSet());
+
+                factures = factures.stream()
+                        .filter(f -> f.getUtilisateurCreateur().getId().equals(currentUser.getId())
+                               || f.getApprobateurs().contains(currentUser)
+                               || factureIdsDestinataire.contains(f.getId()))
+                        .collect(Collectors.toList());
+            } else {
+                // Sans permission facturation : créées + approbées uniquement
                 factures = factures.stream()
                         .filter(f -> f.getUtilisateurCreateur().getId().equals(currentUser.getId())
                                || f.getApprobateurs().contains(currentUser))
-                        .collect(Collectors.toList());
-            } else {
-                factures = factures.stream()
-                        .filter(f -> f.getUtilisateurCreateur().getId().equals(currentUser.getId()))
                         .collect(Collectors.toList());
             }
         }
@@ -1315,7 +1335,9 @@ public List<FactureProFormaDTO> getFacturesParPeriode(Long userIdRequete, HttpSe
                 .collect(Collectors.toList());
     }
 
-    // Récupérer l'historique de toutes les notes de factures proforma de l'entreprise
+    // Récupérer l'historique des notes de factures proforma
+    // ADMIN/MANAGER : toutes les notes de l'entreprise
+    // Autres : uniquement les notes qui leur sont assignées (destinataire)
     public List<HistoriqueNoteProformaDTO> getHistoriqueNotesProforma(HttpServletRequest request) {
         User user = authHelper.getAuthenticatedUserWithFallback(request);
         
@@ -1325,7 +1347,19 @@ public List<FactureProFormaDTO> getFacturesParPeriode(Long userIdRequete, HttpSe
         
         Long entrepriseId = user.getEntreprise().getId();
         
-        List<NoteFactureProForma> notes = noteFactureProFormaRepository.findAllByEntrepriseId(entrepriseId);
+        RoleType role = user.getRole().getName();
+        boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
+        
+        List<NoteFactureProForma> notes;
+        
+        if (isAdminOrManager) {
+            // ADMIN/MANAGER voit toutes les notes de l'entreprise
+            notes = noteFactureProFormaRepository.findAllByEntrepriseId(entrepriseId);
+        } else {
+            // Autres utilisateurs : uniquement les notes qui leur sont assignées
+            notes = noteFactureProFormaRepository.findByEntrepriseIdAndDestinataire(
+                    entrepriseId, user.getId());
+        }
         
         return notes.stream()
                 .map(note -> {
@@ -1342,6 +1376,12 @@ public List<FactureProFormaDTO> getFacturesParPeriode(Long userIdRequete, HttpSe
                         dto.setAuteurId(note.getAuteur().getId());
                         dto.setAuteurNom(note.getAuteur().getNomComplet());
                         dto.setPhotoAuteur(note.getAuteur().getPhoto());
+                    }
+                    
+                    // Infos destinataire
+                    if (note.getDestinataire() != null) {
+                        dto.setDestinataireId(note.getDestinataire().getId());
+                        dto.setDestinataireNom(note.getDestinataire().getNomComplet());
                     }
                     
                     // Infos facture
