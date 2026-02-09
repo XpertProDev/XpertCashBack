@@ -2524,6 +2524,8 @@ public class ComptabiliteService {
         Double montantTotal = ventes.stream()
                 .mapToDouble(v -> v.getMontantTotal() != null ? v.getMontantTotal() : 0.0)
                 .sum();
+        // Arrondir pour éviter les erreurs de précision après sommation de doubles
+        montantTotal = Math.round(montantTotal * 100.0) / 100.0;
         dto.setMontantTotal(montantTotal);
         dto.setNombreVentes(ventes.size());
         
@@ -2585,15 +2587,19 @@ public class ComptabiliteService {
                 Double montantLigneAffiche = ligne.getMontantLigne();
                 
                 if (hasRemiseGlobale) {
-                    // Calcul inverse : prix_original = prix_actuel / (1 - remise_globale/100)
-                    // Le montant actuel est déjà après remise, donc on recalcule le montant original
-                    double montantLigneOriginal = montantLigneAffiche / (1 - remiseGlobale / 100.0);
-                    prixUnitaireAffiche = montantLigneOriginal / ligne.getQuantite();
-                    montantLigneAffiche = montantLigneOriginal;
+                    // Calcul inverse avec BigDecimal pour éviter les erreurs de précision
+                    // prix_original = prix_actuel / (1 - remise_globale/100)
+                    java.math.BigDecimal montantBD = java.math.BigDecimal.valueOf(montantLigneAffiche);
+                    java.math.BigDecimal remiseBD = java.math.BigDecimal.valueOf(remiseGlobale);
+                    java.math.BigDecimal facteur = java.math.BigDecimal.ONE
+                        .subtract(remiseBD.divide(java.math.BigDecimal.valueOf(100), 10, java.math.RoundingMode.HALF_UP));
                     
-                    // Arrondir à 2 décimales pour éviter les erreurs de précision
-                    prixUnitaireAffiche = Math.round(prixUnitaireAffiche * 100.0) / 100.0;
-                    montantLigneAffiche = Math.round(montantLigneAffiche * 100.0) / 100.0;
+                    java.math.BigDecimal montantOriginal = montantBD.divide(facteur, 2, java.math.RoundingMode.HALF_UP);
+                    java.math.BigDecimal prixUnitaireBD = montantOriginal.divide(
+                        java.math.BigDecimal.valueOf(ligne.getQuantite()), 2, java.math.RoundingMode.HALF_UP);
+                    
+                    montantLigneAffiche = montantOriginal.doubleValue();
+                    prixUnitaireAffiche = prixUnitaireBD.doubleValue();
                 }
                 
                 dto.setPrixUnitaire(prixUnitaireAffiche);

@@ -196,6 +196,8 @@ public VenteResponse enregistrerVente(VenteRequest request, HttpServletRequest h
         }
 
         double prixApresRemise = prixUnitaire * (1 - remisePct / 100.0);
+        // Arrondir le prix après remise avant multiplication pour éviter la propagation d'erreurs
+        prixApresRemise = Math.round(prixApresRemise * 100.0) / 100.0;
         double montantLigne = prixApresRemise * quantiteVendue;
         
         // Arrondir à 2 décimales avant de sauvegarder pour éviter les erreurs de précision
