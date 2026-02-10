@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
@@ -25,6 +26,9 @@ import com.xpertcash.DTOs.FactureReelleDTO;
 import com.xpertcash.DTOs.LigneFactureDTO;
 import com.xpertcash.DTOs.PaiementDTO;
 import com.xpertcash.DTOs.PaginatedResponseDTO;
+import com.xpertcash.DTOs.StatistiquesFactureReelleDTO;
+import com.xpertcash.DTOs.TopClientFactureDTO;
+import com.xpertcash.DTOs.TopCreateurFactureDTO;
 import com.xpertcash.DTOs.CLIENT.ClientDTO;
 import com.xpertcash.configuration.CentralAccess;
 
@@ -668,6 +672,169 @@ public List<FactureReelleDTO> getFacturesParPeriode(Long userIdRequete, HttpServ
                     return new FactureReelleDTO(facture, montantRestant);
                 })
                 .collect(Collectors.toList());
+    }
+
+    // Stats globales des factures réelles (filtre par période)
+    public StatistiquesFactureReelleDTO getStatistiquesGlobales(String periode, HttpServletRequest request) {
+        User user = authHelper.getAuthenticatedUserWithFallback(request);
+
+        Long entrepriseId = user.getEntreprise() != null ? user.getEntreprise().getId() : null;
+        if (entrepriseId == null) {
+            throw new RuntimeException("Aucune entreprise associée à cet utilisateur");
+        }
+
+        PeriodeDates periodeDates = calculerDatesPeriodeStatistiques(periode);
+        LocalDate dateDebut = periodeDates.dateDebut;
+        LocalDate dateFin = periodeDates.dateFin;
+
+        // Stats par statut (sert aussi à calculer les totaux globaux)
+        List<Object[]> statsParStatut = factureReelleRepository.getStatistiquesParStatutByEntrepriseIdAndPeriode(
+                entrepriseId, dateDebut, dateFin);
+        Long totalFactures = 0L;
+        Double montantTotal = 0.0;
+        Long nombreFacturesPayees = 0L;
+        Long nombreFacturesPartiellementPayees = 0L;
+        Long nombreFacturesEnAttente = 0L;
+        Double montantFacturesPayees = 0.0;
+        Double montantFacturesPartiellementPayees = 0.0;
+        Double montantFacturesEnAttente = 0.0;
+
+        if (statsParStatut != null) {
+            for (Object[] row : statsParStatut) {
+                String statut = row[0] != null ? row[0].toString() : "";
+                Long count = row[1] != null ? ((Number) row[1]).longValue() : 0L;
+                Double montant = row[2] != null ? ((Number) row[2]).doubleValue() : 0.0;
+
+                totalFactures += count;
+                montantTotal += montant;
+
+                switch (statut) {
+                    case "PAYEE":
+                        nombreFacturesPayees = count;
+                        montantFacturesPayees = montant;
+                        break;
+                    case "PARTIELLEMENT_PAYEE":
+                        nombreFacturesPartiellementPayees = count;
+                        montantFacturesPartiellementPayees = montant;
+                        break;
+                    case "EN_ATTENTE":
+                        nombreFacturesEnAttente = count;
+                        montantFacturesEnAttente = montant;
+                        break;
+                }
+            }
+        }
+
+        // Total payé
+        BigDecimal totalPayeBD = paiementRepository.sumMontantsByEntrepriseIdAndPeriodeFacture(
+                entrepriseId, dateDebut, dateFin);
+        Double montantTotalPaye = totalPayeBD != null ? totalPayeBD.doubleValue() : 0.0;
+        Double montantTotalRestant = montantTotal - montantTotalPaye;
+
+        // Top clients (Client + EntrepriseClient combinés)
+        List<Object[]> clientsData = factureReelleRepository.findAllTopClientsByEntrepriseIdAndPeriode(
+                entrepriseId, dateDebut, dateFin);
+        List<TopClientFactureDTO> topClients = new ArrayList<>();
+        if (clientsData != null) {
+            for (Object[] row : clientsData) {
+                TopClientFactureDTO dto = new TopClientFactureDTO();
+                dto.setClientId(((Number) row[0]).longValue());
+                dto.setNomClient((String) row[1]);
+                dto.setType((String) row[2]);
+                dto.setNombreFactures(((Number) row[3]).longValue());
+                dto.setMontantTotal(row[4] != null ? ((Number) row[4]).doubleValue() : 0.0);
+                topClients.add(dto);
+            }
+        }
+
+        // Top créateurs
+        List<Object[]> createursData = factureReelleRepository.findTopCreateursByEntrepriseIdAndPeriode(
+                entrepriseId, dateDebut, dateFin);
+        List<TopCreateurFactureDTO> topCreateurs = new ArrayList<>();
+        if (createursData != null) {
+            for (Object[] row : createursData) {
+                TopCreateurFactureDTO dto = new TopCreateurFactureDTO();
+                dto.setCreateurId(((Number) row[0]).longValue());
+                dto.setNomCreateur((String) row[1]);
+                dto.setNombreFactures(((Number) row[2]).longValue());
+                dto.setMontantTotal(row[3] != null ? ((Number) row[3]).doubleValue() : 0.0);
+                topCreateurs.add(dto);
+            }
+        }
+
+        StatistiquesFactureReelleDTO statistiques = new StatistiquesFactureReelleDTO();
+        statistiques.setTotalFactures(totalFactures);
+        statistiques.setMontantTotal(Math.round(montantTotal * 100.0) / 100.0);
+        statistiques.setMontantTotalPaye(Math.round(montantTotalPaye * 100.0) / 100.0);
+        statistiques.setMontantTotalRestant(Math.round(montantTotalRestant * 100.0) / 100.0);
+        statistiques.setNombreFacturesPayees(nombreFacturesPayees);
+        statistiques.setNombreFacturesPartiellementPayees(nombreFacturesPartiellementPayees);
+        statistiques.setNombreFacturesEnAttente(nombreFacturesEnAttente);
+        statistiques.setMontantFacturesPayees(Math.round(montantFacturesPayees * 100.0) / 100.0);
+        statistiques.setMontantFacturesPartiellementPayees(Math.round(montantFacturesPartiellementPayees * 100.0) / 100.0);
+        statistiques.setMontantFacturesEnAttente(Math.round(montantFacturesEnAttente * 100.0) / 100.0);
+        statistiques.setTopClients(topClients);
+        statistiques.setTopCreateurs(topCreateurs);
+        statistiques.setPeriode(periodeDates.periodeLabel);
+
+        return statistiques;
+    }
+
+    private PeriodeDates calculerDatesPeriodeStatistiques(String periode) {
+        if (periode == null || periode.trim().isEmpty()) {
+            periode = "aujourdhui";
+        }
+
+        LocalDate dateStart;
+        LocalDate dateEnd;
+        String periodeLabel;
+
+        switch (periode.toLowerCase()) {
+            case "aujourdhui":
+                dateStart = LocalDate.now();
+                dateEnd = dateStart.plusDays(1);
+                periodeLabel = "Aujourd'hui";
+                break;
+            case "hier":
+                dateStart = LocalDate.now().minusDays(1);
+                dateEnd = dateStart.plusDays(1);
+                periodeLabel = "Hier";
+                break;
+            case "semaine":
+                LocalDate aujourdhui = LocalDate.now();
+                dateStart = aujourdhui.minusDays(aujourdhui.getDayOfWeek().getValue() - 1);
+                dateEnd = dateStart.plusWeeks(1);
+                periodeLabel = "Cette semaine";
+                break;
+            case "mois":
+                dateStart = LocalDate.now().withDayOfMonth(1);
+                dateEnd = dateStart.plusMonths(1);
+                periodeLabel = "Ce mois";
+                break;
+            case "annee":
+                dateStart = LocalDate.now().withDayOfYear(1);
+                dateEnd = dateStart.plusYears(1);
+                periodeLabel = "Cette année";
+                break;
+            default:
+                dateStart = LocalDate.now();
+                dateEnd = dateStart.plusDays(1);
+                periodeLabel = "Aujourd'hui";
+        }
+
+        return new PeriodeDates(dateStart, dateEnd, periodeLabel);
+    }
+
+    private static class PeriodeDates {
+        final LocalDate dateDebut;
+        final LocalDate dateFin;
+        final String periodeLabel;
+
+        PeriodeDates(LocalDate dateDebut, LocalDate dateFin, String periodeLabel) {
+            this.dateDebut = dateDebut;
+            this.dateFin = dateFin;
+            this.periodeLabel = periodeLabel;
+        }
     }
 
     private String normaliserModePaiementPourStockage(String modePaiement) {
