@@ -30,6 +30,7 @@ import com.xpertcash.DTOs.StatistiquesFactureReelleDTO;
 import com.xpertcash.DTOs.TopClientFactureDTO;
 import com.xpertcash.DTOs.TopCreateurFactureDTO;
 import com.xpertcash.DTOs.CLIENT.ClientDTO;
+import com.xpertcash.composant.Utilitaire;
 import com.xpertcash.configuration.CentralAccess;
 
 import com.xpertcash.entity.Entreprise;
@@ -82,7 +83,8 @@ public class FactureReelleService {
     @Autowired
     private FactureProformaRepository factureProformaRepository;
 
-
+    @Autowired
+    private Utilitaire utilitaire;
 
     @Autowired
     private ModuleActivationService moduleActivationService;
@@ -231,6 +233,12 @@ public class FactureReelleService {
         throw new SecurityException("Accès interdit : Vous n'avez pas les permissions nécessaires pour voir ces factures.");
     }
 
+    if (!utilitaire.isEntrepriseActive(entreprise.getId())) {
+        throw new SecurityException("Votre entreprise est désactivée, opération non autorisée.");
+    }
+
+    
+
     Pageable pageable = PageRequest.of(page, size, 
         Sort.by("dateCreation").descending().and(Sort.by("id").descending()));
 
@@ -272,6 +280,9 @@ public class FactureReelleService {
 
     if (!(isAdminOrManager || hasPermission)) {
         throw new SecurityException("Accès interdit : Vous n'avez pas les permissions nécessaires pour filtrer les factures.");
+    }
+    if (!utilitaire.isEntrepriseActive(entrepriseId)) {
+        throw new SecurityException("Votre entreprise est désactivée, opération non autorisée.");
     }
 
     List<FactureReelle> factures;

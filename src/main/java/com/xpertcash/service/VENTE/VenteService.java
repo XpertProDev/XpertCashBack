@@ -105,6 +105,10 @@ public VenteResponse enregistrerVente(VenteRequest request, HttpServletRequest h
     Caisse caisse = caisseService.getCaisseActive(boutique.getId(), httpRequest)
         .orElseThrow(() -> new RuntimeException("Aucune caisse ouverte pour ce vendeur dans cette boutique. Veuillez ouvrir une caisse avant de vendre."));
 
+    if (!utilitaire.isEntrepriseActive(user.getEntreprise().getId())) {
+        throw new RuntimeException("Votre entreprise est désactivée, opération non autorisée.");
+    }
+
     User vendeur = user;
 
     Vente vente = new Vente();
@@ -553,6 +557,9 @@ public VenteResponse getVenteById(Long id, HttpServletRequest httpRequest) {
     if (!entrepriseVenteId.equals(user.getEntreprise().getId())) {
         throw new RuntimeException("Accès interdit : cette vente n'appartient pas à votre entreprise.");
     }
+    if (!utilitaire.isEntrepriseActive(user.getEntreprise().getId())) {
+        throw new RuntimeException("Votre entreprise est désactivée, opération non autorisée.");
+    }
 
     return toVenteResponse(vente);
 }
@@ -571,6 +578,9 @@ public VenteResponse getVenteById(Long id, HttpServletRequest httpRequest) {
     User user = utilitaire.getAuthenticatedUser(request);
 
     utilitaire.validateAdminOrManagerAccess(boutiqueId, user);
+    if (!utilitaire.isEntrepriseActive(user.getEntreprise().getId())) {
+        throw new RuntimeException("Votre entreprise est désactivée, opération non autorisée.");
+    }
 
     List<Vente> ventes = venteRepository.findByBoutiqueId(boutiqueId);
 
@@ -597,6 +607,10 @@ public List<VenteResponse> getVentesByVendeur(Long vendeurId, HttpServletRequest
 
         if (!vendeur.getEntreprise().getId().equals(user.getEntreprise().getId())) {
             throw new RuntimeException("Accès interdit : ce vendeur n'appartient pas à votre entreprise.");
+        }
+
+        if (!utilitaire.isEntrepriseActive(vendeur.getEntreprise().getId())) {
+            throw new RuntimeException("Votre entreprise est désactivée, opération non autorisée.");
         }
 
         List<Vente> ventes = venteRepository.findByVendeurId(vendeurId);
@@ -752,6 +766,9 @@ public double getMontantTotalVentesDuMois(Long entrepriseId) {
         boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
         if (!isAdminOrManager) {
             throw new RuntimeException("Vous n'avez pas les droits nécessaires pour accéder à cette information.");
+        }
+        if (!utilitaire.isEntrepriseActive(entrepriseId)) {
+            throw new RuntimeException("Votre entreprise est désactivée, opération non autorisée.");
         }
 
         return calculerBeneficeNetEntreprise(entrepriseId);
@@ -959,6 +976,10 @@ public List<VenteResponse> getVentesRecentes(int limit, HttpServletRequest reque
     boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
     if (!isAdminOrManager) {
         throw new RuntimeException("Vous n'avez pas les droits nécessaires pour accéder à cette information.");
+    }
+
+    if (!utilitaire.isEntrepriseActive(entrepriseId)) {
+        throw new RuntimeException("Votre entreprise est désactivée, opération non autorisée.");
     }
 
     List<Vente> ventes = venteRepository.findRecentVentesByEntrepriseId(entrepriseId);
