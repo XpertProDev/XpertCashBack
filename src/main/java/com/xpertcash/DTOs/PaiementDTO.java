@@ -24,6 +24,7 @@ public class PaiementDTO {
     private String description;
     private String objet;
     private String numeroFacture;
+    private Long factureId;
     private String statut;
     private String boutique;
     private String origine;
