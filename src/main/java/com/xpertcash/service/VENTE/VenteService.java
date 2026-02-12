@@ -226,24 +226,32 @@ public VenteResponse enregistrerVente(VenteRequest request, HttpServletRequest h
         double remiseGlobalePct = request.getRemiseGlobale();
         vente.setRemiseGlobale(remiseGlobalePct);
 
+        double montantRemiseGlobale = montantTotalSansRemise * (remiseGlobalePct / 100.0);
+        double totalCibleApresRemise = Math.round((montantTotalSansRemise - montantRemiseGlobale) * 100.0) / 100.0;
+
         for (VenteProduit ligne : lignes) {
             double proportion = ligne.getMontantLigne() / montantTotalSansRemise;
             double montantRemiseLigne = montantTotalSansRemise * (remiseGlobalePct / 100.0) * proportion;
             double nouveauMontantLigne = ligne.getMontantLigne() - montantRemiseLigne;
-            
-            // Arrondir à 2 décimales avant de sauvegarder
+
             nouveauMontantLigne = Math.round(nouveauMontantLigne * 100.0) / 100.0;
             double nouveauPrixUnitaire = nouveauMontantLigne / ligne.getQuantite();
             nouveauPrixUnitaire = Math.round(nouveauPrixUnitaire * 100.0) / 100.0;
-            
+
             ligne.setMontantLigne(nouveauMontantLigne);
             ligne.setPrixUnitaire(nouveauPrixUnitaire);
             ligne.setRemise(0.0);
         }
 
-        montantTotal = lignes.stream().mapToDouble(VenteProduit::getMontantLigne).sum();
-        // Arrondir le montant total à 2 décimales
-        montantTotal = Math.round(montantTotal * 100.0) / 100.0;
+        double sommeLignes = lignes.stream().mapToDouble(VenteProduit::getMontantLigne).sum();
+        double ecartArrondi = Math.round((totalCibleApresRemise - sommeLignes) * 100.0) / 100.0;
+        if (ecartArrondi != 0.0 && !lignes.isEmpty()) {
+            VenteProduit derniereLigne = lignes.get(lignes.size() - 1);
+            double nouveauMontantDerniere = Math.round((derniereLigne.getMontantLigne() + ecartArrondi) * 100.0) / 100.0;
+            derniereLigne.setMontantLigne(nouveauMontantDerniere);
+            derniereLigne.setPrixUnitaire(Math.round(nouveauMontantDerniere / derniereLigne.getQuantite() * 100.0) / 100.0);
+        }
+        montantTotal = totalCibleApresRemise;
     } else {
         vente.setRemiseGlobale(0.0);
     }
