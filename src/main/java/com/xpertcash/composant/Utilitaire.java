@@ -5,9 +5,11 @@ import org.springframework.stereotype.Service;
 
 import com.xpertcash.configuration.JwtUtil;
 import com.xpertcash.entity.Boutique;
+import com.xpertcash.entity.Entreprise;
 import com.xpertcash.entity.User;
 import com.xpertcash.entity.Enum.RoleType;
 import com.xpertcash.repository.BoutiqueRepository;
+import com.xpertcash.repository.EntrepriseRepository;
 import com.xpertcash.repository.UsersRepository;
 
 import jakarta.servlet.http.HttpServletRequest;
@@ -23,6 +25,9 @@ public class Utilitaire {
 
     @Autowired
     private BoutiqueRepository boutiqueRepository;
+
+    @Autowired
+    private EntrepriseRepository entrepriseRepository;
 
     public User getAuthenticatedUser(HttpServletRequest request) {
         String token = request.getHeader("Authorization");
@@ -61,6 +66,14 @@ public class Utilitaire {
         }
 
         return boutique;
+    }
+
+    //verifier si son Entreprise est active
+    public boolean isEntrepriseActive(Long entrepriseId) {
+        Entreprise entreprise = entrepriseRepository.findById(entrepriseId)
+                .orElseThrow(() -> new RuntimeException("Entreprise introuvable"));
+        return Boolean.TRUE.equals(entreprise.getActive());
+
     }
 
 }

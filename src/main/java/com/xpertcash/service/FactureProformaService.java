@@ -23,6 +23,7 @@ import com.xpertcash.DTOs.FactureProformaPaginatedResponseDTO;
 import com.xpertcash.DTOs.HistoriqueNoteProformaDTO;
 import com.xpertcash.DTOs.LigneFactureDTO;
 import com.xpertcash.DTOs.CLIENT.ClientDTO;
+import com.xpertcash.composant.Utilitaire;
 import com.xpertcash.configuration.CentralAccess;
 
 import com.xpertcash.entity.Client;
@@ -104,7 +105,10 @@ public class FactureProformaService {
     
     @Autowired
     private MailService mailService;
-    
+
+    @Autowired
+    private Utilitaire utilitaire;
+
     // Methode pour creer une facture pro forma
     public FactureProForma ajouterFacture(FactureProForma facture, Double remisePourcentage, Boolean appliquerTVA, HttpServletRequest request) {
     if (facture == null) {
@@ -125,6 +129,9 @@ public class FactureProformaService {
         throw new RuntimeException("Accès refusé : vous n'avez pas les droits nécessaires pour créer une facture dans cette entreprise !");
     }
 
+    if (!utilitaire.isEntrepriseActive(entrepriseUtilisateur.getId())) {
+        throw new SecurityException("Votre entreprise est désactivée, opération non autorisée.");
+    }
 
     moduleActivationService.verifierAccesModulePourEntreprise(entrepriseUtilisateur, "GESTION_FACTURATION");
 
@@ -355,6 +362,10 @@ public class FactureProformaService {
 
         if (!isAdmin && !hasPermission) {
             throw new RuntimeException("Accès refusé : vous n'avez pas les droits nécessaires pour créer une facture dans cette entreprise !");
+        }
+
+        if (!utilitaire.isEntrepriseActive(entrepriseUtilisateur.getId())) {
+            throw new SecurityException("Votre entreprise est désactivée, opération non autorisée.");
         }
 
 
@@ -685,7 +696,7 @@ public class FactureProformaService {
             facture.setUtilisateurRelanceur(facture.getUtilisateurModificateur());
 
             if (modifications.getMethodeEnvoi() == MethodeEnvoi.EMAIL) {
-                log.info("📨 La facture {} est marquée ENVOYÉE par EMAIL. Le front doit appeler le service d'envoi de mail.", facture.getNumeroFacture());
+                log.info("La facture {} est marquée ENVOYÉE par EMAIL. Le front doit appeler le service d'envoi de mail.", facture.getNumeroFacture());
             }
 
             String details = "Facture envoyée au client via " + facture.getMethodeEnvoi();
