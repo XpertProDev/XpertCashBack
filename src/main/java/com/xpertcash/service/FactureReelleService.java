@@ -694,6 +694,14 @@ public List<FactureReelleDTO> getFacturesParPeriode(Long userIdRequete, HttpServ
             throw new RuntimeException("Aucune entreprise associée à cet utilisateur");
         }
 
+        // Vérification des droits adamin manager ou comptable ou gestionnaire de facturation
+        boolean isAdminOrManager = CentralAccess.isAdminOrManagerOfEntreprise(user, entrepriseId);
+        boolean isComptable = CentralAccess.isComptable(user, entrepriseId);
+        boolean hasGestionFacturePermission = user.getRole().hasPermission(PermissionType.GESTION_FACTURATION);
+        if (!isAdminOrManager && !isComptable && !hasGestionFacturePermission) {
+            throw new RuntimeException("Vous n'avez pas les droits nécessaires pour consulter les statistiques globales des factures.");
+        }
+
         PeriodeDates periodeDates = calculerDatesPeriodeStatistiques(periode);
         LocalDate dateDebut = periodeDates.dateDebut;
         LocalDate dateFin = periodeDates.dateFin;

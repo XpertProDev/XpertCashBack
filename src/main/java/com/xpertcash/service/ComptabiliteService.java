@@ -2344,6 +2344,7 @@ public class ComptabiliteService {
                             org.hibernate.Hibernate.initialize(facture.getLignesFacture());
                         }
                         
+                        dto.setFactureId(facture.getId());
                         dto.setNumeroFacture(facture.getNumeroFacture());
                         
                         String objetFacture = facture.getDescription() != null && !facture.getDescription().trim().isEmpty() 

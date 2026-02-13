@@ -36,6 +36,24 @@ public class TresorerieController {
         return handleRequest(() -> tresorerieService.getDettesDetaillees(request, page, size));
     }
 
+     // Dettes issues uniquement du POS (ventes à crédit).
+   
+    @GetMapping("/tresorerie/dettes/pos")
+    public ResponseEntity<?> getDettesPos(
+            HttpServletRequest request,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false, defaultValue = "aujourdhui") String periode,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateDebut,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateFin,
+            @RequestParam(defaultValue = "date") String sortBy,
+            @RequestParam(defaultValue = "desc") String sortDir,
+            @RequestParam(required = false) Long vendeurId,
+            @RequestParam(required = false) Long boutiqueId) {
+        return handleRequest(() -> tresorerieService.getDettesPos(request, page, size,
+                periode, dateDebut, dateFin, sortBy, sortDir, vendeurId, boutiqueId));
+    }
+
     private ResponseEntity<?> handleRequest(Supplier<Object> supplier) {
         try {
             return ResponseEntity.ok(supplier.get());

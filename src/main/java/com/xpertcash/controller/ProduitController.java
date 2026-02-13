@@ -583,6 +583,31 @@ public ResponseEntity<?> updateProduit(
         }
     }
 
+    /**
+     * POS / Vente : tous les produits en stock d'une boutique en un seul appel (pagination, tri, recherche).
+     * Remplacer les appels multiples par catégorie par cet endpoint.
+     */
+    @GetMapping("/boutique/{boutiqueId}/produits/vente/paginated")
+    public ResponseEntity<ProduitStockPaginatedResponseDTO> getProduitsBoutiquePourVentePaginated(
+            @PathVariable Long boutiqueId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false) String sort,
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) String searchField,
+            HttpServletRequest request) {
+        try {
+            ProduitStockPaginatedResponseDTO response = produitService.getProduitsBoutiquePourVentePaginated(
+                    boutiqueId, page, size, sort, search, searchField, request);
+            return ResponseEntity.ok(response);
+        } catch (RuntimeException e) {
+            throw e;
+        } catch (Exception e) {
+            e.printStackTrace();
+            throw new RuntimeException("Erreur lors de la récupération des produits pour la vente: " + e.getMessage());
+        }
+    }
+
      // Endpoint pour récupérer les compteurs de produits par boutique pour l'entreprise de l'utilisateur connecté
     @GetMapping("/produits/compteurs-boutiques")
     public ResponseEntity<?> getCompteursBoutiques(HttpServletRequest request) {
