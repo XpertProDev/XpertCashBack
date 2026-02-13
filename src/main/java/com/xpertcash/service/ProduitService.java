@@ -999,9 +999,97 @@ public class ProduitService {
         return ProduitStockPaginatedResponseDTO.fromPage(dtoPage, totalProduitsActifs, totalProduitsEnStock, totalProduitsHorsStock);
     }
 
+    /**
+     * POS / Vente : produits en stock d'une boutique uniquement, avec pagination, tri et recherche.
+     * N'affecte pas les autres méthodes. Utilisé pour remplacer les appels multiples par catégorie.
+     */
+    @Transactional(readOnly = true)
+    public ProduitStockPaginatedResponseDTO getProduitsBoutiquePourVentePaginated(
+            Long boutiqueId,
+            int page,
+            int size,
+            String sortParam,
+            String search,
+            String searchField,
+            HttpServletRequest request) {
 
-   
+        if (page < 0) page = 0;
+        if (size <= 0) size = 20;
+        if (size > 100) size = 100;
 
+        if (boutiqueId == null) {
+            throw new RuntimeException("L'ID de la boutique ne peut pas être null");
+        }
+
+        String token = request.getHeader("Authorization");
+        if (token == null || !token.startsWith("Bearer ")) {
+            throw new RuntimeException("Token JWT manquant ou mal formaté");
+        }
+
+        User user = authHelper.getAuthenticatedUserWithFallback(request);
+
+        Boutique boutique = boutiqueRepository.findById(boutiqueId)
+                .orElseThrow(() -> new RuntimeException("Boutique non trouvée"));
+        if (!boutique.isActif()) {
+            throw new RuntimeException("Cette boutique est désactivée, ses produits ne sont pas accessibles !");
+        }
+
+        Long entrepriseId = boutique.getEntreprise().getId();
+        if (!entrepriseId.equals(user.getEntreprise().getId())) {
+            throw new RuntimeException("Accès interdit : cette boutique ne vous appartient pas");
+        }
+
+        RoleType role = user.getRole().getName();
+        boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
+        boolean hasPermission = user.getRole().hasPermission(PermissionType.GERER_PRODUITS)
+                || user.getRole().hasPermission(PermissionType.VENDRE_PRODUITS)
+                || user.getRole().hasPermission(PermissionType.APPROVISIONNER_STOCK)
+                || user.getRole().hasPermission(PermissionType.GERER_BOUTIQUE);
+
+        if (!isAdminOrManager && !hasPermission) {
+            throw new RuntimeException("Accès interdit : vous n'avez pas les droits pour consulter les produits.");
+        }
+
+        if (role == RoleType.VENDEUR) {
+            Optional<UserBoutique> userBoutique = userBoutiqueRepository.findByUserIdAndBoutiqueId(user.getId(), boutiqueId);
+            if (!userBoutique.isPresent()) {
+                throw new RuntimeException("Vous n'êtes pas affecté à cette boutique, vous ne pouvez pas voir ses produits.");
+            }
+        }
+
+        Sort sort = parseSortParam(sortParam);
+        String searchTerm = (search != null && !search.isBlank()) ? search.trim() : null;
+        Pageable pageable = PageRequest.of(page, size, sort);
+
+        Page<Produit> produitsPage = produitRepository.findProduitsEnStockByBoutiqueIdForVentePaginated(
+                boutiqueId, searchTerm, pageable);
+
+        long totalEnStock = produitsPage.getTotalElements();
+
+        List<ProduitDTO> dtos = produitsPage.getContent().stream()
+                .map(this::convertToProduitDTO)
+                .collect(Collectors.toList());
+
+        Page<ProduitDTO> dtoPage = new PageImpl<>(dtos, pageable, totalEnStock);
+
+        return ProduitStockPaginatedResponseDTO.fromPage(
+                dtoPage,
+                totalEnStock,
+                totalEnStock,
+                0L);
+    }
+
+    private Sort parseSortParam(String sortParam) {
+        if (sortParam == null || sortParam.isBlank()) {
+            return Sort.by(Sort.Direction.DESC, "createdAt");
+        }
+        String[] parts = sortParam.split(",");
+        String property = parts[0].trim();
+        Sort.Direction direction = parts.length > 1 && "asc".equalsIgnoreCase(parts[1].trim())
+                ? Sort.Direction.ASC
+                : Sort.Direction.DESC;
+        return Sort.by(direction, property);
+    }
 
     // Méthode pour convertir un Produit en ProduitDTO
         private ProduitDTO convertToProduitDTO(Produit produit) {

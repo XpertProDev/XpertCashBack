@@ -248,5 +248,19 @@ long countProduitsEnStockByBoutiqueId(@Param("boutiqueId") Long boutiqueId);
        "AND (p.enStock = false OR p.enStock IS NULL)")
 long countProduitsHorsStockByBoutiqueId(@Param("boutiqueId") Long boutiqueId);
 
+// --- POS / Vente : produits en stock uniquement, avec pagination, tri et recherche ---
+@Query("SELECT DISTINCT p FROM Produit p " +
+       "LEFT JOIN FETCH p.categorie c " +
+       "LEFT JOIN FETCH p.uniteDeMesure u " +
+       "LEFT JOIN FETCH p.boutique b " +
+       "WHERE b.id = :boutiqueId " +
+       "AND (p.deleted IS NULL OR p.deleted = false) " +
+       "AND p.enStock = true " +
+       "AND ( :search IS NULL OR :search = '' OR LOWER(p.nom) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(p.codeGenerique) LIKE LOWER(CONCAT('%', :search, '%')) )")
+Page<Produit> findProduitsEnStockByBoutiqueIdForVentePaginated(
+    @Param("boutiqueId") Long boutiqueId,
+    @Param("search") String search,
+    Pageable pageable);
+
 }
 
