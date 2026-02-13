@@ -311,6 +311,12 @@ public class TresorerieService {
             dto.setMontantRestant(restant);
             dto.setDate(v.getDateVente());
             dto.setDescription(v.getDescription());
+            double remiseGlobaleVal = v.getRemiseGlobale() != null ? v.getRemiseGlobale() : 0.0;
+            dto.setRemiseGlobale(remiseGlobaleVal);
+            dto.setVendeurId(v.getVendeur() != null ? v.getVendeur().getId() : null);
+            dto.setVendeurNom(v.getVendeur() != null ? v.getVendeur().getNomComplet() : null);
+            dto.setBoutiqueId(v.getBoutique() != null ? v.getBoutique().getId() : null);
+            dto.setBoutiqueNom(v.getBoutique() != null ? v.getBoutique().getNomBoutique() : null);
             Long venteEntrepriseId = v.getBoutique() != null && v.getBoutique().getEntreprise() != null 
                     ? v.getBoutique().getEntreprise().getId() : null;
             if (venteEntrepriseId != null) {
@@ -328,6 +334,34 @@ public class TresorerieService {
                 dto.setContact(v.getClientNumero());
             }
 
+            // Détail des produits vendus (dettes POS)
+            if (v.getProduits() != null && !v.getProduits().isEmpty()) {
+                java.util.List<DetteItemDTO.LigneProduitDetteDTO> lignes = v.getProduits().stream()
+                        .map(vp -> {
+                            DetteItemDTO.LigneProduitDetteDTO ligne = new DetteItemDTO.LigneProduitDetteDTO();
+                            ligne.setProduitId(vp.getProduit() != null ? vp.getProduit().getId() : null);
+                            ligne.setNomProduit(vp.getProduit() != null ? vp.getProduit().getNom() : null);
+                            ligne.setQuantite(vp.getQuantite());
+                            ligne.setPrixUnitaire(vp.getPrixUnitaire());
+                            ligne.setRemise(vp.getRemise());
+                            ligne.setMontantLigne(vp.getMontantLigne());
+                            return ligne;
+                        })
+                        .collect(Collectors.toList());
+                dto.setProduits(lignes);
+                if (remiseGlobaleVal > 0) {
+                    dto.setTypeRemise("GLOBALE");
+                } else if (lignes.stream().anyMatch(l -> l.getRemise() != null && l.getRemise() > 0)) {
+                    dto.setTypeRemise("PAR_LIGNE");
+                    dto.setRemiseGlobale(0.0);
+                } else {
+                    dto.setTypeRemise(null);
+                }
+            } else {
+                dto.setProduits(java.util.Collections.emptyList());
+                dto.setTypeRemise(remiseGlobaleVal > 0 ? "GLOBALE" : null);
+            }
+
             items.add(dto);
         }
 
@@ -336,6 +370,161 @@ public class TresorerieService {
             if (a.getDate() == null) return 1;
             if (b.getDate() == null) return -1;
             return b.getDate().compareTo(a.getDate());
+        });
+
+        int totalElements = items.size();
+        int totalPages = (int) Math.ceil((double) totalElements / size);
+        int fromIndex = page * size;
+        int toIndex = Math.min(fromIndex + size, totalElements);
+
+        java.util.List<DetteItemDTO> pageContent =
+                (fromIndex >= totalElements) ? java.util.Collections.emptyList() : items.subList(fromIndex, toIndex);
+
+        PaginatedResponseDTO<DetteItemDTO> response = new PaginatedResponseDTO<>();
+        response.setContent(pageContent);
+        response.setPageNumber(page);
+        response.setPageSize(size);
+        response.setTotalElements(totalElements);
+        response.setTotalPages(totalPages);
+        response.setHasNext(page < totalPages - 1);
+        response.setHasPrevious(page > 0);
+        response.setFirst(page == 0);
+        response.setLast(page >= totalPages - 1 || totalPages == 0);
+
+        return response;
+    }
+
+  
+     // Récupère uniquement les dettes issues du POS (ventes à crédit).
+    
+    @Transactional(readOnly = true)
+    public PaginatedResponseDTO<DetteItemDTO> getDettesPos(HttpServletRequest request, int page, int size,
+            String periode, LocalDate dateDebut, LocalDate dateFin,
+            String sortBy, String sortDir, Long vendeurId, Long boutiqueId) {
+        Long entrepriseId = validerEntrepriseEtPermissions(request);
+
+        // Charger les données avec ou sans filtre de période
+        TresorerieData data;
+        if (periode != null && !periode.trim().isEmpty() && !"toutes".equalsIgnoreCase(periode.trim())) {
+            PeriodeDates periodeDates = calculerDatesPeriode(periode, dateDebut, dateFin);
+            data = chargerDonneesAvecPeriode(entrepriseId, periodeDates);
+        } else {
+            data = chargerDonnees(entrepriseId);
+        }
+
+        List<Vente> ventesCredit = data.toutesVentes.stream()
+                .filter(v -> v.getModePaiement() == ModePaiement.CREDIT)
+                .filter(v -> vendeurId == null || (v.getVendeur() != null && v.getVendeur().getId().equals(vendeurId)))
+                .filter(v -> boutiqueId == null || (v.getBoutique() != null && v.getBoutique().getId().equals(boutiqueId)))
+                .collect(Collectors.toList());
+
+        java.util.List<DetteItemDTO> items = new java.util.ArrayList<>();
+        for (Vente v : ventesCredit) {
+            double total = getValeurDouble(v.getMontantTotal());
+            double rembourse = getValeurDouble(v.getMontantTotalRembourse());
+            double restant = total - rembourse;
+            if (restant <= 0) {
+                continue;
+            }
+
+            DetteItemDTO dto = new DetteItemDTO();
+            dto.setId(v.getId());
+            dto.setType("VENTE_CREDIT");
+            dto.setMontantInitial(total);
+            dto.setMontantRestant(restant);
+            dto.setDate(v.getDateVente());
+            dto.setDescription(v.getDescription());
+            double remiseGlobaleVal = v.getRemiseGlobale() != null ? v.getRemiseGlobale() : 0.0;
+            dto.setRemiseGlobale(remiseGlobaleVal);
+            dto.setVendeurId(v.getVendeur() != null ? v.getVendeur().getId() : null);
+            dto.setVendeurNom(v.getVendeur() != null ? v.getVendeur().getNomComplet() : null);
+            dto.setBoutiqueId(v.getBoutique() != null ? v.getBoutique().getId() : null);
+            dto.setBoutiqueNom(v.getBoutique() != null ? v.getBoutique().getNomBoutique() : null);
+            Long venteEntrepriseId = v.getBoutique() != null && v.getBoutique().getEntreprise() != null
+                    ? v.getBoutique().getEntreprise().getId() : null;
+            if (venteEntrepriseId != null) {
+                factureVenteRepository.findByVenteIdAndEntrepriseId(v.getId(), venteEntrepriseId)
+                        .ifPresent(f -> dto.setNumero(f.getNumeroFacture()));
+            }
+            if (v.getClient() != null) {
+                dto.setClient(v.getClient().getNomComplet());
+                dto.setContact(v.getClient().getTelephone());
+            } else if (v.getEntrepriseClient() != null) {
+                dto.setClient(v.getEntrepriseClient().getNom());
+                dto.setContact(v.getEntrepriseClient().getTelephone());
+            } else {
+                dto.setClient(v.getClientNom());
+                dto.setContact(v.getClientNumero());
+            }
+
+            // Détail des produits vendus (quel produit, quelle quantité, quel montant, remise)
+            if (v.getProduits() != null && !v.getProduits().isEmpty()) {
+                java.util.List<DetteItemDTO.LigneProduitDetteDTO> lignes = v.getProduits().stream()
+                        .map(vp -> {
+                            DetteItemDTO.LigneProduitDetteDTO ligne = new DetteItemDTO.LigneProduitDetteDTO();
+                            ligne.setProduitId(vp.getProduit() != null ? vp.getProduit().getId() : null);
+                            ligne.setNomProduit(vp.getProduit() != null ? vp.getProduit().getNom() : null);
+                            ligne.setQuantite(vp.getQuantite());
+                            ligne.setPrixUnitaire(vp.getPrixUnitaire());
+                            double remiseLigne = vp.getRemise();
+                            ligne.setRemise(remiseLigne);
+                            ligne.setMontantLigne(vp.getMontantLigne());
+                            return ligne;
+                        })
+                        .collect(Collectors.toList());
+                dto.setProduits(lignes);
+                // Type de remise : soit globale soit par ligne, pas les deux
+                if (remiseGlobaleVal > 0) {
+                    dto.setTypeRemise("GLOBALE");
+                } else if (lignes.stream().anyMatch(l -> l.getRemise() != null && l.getRemise() > 0)) {
+                    dto.setTypeRemise("PAR_LIGNE");
+                    dto.setRemiseGlobale(0.0);
+                } else {
+                    dto.setTypeRemise(null);
+                }
+            } else {
+                dto.setProduits(java.util.Collections.emptyList());
+                dto.setTypeRemise(remiseGlobaleVal > 0 ? "GLOBALE" : null);
+            }
+
+            items.add(dto);
+        }
+
+        // Trier selon sortBy et sortDir
+        String sb = sortBy != null ? sortBy.toLowerCase() : "date";
+        String sd = sortDir != null ? sortDir : "desc";
+        items.sort((a, b) -> {
+            int comparison = 0;
+            switch (sb) {
+                case "vendeur":
+                    String v1 = a.getVendeurNom() != null ? a.getVendeurNom() : "";
+                    String v2 = b.getVendeurNom() != null ? b.getVendeurNom() : "";
+                    comparison = v1.compareToIgnoreCase(v2);
+                    if ("desc".equalsIgnoreCase(sd)) comparison = -comparison;
+                    break;
+                case "boutique":
+                case "boutiquenom":
+                    String b1 = a.getBoutiqueNom() != null ? a.getBoutiqueNom() : "";
+                    String b2 = b.getBoutiqueNom() != null ? b.getBoutiqueNom() : "";
+                    comparison = b1.compareToIgnoreCase(b2);
+                    if ("desc".equalsIgnoreCase(sd)) comparison = -comparison;
+                    break;
+                case "montantrestant":
+                case "montant":
+                    comparison = Double.compare(a.getMontantRestant() != null ? a.getMontantRestant() : 0.0,
+                            b.getMontantRestant() != null ? b.getMontantRestant() : 0.0);
+                    if ("desc".equalsIgnoreCase(sd)) comparison = -comparison;
+                    break;
+                case "date":
+                default:
+                    if (a.getDate() == null && b.getDate() == null) comparison = 0;
+                    else if (a.getDate() == null) comparison = 1;
+                    else if (b.getDate() == null) comparison = -1;
+                    else comparison = a.getDate().compareTo(b.getDate());
+                    if ("desc".equalsIgnoreCase(sd)) comparison = -comparison;
+                    break;
+            }
+            return comparison;
         });
 
         int totalElements = items.size();
@@ -384,8 +573,12 @@ public class TresorerieService {
 
     /**
      * Calcule les dates de début et fin selon le type de période.
+     * Si dateDebut et dateFin sont fournis (ex. période personnalisée), ils sont utilisés.
      */
     private PeriodeDates calculerDatesPeriode(String periode, LocalDate dateDebut, LocalDate dateFin) {
+        if (dateDebut != null && dateFin != null) {
+            return new PeriodeDates(dateDebut.atStartOfDay(), dateFin.plusDays(1).atStartOfDay(), true);
+        }
         if (periode == null || periode.trim().isEmpty()) {
             periode = "aujourdhui";
         }
