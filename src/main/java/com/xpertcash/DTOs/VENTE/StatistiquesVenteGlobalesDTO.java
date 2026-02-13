@@ -14,9 +14,15 @@ public class StatistiquesVenteGlobalesDTO {
     private Long nombreArticles;        // Nombre total d'articles vendus
     private Double montantTotal;        // Montant total des ventes
     
-    // Top 3
-    private List<TopProduitVenduDTO> top3ProduitsVendus;
-    private List<TopVendeurDTO> top3Vendeurs;
+    // Montants par statut de caisse
+    private Double montantCaisseOuverte;   // Montant des ventes dans les caisses ouvertes
+    private Double montantCaisseFermee;    // Montant des ventes dans les caisses fermées
+    
+    // Tous les produits vendus (triés par quantité décroissante - les 3 premiers sont le "top 3")
+    private List<TopProduitVenduDTO> produitsVendus;
+    
+    // Tous les vendeurs (triés par montant décroissant - les 3 premiers sont le "top 3")
+    private List<TopVendeurDTO> vendeurs;
     
     // Période appliquée
     private String periode;

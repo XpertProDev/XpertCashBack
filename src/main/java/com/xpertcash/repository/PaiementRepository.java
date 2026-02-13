@@ -41,4 +41,14 @@ public interface PaiementRepository extends JpaRepository<Paiement, Long>{
             @Param("dateDebut") LocalDateTime dateDebut,
             @Param("dateFin") LocalDateTime dateFin);
 
+    // Total payé pour les factures créées dans une période
+    @Query(value = "SELECT COALESCE(SUM(p.montant), 0) FROM paiement p " +
+           "INNER JOIN facture_reelle f ON p.facture_reelle_id = f.id " +
+           "WHERE f.entreprise_id = :entrepriseId " +
+           "AND f.date_creation >= :dateDebut AND f.date_creation < :dateFin", nativeQuery = true)
+    java.math.BigDecimal sumMontantsByEntrepriseIdAndPeriodeFacture(
+            @Param("entrepriseId") Long entrepriseId,
+            @Param("dateDebut") java.time.LocalDate dateDebut,
+            @Param("dateFin") java.time.LocalDate dateFin);
+
 }

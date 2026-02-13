@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.xpertcash.DTOs.FactureReelleDTO;
 import com.xpertcash.DTOs.PaginatedResponseDTO;
 import com.xpertcash.DTOs.PaiementDTO;
+import com.xpertcash.DTOs.StatistiquesFactureReelleDTO;
 import com.xpertcash.service.AuthenticationHelper;
 import com.xpertcash.entity.FactureProForma;
 import com.xpertcash.entity.FactureReelle;
@@ -172,6 +173,22 @@ public ResponseEntity<?> getFacturesParPeriode(
         ));
     }
 }
+
+    @GetMapping("/factureReelle/statistiques")
+    public ResponseEntity<?> getStatistiquesGlobales(
+            @RequestParam(defaultValue = "aujourdhui") String periode,
+            HttpServletRequest request) {
+        try {
+            StatistiquesFactureReelleDTO statistiques = factureReelleService.getStatistiquesGlobales(periode, request);
+            return ResponseEntity.ok(statistiques);
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Erreur interne du serveur : " + e.getMessage()));
+        }
+    }
 
     // Endpoint pour récupérer les factures réelles récentes
    

@@ -109,8 +109,21 @@ public class ComptabiliteController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
             HttpServletRequest request) {
-        return handleRequest(() -> comptabiliteService.getComptabiliteCompletePaginated(request, page, size));
+    
+        try {
+            // Appel du service
+            Object result = comptabiliteService.getComptabiliteCompletePaginated(request, page, size);
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            // Log immédiat pour debug
+            System.out.println("===== EXCEPTION DANS getComptabiliteComplete =====");
+            e.printStackTrace();
+    
+            // Relance pour que le GlobalExceptionLogger la capture
+            throw e;
+        }
     }
+    
 
      // Payer une dette depuis la comptabilité (actuellement pour VENTE_CREDIT).
     @PostMapping("/comptabilite/dettes/payer")

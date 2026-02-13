@@ -18,6 +18,7 @@ import org.springframework.web.multipart.MultipartFile;
 import com.xpertcash.DTOs.VENTE.FactureVentePaginatedDTO;
 import com.xpertcash.DTOs.VENTE.ReceiptEmailRequest;
 import com.xpertcash.DTOs.VENTE.StatistiquesVenteGlobalesDTO;
+import com.xpertcash.DTOs.VENTE.StatistiquesVendeurDTO;
 import com.xpertcash.service.MailService;
 import com.xpertcash.service.VENTE.FactureVenteService;
 
@@ -138,6 +139,33 @@ public class FactureVenteController {
             HttpServletRequest request) {
         try {
             StatistiquesVenteGlobalesDTO statistiques = factureVenteService.getStatistiquesGlobales(periode, request);
+            return ResponseEntity.ok(statistiques);
+        } catch (RuntimeException e) {
+            e.printStackTrace();
+            return ResponseEntity.badRequest().body(java.util.Map.of(
+                "error", e.getMessage() != null ? e.getMessage() : "Erreur inconnue"
+            ));
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(java.util.Map.of("error", "Erreur serveur: " + e.getMessage()));
+        }
+    }
+
+    /**
+     * Endpoint pour récupérer les statistiques de vente d'un vendeur spécifique
+     * Inclut : Infos vendeur, Total ventes, Nombre d'articles, Montant Total, Produits vendus
+     * 
+     * vendeurId ID du vendeur
+     * periode Filtre de période : aujourdhui, hier, semaine, mois, annee (défaut: aujourdhui)
+     */
+    @GetMapping("/vente/statistiques/vendeur/{vendeurId}")
+    public ResponseEntity<?> getStatistiquesVendeur(
+            @org.springframework.web.bind.annotation.PathVariable Long vendeurId,
+            @RequestParam(required = false, defaultValue = "aujourdhui") String periode,
+            HttpServletRequest request) {
+        try {
+            StatistiquesVendeurDTO statistiques = factureVenteService.getStatistiquesVendeur(vendeurId, periode, request);
             return ResponseEntity.ok(statistiques);
         } catch (RuntimeException e) {
             e.printStackTrace();

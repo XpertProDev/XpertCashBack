@@ -151,5 +151,15 @@ public interface UsersRepository extends JpaRepository<User, Long> {
     @Query("UPDATE User u SET u.lastActivity = :lastActivity WHERE u.id = :userId")
     void updateLastActivity(@Param("userId") Long userId, @Param("lastActivity") LocalDateTime lastActivity);
 
+    // Récupérer les utilisateurs ayant une permission spécifique dans une entreprise
+    @Query("SELECT DISTINCT u FROM User u " +
+           "JOIN FETCH u.entreprise e " +
+           "JOIN FETCH u.role r " +
+           "JOIN r.permissions p " +
+           "WHERE e.id = :entrepriseId AND p.type = :permissionType")
+    List<User> findByEntrepriseIdAndPermission(
+            @Param("entrepriseId") Long entrepriseId,
+            @Param("permissionType") com.xpertcash.entity.PermissionType permissionType);
+
 }
 

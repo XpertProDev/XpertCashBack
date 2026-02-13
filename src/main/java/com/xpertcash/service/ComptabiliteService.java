@@ -2344,6 +2344,7 @@ public class ComptabiliteService {
                             org.hibernate.Hibernate.initialize(facture.getLignesFacture());
                         }
                         
+                        dto.setFactureId(facture.getId());
                         dto.setNumeroFacture(facture.getNumeroFacture());
                         
                         String objetFacture = facture.getDescription() != null && !facture.getDescription().trim().isEmpty() 
@@ -2378,21 +2379,21 @@ public class ComptabiliteService {
                         dto.setStatut(statutFacture);
                         dto.setOrigine("FACTURATION");
                         
-                        // Informations client
-                        if (facture.getClient() != null) {
-                            dto.setClientNom(facture.getClient().getNomComplet());
-                            dto.setClientNumero(facture.getClient().getTelephone());
-                        } else if (facture.getEntrepriseClient() != null) {
-                            dto.setClientNom(facture.getEntrepriseClient().getNom());
-                            dto.setClientNumero(facture.getEntrepriseClient().getTelephone());
-                        }
-                        
                         // Informations de remise et TVA
                         dto.setRemise(facture.getRemise());
                         dto.setTauxRemise(facture.getTauxRemise());
                         dto.setTva(facture.isTva());
                         dto.setTotalHT(facture.getTotalHT());
                         dto.setTotalTTC(facture.getTotalFacture());
+                        
+                        // Informations client
+                        if (facture.getClient() != null) {
+                            dto.setClientNom(facture.getClient().getNomComplet());
+                            dto.setClientContact(facture.getClient().getTelephone());
+                        } else if (facture.getEntrepriseClient() != null) {
+                            dto.setClientNom(facture.getEntrepriseClient().getNom());
+                            dto.setClientContact(facture.getEntrepriseClient().getTelephone());
+                        }
                     } else {
                         dto.setDescription("Paiement sans facture associée");
                         dto.setObjet(null);
@@ -2524,6 +2525,8 @@ public class ComptabiliteService {
         Double montantTotal = ventes.stream()
                 .mapToDouble(v -> v.getMontantTotal() != null ? v.getMontantTotal() : 0.0)
                 .sum();
+        // Arrondir pour éviter les erreurs de précision après sommation de doubles
+        montantTotal = Math.round(montantTotal * 100.0) / 100.0;
         dto.setMontantTotal(montantTotal);
         dto.setNombreVentes(ventes.size());
         
@@ -2563,21 +2566,8 @@ public class ComptabiliteService {
         
         response.setMontantTotal(montantTotalArrondi);
         response.setDescription(vente.getDescription());
-        
-        // Récupérer les informations client (priorité : champs texte, puis Client, puis EntrepriseClient)
-        String clientNom = vente.getClientNom();
-        String clientNumero = vente.getClientNumero();
-        if ((clientNom == null || clientNom.trim().isEmpty()) && vente.getClient() != null) {
-            clientNom = vente.getClient().getNomComplet();
-            clientNumero = vente.getClient().getTelephone();
-        }
-        if ((clientNom == null || clientNom.trim().isEmpty()) && vente.getEntrepriseClient() != null) {
-            clientNom = vente.getEntrepriseClient().getNom();
-            clientNumero = vente.getEntrepriseClient().getTelephone();
-        }
-        response.setClientNom(clientNom);
-        response.setClientNumero(clientNumero);
-        
+        response.setClientNom(vente.getClientNom());
+        response.setClientNumero(vente.getClientNumero());
         response.setModePaiement(vente.getModePaiement() != null ? vente.getModePaiement().name() : null);
         response.setMontantPaye(montantPayeArrondi);
         
@@ -2597,16 +2587,42 @@ public class ComptabiliteService {
                 Double prixUnitaireAffiche = ligne.getPrixUnitaire();
                 Double montantLigneAffiche = ligne.getMontantLigne();
                 
+                /*
                 if (hasRemiseGlobale) {
-                    // Calcul inverse : prix_original = prix_actuel / (1 - remise_globale/100)
-                    // Le montant actuel est déjà après remise, donc on recalcule le montant original
-                    double montantLigneOriginal = montantLigneAffiche / (1 - remiseGlobale / 100.0);
-                    prixUnitaireAffiche = montantLigneOriginal / ligne.getQuantite();
-                    montantLigneAffiche = montantLigneOriginal;
+                    // Calcul inverse avec BigDecimal pour éviter les erreurs de précision
+                    // prix_original = prix_actuel / (1 - remise_globale/100)
+                    java.math.BigDecimal montantBD = java.math.BigDecimal.valueOf(montantLigneAffiche);
+                    java.math.BigDecimal remiseBD = java.math.BigDecimal.valueOf(remiseGlobale);
+                    java.math.BigDecimal facteur = java.math.BigDecimal.ONE
+                        .subtract(remiseBD.divide(java.math.BigDecimal.valueOf(100), 10, java.math.RoundingMode.HALF_UP));
                     
-                    // Arrondir à 2 décimales pour éviter les erreurs de précision
-                    prixUnitaireAffiche = Math.round(prixUnitaireAffiche * 100.0) / 100.0;
-                    montantLigneAffiche = Math.round(montantLigneAffiche * 100.0) / 100.0;
+                    java.math.BigDecimal montantOriginal = montantBD.divide(facteur, 2, java.math.RoundingMode.HALF_UP);
+                    java.math.BigDecimal prixUnitaireBD = montantOriginal.divide(
+                        java.math.BigDecimal.valueOf(ligne.getQuantite()), 2, java.math.RoundingMode.HALF_UP);
+                    
+                    montantLigneAffiche = montantOriginal.doubleValue();
+                    prixUnitaireAffiche = prixUnitaireBD.doubleValue();
+                }
+                */
+
+                if (hasRemiseGlobale) {
+                    java.math.BigDecimal montantBD = java.math.BigDecimal.valueOf(montantLigneAffiche);
+                    java.math.BigDecimal remiseBD = java.math.BigDecimal.valueOf(remiseGlobale);
+                    java.math.BigDecimal facteur = java.math.BigDecimal.ONE
+                        .subtract(remiseBD.divide(java.math.BigDecimal.valueOf(100), 10, java.math.RoundingMode.HALF_UP));
+                
+                    // Si remiseGlobale = 100%, on considère que le montant original = 0
+                    java.math.BigDecimal montantOriginal = (facteur.compareTo(java.math.BigDecimal.ZERO) == 0)
+                        ? java.math.BigDecimal.ZERO
+                        : montantBD.divide(facteur, 2, java.math.RoundingMode.HALF_UP);
+                
+                    long quantite = ligne.getQuantite() != null ? ligne.getQuantite() : 0;
+                    java.math.BigDecimal prixUnitaireBD = (quantite == 0)
+                        ? java.math.BigDecimal.ZERO
+                        : montantOriginal.divide(java.math.BigDecimal.valueOf(quantite), 2, java.math.RoundingMode.HALF_UP);
+                
+                    montantLigneAffiche = montantOriginal.doubleValue();
+                    prixUnitaireAffiche = prixUnitaireBD.doubleValue();
                 }
                 
                 dto.setPrixUnitaire(prixUnitaireAffiche);

@@ -17,7 +17,6 @@ import com.xpertcash.entity.Enum.StatutPaiementFacture;
 @Repository
 public interface FactureReelleRepository extends JpaRepository<FactureReelle, Long> {
 
-    // Recherche de la dernière facture réelle par date et entreprise (pour isolation)
     @Query("SELECT f FROM FactureReelle f " +
            "LEFT JOIN FETCH f.entreprise e " +
            "WHERE e.id = :entrepriseId " +
@@ -33,14 +32,12 @@ public interface FactureReelleRepository extends JpaRepository<FactureReelle, Lo
            "AND FUNCTION('YEAR', f.dateCreation) = :year " +
            "ORDER BY f.numeroFacture DESC")
     List<FactureReelle> findFacturesDeLAnneeParEntreprise(@Param("entrepriseId") Long entrepriseId, @Param("year") int year);
-    
-    // Récupérer les factures par entreprise (optimisé avec JOIN FETCH)
+
     @Query("SELECT DISTINCT f FROM FactureReelle f " +
            "LEFT JOIN FETCH f.entreprise e " +
            "WHERE e.id = :entrepriseId")
     List<FactureReelle> findByEntrepriseId(@Param("entrepriseId") Long entrepriseId);
 
-    // Tri par mois et année (optimisé avec JOIN FETCH)
     @Query("SELECT DISTINCT f FROM FactureReelle f " +
            "LEFT JOIN FETCH f.entreprise e " +
            "WHERE e.id = :entrepriseId " +
@@ -50,29 +47,25 @@ public interface FactureReelleRepository extends JpaRepository<FactureReelle, Lo
             @Param("mois") Integer mois, 
             @Param("annee") Integer annee, 
             @Param("entrepriseId") Long entrepriseId);
-    
-    // Tri par mois (optimisé avec JOIN FETCH)
+
     @Query("SELECT DISTINCT f FROM FactureReelle f " +
            "LEFT JOIN FETCH f.entreprise e " +
            "WHERE e.id = :entrepriseId " +
            "AND MONTH(f.dateCreation) = :mois")
     List<FactureReelle> findByMonthAndEntreprise(@Param("mois") Integer mois, @Param("entrepriseId") Long entrepriseId);
-    
-    // Tri par année (optimisé avec JOIN FETCH)
+
     @Query("SELECT DISTINCT f FROM FactureReelle f " +
            "LEFT JOIN FETCH f.entreprise e " +
            "WHERE e.id = :entrepriseId " +
            "AND YEAR(f.dateCreation) = :annee")
     List<FactureReelle> findByYearAndEntreprise(@Param("annee") Integer annee, @Param("entrepriseId") Long entrepriseId);
-    
-    // Récupère les factures réelles récentes d'une entreprise (triées par date de création décroissante, optimisé)
+
     @Query("SELECT DISTINCT f FROM FactureReelle f " +
            "LEFT JOIN FETCH f.entreprise e " +
            "WHERE e.id = :entrepriseId " +
            "ORDER BY f.dateCreationPro DESC")
     List<FactureReelle> findRecentFacturesReellesByEntrepriseId(@Param("entrepriseId") Long entrepriseId);
 
-    // Recherche par facture proforma et entreprise (pour isolation)
     @Query("SELECT DISTINCT f FROM FactureReelle f " +
            "LEFT JOIN FETCH f.entreprise e " +
            "LEFT JOIN FETCH f.factureProForma fp " +
@@ -88,7 +81,6 @@ public interface FactureReelleRepository extends JpaRepository<FactureReelle, Lo
            "ORDER BY fr.dateCreation DESC, fr.id DESC")
     List<FactureReelle> findByEntrepriseOrderByDateCreationDesc(@Param("entrepriseId") Long entrepriseId);
 
-    // Méthode paginée pour récupérer les factures par entreprise (optimisé avec JOIN FETCH)
     @Query("SELECT DISTINCT fr FROM FactureReelle fr " +
            "LEFT JOIN FETCH fr.entreprise e " +
            "WHERE e.id = :entrepriseId " +
@@ -97,8 +89,6 @@ public interface FactureReelleRepository extends JpaRepository<FactureReelle, Lo
             @Param("entrepriseId") Long entrepriseId, 
             Pageable pageable);
 
-
-    // Recherche par entreprise et statuts de paiement (optimisé avec JOIN FETCH)
     @Query("SELECT DISTINCT f FROM FactureReelle f " +
            "LEFT JOIN FETCH f.entreprise e " +
            "WHERE e.id = :entrepriseId " +
@@ -107,7 +97,6 @@ public interface FactureReelleRepository extends JpaRepository<FactureReelle, Lo
             @Param("entrepriseId") Long entrepriseId, 
             @Param("statuts") List<StatutPaiementFacture> statuts);
 
-    // Recherche par entreprise, utilisateur et statuts de paiement (optimisé avec JOIN FETCH)
     @Query("SELECT DISTINCT f FROM FactureReelle f " +
            "LEFT JOIN FETCH f.entreprise e " +
            "LEFT JOIN FETCH f.utilisateurCreateur u " +
@@ -119,7 +108,6 @@ public interface FactureReelleRepository extends JpaRepository<FactureReelle, Lo
             @Param("utilisateurId") Long utilisateurId, 
             @Param("statuts") List<StatutPaiementFacture> statuts);
 
-    // Recherche toutes les factures réelles par facture proforma et entreprise (pour isolation)
     @Query("SELECT DISTINCT f FROM FactureReelle f " +
            "LEFT JOIN FETCH f.entreprise e " +
            "LEFT JOIN FETCH f.factureProForma fp " +
@@ -129,7 +117,6 @@ public interface FactureReelleRepository extends JpaRepository<FactureReelle, Lo
             @Param("factureProFormaId") Long factureProFormaId,
             @Param("entrepriseId") Long entrepriseId);
 
-    // Recherche par entreprise et utilisateur créateur (optimisé avec JOIN FETCH)
     @Query("SELECT DISTINCT f FROM FactureReelle f " +
            "LEFT JOIN FETCH f.entreprise e " +
            "LEFT JOIN FETCH f.utilisateurCreateur u " +
@@ -140,19 +127,16 @@ public interface FactureReelleRepository extends JpaRepository<FactureReelle, Lo
             @Param("entrepriseId") Long entrepriseId,
             @Param("utilisateurCreateurId") Long utilisateurCreateurId);
 
-    // Vérifier l'existence par client et entreprise (pour isolation)
     @Query("SELECT CASE WHEN COUNT(f) > 0 THEN true ELSE false END FROM FactureReelle f " +
            "INNER JOIN f.entreprise e " +
            "WHERE e.id = :entrepriseId AND f.client.id = :clientId")
     boolean existsByClientIdAndEntrepriseId(@Param("clientId") Long clientId, @Param("entrepriseId") Long entrepriseId);
 
-    // Vérifier l'existence par entreprise client et entreprise (pour isolation)
     @Query("SELECT CASE WHEN COUNT(f) > 0 THEN true ELSE false END FROM FactureReelle f " +
            "INNER JOIN f.entreprise e " +
            "WHERE e.id = :entrepriseId AND f.entrepriseClient.id = :entrepriseClientId")
     boolean existsByEntrepriseClientIdAndEntrepriseId(@Param("entrepriseClientId") Long entrepriseClientId, @Param("entrepriseId") Long entrepriseId);
 
-    // Récupérer les factures par entreprise et période (optimisé avec JOIN FETCH)
     @Query("SELECT DISTINCT f FROM FactureReelle f " +
            "LEFT JOIN FETCH f.entreprise e " +
            "WHERE e.id = :entrepriseId " +
@@ -163,16 +147,63 @@ public interface FactureReelleRepository extends JpaRepository<FactureReelle, Lo
             @Param("start") LocalDate start, 
             @Param("end") LocalDate end);
 
-    // Compter toutes les factures réelles d'une entreprise (optimisé avec INNER JOIN)
     @Query("SELECT COUNT(f) FROM FactureReelle f " +
            "INNER JOIN f.entreprise e " +
            "WHERE e.id = :entrepriseId")
     long countByEntrepriseId(@Param("entrepriseId") Long entrepriseId);
 
 
+    // ==================== STATISTIQUES ====================
 
+    // [0] statut, [1] count, [2] montant
+    @Query(value = "SELECT f.statut_paiement, COUNT(f.id), COALESCE(SUM(f.total_facture), 0) " +
+           "FROM facture_reelle f " +
+           "WHERE f.entreprise_id = :entrepriseId " +
+           "AND f.date_creation >= :dateDebut AND f.date_creation < :dateFin " +
+           "GROUP BY f.statut_paiement", nativeQuery = true)
+    List<Object[]> getStatistiquesParStatutByEntrepriseIdAndPeriode(
+            @Param("entrepriseId") Long entrepriseId,
+            @Param("dateDebut") LocalDate dateDebut,
+            @Param("dateFin") LocalDate dateFin);
 
+    // [0] id, [1] nom, [2] type, [3] count, [4] montant
+    @Query(value = "SELECT client_id, nom_client, type_client, nb_factures, montant_total FROM (" +
+           "  SELECT f.client_id as client_id, c.nom_complet as nom_client, 'CLIENT' as type_client, " +
+           "    COUNT(f.id) as nb_factures, COALESCE(SUM(f.total_facture), 0) as montant_total " +
+           "  FROM facture_reelle f " +
+           "  INNER JOIN client c ON f.client_id = c.id " +
+           "  WHERE f.entreprise_id = :entrepriseId " +
+           "    AND f.date_creation >= :dateDebut AND f.date_creation < :dateFin " +
+           "    AND f.client_id IS NOT NULL " +
+           "  GROUP BY f.client_id, c.nom_complet " +
+           "  UNION ALL " +
+           "  SELECT f.entreprise_client_id as client_id, ec.nom as nom_client, 'ENTREPRISE_CLIENT' as type_client, " +
+           "    COUNT(f.id) as nb_factures, COALESCE(SUM(f.total_facture), 0) as montant_total " +
+           "  FROM facture_reelle f " +
+           "  INNER JOIN entreprise_client ec ON f.entreprise_client_id = ec.id " +
+           "  WHERE f.entreprise_id = :entrepriseId " +
+           "    AND f.date_creation >= :dateDebut AND f.date_creation < :dateFin " +
+           "    AND f.entreprise_client_id IS NOT NULL " +
+           "  GROUP BY f.entreprise_client_id, ec.nom " +
+           ") AS combined ORDER BY montant_total DESC", nativeQuery = true)
+    List<Object[]> findAllTopClientsByEntrepriseIdAndPeriode(
+            @Param("entrepriseId") Long entrepriseId,
+            @Param("dateDebut") LocalDate dateDebut,
+            @Param("dateFin") LocalDate dateFin);
 
+    // [0] id, [1] nom, [2] count, [3] montant
+    @Query(value = "SELECT f.utilisateur_createur_id, u.nom_complet, COUNT(f.id) as nb_factures, " +
+           "COALESCE(SUM(f.total_facture), 0) as montant_total " +
+           "FROM facture_reelle f " +
+           "INNER JOIN user u ON f.utilisateur_createur_id = u.id " +
+           "WHERE f.entreprise_id = :entrepriseId " +
+           "AND f.date_creation >= :dateDebut AND f.date_creation < :dateFin " +
+           "AND f.utilisateur_createur_id IS NOT NULL " +
+           "GROUP BY f.utilisateur_createur_id, u.nom_complet " +
+           "ORDER BY montant_total DESC", nativeQuery = true)
+    List<Object[]> findTopCreateursByEntrepriseIdAndPeriode(
+            @Param("entrepriseId") Long entrepriseId,
+            @Param("dateDebut") LocalDate dateDebut,
+            @Param("dateFin") LocalDate dateFin);
 
 }
-

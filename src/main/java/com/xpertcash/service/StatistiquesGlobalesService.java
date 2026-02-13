@@ -17,6 +17,8 @@ import com.xpertcash.repository.StockRepository;
 import com.xpertcash.repository.UsersRepository;
 import com.xpertcash.repository.VENTE.VenteRepository;
 import com.xpertcash.repository.VENTE.VenteHistoriqueRepository;
+import com.xpertcash.repository.BoutiqueRepository;
+import com.xpertcash.entity.Boutique;
 
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -57,9 +59,13 @@ public class StatistiquesGlobalesService {
     @Autowired
     private AuthenticationHelper authHelper;
 
+    @Autowired
+    private BoutiqueRepository boutiqueRepository;
+
      // Récupère toutes les statistiques globales de l'entreprise
+     // Supporte les filtres optionnels par vendeur et/ou boutique
     @Transactional(readOnly = true)
-    public StatistiquesGlobalesDTO getStatistiquesGlobales(HttpServletRequest request) {
+    public StatistiquesGlobalesDTO getStatistiquesGlobales(Long vendeurId, Long boutiqueId, HttpServletRequest request) {
         String token = request.getHeader("Authorization");
         if (token == null || !token.startsWith("Bearer ")) {
             throw new RuntimeException("Token JWT manquant ou mal formaté");
@@ -79,27 +85,55 @@ public class StatistiquesGlobalesService {
             throw new RuntimeException("Vous n'avez pas les droits nécessaires pour accéder à ces statistiques.");
         }
 
+        // Validation des filtres
+        if (vendeurId != null) {
+            User vendeur = usersRepository.findById(vendeurId)
+                    .orElseThrow(() -> new RuntimeException("Vendeur non trouvé avec l'ID: " + vendeurId));
+            if (vendeur.getEntreprise() == null || !vendeur.getEntreprise().getId().equals(entrepriseId)) {
+                throw new RuntimeException("Ce vendeur n'appartient pas à votre entreprise");
+            }
+        }
+
+        if (boutiqueId != null) {
+            Boutique boutique = boutiqueRepository.findById(boutiqueId)
+                    .orElseThrow(() -> new RuntimeException("Boutique non trouvée avec l'ID: " + boutiqueId));
+            if (boutique.getEntreprise() == null || !boutique.getEntreprise().getId().equals(entrepriseId)) {
+                throw new RuntimeException("Cette boutique n'appartient pas à votre entreprise");
+            }
+        }
+
         StatistiquesGlobalesDTO stats = new StatistiquesGlobalesDTO();
 
-        stats.setProduits(getProduitsStats(entrepriseId));
+        stats.setProduits(getProduitsStats(entrepriseId, boutiqueId));
 
-        stats.setVentes(getVentesStats(entrepriseId));
+        stats.setVentes(getVentesStats(entrepriseId, vendeurId, boutiqueId));
 
-        stats.setBenefices(getBeneficesStats(entrepriseId));
+        stats.setBenefices(getBeneficesStats(entrepriseId, vendeurId, boutiqueId));
 
         stats.setUtilisateurs(getUtilisateursStats(entrepriseId));
+
+        // Ajouter les infos de filtre appliqué
+        stats.setFiltreVendeurId(vendeurId);
+        stats.setFiltreBoutiqueId(boutiqueId);
 
         return stats;
     }
 
-     // Calcule les statistiques des produits pour une entreprise
+     // Calcule les statistiques des produits pour une entreprise (avec filtre optionnel par boutique)
 
      
-    private StatistiquesGlobalesDTO.ProduitsStats getProduitsStats(Long entrepriseId) {
-        List<Produit> produitsActifs = produitRepository.findAllByEntrepriseId(entrepriseId)
-                .stream()
-                .filter(p -> p.getDeleted() == null || !p.getDeleted())
-                .collect(Collectors.toList());
+    private StatistiquesGlobalesDTO.ProduitsStats getProduitsStats(Long entrepriseId, Long boutiqueId) {
+        List<Produit> produitsActifs;
+        
+        if (boutiqueId != null) {
+            // Filtrer les produits par boutique (méthode existante qui exclut déjà les supprimés)
+            produitsActifs = produitRepository.findByBoutiqueIdAndDeletedFalseOrDeletedIsNull(boutiqueId);
+        } else {
+            produitsActifs = produitRepository.findAllByEntrepriseId(entrepriseId)
+                    .stream()
+                    .filter(p -> p.getDeleted() == null || !p.getDeleted())
+                    .collect(Collectors.toList());
+        }
 
         long total = produitsActifs.size();
         long quantiteEnStock = 0;
@@ -123,32 +157,44 @@ public class StatistiquesGlobalesService {
         return new StatistiquesGlobalesDTO.ProduitsStats(total, quantiteEnStock, quantiteHorsStock);
     }
 
-     // Calcule les statistiques des ventes pour une entreprise
-    private StatistiquesGlobalesDTO.VentesStats getVentesStats(Long entrepriseId) {
+     // Calcule les statistiques des ventes pour une entreprise (avec filtres optionnels)
+    private StatistiquesGlobalesDTO.VentesStats getVentesStats(Long entrepriseId, Long vendeurId, Long boutiqueId) {
         LocalDate today = LocalDate.now();
 
         LocalDateTime startOfDay = today.atStartOfDay();
         LocalDateTime endOfDay = today.atTime(LocalTime.MAX);
-        double ventesJour = calculerMontantVentes(entrepriseId, startOfDay, endOfDay);
+        double ventesJour = calculerMontantVentes(entrepriseId, vendeurId, boutiqueId, startOfDay, endOfDay);
 
         LocalDateTime startOfMonth = today.withDayOfMonth(1).atStartOfDay();
         LocalDateTime endOfMonth = today.withDayOfMonth(today.lengthOfMonth()).atTime(LocalTime.MAX);
-        double ventesMois = calculerMontantVentes(entrepriseId, startOfMonth, endOfMonth);
+        double ventesMois = calculerMontantVentes(entrepriseId, vendeurId, boutiqueId, startOfMonth, endOfMonth);
 
         LocalDate firstDayOfYear = today.withDayOfYear(1);
         LocalDate lastDayOfYear = today.withDayOfYear(today.lengthOfYear());
         LocalDateTime startOfYear = firstDayOfYear.atStartOfDay();
         LocalDateTime endOfYear = lastDayOfYear.atTime(LocalTime.MAX);
-        double ventesAnnuel = calculerMontantVentes(entrepriseId, startOfYear, endOfYear);
+        double ventesAnnuel = calculerMontantVentes(entrepriseId, vendeurId, boutiqueId, startOfYear, endOfYear);
 
         return new StatistiquesGlobalesDTO.VentesStats(ventesJour, ventesMois, ventesAnnuel);
     }
 
-     // Calcule le montant total des ventes pour une période donnée
-    private double calculerMontantVentes(Long entrepriseId, LocalDateTime debut, LocalDateTime fin) {
+     // Calcule le montant total des ventes pour une période donnée (avec filtres optionnels)
+    private double calculerMontantVentes(Long entrepriseId, Long vendeurId, Long boutiqueId, LocalDateTime debut, LocalDateTime fin) {
         List<Vente> ventes = venteRepository.findByBoutique_Entreprise_IdAndDateVenteBetween(
                 entrepriseId, debut, fin
         );
+
+        // Appliquer les filtres optionnels
+        if (vendeurId != null) {
+            ventes = ventes.stream()
+                    .filter(v -> v.getVendeur() != null && v.getVendeur().getId().equals(vendeurId))
+                    .collect(Collectors.toList());
+        }
+        if (boutiqueId != null) {
+            ventes = ventes.stream()
+                    .filter(v -> v.getBoutique() != null && v.getBoutique().getId().equals(boutiqueId))
+                    .collect(Collectors.toList());
+        }
 
         List<Long> venteIds = ventes.stream().map(Vente::getId).collect(Collectors.toList());
         
@@ -173,35 +219,47 @@ public class StatistiquesGlobalesService {
         return total;
     }
 
-     // Calcule les statistiques des bénéfices pour une entreprise
-    private StatistiquesGlobalesDTO.BeneficesStats getBeneficesStats(Long entrepriseId) {
+     // Calcule les statistiques des bénéfices pour une entreprise (avec filtres optionnels)
+    private StatistiquesGlobalesDTO.BeneficesStats getBeneficesStats(Long entrepriseId, Long vendeurId, Long boutiqueId) {
         LocalDate today = LocalDate.now();
 
         // Bénéfices du jour
         LocalDateTime startOfDay = today.atStartOfDay();
         LocalDateTime endOfDay = today.atTime(LocalTime.MAX);
-        double beneficesJour = calculerBeneficeNet(entrepriseId, startOfDay, endOfDay);
+        double beneficesJour = calculerBeneficeNet(entrepriseId, vendeurId, boutiqueId, startOfDay, endOfDay);
 
         // Bénéfices du mois
         LocalDateTime startOfMonth = today.withDayOfMonth(1).atStartOfDay();
         LocalDateTime endOfMonth = today.withDayOfMonth(today.lengthOfMonth()).atTime(LocalTime.MAX);
-        double beneficesMois = calculerBeneficeNet(entrepriseId, startOfMonth, endOfMonth);
+        double beneficesMois = calculerBeneficeNet(entrepriseId, vendeurId, boutiqueId, startOfMonth, endOfMonth);
 
         // Bénéfices annuels
         LocalDate firstDayOfYear = today.withDayOfYear(1);
         LocalDate lastDayOfYear = today.withDayOfYear(today.lengthOfYear());
         LocalDateTime startOfYear = firstDayOfYear.atStartOfDay();
         LocalDateTime endOfYear = lastDayOfYear.atTime(LocalTime.MAX);
-        double beneficesAnnuel = calculerBeneficeNet(entrepriseId, startOfYear, endOfYear);
+        double beneficesAnnuel = calculerBeneficeNet(entrepriseId, vendeurId, boutiqueId, startOfYear, endOfYear);
 
         return new StatistiquesGlobalesDTO.BeneficesStats(beneficesJour, beneficesMois, beneficesAnnuel);
     }
 
-     // Calcule le bénéfice net pour une période donnée
-    private double calculerBeneficeNet(Long entrepriseId, LocalDateTime debut, LocalDateTime fin) {
+     // Calcule le bénéfice net pour une période donnée (avec filtres optionnels)
+    private double calculerBeneficeNet(Long entrepriseId, Long vendeurId, Long boutiqueId, LocalDateTime debut, LocalDateTime fin) {
         List<Vente> ventes = venteRepository.findByBoutique_Entreprise_IdAndDateVenteBetween(
                 entrepriseId, debut, fin
         );
+
+        // Appliquer les filtres optionnels
+        if (vendeurId != null) {
+            ventes = ventes.stream()
+                    .filter(v -> v.getVendeur() != null && v.getVendeur().getId().equals(vendeurId))
+                    .collect(Collectors.toList());
+        }
+        if (boutiqueId != null) {
+            ventes = ventes.stream()
+                    .filter(v -> v.getBoutique() != null && v.getBoutique().getId().equals(boutiqueId))
+                    .collect(Collectors.toList());
+        }
 
         List<Long> venteIds = ventes.stream().map(Vente::getId).collect(Collectors.toList());
         

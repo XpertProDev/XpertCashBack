@@ -8,6 +8,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.HashMap;
@@ -21,11 +22,15 @@ public class StatistiquesGlobalesController {
     private StatistiquesGlobalesService statistiquesService;
 
      // Endpoint unique qui retourne TOUTES les statistiques globales de l'entreprise
+     // Supporte les filtres optionnels par vendeur et/ou boutique
   
     @GetMapping("/statistiques/globales")
-    public ResponseEntity<?> getStatistiquesGlobales(HttpServletRequest request) {
+    public ResponseEntity<?> getStatistiquesGlobales(
+            @RequestParam(required = false) Long vendeurId,
+            @RequestParam(required = false) Long boutiqueId,
+            HttpServletRequest request) {
         try {
-            StatistiquesGlobalesDTO statistiques = statistiquesService.getStatistiquesGlobales(request);
+            StatistiquesGlobalesDTO statistiques = statistiquesService.getStatistiquesGlobales(vendeurId, boutiqueId, request);
             return ResponseEntity.ok(statistiques);
         } catch (RuntimeException e) {
             Map<String, String> error = new HashMap<>();

@@ -240,11 +240,15 @@ public class FactureProformaController {
         List<Map<String, Object>> notesSimplifiees = notes.stream().map(note -> {
             Map<String, Object> noteMap = new HashMap<>();
             noteMap.put("id", note.getId());
-            noteMap.put("auteur", note.getAuteur().getNomComplet());
+            noteMap.put("auteur", note.getAuteur() != null ? note.getAuteur().getNomComplet() : null);
             noteMap.put("note", note.getContenu());
             noteMap.put("dateCreation", note.getDateCreation());
             noteMap.put("modifiee", note.isModifiee());
             noteMap.put("numeroIdentifiant", note.getNumeroIdentifiant());
+            if (note.getDestinataire() != null) {
+                noteMap.put("destinataireId", note.getDestinataire().getId());
+                noteMap.put("destinataireNom", note.getDestinataire().getNomComplet());
+            }
             return noteMap;
         }).toList();
 
@@ -404,8 +408,17 @@ public ResponseEntity<?> getFacturesParPeriode(
         }
     }
 
+    // Endpoint pour récupérer l'historique de toutes les notes de factures proforma
+    @GetMapping("/factures/notes/historique")
+    public ResponseEntity<?> getHistoriqueNotesProforma(HttpServletRequest request) {
+        try {
+            return ResponseEntity.ok(factureProformaService.getHistoriqueNotesProforma(request));
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("error", e.getMessage()));
+        }
+    }
+
 }
-    
-   
-    
+
 

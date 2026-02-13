@@ -105,6 +105,10 @@ public VenteResponse enregistrerVente(VenteRequest request, HttpServletRequest h
     Caisse caisse = caisseService.getCaisseActive(boutique.getId(), httpRequest)
         .orElseThrow(() -> new RuntimeException("Aucune caisse ouverte pour ce vendeur dans cette boutique. Veuillez ouvrir une caisse avant de vendre."));
 
+    if (!utilitaire.isEntrepriseActive(user.getEntreprise().getId())) {
+        throw new RuntimeException("Votre entreprise est désactivée, opération non autorisée.");
+    }
+
     User vendeur = user;
 
     Vente vente = new Vente();
@@ -196,6 +200,8 @@ public VenteResponse enregistrerVente(VenteRequest request, HttpServletRequest h
         }
 
         double prixApresRemise = prixUnitaire * (1 - remisePct / 100.0);
+        // Arrondir le prix après remise avant multiplication pour éviter la propagation d'erreurs
+        prixApresRemise = Math.round(prixApresRemise * 100.0) / 100.0;
         double montantLigne = prixApresRemise * quantiteVendue;
         
         // Arrondir à 2 décimales avant de sauvegarder pour éviter les erreurs de précision
@@ -220,24 +226,32 @@ public VenteResponse enregistrerVente(VenteRequest request, HttpServletRequest h
         double remiseGlobalePct = request.getRemiseGlobale();
         vente.setRemiseGlobale(remiseGlobalePct);
 
+        double montantRemiseGlobale = montantTotalSansRemise * (remiseGlobalePct / 100.0);
+        double totalCibleApresRemise = Math.round((montantTotalSansRemise - montantRemiseGlobale) * 100.0) / 100.0;
+
         for (VenteProduit ligne : lignes) {
             double proportion = ligne.getMontantLigne() / montantTotalSansRemise;
             double montantRemiseLigne = montantTotalSansRemise * (remiseGlobalePct / 100.0) * proportion;
             double nouveauMontantLigne = ligne.getMontantLigne() - montantRemiseLigne;
-            
-            // Arrondir à 2 décimales avant de sauvegarder
+
             nouveauMontantLigne = Math.round(nouveauMontantLigne * 100.0) / 100.0;
             double nouveauPrixUnitaire = nouveauMontantLigne / ligne.getQuantite();
             nouveauPrixUnitaire = Math.round(nouveauPrixUnitaire * 100.0) / 100.0;
-            
+
             ligne.setMontantLigne(nouveauMontantLigne);
             ligne.setPrixUnitaire(nouveauPrixUnitaire);
             ligne.setRemise(0.0);
         }
 
-        montantTotal = lignes.stream().mapToDouble(VenteProduit::getMontantLigne).sum();
-        // Arrondir le montant total à 2 décimales
-        montantTotal = Math.round(montantTotal * 100.0) / 100.0;
+        double sommeLignes = lignes.stream().mapToDouble(VenteProduit::getMontantLigne).sum();
+        double ecartArrondi = Math.round((totalCibleApresRemise - sommeLignes) * 100.0) / 100.0;
+        if (ecartArrondi != 0.0 && !lignes.isEmpty()) {
+            VenteProduit derniereLigne = lignes.get(lignes.size() - 1);
+            double nouveauMontantDerniere = Math.round((derniereLigne.getMontantLigne() + ecartArrondi) * 100.0) / 100.0;
+            derniereLigne.setMontantLigne(nouveauMontantDerniere);
+            derniereLigne.setPrixUnitaire(Math.round(nouveauMontantDerniere / derniereLigne.getQuantite() * 100.0) / 100.0);
+        }
+        montantTotal = totalCibleApresRemise;
     } else {
         vente.setRemiseGlobale(0.0);
     }
@@ -551,6 +565,9 @@ public VenteResponse getVenteById(Long id, HttpServletRequest httpRequest) {
     if (!entrepriseVenteId.equals(user.getEntreprise().getId())) {
         throw new RuntimeException("Accès interdit : cette vente n'appartient pas à votre entreprise.");
     }
+    if (!utilitaire.isEntrepriseActive(user.getEntreprise().getId())) {
+        throw new RuntimeException("Votre entreprise est désactivée, opération non autorisée.");
+    }
 
     return toVenteResponse(vente);
 }
@@ -569,6 +586,9 @@ public VenteResponse getVenteById(Long id, HttpServletRequest httpRequest) {
     User user = utilitaire.getAuthenticatedUser(request);
 
     utilitaire.validateAdminOrManagerAccess(boutiqueId, user);
+    if (!utilitaire.isEntrepriseActive(user.getEntreprise().getId())) {
+        throw new RuntimeException("Votre entreprise est désactivée, opération non autorisée.");
+    }
 
     List<Vente> ventes = venteRepository.findByBoutiqueId(boutiqueId);
 
@@ -595,6 +615,10 @@ public List<VenteResponse> getVentesByVendeur(Long vendeurId, HttpServletRequest
 
         if (!vendeur.getEntreprise().getId().equals(user.getEntreprise().getId())) {
             throw new RuntimeException("Accès interdit : ce vendeur n'appartient pas à votre entreprise.");
+        }
+
+        if (!utilitaire.isEntrepriseActive(vendeur.getEntreprise().getId())) {
+            throw new RuntimeException("Votre entreprise est désactivée, opération non autorisée.");
         }
 
         List<Vente> ventes = venteRepository.findByVendeurId(vendeurId);
@@ -750,6 +774,9 @@ public double getMontantTotalVentesDuMois(Long entrepriseId) {
         boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
         if (!isAdminOrManager) {
             throw new RuntimeException("Vous n'avez pas les droits nécessaires pour accéder à cette information.");
+        }
+        if (!utilitaire.isEntrepriseActive(entrepriseId)) {
+            throw new RuntimeException("Votre entreprise est désactivée, opération non autorisée.");
         }
 
         return calculerBeneficeNetEntreprise(entrepriseId);
@@ -957,6 +984,10 @@ public List<VenteResponse> getVentesRecentes(int limit, HttpServletRequest reque
     boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
     if (!isAdminOrManager) {
         throw new RuntimeException("Vous n'avez pas les droits nécessaires pour accéder à cette information.");
+    }
+
+    if (!utilitaire.isEntrepriseActive(entrepriseId)) {
+        throw new RuntimeException("Votre entreprise est désactivée, opération non autorisée.");
     }
 
     List<Vente> ventes = venteRepository.findRecentVentesByEntrepriseId(entrepriseId);

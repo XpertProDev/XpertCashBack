@@ -12,6 +12,10 @@ public class StatistiquesGlobalesDTO {
     private VentesStats ventes;
     private BeneficesStats benefices;
     private UtilisateursStats utilisateurs;
+    
+    // Filtres appliqués (null si pas de filtre)
+    private Long filtreVendeurId;
+    private Long filtreBoutiqueId;
 
     @Data
     @AllArgsConstructor

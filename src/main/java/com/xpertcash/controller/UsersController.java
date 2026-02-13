@@ -416,5 +416,17 @@ public ResponseEntity<UserDTO> assignPermissionsToUser(
                 return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
             }
         }
+
+        // Endpoint pour récupérer les utilisateurs ayant la permission de vendre
+        @GetMapping("/vendeurs")
+        public ResponseEntity<?> getVendeurs(HttpServletRequest request) {
+            try {
+                return ResponseEntity.ok(usersService.getVendeurs(request));
+            } catch (RuntimeException e) {
+                Map<String, String> response = new HashMap<>();
+                response.put("error", e.getMessage());
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+            }
+        }
  
 }
