@@ -539,13 +539,14 @@ public class FactureProformaService {
         }
 
 
+    // Ne pas repasser en brouillon si on ajoute uniquement une note
     if (modifications.getStatut() == StatutFactureProForma.BROUILLON
             && facture.getStatut() != StatutFactureProForma.BROUILLON
-            // && !(modifications.getNoteModification() != null
-                && (modifications.getLignesFacture() == null || modifications.getLignesFacture().isEmpty())
-                && modifications.getDescription() == null
-                && modifications.getDateRelance() == null
-                && modifications.getMethodeEnvoi() == null) {
+            && (modifications.getNoteModification() == null || modifications.getNoteModification().isBlank())
+            && (modifications.getLignesFacture() == null || modifications.getLignesFacture().isEmpty())
+            && modifications.getDescription() == null
+            && modifications.getDateRelance() == null
+            && modifications.getMethodeEnvoi() == null) {
 
         facture.setStatut(StatutFactureProForma.BROUILLON);
 
