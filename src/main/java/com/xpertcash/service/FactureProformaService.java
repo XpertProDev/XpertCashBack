@@ -222,7 +222,8 @@ public class FactureProformaService {
                     produitRepository.save(produit);
                 }
 
-                ligne.setMontantTotal(ligne.getQuantite() * ligne.getPrixUnitaire());
+                double montantLigne = ligne.getQuantite() * ligne.getPrixUnitaire();
+                ligne.setMontantTotal(Math.round(montantLigne * 100.0) / 100.0);
 
                 if (ligne.getLigneDescription() != null) {
                     ligne.setLigneDescription(ligne.getLigneDescription());
@@ -234,7 +235,9 @@ public class FactureProformaService {
             }
         }
 
+    montantTotalHT = Math.round(montantTotalHT * 100.0) / 100.0;
     double remiseMontant = (remisePourcentage > 0) ? montantTotalHT * (remisePourcentage / 100) : 0;
+    remiseMontant = Math.round(remiseMontant * 100.0) / 100.0;
 
     boolean tvaActive = appliquerTVA != null && appliquerTVA;
     double montantTVA = 0;
@@ -244,10 +247,12 @@ public class FactureProformaService {
             throw new RuntimeException("Le taux de TVA de l'entreprise n'est pas défini !");
         }
         montantTVA = (montantTotalHT - remiseMontant) * tauxTva;
+        montantTVA = Math.round(montantTVA * 100.0) / 100.0;
     }
 
 
     double montantTotalAPayer = (montantTotalHT - remiseMontant) + montantTVA;
+    montantTotalAPayer = Math.round(montantTotalAPayer * 100.0) / 100.0;
 
     // Assigner les montants calculés à la facture
     facture.setTotalHT(montantTotalHT);
@@ -740,7 +745,8 @@ public class FactureProformaService {
                     produitRepository.save(produit);
                 }
 
-                ligne.setMontantTotal(ligne.getQuantite() * ligne.getPrixUnitaire());
+                double montantLigne = ligne.getQuantite() * ligne.getPrixUnitaire();
+                ligne.setMontantTotal(Math.round(montantLigne * 100.0) / 100.0);
                 ligne.setFactureProForma(facture);
                 ligne.setProduit(produit);
                 ligne.setLigneDescription(Optional.ofNullable(ligne.getLigneDescription()).orElse(produit.getDescription()));
@@ -758,11 +764,11 @@ public class FactureProformaService {
             throw new RuntimeException("Le pourcentage de remise doit être compris entre 0 et 100 !");
         }
 
-        double montantTotalHT = facture.getLignesFacture().stream().mapToDouble(LigneFactureProforma::getMontantTotal).sum();
-        double remiseMontant = montantTotalHT * (remisePourcentage / 100);
+        double montantTotalHT = Math.round(facture.getLignesFacture().stream().mapToDouble(LigneFactureProforma::getMontantTotal).sum() * 100.0) / 100.0;
+        double remiseMontant = Math.round(montantTotalHT * (remisePourcentage / 100) * 100.0) / 100.0;
         boolean tvaActive = appliquerTVA != null && appliquerTVA;
-        double montantTVA = tvaActive ? (montantTotalHT - remiseMontant) * 0.18 : 0;
-        double montantTotalAPayer = (montantTotalHT - remiseMontant) + montantTVA;
+        double montantTVA = tvaActive ? Math.round((montantTotalHT - remiseMontant) * 0.18 * 100.0) / 100.0 : 0;
+        double montantTotalAPayer = Math.round(((montantTotalHT - remiseMontant) + montantTVA) * 100.0) / 100.0;
 
         facture.setTotalHT(montantTotalHT);
         facture.setRemise(remiseMontant);
@@ -793,13 +799,13 @@ public class FactureProformaService {
                     "La facture a été modifiée (montant: " + montantFormate + ")"
             );
 
-            String numero = Optional.ofNullable(facture.getNumeroFacture())
-                    .filter(s -> !s.isBlank())
-                    .orElseGet(() -> "Facture #" + facture.getId());
+            String numeroFacture = facture.getNumeroFacture();
+            String numero = (numeroFacture != null && !numeroFacture.isBlank())
+                    ? numeroFacture : "Facture #" + facture.getId();
             String modificateurNom = user.getNomComplet() != null && !user.getNomComplet().isBlank()
                     ? user.getNomComplet()
                     : user.getEmail();
-            String montantTotalFormate = String.format(Locale.GERMAN, "%,.0f", montantTotalAPayer);
+            String montantFormateModif = String.format(Locale.GERMAN, "%,.0f", facture.getTotalFacture());
             String objetFacture = facture.getDescription() != null ? facture.getDescription() : "";
 
             // Envoyer aux approbateurs
@@ -817,7 +823,7 @@ public class FactureProformaService {
                                     nomApprobateur,
                                     numero,
                                     modificateurNom,
-                                    montantTotalFormate,
+                                    montantFormateModif,
                                     objetFacture
                             );
                             log.info(" Email de modification envoyé à l'approbateur : {}", approbateur.getEmail());
@@ -843,7 +849,7 @@ public class FactureProformaService {
                             nomCreateur,
                             numero,
                             modificateurNom,
-                            montantTotalFormate,
+                            montantFormateModif,
                             objetFacture
                     );
                     log.info(" Email de modification envoyé au créateur : {}", createur.getEmail());
@@ -863,7 +869,7 @@ public class FactureProformaService {
             note.setDateCreation(LocalDateTime.now());
             note.setNumeroIdentifiant(genererNumeroNotePourFacture(facture));
 
-            // Assigner le destinataire à la note (sans modifier ses permissions)
+            // Assigner le destinataire à la note : si non fourni, c'est l'auteur (utilisateur connecté)
             if (modifications.getDestinataireNoteId() != null) {
                 Long noteEntrepriseId = facture.getEntreprise() != null ? facture.getEntreprise().getId() : null;
                 User destinataire = usersRepository.findByIdAndEntrepriseId(
@@ -873,7 +879,7 @@ public class FactureProformaService {
                 
                 note.setDestinataire(destinataire);
             } else {
-                throw new RuntimeException("Vous devez assigner la note à un destinataire de votre entreprise.");
+                note.setDestinataire(user);
             }
 
             noteFactureProFormaRepository.save(note);
@@ -996,10 +1002,10 @@ public class FactureProformaService {
                     map.put("numeroFacture", facture.getNumeroFacture());
                     map.put("dateCreation", facture.getDateCreation());
                     map.put("description", facture.getDescription());
-                    map.put("totalHT", facture.getTotalHT());
-                    map.put("remise", facture.getRemise());
+                    map.put("totalHT", Math.round(facture.getTotalHT() * 100.0) / 100.0);
+                    map.put("remise", facture.getRemise() != null ? Math.round(facture.getRemise() * 100.0) / 100.0 : 0.0);
                     map.put("tva", facture.isTva());
-                    map.put("totalFacture", facture.getTotalFacture());
+                    map.put("totalFacture", Math.round(facture.getTotalFacture() * 100.0) / 100.0);
                     map.put("statut", facture.getStatut());
                     map.put("ligneFactureProforma", facture.getLignesFacture() != null ? facture.getLignesFacture() : Collections.emptyList());
                     map.put("client", facture.getClient() != null ? facture.getClient().getNomComplet() : null);
@@ -1284,10 +1290,10 @@ public List<FactureProFormaDTO> getFacturesParPeriode(Long userIdRequete, HttpSe
                 dto.setNumeroFacture(f.getNumeroFacture());
                 dto.setDateCreation(f.getDateCreation());
                 dto.setDescription(f.getDescription());
-                dto.setTotalHT(f.getTotalHT());
-                dto.setRemise(f.getRemise());
+                dto.setTotalHT(Math.round(f.getTotalHT() * 100.0) / 100.0);
+                dto.setRemise(f.getRemise() != null ? Math.round(f.getRemise() * 100.0) / 100.0 : 0.0);
                 dto.setTva(f.isTva());
-                dto.setTotalFacture(f.getTotalFacture());
+                dto.setTotalFacture(Math.round(f.getTotalFacture() * 100.0) / 100.0);
                 dto.setStatut(f.getStatut());
                 dto.setLigneFactureProforma(f.getLignesFacture().stream()
                         .map(LigneFactureDTO::new)
@@ -1330,11 +1336,11 @@ public List<FactureProFormaDTO> getFacturesParPeriode(Long userIdRequete, HttpSe
                     dto.setDateCreation(f.getDateCreation());
                     dto.setDescription(f.getDescription());
                     dto.setUtilisateurCreateur(f.getUtilisateurCreateur() != null ? f.getUtilisateurCreateur().getNomComplet() : null);
-                    dto.setTotalHT(f.getTotalHT());
-                    dto.setRemise(f.getRemise());
-                    dto.setTauxRemise(f.getTauxRemise());
+                    dto.setTotalHT(Math.round(f.getTotalHT() * 100.0) / 100.0);
+                    dto.setRemise(f.getRemise() != null ? Math.round(f.getRemise() * 100.0) / 100.0 : 0.0);
+                    dto.setTauxRemise(f.getTauxRemise() != null ? Math.round(f.getTauxRemise() * 100.0) / 100.0 : 0.0);
                     dto.setTva(f.isTva());
-                    dto.setTotalFacture(f.getTotalFacture());
+                    dto.setTotalFacture(Math.round(f.getTotalFacture() * 100.0) / 100.0);
                     dto.setStatut(f.getStatut());
                     dto.setNomEntreprise(f.getEntreprise() != null ? f.getEntreprise().getNomEntreprise() : null);
                     dto.setEntrepriseId(f.getEntreprise() != null ? f.getEntreprise().getId() : null);

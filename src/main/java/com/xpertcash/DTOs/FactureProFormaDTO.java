@@ -58,10 +58,10 @@ public class FactureProFormaDTO {
         this.dateCreationPro = facture.getDateCreation();
 
         
-        this.totalFacture = facture.getTotalFacture();
-        this.totalHT = facture.getTotalHT();
-        this.remise = facture.getRemise();
-        this.tauxRemise = facture.getTauxRemise();
+        this.totalFacture = Math.round(facture.getTotalFacture() * 100.0) / 100.0;
+        this.totalHT = Math.round(facture.getTotalHT() * 100.0) / 100.0;
+        this.remise = facture.getRemise() != null ? Math.round(facture.getRemise() * 100.0) / 100.0 : 0.0;
+        this.tauxRemise = facture.getTauxRemise() != null ? Math.round(facture.getTauxRemise() * 100.0) / 100.0 : 0.0;
         this.tva = facture.isTva();
         this.statut = facture.getStatut();
         this.justification = facture.getJustification();
