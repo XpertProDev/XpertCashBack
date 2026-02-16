@@ -4,6 +4,7 @@ package com.xpertcash.controller;
 import java.io.IOException;
 import java.time.LocalDate;
 import java.util.*;
+import java.util.function.Supplier;
 
 import jakarta.servlet.http.HttpServletResponse;
 import org.apache.poi.ss.usermodel.Row;
@@ -399,23 +400,15 @@ public ResponseEntity<?> updateProduit(
             }
         }
 
-      
-
-            
-        @GetMapping("/produits/entreprise/{entrepriseId}")
-        public ResponseEntity<?> getProduitsParEntreprise(@PathVariable Long entrepriseId, HttpServletRequest request) {
-            try {
-                List<ProduitDTO> produitsDTO = produitService.getProduitsParEntreprise(entrepriseId, request);
-                return ResponseEntity.ok(produitsDTO);
-            } catch (RuntimeException e) {
-                Map<String, String> errorResponse = new HashMap<>();
-                errorResponse.put("error", e.getMessage());
-                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(errorResponse);
-            } catch (Exception e) {
-                Map<String, String> errorResponse = new HashMap<>();
-                errorResponse.put("error", "Une erreur est survenue lors de la récupération des produits.");
-                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
-            }
+        /** Produits de l'entreprise de l'utilisateur connecté (entreprise issue du token JWT uniquement). Pagination comme TresorerieController. Isolation multi-tenant. */
+        @GetMapping("/produits/entreprise/paginated")
+        public ResponseEntity<?> getProduitsEntreprisePaginated(
+                HttpServletRequest request,
+                @RequestParam(defaultValue = "0") int page,
+                @RequestParam(defaultValue = "20") int size,
+                @RequestParam(defaultValue = "codeGenerique") String sortBy,
+                @RequestParam(defaultValue = "asc") String sortDir) {
+            return handleRequest(() -> produitService.getProduitsEntreprisePaginated(request, page, size, sortBy, sortDir));
         }
 
 
@@ -535,30 +528,6 @@ public ResponseEntity<?> updateProduit(
         }
     }
 
-    // Endpoint  pagination pour récupérer les produits d'une entreprise
-    @GetMapping("/entreprise/{entrepriseId}/produits/paginated")
-    public ResponseEntity<ProduitEntreprisePaginatedResponseDTO> getProduitsParEntreprisePaginated(
-            @PathVariable Long entrepriseId,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size,
-            HttpServletRequest request) {
-        
-        try {
-            if (page < 0) page = 0;
-            if (size <= 0) size = 10;
-            if (size > 100) size = 100;
-            
-            ProduitEntreprisePaginatedResponseDTO response = produitService.getProduitsParEntreprisePaginated(
-                    entrepriseId, page, size, request);
-            
-            return ResponseEntity.ok(response);
-            
-        } catch (Exception e) {
-            e.printStackTrace();
-            throw new RuntimeException("Erreur lors de la récupération des produits paginés: " + e.getMessage());
-        }
-    }
-
     // Endpoint  avec pagination pour récupérer les produits d'une boutique
     @GetMapping("/boutique/{boutiqueId}/produits/paginated")
     public ResponseEntity<ProduitStockPaginatedResponseDTO> getProduitsParStockPaginated(
@@ -625,6 +594,20 @@ public ResponseEntity<?> updateProduit(
         }
     }
 
-    
-       
+    private ResponseEntity<?> handleRequest(Supplier<Object> supplier) {
+        try {
+            return ResponseEntity.ok(supplier.get());
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(createErrorResponse(e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(createErrorResponse("Erreur interne du serveur : " + e.getMessage()));
+        }
+    }
+
+    private Map<String, String> createErrorResponse(String message) {
+        Map<String, String> error = new HashMap<>();
+        error.put("error", message);
+        return error;
+    }
 } 

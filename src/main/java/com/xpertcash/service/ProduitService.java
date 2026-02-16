@@ -1091,6 +1091,31 @@ public class ProduitService {
         return Sort.by(direction, property);
     }
 
+    /** Tri pour pagination entreprise : sortBy/sortDir optionnels, sinon défaut codeGenerique puis nom, asc. */
+    private Sort buildSort(String sortBy, String sortDir, String defaultProp1, String defaultProp2) {
+        if (sortBy != null && !sortBy.isBlank()) {
+            Sort.Direction direction = "desc".equalsIgnoreCase(sortDir) ? Sort.Direction.DESC : Sort.Direction.ASC;
+            return Sort.by(direction, sortBy.trim());
+        }
+        return Sort.by(Sort.Direction.ASC, defaultProp1).and(Sort.by(Sort.Direction.ASC, defaultProp2));
+    }
+
+    /** Résout l'utilisateur depuis le token JWT et valide entreprise (isolation multi-tenant). */
+    private User resolveUserAndValidateToken(HttpServletRequest request) {
+        String token = request.getHeader("Authorization");
+        if (token == null || !token.startsWith("Bearer ")) {
+            throw new RuntimeException("Token JWT manquant ou mal formaté");
+        }
+        User user = authHelper.getAuthenticatedUserWithFallback(request);
+        if (user.getEntreprise() == null) {
+            throw new RuntimeException("Aucune entreprise associée à l'utilisateur ID: " + user.getId());
+        }
+        if (user.getEntreprise().getId() == null) {
+            throw new RuntimeException("L'ID de l'entreprise de l'utilisateur est null");
+        }
+        return user;
+    }
+
     // Méthode pour convertir un Produit en ProduitDTO
         private ProduitDTO convertToProduitDTO(Produit produit) {
             ProduitDTO produitDTO = new ProduitDTO();
@@ -1284,35 +1309,52 @@ public class ProduitService {
 
     // Méthode pour récupérer tous les produits de toutes les boutiques d'une entreprise
     public List<ProduitDTO> getProduitsParEntreprise(Long entrepriseId, HttpServletRequest request) {
-        return getProduitsParEntreprisePaginated(entrepriseId, 0, Integer.MAX_VALUE, request).getContent();
+        return getProduitsParEntreprisePaginated(entrepriseId, 0, Integer.MAX_VALUE, null, null, request).getContent();
+    }
+
+    /**
+     * Récupère les produits de l'entreprise de l'utilisateur connecté (entreprise issue du token JWT uniquement).
+     * Isolation multi-tenant : aucun entrepriseId n'est accepté depuis le client.
+     */
+    public ProduitEntreprisePaginatedResponseDTO getProduitsEntreprisePaginated(
+            HttpServletRequest request,
+            int page,
+            int size,
+            String sortBy,
+            String sortDir) {
+        User user = resolveUserAndValidateToken(request);
+        Long entrepriseId = user.getEntreprise().getId();
+        return getProduitsParEntreprisePaginated(entrepriseId, page, size, sortBy, sortDir, request);
     }
 
     // Méthode scalable avec pagination pour récupérer les produits d'une entreprise
     public ProduitEntreprisePaginatedResponseDTO getProduitsParEntreprisePaginated(
-            Long entrepriseId, 
-            int page, 
-            int size, 
+            Long entrepriseId,
+            int page,
+            int size,
+            String sortBy,
+            String sortDir,
             HttpServletRequest request) {
-        
+
         if (page < 0) page = 0;
-        if (size <= 0) size = 10;
+        if (size <= 0) size = 20;
         if (size > 100) size = 100;
-        
+
         if (entrepriseId == null) {
             throw new RuntimeException("L'ID de l'entreprise ne peut pas être null");
         }
-        
+
         String token = request.getHeader("Authorization");
         if (token == null || !token.startsWith("Bearer ")) {
             throw new RuntimeException("Token JWT manquant ou mal formaté");
         }
 
         User user = authHelper.getAuthenticatedUserWithFallback(request);
-        
+
         if (user.getEntreprise() == null) {
             throw new RuntimeException("Aucune entreprise associée à l'utilisateur ID: " + user.getId());
         }
-        
+
         Entreprise entreprise = user.getEntreprise();
         if (entreprise.getId() == null) {
             throw new RuntimeException("L'ID de l'entreprise de l'utilisateur est null");
@@ -1331,7 +1373,8 @@ public class ProduitService {
             throw new RuntimeException("Accès refusé : vous ne pouvez pas accéder aux produits d'une autre entreprise. Votre entreprise: " + entreprise.getId() + ", Demandée: " + entrepriseId);
         }
 
-        Pageable pageable = PageRequest.of(page, size, Sort.by("codeGenerique").ascending().and(Sort.by("nom").ascending()));
+        Sort sort = buildSort(sortBy, sortDir, "codeGenerique", "nom");
+        Pageable pageable = PageRequest.of(page, size, sort);
 
         Page<Produit> produitsPage = produitRepository.findProduitsByEntrepriseIdPaginated(entrepriseId, pageable);
 

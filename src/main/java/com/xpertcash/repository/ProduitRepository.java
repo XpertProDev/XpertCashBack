@@ -188,15 +188,14 @@ List<Produit> findAllWithBoutiqueByEntrepriseId(@Param("entrepriseId") Long entr
        "WHERE b.id = :boutiqueId AND (p.deleted IS NULL OR p.deleted = false)")
 List<Produit> findActiveByBoutiqueIdWithRelations(@Param("boutiqueId") Long boutiqueId);
 
-// Récupérer les produits d'une entreprise avec pagination et groupement par code générique
+// Récupérer les produits d'une entreprise avec pagination (tri via Pageable)
 @Query("SELECT DISTINCT p FROM Produit p " +
        "LEFT JOIN FETCH p.boutique b " +
        "LEFT JOIN b.entreprise e " +
        "WHERE ((e.id = :entrepriseId) OR (b IS NULL)) " +
-       "AND (p.deleted IS NULL OR p.deleted = false) " +
-       "ORDER BY p.codeGenerique, p.nom")
+       "AND (p.deleted IS NULL OR p.deleted = false)")
 Page<Produit> findProduitsByEntrepriseIdPaginated(
-    @Param("entrepriseId") Long entrepriseId, 
+    @Param("entrepriseId") Long entrepriseId,
     Pageable pageable);
 
 // Compter le nombre total de produits uniques par entreprise
