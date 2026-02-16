@@ -82,6 +82,20 @@ public interface VenteRepository extends JpaRepository<Vente, Long> {
             @Param("dateDebut") LocalDateTime dateDebut,
             @Param("dateFin") LocalDateTime dateFin);
 
+    // Même statistiques avec filtres optionnels vendeur et boutique
+    @Query(value = "SELECT COUNT(v.id), COALESCE(SUM(v.montant_total), 0) " +
+           "FROM vente v INNER JOIN boutique b ON v.boutique_id = b.id " +
+           "WHERE b.entreprise_id = :entrepriseId " +
+           "AND v.date_vente >= :dateDebut AND v.date_vente < :dateFin " +
+           "AND (:vendeurId IS NULL OR v.vendeur_id = :vendeurId) " +
+           "AND (:boutiqueId IS NULL OR v.boutique_id = :boutiqueId)", nativeQuery = true)
+    List<Object[]> getStatistiquesGlobalesByEntrepriseIdAndPeriodeAndFilters(
+            @Param("entrepriseId") Long entrepriseId,
+            @Param("dateDebut") LocalDateTime dateDebut,
+            @Param("dateFin") LocalDateTime dateFin,
+            @Param("vendeurId") Long vendeurId,
+            @Param("boutiqueId") Long boutiqueId);
+
     // Top 3 vendeurs par entreprise et période
     @Query(value = "SELECT v.vendeur_id, u.nom_complet, COUNT(v.id) as nombre_ventes, " +
            "COALESCE(SUM(v.montant_total), 0) as montant_total " +
@@ -115,6 +129,26 @@ public interface VenteRepository extends JpaRepository<Vente, Long> {
             @Param("dateDebut") LocalDateTime dateDebut,
             @Param("dateFin") LocalDateTime dateFin);
 
+    // Même avec filtres optionnels vendeur et boutique
+    @Query(value = "SELECT v.vendeur_id, u.nom_complet, COUNT(v.id) as nombre_ventes, " +
+           "COALESCE(SUM(v.montant_total), 0) as montant_total " +
+           "FROM vente v " +
+           "INNER JOIN boutique b ON v.boutique_id = b.id " +
+           "INNER JOIN user u ON v.vendeur_id = u.id " +
+           "WHERE b.entreprise_id = :entrepriseId " +
+           "AND v.date_vente >= :dateDebut AND v.date_vente < :dateFin " +
+           "AND v.vendeur_id IS NOT NULL " +
+           "AND (:vendeurId IS NULL OR v.vendeur_id = :vendeurId) " +
+           "AND (:boutiqueId IS NULL OR v.boutique_id = :boutiqueId) " +
+           "GROUP BY v.vendeur_id, u.nom_complet " +
+           "ORDER BY montant_total DESC", nativeQuery = true)
+    List<Object[]> findAllVendeursByEntrepriseIdAndPeriodeAndFilters(
+            @Param("entrepriseId") Long entrepriseId,
+            @Param("dateDebut") LocalDateTime dateDebut,
+            @Param("dateFin") LocalDateTime dateFin,
+            @Param("vendeurId") Long vendeurId,
+            @Param("boutiqueId") Long boutiqueId);
+
     // Montants des ventes par statut de caisse (OUVERTE et FERMEE) en une seule requête
     // Retourne: [0] = montantCaisseOuverte, [1] = montantCaisseFermee
     @Query(value = "SELECT " +
@@ -129,6 +163,23 @@ public interface VenteRepository extends JpaRepository<Vente, Long> {
             @Param("entrepriseId") Long entrepriseId,
             @Param("dateDebut") LocalDateTime dateDebut,
             @Param("dateFin") LocalDateTime dateFin);
+
+    @Query(value = "SELECT " +
+           "COALESCE(SUM(CASE WHEN c.statut = 'OUVERTE' THEN v.montant_total ELSE 0 END), 0) as montant_ouverte, " +
+           "COALESCE(SUM(CASE WHEN c.statut = 'FERMEE' THEN v.montant_total ELSE 0 END), 0) as montant_fermee " +
+           "FROM vente v " +
+           "INNER JOIN boutique b ON v.boutique_id = b.id " +
+           "INNER JOIN caisse c ON v.caisse_id = c.id " +
+           "WHERE b.entreprise_id = :entrepriseId " +
+           "AND v.date_vente >= :dateDebut AND v.date_vente < :dateFin " +
+           "AND (:vendeurId IS NULL OR v.vendeur_id = :vendeurId) " +
+           "AND (:boutiqueId IS NULL OR v.boutique_id = :boutiqueId)", nativeQuery = true)
+    List<Object[]> sumMontantParStatutCaisseByEntrepriseIdAndPeriodeAndFilters(
+            @Param("entrepriseId") Long entrepriseId,
+            @Param("dateDebut") LocalDateTime dateDebut,
+            @Param("dateFin") LocalDateTime dateFin,
+            @Param("vendeurId") Long vendeurId,
+            @Param("boutiqueId") Long boutiqueId);
 
     // ==================== STATISTIQUES PAR VENDEUR ====================
 

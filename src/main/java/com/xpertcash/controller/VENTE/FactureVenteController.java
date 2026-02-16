@@ -37,6 +37,10 @@ public class FactureVenteController {
 
     
 
+    /**
+     * Factures de vente paginées, avec filtres optionnels (vendeur, période, boutique).
+     * Exemple : GET /api/auth/factureVente/entreprise/paginated?page=0&size=20&periode=mois&vendeurId=5&boutiqueId=2&sortBy=dateEmission&sortDir=desc
+     */
     @GetMapping("/factureVente/entreprise/paginated")
     public ResponseEntity<FactureVentePaginatedDTO> getFacturesForEntrepriseWithPagination(
             @RequestParam(defaultValue = "0") int page,
@@ -46,10 +50,12 @@ public class FactureVenteController {
             @RequestParam(required = false, defaultValue = "aujourdhui") String periode,
             @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate dateDebut,
             @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate dateFin,
+            @RequestParam(required = false) Long vendeurId,
+            @RequestParam(required = false) Long boutiqueId,
             HttpServletRequest request) {
         
         FactureVentePaginatedDTO factures = factureVenteService.getAllFacturesWithPagination(
-            page, size, sortBy, sortDir, periode, dateDebut, dateFin, request);
+            page, size, sortBy, sortDir, periode, dateDebut, dateFin, vendeurId, boutiqueId, request);
         return ResponseEntity.ok(factures);
     }
 
@@ -130,15 +136,17 @@ public class FactureVenteController {
     /**
      * Endpoint pour récupérer les statistiques globales de vente
      * Inclut : Total ventes, Nombre d'articles, Montant Total, Top 3 produits, Top 3 vendeurs
-     * 
-     * periode Filtre de période : aujourdhui, hier, semaine, mois, annee (défaut: aujourdhui)
+     * Filtres optionnels : periode, vendeurId, boutiqueId
+     * Exemple : GET /api/auth/vente/statistiques/globales?periode=mois&vendeurId=5&boutiqueId=2
      */
     @GetMapping("/vente/statistiques/globales")
     public ResponseEntity<?> getStatistiquesGlobales(
             @RequestParam(required = false, defaultValue = "aujourdhui") String periode,
+            @RequestParam(required = false) Long vendeurId,
+            @RequestParam(required = false) Long boutiqueId,
             HttpServletRequest request) {
         try {
-            StatistiquesVenteGlobalesDTO statistiques = factureVenteService.getStatistiquesGlobales(periode, request);
+            StatistiquesVenteGlobalesDTO statistiques = factureVenteService.getStatistiquesGlobales(periode, vendeurId, boutiqueId, request);
             return ResponseEntity.ok(statistiques);
         } catch (RuntimeException e) {
             e.printStackTrace();
