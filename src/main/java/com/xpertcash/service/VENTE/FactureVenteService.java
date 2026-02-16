@@ -30,6 +30,7 @@ import com.xpertcash.entity.FactureVente;
 import com.xpertcash.entity.User;
 import com.xpertcash.entity.VENTE.Vente;
 import com.xpertcash.entity.Enum.RoleType;
+import com.xpertcash.repository.BoutiqueRepository;
 import com.xpertcash.repository.FactureVenteRepository;
 import com.xpertcash.repository.UsersRepository;
 import com.xpertcash.repository.VENTE.VenteProduitRepository;
@@ -50,6 +51,8 @@ public class FactureVenteService {
     private VenteProduitRepository venteProduitRepository;
     @Autowired
     private VenteRepository venteRepository;
+    @Autowired
+    private BoutiqueRepository boutiqueRepository;
 
 private FactureVenteResponseDTO toResponse(FactureVente facture) {
     Vente vente = facture.getVente();
@@ -146,7 +149,8 @@ private FactureVenteResponseDTO toResponse(FactureVente facture) {
 
 
 /**
- * Récupère toutes les factures de vente avec pagination pour l'entreprise de l'utilisateur connecté
+ * Récupère toutes les factures de vente avec pagination pour l'entreprise de l'utilisateur connecté.
+ * Filtres optionnels : période (periode / dateDebut-dateFin), vendeurId, boutiqueId.
  */
 public FactureVentePaginatedDTO getAllFacturesWithPagination(
         int page, 
@@ -156,6 +160,8 @@ public FactureVentePaginatedDTO getAllFacturesWithPagination(
         String periode,
         LocalDate dateDebut,
         LocalDate dateFin,
+        Long vendeurId,
+        Long boutiqueId,
         HttpServletRequest request) {
     
     String token = request.getHeader("Authorization");
@@ -167,6 +173,14 @@ public FactureVentePaginatedDTO getAllFacturesWithPagination(
             .orElseThrow(() -> new RuntimeException("Utilisateur non trouvé"));
 
     Long entrepriseId = user.getEntreprise().getId();
+
+    // Multi-tenant : vérifier que vendeur et boutique appartiennent à l'entreprise
+    if (vendeurId != null && !usersRepository.findByIdAndEntrepriseId(vendeurId, entrepriseId).isPresent()) {
+        throw new RuntimeException("Vendeur invalide ou n'appartient pas à votre entreprise.");
+    }
+    if (boutiqueId != null && !boutiqueRepository.findByIdAndEntrepriseId(boutiqueId, entrepriseId).isPresent()) {
+        throw new RuntimeException("Boutique invalide ou n'appartient pas à votre entreprise.");
+    }
 
     // Récupérer tous les vendeurs de l'entreprise (même ceux qui n'ont pas encore vendu)
     List<User> allUsersEntreprise = usersRepository.findByEntrepriseId(entrepriseId);
@@ -185,6 +199,20 @@ public FactureVentePaginatedDTO getAllFacturesWithPagination(
                 entrepriseId, periodeDates.dateDebut, periodeDates.dateFin);
     } else {
         allFactures = factureVenteRepository.findAllByEntrepriseId(entrepriseId);
+    }
+    
+    // Filtrer par vendeur et/ou boutique si fournis
+    if (vendeurId != null) {
+        allFactures = allFactures.stream()
+                .filter(f -> f.getVente() != null && f.getVente().getVendeur() != null 
+                        && vendeurId.equals(f.getVente().getVendeur().getId()))
+                .collect(Collectors.toList());
+    }
+    if (boutiqueId != null) {
+        allFactures = allFactures.stream()
+                .filter(f -> f.getVente() != null && f.getVente().getBoutique() != null 
+                        && boutiqueId.equals(f.getVente().getBoutique().getId()))
+                .collect(Collectors.toList());
     }
     
     List<FactureVenteResponseDTO> allItems = allFactures.stream()
@@ -464,9 +492,9 @@ public ReceiptEmailRequest getFactureDataForEmail(String venteId, String email, 
 }
 
 /**
- * Récupère les statistiques globales de vente pour l'entreprise de l'utilisateur connecté
+ * Récupère les statistiques globales de vente pour l'entreprise (filtres optionnels : période, vendeur, boutique).
  */
-public StatistiquesVenteGlobalesDTO getStatistiquesGlobales(String periode, HttpServletRequest request) {
+public StatistiquesVenteGlobalesDTO getStatistiquesGlobales(String periode, Long vendeurId, Long boutiqueId, HttpServletRequest request) {
     String token = request.getHeader("Authorization");
     if (token == null || !token.startsWith("Bearer ")) {
         throw new RuntimeException("Token JWT manquant ou invalide");
@@ -480,12 +508,20 @@ public StatistiquesVenteGlobalesDTO getStatistiquesGlobales(String periode, Http
         throw new RuntimeException("Aucune entreprise associée à cet utilisateur");
     }
 
+    // Multi-tenant : vérifier que vendeur et boutique appartiennent à l'entreprise
+    if (vendeurId != null && !usersRepository.findByIdAndEntrepriseId(vendeurId, entrepriseId).isPresent()) {
+        throw new RuntimeException("Vendeur invalide ou n'appartient pas à votre entreprise.");
+    }
+    if (boutiqueId != null && !boutiqueRepository.findByIdAndEntrepriseId(boutiqueId, entrepriseId).isPresent()) {
+        throw new RuntimeException("Boutique invalide ou n'appartient pas à votre entreprise.");
+    }
+
     PeriodeDates periodeDates = calculerDatesPeriodeStatistiques(periode);
     LocalDateTime dateDebut = periodeDates.dateDebut;
     LocalDateTime dateFin = periodeDates.dateFin;
 
-    List<Object[]> statsGlobalesList = venteRepository.getStatistiquesGlobalesByEntrepriseIdAndPeriode(
-            entrepriseId, dateDebut, dateFin);
+    List<Object[]> statsGlobalesList = venteRepository.getStatistiquesGlobalesByEntrepriseIdAndPeriodeAndFilters(
+            entrepriseId, dateDebut, dateFin, vendeurId, boutiqueId);
     Long totalVentes = 0L;
     Double montantTotal = 0.0;
     if (statsGlobalesList != null && !statsGlobalesList.isEmpty()) {
@@ -494,11 +530,11 @@ public StatistiquesVenteGlobalesDTO getStatistiquesGlobales(String periode, Http
         montantTotal = row[1] != null ? ((Number) row[1]).doubleValue() : 0.0;
     }
     
-    Long nombreArticles = venteProduitRepository.countTotalArticlesVendusByEntrepriseIdAndPeriode(
-            entrepriseId, dateDebut, dateFin);
+    Long nombreArticles = venteProduitRepository.countTotalArticlesVendusByEntrepriseIdAndPeriodeAndFilters(
+            entrepriseId, dateDebut, dateFin, vendeurId, boutiqueId);
 
-    List<Object[]> produitsData = venteProduitRepository.findAllProduitsVendusByEntrepriseIdAndPeriode(
-            entrepriseId, dateDebut, dateFin);
+    List<Object[]> produitsData = venteProduitRepository.findAllProduitsVendusByEntrepriseIdAndPeriodeAndFilters(
+            entrepriseId, dateDebut, dateFin, vendeurId, boutiqueId);
     List<TopProduitVenduDTO> produitsVendus = produitsData.stream()
             .map(row -> {
                 TopProduitVenduDTO dto = new TopProduitVenduDTO();
@@ -510,8 +546,8 @@ public StatistiquesVenteGlobalesDTO getStatistiquesGlobales(String periode, Http
             })
             .collect(Collectors.toList());
 
-    List<Object[]> vendeursData = venteRepository.findAllVendeursByEntrepriseIdAndPeriode(
-            entrepriseId, dateDebut, dateFin);
+    List<Object[]> vendeursData = venteRepository.findAllVendeursByEntrepriseIdAndPeriodeAndFilters(
+            entrepriseId, dateDebut, dateFin, vendeurId, boutiqueId);
     List<TopVendeurDTO> vendeurs = vendeursData.stream()
             .map(row -> {
                 TopVendeurDTO dto = new TopVendeurDTO();
@@ -523,8 +559,8 @@ public StatistiquesVenteGlobalesDTO getStatistiquesGlobales(String periode, Http
             })
             .collect(Collectors.toList());
 
-    List<Object[]> montantsCaisse = venteRepository.sumMontantParStatutCaisseByEntrepriseIdAndPeriode(
-            entrepriseId, dateDebut, dateFin);
+    List<Object[]> montantsCaisse = venteRepository.sumMontantParStatutCaisseByEntrepriseIdAndPeriodeAndFilters(
+            entrepriseId, dateDebut, dateFin, vendeurId, boutiqueId);
     Double montantCaisseOuverte = 0.0;
     Double montantCaisseFermee = 0.0;
     if (montantsCaisse != null && !montantsCaisse.isEmpty()) {
