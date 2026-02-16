@@ -39,7 +39,6 @@ public class FactureVenteController {
 
     /**
      * Factures de vente paginées, avec filtres optionnels (vendeur, période, boutique).
-     * Exemple : GET /api/auth/factureVente/entreprise/paginated?page=0&size=20&periode=mois&vendeurId=5&boutiqueId=2&sortBy=dateEmission&sortDir=desc
      */
     @GetMapping("/factureVente/entreprise/paginated")
     public ResponseEntity<FactureVentePaginatedDTO> getFacturesForEntrepriseWithPagination(
