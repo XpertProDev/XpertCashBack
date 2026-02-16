@@ -2344,7 +2344,6 @@ public class ComptabiliteService {
                             org.hibernate.Hibernate.initialize(facture.getLignesFacture());
                         }
                         
-                        dto.setFactureId(facture.getId());
                         dto.setNumeroFacture(facture.getNumeroFacture());
                         
                         String objetFacture = facture.getDescription() != null && !facture.getDescription().trim().isEmpty() 
@@ -2380,8 +2379,8 @@ public class ComptabiliteService {
                         dto.setOrigine("FACTURATION");
                         
                         // Informations de remise et TVA
-                        dto.setRemise(facture.getRemise());
-                        dto.setTauxRemise(facture.getTauxRemise());
+                        dto.setRemise(Math.round(facture.getRemise() * 100.0) / 100.0);
+                        dto.setTauxRemise(facture.getTauxRemise() != null ? Math.round(facture.getTauxRemise() * 100.0) / 100.0 : null);
                         dto.setTva(facture.isTva());
                         dto.setTotalHT(facture.getTotalHT());
                         dto.setTotalTTC(facture.getTotalFacture());

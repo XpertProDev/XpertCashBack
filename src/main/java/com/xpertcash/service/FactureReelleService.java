@@ -101,7 +101,9 @@ public class FactureReelleService {
         factureReelle.setDateCreationPro(factureProForma.getDateCreation());
         factureReelle.setTotalHT(factureProForma.getTotalHT());
         factureReelle.setRemise(factureProForma.getRemise());
-        factureReelle.setTauxRemise(factureProForma.getTauxRemise());
+        // Arrondir le taux de remise à 2 décimales (ex: 2,96 % au lieu de 2,958579881656805)
+        Double tauxRemise = factureProForma.getTauxRemise();
+        factureReelle.setTauxRemise(tauxRemise != null ? Math.round(tauxRemise * 100.0) / 100.0 : null);
         factureReelle.setDescription(factureProForma.getDescription());
 
         factureReelle.setTva(factureProForma.isTva());
@@ -634,7 +636,7 @@ public List<FactureReelleDTO> getFacturesParPeriode(Long userIdRequete, HttpServ
             factureDTO.setDateCreation(facture.getDateCreation());
             factureDTO.setDescription(facture.getDescription());
             factureDTO.setTotalHT(facture.getTotalHT());
-            factureDTO.setRemise(facture.getRemise());
+            factureDTO.setRemise(Math.round(facture.getRemise() * 100.0) / 100.0);
             factureDTO.setTva(facture.isTva());
             factureDTO.setTotalFacture(facture.getTotalFacture());
 

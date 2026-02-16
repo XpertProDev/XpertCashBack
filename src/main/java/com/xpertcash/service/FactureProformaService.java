@@ -251,8 +251,9 @@ public class FactureProformaService {
 
     // Assigner les montants calculés à la facture
     facture.setTotalHT(montantTotalHT);
-    facture.setRemise(remiseMontant);
-    facture.setTauxRemise(remisePourcentage);
+    facture.setRemise(Math.round(remiseMontant * 100.0) / 100.0);
+    // Arrondir le taux de remise à 2 décimales avant enregistrement (ex: 2,96 % au lieu de 2,958579881656805)
+    facture.setTauxRemise(remisePourcentage != null ? Math.round(remisePourcentage * 100.0) / 100.0 : 0.0);
     facture.setTva(tvaActive);
     facture.setTotalFacture(montantTotalAPayer);
 
@@ -765,8 +766,9 @@ public class FactureProformaService {
         double montantTotalAPayer = (montantTotalHT - remiseMontant) + montantTVA;
 
         facture.setTotalHT(montantTotalHT);
-        facture.setRemise(remiseMontant);
-        facture.setTauxRemise(remisePourcentage);
+        facture.setRemise(Math.round(remiseMontant * 100.0) / 100.0);
+        // Arrondir le taux de remise à 2 décimales avant enregistrement (ex: 2,96 % au lieu de 2,958579881656805)
+        facture.setTauxRemise(remisePourcentage != null ? Math.round(remisePourcentage * 100.0) / 100.0 : 0.0);
         facture.setTva(tvaActive);
         facture.setTotalFacture(montantTotalAPayer);
 
@@ -1285,7 +1287,7 @@ public List<FactureProFormaDTO> getFacturesParPeriode(Long userIdRequete, HttpSe
                 dto.setDateCreation(f.getDateCreation());
                 dto.setDescription(f.getDescription());
                 dto.setTotalHT(f.getTotalHT());
-                dto.setRemise(f.getRemise());
+                dto.setRemise(f.getRemise() != null ? Math.round(f.getRemise() * 100.0) / 100.0 : 0.0);
                 dto.setTva(f.isTva());
                 dto.setTotalFacture(f.getTotalFacture());
                 dto.setStatut(f.getStatut());
@@ -1331,8 +1333,8 @@ public List<FactureProFormaDTO> getFacturesParPeriode(Long userIdRequete, HttpSe
                     dto.setDescription(f.getDescription());
                     dto.setUtilisateurCreateur(f.getUtilisateurCreateur() != null ? f.getUtilisateurCreateur().getNomComplet() : null);
                     dto.setTotalHT(f.getTotalHT());
-                    dto.setRemise(f.getRemise());
-                    dto.setTauxRemise(f.getTauxRemise());
+                    dto.setRemise(f.getRemise() != null ? Math.round(f.getRemise() * 100.0) / 100.0 : 0.0);
+                    dto.setTauxRemise(f.getTauxRemise() != null ? Math.round(f.getTauxRemise() * 100.0) / 100.0 : null);
                     dto.setTva(f.isTva());
                     dto.setTotalFacture(f.getTotalFacture());
                     dto.setStatut(f.getStatut());

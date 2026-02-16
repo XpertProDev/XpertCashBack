@@ -64,8 +64,8 @@ public class FactureReelleDTO {
         this.utilisateurCreateur = (facture.getUtilisateurCreateur() != null) ? facture.getUtilisateurCreateur().getNomComplet() : null;
         this.utilisateurValidateur = (facture.getUtilisateurValidateur() != null) ? facture.getUtilisateurValidateur().getNomComplet() : null;
         this.totalFacture = facture.getTotalFacture();
-        this.remise = facture.getRemise();
-        this.tauxRemise = facture.getTauxRemise();
+        this.remise = Math.round(facture.getRemise() * 100.0) / 100.0;
+        this.tauxRemise = facture.getTauxRemise() != null ? Math.round(facture.getTauxRemise() * 100.0) / 100.0 : null;
         this.tva = facture.isTva();
         this.statutPaiement = facture.getStatutPaiement();
         this.entrepriseClient = (facture.getEntrepriseClient() != null) ? new EntrepriseClientDTO(facture.getEntrepriseClient()) : null;
