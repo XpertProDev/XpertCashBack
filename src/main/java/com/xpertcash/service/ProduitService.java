@@ -1057,7 +1057,11 @@ public class ProduitService {
             }
         }
 
-        Sort sort = parseSortParam(sortParam);
+        // Favoris en premier (favoriPourVente DESC), puis ordreFavori, puis tri demandé (ex. nom)
+        Sort sort = Sort.by(
+                Sort.Order.desc("favoriPourVente"),
+                Sort.Order.asc("ordreFavori").nullsLast()
+        ).and(parseSortParam(sortParam));
         String searchTerm = (search != null && !search.isBlank()) ? search.trim() : null;
         Pageable pageable = PageRequest.of(page, size, sort);
 
@@ -1077,6 +1081,55 @@ public class ProduitService {
                 totalEnStock,
                 totalEnStock,
                 0L);
+    }
+
+    /**
+     * Marque ou retire un produit des favoris pour la vente dans une boutique (vendeur / droits boutique).
+     * Les favoris s'affichent en premier au POS.
+     */
+    @Transactional
+    public ProduitDTO setProduitFavoriPourVente(Long boutiqueId, Long produitId, Boolean favori, Integer ordre, HttpServletRequest request) {
+        if (boutiqueId == null || produitId == null) {
+            throw new RuntimeException("Boutique et produit sont obligatoires.");
+        }
+        String token = request.getHeader("Authorization");
+        if (token == null || !token.startsWith("Bearer ")) {
+            throw new RuntimeException("Token JWT manquant ou mal formaté");
+        }
+        User user = authHelper.getAuthenticatedUserWithFallback(request);
+        Boutique boutique = boutiqueRepository.findById(boutiqueId)
+                .orElseThrow(() -> new RuntimeException("Boutique non trouvée"));
+        if (!boutique.isActif()) {
+            throw new RuntimeException("Cette boutique est désactivée.");
+        }
+        Long entrepriseId = boutique.getEntreprise().getId();
+        if (!entrepriseId.equals(user.getEntreprise().getId())) {
+            throw new RuntimeException("Accès interdit : cette boutique ne vous appartient pas");
+        }
+        RoleType role = user.getRole().getName();
+        boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
+        boolean hasPermission = user.getRole().hasPermission(PermissionType.GERER_PRODUITS)
+                || user.getRole().hasPermission(PermissionType.VENDRE_PRODUITS)
+                || user.getRole().hasPermission(PermissionType.GERER_BOUTIQUE);
+        if (!isAdminOrManager && !hasPermission) {
+            throw new RuntimeException("Accès interdit : vous n'avez pas les droits pour gérer les favoris.");
+        }
+        if (role == RoleType.VENDEUR) {
+            Optional<UserBoutique> userBoutique = userBoutiqueRepository.findByUserIdAndBoutiqueId(user.getId(), boutiqueId);
+            if (!userBoutique.isPresent()) {
+                throw new RuntimeException("Vous n'êtes pas affecté à cette boutique.");
+            }
+        }
+        Produit produit = produitRepository.findByBoutiqueAndId(boutiqueId, produitId)
+                .orElseThrow(() -> new RuntimeException("Produit non trouvé dans cette boutique"));
+        if (Boolean.TRUE.equals(produit.getDeleted())) {
+            throw new RuntimeException("Ce produit est supprimé.");
+        }
+        produit.setFavoriPourVente(Boolean.TRUE.equals(favori));
+        produit.setOrdreFavori(favori != null && favori ? (ordre != null ? ordre : produit.getOrdreFavori()) : null);
+        produit.setLastUpdated(LocalDateTime.now());
+        produitRepository.save(produit);
+        return convertToProduitDTO(produit);
     }
 
     private Sort parseSortParam(String sortParam) {
@@ -1132,6 +1185,8 @@ public class ProduitService {
             produitDTO.setCodeBare(produit.getCodeBare());
             produitDTO.setPhoto(produit.getPhoto());
             produitDTO.setEnStock(produit.getEnStock());
+            produitDTO.setFavoriPourVente(Boolean.TRUE.equals(produit.getFavoriPourVente()));
+            produitDTO.setOrdreFavori(produit.getOrdreFavori());
 
             produitDTO.setCreatedAt(produit.getCreatedAt());
             produitDTO.setLastUpdated(produit.getLastUpdated());
@@ -1297,6 +1352,8 @@ public class ProduitService {
         dto.setPhoto(produit.getPhoto());
         dto.setTypeProduit(produit.getTypeProduit() != null ? produit.getTypeProduit().name() : null);
         dto.setEnStock(produit.getEnStock());
+        dto.setFavoriPourVente(Boolean.TRUE.equals(produit.getFavoriPourVente()));
+        dto.setOrdreFavori(produit.getOrdreFavori());
         dto.setCreatedAt(produit.getCreatedAt());
         dto.setLastUpdated(produit.getLastUpdated());
         dto.setNomCategorie(produit.getCategorie() != null ? produit.getCategorie().getNom() : null);

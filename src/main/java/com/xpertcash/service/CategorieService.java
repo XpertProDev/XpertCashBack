@@ -144,7 +144,12 @@ public class CategorieService {
         if (size <= 0) size = 20;
         if (size > 100) size = 100;
 
-        Pageable pageable = PageRequest.of(page, size, Sort.by("nom").ascending());
+        // Favoris pour la vente en premier, puis ordreFavori, puis nom
+        Sort sort = Sort.by(
+                Sort.Order.desc("favoriPourVente"),
+                Sort.Order.asc("ordreFavori").nullsLast()
+        ).and(Sort.by("nom").ascending());
+        Pageable pageable = PageRequest.of(page, size, sort);
         Page<Produit> produitsPage = produitRepository.findByCategorieIdAndEntrepriseIdPaginated(
                 categorieId, entreprise.getId(), pageable);
 
@@ -286,7 +291,9 @@ public class CategorieService {
                 produit.getLastUpdated(),
                 produit.getDatePreemption(),
                 produit.getBoutique() != null ? produit.getBoutique().getId() : null,
-                produit.getBoutique() != null ? produit.getBoutique().getNomBoutique() : null
+                produit.getBoutique() != null ? produit.getBoutique().getNomBoutique() : null,
+                Boolean.TRUE.equals(produit.getFavoriPourVente()),
+                produit.getOrdreFavori()
         );
     }
 
@@ -314,7 +321,9 @@ private ProduitDetailsResponseDTO toProduitDTO(Produit produit) {
         produit.getLastUpdated(),
         produit.getDatePreemption(),
         produit.getBoutique() != null ? produit.getBoutique().getId() : null,
-        produit.getBoutique() != null ? produit.getBoutique().getNomBoutique() : null
+        produit.getBoutique() != null ? produit.getBoutique().getNomBoutique() : null,
+        Boolean.TRUE.equals(produit.getFavoriPourVente()),
+        produit.getOrdreFavori()
     );
 }
  */
