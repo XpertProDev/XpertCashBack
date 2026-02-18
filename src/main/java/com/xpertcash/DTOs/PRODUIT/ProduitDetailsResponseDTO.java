@@ -31,9 +31,10 @@ public class ProduitDetailsResponseDTO {
     private LocalDate datePreemption;
     private Long boutiqueId;
     private String nomBoutique;
-
-    // Constructeur si tu ne veux pas utiliser @AllArgsConstructor
-
+    /** Favori pour la vente (affichés en premier au POS). */
+    private Boolean favoriPourVente;
+    /** Ordre parmi les favoris. */
+    private Integer ordreFavori;
 }
 
 
