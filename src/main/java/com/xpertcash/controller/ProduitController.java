@@ -22,6 +22,7 @@ import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.xpertcash.DTOs.AjouterStockRequest;
 import com.xpertcash.DTOs.CompteurBoutiqueDTO;
+import com.xpertcash.DTOs.FavoriVenteRequest;
 import com.xpertcash.DTOs.FactureDTO;
 import com.xpertcash.DTOs.ProduitDTO;
 import com.xpertcash.DTOs.ProduitEntreprisePaginatedResponseDTO;
@@ -575,6 +576,19 @@ public ResponseEntity<?> updateProduit(
             e.printStackTrace();
             throw new RuntimeException("Erreur lors de la récupération des produits pour la vente: " + e.getMessage());
         }
+    }
+
+    /** Marquer / retirer un produit comme favori pour la vente dans cette boutique (vendeur). Les favoris s'affichent en premier au POS. */
+    @PatchMapping("/boutique/{boutiqueId}/produits/{produitId}/favori-vente")
+    public ResponseEntity<?> setProduitFavoriPourVente(
+            @PathVariable Long boutiqueId,
+            @PathVariable Long produitId,
+            @RequestBody(required = false) FavoriVenteRequest body,
+            HttpServletRequest request) {
+        Boolean favori = body != null ? body.getFavori() : true;
+        Integer ordre = body != null ? body.getOrdre() : null;
+        return handleRequest(() -> produitService.setProduitFavoriPourVente(
+                boutiqueId, produitId, favori, ordre, request));
     }
 
      // Endpoint pour récupérer les compteurs de produits par boutique pour l'entreprise de l'utilisateur connecté

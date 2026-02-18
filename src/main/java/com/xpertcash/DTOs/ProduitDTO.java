@@ -50,6 +50,10 @@ public class ProduitDTO {
     private String description;
     private String photo;
     private Boolean enStock;
+    /** Favori pour la vente (affichés en premier au POS). */
+    private Boolean favoriPourVente;
+    /** Ordre parmi les favoris. */
+    private Integer ordreFavori;
     // Nouveaux attributs pour afficher les noms
     private String nomCategorie;
     private String nomUnite;

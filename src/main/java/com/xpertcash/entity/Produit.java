@@ -35,6 +35,14 @@ public class Produit {
     private String photo;
     private Boolean enStock = false;
 
+    /** Favori pour la vente dans cette boutique : affichés en premier au POS. */
+    @Column(name = "favori_pour_vente")
+    private Boolean favoriPourVente = false;
+
+    /** Ordre d'affichage parmi les favoris (plus petit = en premier). */
+    @Column(name = "ordre_favori")
+    private Integer ordreFavori;
+
     private LocalDateTime createdAt;
     private LocalDateTime lastUpdated;
     private Boolean deleted = false;
