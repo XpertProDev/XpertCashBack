@@ -69,6 +69,67 @@ public interface ProduitRepository extends JpaRepository<Produit, Long> {
            "WHERE p.codeGenerique = :codeGenerique AND e.id = :entrepriseId")
     List<Produit> findByCodeGeneriqueAndEntrepriseId(@Param("codeGenerique") String codeGenerique, @Param("entrepriseId") Long entrepriseId);
 
+    /** Page de codeGenerique distincts (tri par code) — pagination côté base. */
+    @Query(value = """
+        SELECT p.code_generique FROM produit p
+        LEFT JOIN boutique b ON p.boutique_id = b.id
+        WHERE (b.entreprise_id = :entrepriseId OR b.id IS NULL)
+          AND (p.deleted IS NULL OR p.deleted = false)
+        GROUP BY p.code_generique
+        ORDER BY p.code_generique ASC
+        LIMIT :limit OFFSET :offset
+        """, nativeQuery = true)
+    List<String> findCodeGeneriquesPageOrderByCodeGenerique(
+            @Param("entrepriseId") Long entrepriseId, @Param("limit") int limit, @Param("offset") int offset);
+
+    @Query(value = """
+        SELECT p.code_generique FROM produit p
+        LEFT JOIN boutique b ON p.boutique_id = b.id
+        WHERE (b.entreprise_id = :entrepriseId OR b.id IS NULL)
+          AND (p.deleted IS NULL OR p.deleted = false)
+        GROUP BY p.code_generique
+        ORDER BY p.code_generique DESC
+        LIMIT :limit OFFSET :offset
+        """, nativeQuery = true)
+    List<String> findCodeGeneriquesPageOrderByCodeGeneriqueDesc(
+            @Param("entrepriseId") Long entrepriseId, @Param("limit") int limit, @Param("offset") int offset);
+
+    @Query(value = """
+        SELECT p.code_generique FROM produit p
+        LEFT JOIN boutique b ON p.boutique_id = b.id
+        WHERE (b.entreprise_id = :entrepriseId OR b.id IS NULL)
+          AND (p.deleted IS NULL OR p.deleted = false)
+        GROUP BY p.code_generique
+        ORDER BY MIN(p.nom) ASC, p.code_generique ASC
+        LIMIT :limit OFFSET :offset
+        """, nativeQuery = true)
+    List<String> findCodeGeneriquesPageOrderByNom(
+            @Param("entrepriseId") Long entrepriseId, @Param("limit") int limit, @Param("offset") int offset);
+
+    @Query(value = """
+        SELECT p.code_generique FROM produit p
+        LEFT JOIN boutique b ON p.boutique_id = b.id
+        WHERE (b.entreprise_id = :entrepriseId OR b.id IS NULL)
+          AND (p.deleted IS NULL OR p.deleted = false)
+        GROUP BY p.code_generique
+        ORDER BY MIN(p.nom) DESC, p.code_generique ASC
+        LIMIT :limit OFFSET :offset
+        """, nativeQuery = true)
+    List<String> findCodeGeneriquesPageOrderByNomDesc(
+            @Param("entrepriseId") Long entrepriseId, @Param("limit") int limit, @Param("offset") int offset);
+
+    /** Charge les produits d'une entreprise par liste de codeGenerique (pagination produits uniques). */
+    @Query("SELECT DISTINCT p FROM Produit p " +
+           "LEFT JOIN FETCH p.boutique b " +
+           "LEFT JOIN FETCH p.categorie c " +
+           "LEFT JOIN FETCH p.uniteDeMesure u " +
+           "LEFT JOIN b.entreprise e " +
+           "WHERE ((e.id = :entrepriseId) OR (b IS NULL)) AND p.codeGenerique IN :codeGeneriques " +
+           "AND (p.deleted IS NULL OR p.deleted = false)")
+    List<Produit> findByEntrepriseIdAndCodeGeneriqueIn(
+            @Param("entrepriseId") Long entrepriseId,
+            @Param("codeGeneriques") List<String> codeGeneriques);
+
     // Recherche par boutique et liste d'IDs (optimisé avec JOIN FETCH)
     @Query("SELECT DISTINCT p FROM Produit p " +
            "LEFT JOIN FETCH p.boutique b " +

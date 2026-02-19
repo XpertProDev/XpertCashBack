@@ -1153,6 +1153,18 @@ public class ProduitService {
         return Sort.by(Sort.Direction.ASC, defaultProp1).and(Sort.by(Sort.Direction.ASC, defaultProp2));
     }
 
+    /** Délègue au bon findCodeGeneriquesPage* selon sortBy/sortDir (whitelisté). */
+    private List<String> findCodeGeneriquesPage(ProduitRepository repo, Long entrepriseId, String sortBy, String sortDir, int limit, int offset) {
+        boolean desc = "desc".equalsIgnoreCase(sortDir != null ? sortDir : "asc");
+        boolean byNom = sortBy != null && "nom".equalsIgnoreCase(sortBy.trim());
+        if (byNom) {
+            return desc ? repo.findCodeGeneriquesPageOrderByNomDesc(entrepriseId, limit, offset)
+                    : repo.findCodeGeneriquesPageOrderByNom(entrepriseId, limit, offset);
+        }
+        return desc ? repo.findCodeGeneriquesPageOrderByCodeGeneriqueDesc(entrepriseId, limit, offset)
+                : repo.findCodeGeneriquesPageOrderByCodeGenerique(entrepriseId, limit, offset);
+    }
+
     /** Résout l'utilisateur depuis le token JWT et valide entreprise (isolation multi-tenant). */
     private User resolveUserAndValidateToken(HttpServletRequest request) {
         String token = request.getHeader("Authorization");
@@ -1430,42 +1442,54 @@ public class ProduitService {
             throw new RuntimeException("Accès refusé : vous ne pouvez pas accéder aux produits d'une autre entreprise. Votre entreprise: " + entreprise.getId() + ", Demandée: " + entrepriseId);
         }
 
-        Sort sort = buildSort(sortBy, sortDir, "codeGenerique", "nom");
-        Pageable pageable = PageRequest.of(page, size, sort);
-
-        Page<Produit> produitsPage = produitRepository.findProduitsByEntrepriseIdPaginated(entrepriseId, pageable);
-
         long totalProduitsUniques = produitRepository.countProduitsUniquesByEntrepriseId(entrepriseId);
         long totalBoutiques = produitRepository.countBoutiquesActivesByEntrepriseId(entrepriseId);
 
-        Map<String, ProduitDTO> produitsUniques = new HashMap<>();
+        List<String> codeGeneriquesPage = findCodeGeneriquesPage(produitRepository, entrepriseId, sortBy, sortDir, size, page * size);
 
-        for (Produit produit : produitsPage.getContent()) {
-            if (Boolean.TRUE.equals(produit.getDeleted())) continue;
+        List<ProduitDTO> produitsDTOs;
+        if (codeGeneriquesPage.isEmpty()) {
+            produitsDTOs = new ArrayList<>();
+        } else {
+            List<Produit> produits = produitRepository.findByEntrepriseIdAndCodeGeneriqueIn(entrepriseId, codeGeneriquesPage);
+            Map<String, ProduitDTO> produitsUniques = new HashMap<>();
 
-            Boutique boutique = produit.getBoutique();
-            if (boutique != null && boutique.isActif()) {
-                String codeGenerique = produit.getCodeGenerique();
+            for (Produit produit : produits) {
+                if (Boolean.TRUE.equals(produit.getDeleted())) continue;
 
-                ProduitDTO produitDTO = produitsUniques.computeIfAbsent(codeGenerique, k -> {
-                    ProduitDTO dto = convertToProduitDTO(produit);
-                    dto.setBoutiques(new ArrayList<>());
-                    dto.setQuantite(0);
-                    return dto;
-                });
+                Boutique boutique = produit.getBoutique();
+                if (boutique != null && boutique.isActif()) {
+                    String codeGenerique = produit.getCodeGenerique();
 
-                Map<String, Object> boutiqueInfo = new HashMap<>();
-                boutiqueInfo.put("nom", boutique.getNomBoutique());
-                boutiqueInfo.put("id", boutique.getId());
-                boutiqueInfo.put("typeBoutique", boutique.getTypeBoutique());
-                boutiqueInfo.put("quantite", produit.getQuantite());
+                    ProduitDTO produitDTO = produitsUniques.computeIfAbsent(codeGenerique, k -> {
+                        ProduitDTO dto = convertToProduitDTO(produit);
+                        dto.setBoutiques(new ArrayList<>());
+                        dto.setQuantite(0);
+                        return dto;
+                    });
 
-                produitDTO.getBoutiques().add(boutiqueInfo);
-                produitDTO.setQuantite(produitDTO.getQuantite() + produit.getQuantite());
+                    Map<String, Object> boutiqueInfo = new HashMap<>();
+                    boutiqueInfo.put("nom", boutique.getNomBoutique());
+                    boutiqueInfo.put("id", boutique.getId());
+                    boutiqueInfo.put("typeBoutique", boutique.getTypeBoutique());
+                    boutiqueInfo.put("quantite", produit.getQuantite());
+
+                    produitDTO.getBoutiques().add(boutiqueInfo);
+                    produitDTO.setQuantite(produitDTO.getQuantite() + produit.getQuantite());
+                }
+            }
+
+            // Conserver l'ordre de la page (codeGeneriques)
+            produitsDTOs = new ArrayList<>();
+            for (String code : codeGeneriquesPage) {
+                ProduitDTO dto = produitsUniques.get(code);
+                if (dto != null) {
+                    produitsDTOs.add(dto);
+                }
             }
         }
 
-        List<ProduitDTO> produitsDTOs = new ArrayList<>(produitsUniques.values());
+        Pageable pageable = PageRequest.of(page, size);
         Page<ProduitDTO> dtoPage = new PageImpl<>(
                 produitsDTOs,
                 pageable,

@@ -110,6 +110,12 @@ public class ComptabiliteService {
     private TransfertFondsService transfertFondsService;
 
     @Autowired
+    private TransfertFondsRepository transfertFondsRepository;
+
+    @Autowired
+    private ComptabilitePaginationRepository comptabilitePaginationRepository;
+
+    @Autowired
     private CategorieService categorieService;
 
     /**
@@ -2252,7 +2258,6 @@ public class ComptabiliteService {
      */
     @Transactional(readOnly = true)
     public ComptabiliteCompletePaginatedDTO getComptabiliteCompletePaginated(HttpServletRequest httpRequest, int page, int size) {
-        // Validation des paramètres de pagination
         if (page < 0) page = 0;
         if (size <= 0) size = 20;
         if (size > 100) size = 100; 
@@ -2265,191 +2270,84 @@ public class ComptabiliteService {
         List<CategorieDepenseDTO> categoriesDepense = listerCategoriesDepense(httpRequest);
         List<CategorieResponseDTO> categoriesEntree = categorieService.getAllCategoriesWithProduitCount(httpRequest);
         TransactionSummaryDTO transactionSummary = transactionSummaryService.getTransactionSummary(httpRequest);
-       
-        int limitParType = Math.max((page + 1) * size, 1000);
+        transactionSummary.setTransactions(Collections.emptyList());
 
+        // Pagination scalable : requêtes dans le repository (UNION + LIMIT/OFFSET côté base)
+        long totalElements = comptabilitePaginationRepository.countTransactions(entrepriseId);
+        int totalPages = size > 0 ? (int) Math.ceil((double) totalElements / size) : 0;
+        List<Object[]> rows = comptabilitePaginationRepository.findTransactionPage(entrepriseId, size, page * size);
 
-        List<DepenseGeneraleResponseDTO> depensesGenerales = listerDepensesGenerales(httpRequest).stream()
-                .filter(d -> !estDepenseDeTransfert(d.getDesignation()))
-                .sorted((a, b) -> {
-                    LocalDateTime dateA = a.getDateCreation();
-                    LocalDateTime dateB = b.getDateCreation();
-                    if (dateA == null && dateB == null) return 0;
-                    if (dateA == null) return 1;
-                    if (dateB == null) return -1;
-                    return dateB.compareTo(dateA);
-                })
-                .limit(limitParType)
-                .collect(Collectors.toList());
-
-        List<EntreeGeneraleResponseDTO> entreesGenerales = listerEntreesGenerales(httpRequest).stream()
-                .filter(e -> !estEntreeDeTransfert(e.getDesignation()))
-                .filter(e -> !estEntreeDePaiementFacture(e.getDetteType()))
-                .sorted((a, b) -> {
-                    LocalDateTime dateA = a.getDateCreation();
-                    LocalDateTime dateB = b.getDateCreation();
-                    if (dateA == null && dateB == null) return 0;
-                    if (dateA == null) return 1;
-                    if (dateB == null) return -1;
-                    return dateB.compareTo(dateA);
-                })
-                .limit(limitParType)
-                .collect(Collectors.toList());
-
-        List<Vente> toutesVentesCaissesFermees = venteRepository.findByEntrepriseIdAndCaisseFermee(entrepriseId);
-        
-        Map<Long, List<Vente>> ventesParCaisse = toutesVentesCaissesFermees.stream()
-                .filter(v -> v.getCaisse() != null)
-                .collect(Collectors.groupingBy(v -> v.getCaisse().getId()));
-        
-        List<Caisse> caissesFermees = caisseRepository.findByEntrepriseIdAndStatut(entrepriseId, StatutCaisse.FERMEE);
-        
-        List<FermetureCaisseResponseDTO> fermeturesCaissesDTO = caissesFermees.stream()
-                .filter(c -> ventesParCaisse.containsKey(c.getId()) && !ventesParCaisse.get(c.getId()).isEmpty())
-                .sorted((a, b) -> {
-                    LocalDateTime dateA = a.getDateFermeture();
-                    LocalDateTime dateB = b.getDateFermeture();
-                    if (dateA == null && dateB == null) return 0;
-                    if (dateA == null) return 1;
-                    if (dateB == null) return -1;
-                    return dateB.compareTo(dateA);
-                })
-                .limit(limitParType)
-                .map(caisse -> {
-                    List<Vente> ventesDeLaCaisse = ventesParCaisse.get(caisse.getId());
-                    return mapCaisseFermeeToResponse(caisse, ventesDeLaCaisse, entrepriseId);
-                })
-                .collect(Collectors.toList());
-
-        List<Paiement> paiements = paiementRepository.findByEntrepriseId(entrepriseId).stream()
-                .sorted((a, b) -> {
-                    LocalDateTime dateA = a.getDatePaiement();
-                    LocalDateTime dateB = b.getDatePaiement();
-                    if (dateA == null && dateB == null) return 0;
-                    if (dateA == null) return 1;
-                    if (dateB == null) return -1;
-                    return dateB.compareTo(dateA);
-                })
-                .limit(limitParType)
-                .collect(Collectors.toList());
-        List<PaiementDTO> paiementsDTO = paiements.stream()
-                .map(p -> {
-                    PaiementDTO dto = new PaiementDTO(p);
-                    dto.setTypeTransaction("PAIEMENT_FACTURE");
-                    
-                    if (p.getFactureReelle() != null) {
-                        FactureReelle facture = p.getFactureReelle();
-                        
-                        if (facture.getLignesFacture() != null) {
-                            org.hibernate.Hibernate.initialize(facture.getLignesFacture());
-                        }
-                        
-                        dto.setNumeroFacture(facture.getNumeroFacture());
-                        
-                        String objetFacture = facture.getDescription() != null && !facture.getDescription().trim().isEmpty() 
-                            ? facture.getDescription() 
-                            : null;
-                        dto.setObjet(objetFacture);
-                        
-                        if (facture.getLignesFacture() != null && !facture.getLignesFacture().isEmpty()) {
-                            List<LigneFactureDTO> lignesDTO = facture.getLignesFacture().stream()
-                                    .map(LigneFactureDTO::new)
-                                    .collect(Collectors.toList());
-                            dto.setLignesFacture(lignesDTO);
-                        } else {
-                            dto.setLignesFacture(new ArrayList<>());
-                        }
-                        
-                        String description = "Paiement facture " + facture.getNumeroFacture();
-                        
-                        if (objetFacture != null) {
-                            description += " - " + objetFacture;
-                        }
-                        
-                        String statutFacture = facture.getStatutPaiement() != null ? facture.getStatutPaiement().name() : "INCONNU";
-                        if ("PARTIELLEMENT_PAYEE".equals(statutFacture)) {
-                            java.math.BigDecimal totalPaye = paiementRepository.sumMontantsByFactureReelle(facture.getId());
-                            if (totalPaye == null) totalPaye = java.math.BigDecimal.ZERO;
-                            double montantRestant = facture.getTotalFacture() - totalPaye.doubleValue();
-                            description += " (Montant restant: " + montantRestant + ")";
-                        }
-                        
-                        dto.setDescription(description);
-                        dto.setStatut(statutFacture);
-                        dto.setOrigine("FACTURATION");
-                        
-                        // Informations de remise et TVA
-                        dto.setRemise(Math.round(facture.getRemise() * 100.0) / 100.0);
-                        dto.setTauxRemise(facture.getTauxRemise() != null ? Math.round(facture.getTauxRemise() * 100.0) / 100.0 : null);
-                        dto.setTva(facture.isTva());
-                        dto.setTotalHT(facture.getTotalHT());
-                        dto.setTotalTTC(facture.getTotalFacture());
-                        
-                        // Informations client
-                        if (facture.getClient() != null) {
-                            dto.setClientNom(facture.getClient().getNomComplet());
-                            dto.setClientContact(facture.getClient().getTelephone());
-                        } else if (facture.getEntrepriseClient() != null) {
-                            dto.setClientNom(facture.getEntrepriseClient().getNom());
-                            dto.setClientContact(facture.getEntrepriseClient().getTelephone());
-                        }
-                    } else {
-                        dto.setDescription("Paiement sans facture associée");
-                        dto.setObjet(null);
-                        dto.setNumeroFacture(null);
-                        dto.setStatut("INCONNU");
-                        dto.setOrigine("FACTURATION");
-                        dto.setLignesFacture(new ArrayList<>());
-                    }
-                    
-                    return dto;
-                })
-                .collect(Collectors.toList());
-
-        // Récupérer les transferts de fonds et créer deux transactions  (SORTIE et ENTREE)
-        List<TransfertFondsResponseDTO> transfertsFondsBruts = transfertFondsService.listerTransferts(httpRequest).stream()
-                .sorted((a, b) -> {
-                    LocalDateTime dateA = a.getDateTransfert();
-                    LocalDateTime dateB = b.getDateTransfert();
-                    if (dateA == null && dateB == null) return 0;
-                    if (dateA == null) return 1;
-                    if (dateB == null) return -1;
-                    return dateB.compareTo(dateA);
-                })
-                .limit(limitParType)
-                .collect(Collectors.toList());
-        
-        List<TransfertFondsResponseDTO> transfertsFonds = new ArrayList<>();
-        for (TransfertFondsResponseDTO transfert : transfertsFondsBruts) {
-            TransfertFondsResponseDTO sortie = creerTransactionTransfert(transfert, "SORTIE", transfert.getDe());
-            transfertsFonds.add(sortie);
-            
-            // Transaction ENTREE (vers la destination)
-            TransfertFondsResponseDTO entree = creerTransactionTransfert(transfert, "ENTREE", transfert.getVers());
-            transfertsFonds.add(entree);
+        List<Long> depenseIds = new ArrayList<>(), entreeIds = new ArrayList<>(), fermetureIds = new ArrayList<>(), paiementIds = new ArrayList<>();
+        List<Long> transfertIds = new ArrayList<>();
+        List<Object[]> orderedRows = new ArrayList<>();
+        for (Object[] row : rows) {
+            String typ = row[1] != null ? row[1].toString() : "";
+            Long eid = row[2] != null ? ((Number) row[2]).longValue() : null;
+            if (eid == null) continue;
+            orderedRows.add(row);
+            switch (typ) {
+                case "DEPENSE" -> depenseIds.add(eid);
+                case "ENTREE" -> entreeIds.add(eid);
+                case "FERMETURE_CAISSE" -> fermetureIds.add(eid);
+                case "PAIEMENT" -> paiementIds.add(eid);
+                case "TRANSFERT_SORTIE", "TRANSFERT_ENTREE" -> transfertIds.add(eid);
+                default -> {}
+            }
         }
 
-        List<Object> toutesTransactions = new ArrayList<>();
-        toutesTransactions.addAll(depensesGenerales);
-        toutesTransactions.addAll(entreesGenerales);
-        toutesTransactions.addAll(fermeturesCaissesDTO);
-        toutesTransactions.addAll(paiementsDTO);
-        toutesTransactions.addAll(transfertsFonds);
+        Map<Long, DepenseGeneraleResponseDTO> depensesMap = new HashMap<>();
+        if (!depenseIds.isEmpty()) {
+            for (DepenseGenerale d : depenseGeneraleRepository.findByIdInWithDetails(depenseIds))
+                depensesMap.put(d.getId(), mapDepenseGeneraleToResponse(d));
+        }
+        Map<Long, EntreeGeneraleResponseDTO> entreesMap = new HashMap<>();
+        if (!entreeIds.isEmpty()) {
+            for (EntreeGenerale e : entreeGeneraleRepository.findByIdInWithDetails(entreeIds))
+                entreesMap.put(e.getId(), mapEntreeGeneraleToResponse(e));
+        }
+        Map<Long, FermetureCaisseResponseDTO> fermeturesMap = new HashMap<>();
+        if (!fermetureIds.isEmpty()) {
+            List<Caisse> caisses = caisseRepository.findAllById(fermetureIds);
+            List<Vente> ventesCaisses = venteRepository.findByCaisse_IdIn(fermetureIds);
+            Map<Long, List<Vente>> ventesParCaisse = ventesCaisses.stream().filter(v -> v.getCaisse() != null).collect(Collectors.groupingBy(v -> v.getCaisse().getId()));
+            for (Caisse c : caisses) {
+                List<Vente> ventes = ventesParCaisse.getOrDefault(c.getId(), Collections.emptyList());
+                fermeturesMap.put(c.getId(), mapCaisseFermeeToResponse(c, ventes, entrepriseId));
+            }
+        }
+        Map<Long, PaiementDTO> paiementsMap = new HashMap<>();
+        if (!paiementIds.isEmpty()) {
+            for (Paiement p : paiementRepository.findAllById(paiementIds))
+                paiementsMap.put(p.getId(), mapPaiementToDTO(p));
+        }
+        Map<Long, TransfertFondsResponseDTO> transfertsMap = new HashMap<>();
+        if (!transfertIds.isEmpty()) {
+            for (TransfertFonds t : transfertFondsRepository.findAllByIdWithDetails(transfertIds))
+                transfertsMap.put(t.getId(), transfertFondsService.toResponseDTO(t));
+        }
 
-        toutesTransactions.sort((a, b) -> {
-            LocalDateTime dateA = getDateFromTransaction(a);
-            LocalDateTime dateB = getDateFromTransaction(b);
-            if (dateA == null && dateB == null) return 0;
-            if (dateA == null) return 1;
-            if (dateB == null) return -1;
-            return dateB.compareTo(dateA);
-        });
-
-        int totalElements = toutesTransactions.size();
-        int totalPages = (int) Math.ceil((double) totalElements / size);
-        int start = page * size;
-        int end = Math.min(start + size, totalElements);
-        List<Object> transactionsPage = start < totalElements ? toutesTransactions.subList(start, end) : new ArrayList<>();
+        List<Object> transactionsPage = new ArrayList<>();
+        for (Object[] row : orderedRows) {
+            String typ = row[1] != null ? row[1].toString() : "";
+            Long id = row[2] != null ? ((Number) row[2]).longValue() : null;
+            if (id == null) continue;
+            Object dto = switch (typ) {
+                case "DEPENSE" -> depensesMap.get(id);
+                case "ENTREE" -> entreesMap.get(id);
+                case "FERMETURE_CAISSE" -> fermeturesMap.get(id);
+                case "PAIEMENT" -> paiementsMap.get(id);
+                case "TRANSFERT_SORTIE" -> {
+                    TransfertFondsResponseDTO tf = transfertsMap.get(id);
+                    yield tf != null ? creerTransactionTransfert(tf, "SORTIE", tf.getDe()) : null;
+                }
+                case "TRANSFERT_ENTREE" -> {
+                    TransfertFondsResponseDTO tf = transfertsMap.get(id);
+                    yield tf != null ? creerTransactionTransfert(tf, "ENTREE", tf.getVers()) : null;
+                }
+                default -> null;
+            };
+            if (dto != null) transactionsPage.add(dto);
+        }
 
         ComptabiliteCompletePaginatedDTO result = new ComptabiliteCompletePaginatedDTO();
         result.setTransactions(transactionsPage);
@@ -2458,14 +2356,50 @@ public class ComptabiliteService {
         result.setTransactionSummary(transactionSummary);
         result.setPageNumber(page);
         result.setPageSize(size);
-        result.setTotalElements(totalElements);
+        result.setTotalElements((int) totalElements);
         result.setTotalPages(totalPages);
         result.setHasNext(page < totalPages - 1);
         result.setHasPrevious(page > 0);
         result.setFirst(page == 0);
         result.setLast(page >= totalPages - 1);
-
         return result;
+    }
+
+    private PaiementDTO mapPaiementToDTO(Paiement p) {
+        PaiementDTO dto = new PaiementDTO(p);
+        dto.setTypeTransaction("PAIEMENT_FACTURE");
+        if (p.getFactureReelle() != null) {
+            FactureReelle facture = p.getFactureReelle();
+            if (facture.getLignesFacture() != null) org.hibernate.Hibernate.initialize(facture.getLignesFacture());
+            dto.setNumeroFacture(facture.getNumeroFacture());
+            String objetFacture = facture.getDescription() != null && !facture.getDescription().trim().isEmpty() ? facture.getDescription() : null;
+            dto.setObjet(objetFacture);
+            if (facture.getLignesFacture() != null && !facture.getLignesFacture().isEmpty())
+                dto.setLignesFacture(facture.getLignesFacture().stream().map(LigneFactureDTO::new).collect(Collectors.toList()));
+            else dto.setLignesFacture(new ArrayList<>());
+            String description = "Paiement facture " + facture.getNumeroFacture();
+            if (objetFacture != null) description += " - " + objetFacture;
+            String statutFacture = facture.getStatutPaiement() != null ? facture.getStatutPaiement().name() : "INCONNU";
+            if ("PARTIELLEMENT_PAYEE".equals(statutFacture)) {
+                java.math.BigDecimal totalPaye = paiementRepository.sumMontantsByFactureReelle(facture.getId());
+                if (totalPaye == null) totalPaye = java.math.BigDecimal.ZERO;
+                description += " (Montant restant: " + (facture.getTotalFacture() - totalPaye.doubleValue()) + ")";
+            }
+            dto.setDescription(description);
+            dto.setStatut(statutFacture);
+            dto.setOrigine("FACTURATION");
+            dto.setRemise(Math.round(facture.getRemise() * 100.0) / 100.0);
+            dto.setTauxRemise(facture.getTauxRemise() != null ? Math.round(facture.getTauxRemise() * 100.0) / 100.0 : null);
+            dto.setTva(facture.isTva());
+            dto.setTotalHT(facture.getTotalHT());
+            dto.setTotalTTC(facture.getTotalFacture());
+            if (facture.getClient() != null) { dto.setClientNom(facture.getClient().getNomComplet()); dto.setClientContact(facture.getClient().getTelephone()); }
+            else if (facture.getEntrepriseClient() != null) { dto.setClientNom(facture.getEntrepriseClient().getNom()); dto.setClientContact(facture.getEntrepriseClient().getTelephone()); }
+        } else {
+            dto.setDescription("Paiement sans facture associée");
+            dto.setObjet(null); dto.setNumeroFacture(null); dto.setStatut("INCONNU"); dto.setOrigine("FACTURATION"); dto.setLignesFacture(new ArrayList<>());
+        }
+        return dto;
     }
 
     private LocalDateTime getDateFromTransaction(Object transaction) {

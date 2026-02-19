@@ -206,4 +206,11 @@ public interface FactureReelleRepository extends JpaRepository<FactureReelle, Lo
             @Param("dateDebut") LocalDate dateDebut,
             @Param("dateFin") LocalDate dateFin);
 
+    /** Pour pagination dettes détaillées : charger factures par IDs avec client / entrepriseClient. */
+    @Query("SELECT DISTINCT f FROM FactureReelle f " +
+           "LEFT JOIN FETCH f.client " +
+           "LEFT JOIN FETCH f.entrepriseClient " +
+           "WHERE f.id IN :ids")
+    List<FactureReelle> findByIdInWithDetailsForDettes(@Param("ids") List<Long> ids);
+
 }

@@ -14,16 +14,18 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 public class SuperAdminEntrepriseListDTO {
 
-    private Long id;                 // numéro de l'entreprise
-    private String nom;              // nom de l'entreprise
-    private LocalDateTime createdAt; // date de création
-    private String pays;             // pays
-    private String secteur;          // secteur
-    private String adminId;         // id de ladmin
-    private String adminNom;         // nom complet de l'admin
-    private String adminPhone;       // téléphone de l'admin
-    private String adminEmail;       // email de l'admin
-    private long nombreUtilisateursEntreprise; // nombre de personnes dans l'entreprise
+    private Long id;
+    private String nom;
+    private Boolean active;
+    private LocalDateTime createdAt;
+    private String pays;
+    private String secteur;
+    private String adminId;
+    private String adminNom;
+    private String adminPhone;
+    private String adminEmail;
+    private long nombreUtilisateursEntreprise;
+    private LocalDateTime derniereConnexion;
 }
 
 

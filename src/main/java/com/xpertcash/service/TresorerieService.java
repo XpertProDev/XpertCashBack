@@ -63,6 +63,9 @@ public class TresorerieService {
     @Autowired
     private FactureVenteRepository factureVenteRepository;
 
+    @Autowired
+    private TresorerieDettesDetailleesRepository tresorerieDettesDetailleesRepository;
+
      // Calcule la trésorerie complète de l'entreprise de l'utilisateur connecté.
     @Transactional(readOnly = true)
     public TresorerieDTO calculerTresorerie(HttpServletRequest request) {
@@ -70,13 +73,9 @@ public class TresorerieService {
         return calculerTresorerieParEntrepriseId(entrepriseId);
     }
 
-    /**
-     * Calcule la trésorerie avec filtrage par période.
-     * @param request Requête HTTP
-     * @param periode Type de période : "aujourdhui", "hier", "semaine", "mois", "annee", "personnalise"
-     * @param dateDebut Date de début (requis si periode = "personnalise")
-     * @param dateFin Date de fin (requis si periode = "personnalise")
-     * @return TresorerieDTO avec les données filtrées par période
+    /*
+        Calcule la trésorerie avec filtrage par période.
+        periode Type de période : "aujourdhui", "hier", "semaine", "mois", "annee", "personnalise"
      */
     @Transactional(readOnly = true)
     public TresorerieDTO calculerTresorerie(HttpServletRequest request, String periode, LocalDate dateDebut, LocalDate dateFin) {
@@ -198,355 +197,278 @@ public class TresorerieService {
             return tresorerie;
     }
 
-     // Récupère la liste paginée des dettes (factures impayées, ventes à crédit, dépenses en DETTE)
-    
+     /* Récupère la liste paginée des dettes (factures impayées, ventes à crédit, dépenses en DETTE). Pagination côté base (scalable).
+        afficher dans Compta front */
     @Transactional(readOnly = true)
     public PaginatedResponseDTO<DetteItemDTO> getDettesDetaillees(HttpServletRequest request, int page, int size) {
         Long entrepriseId = validerEntrepriseEtPermissions(request);
-        
-        TresorerieData data = chargerDonnees(entrepriseId);
+        if (page < 0) page = 0;
+        if (size <= 0) size = 20;
+        if (size > 100) size = 100;
 
-        java.util.List<DetteItemDTO> items = new java.util.ArrayList<>();
+        long totalElements = tresorerieDettesDetailleesRepository.countDettesDetaillees(entrepriseId);
+        int totalPages = size > 0 ? (int) Math.ceil((double) totalElements / size) : 0;
+        List<Object[]> rows = tresorerieDettesDetailleesRepository.findDettesDetailleesPage(entrepriseId, size, page * size);
 
-        for (FactureReelle facture : data.factures) {
-            BigDecimal totalPaye = data.paiementsParFacture.getOrDefault(facture.getId(), BigDecimal.ZERO);
-            double montantRestant = facture.getTotalFacture() - totalPaye.doubleValue();
-
-            if (montantRestant > 0) {
-                DetteItemDTO dto = new DetteItemDTO();
-                dto.setId(facture.getId());
-                dto.setType("FACTURE_IMPAYEE");
-                // Montant de départ = total facture
-                dto.setMontantInitial(facture.getTotalFacture());
-                dto.setMontantRestant(montantRestant);
-                dto.setDate(facture.getDateCreationPro() != null
-                        ? facture.getDateCreationPro()
-                        : (facture.getDateCreation() != null ? facture.getDateCreation().atStartOfDay() : null));
-                dto.setDescription(facture.getDescription());
-                dto.setNumero(facture.getNumeroFacture());
-
-                if (facture.getClient() != null) {
-                    dto.setClient(facture.getClient().getNomComplet());
-                    dto.setContact(facture.getClient().getTelephone());
-                } else if (facture.getEntrepriseClient() != null) {
-                    dto.setClient(facture.getEntrepriseClient().getNom());
-                    dto.setContact(facture.getEntrepriseClient().getTelephone());
-                }
-
-                items.add(dto);
+        java.util.List<Long> factureIds = new java.util.ArrayList<>();
+        java.util.List<Long> depenseIds = new java.util.ArrayList<>();
+        java.util.List<Long> entreeIds = new java.util.ArrayList<>();
+        java.util.List<Long> venteIds = new java.util.ArrayList<>();
+        for (Object[] row : rows) {
+            String typ = row[1] != null ? row[1].toString() : "";
+            Long eid = row[2] != null ? ((Number) row[2]).longValue() : null;
+            if (eid == null) continue;
+            switch (typ) {
+                case "FACTURE_IMPAYEE" -> factureIds.add(eid);
+                case "DEPENSE_DETTE" -> depenseIds.add(eid);
+                case "ENTREE_DETTE" -> entreeIds.add(eid);
+                case "VENTE_CREDIT" -> venteIds.add(eid);
+                default -> {}
             }
         }
 
-        //  Dépenses générales avec source DETTE (filtrées par entreprise via chargerDonnees)
-        List<DepenseGenerale> depensesDette = data.depensesGenerales.stream()
-                .filter(d -> d.getSource() == SourceDepense.DETTE)
-                .collect(Collectors.toList());
-
-        for (DepenseGenerale depense : depensesDette) {
-            DetteItemDTO dto = new DetteItemDTO();
-            dto.setId(depense.getId());
-            dto.setType("DEPENSE_DETTE");
-            Double montant = getValeurDouble(depense.getMontant());
-            dto.setMontantInitial(montant);
-            dto.setMontantRestant(montant);
-            dto.setDate(depense.getDateCreation());
-            dto.setDescription(depense.getDesignation());
-            dto.setNumero(depense.getNumero());
-
-            if (depense.getFournisseur() != null) {
-                dto.setClient(depense.getFournisseur().getNomComplet());
-                dto.setContact(depense.getFournisseur().getTelephone());
-            }
-
-            items.add(dto);
+        java.util.Map<Long, FactureReelle> facturesMap = new java.util.HashMap<>();
+        if (!factureIds.isEmpty()) {
+            for (FactureReelle f : factureReelleRepository.findByIdInWithDetailsForDettes(factureIds))
+                facturesMap.put(f.getId(), f);
+        }
+        java.util.Map<Long, DepenseGenerale> depensesMap = new java.util.HashMap<>();
+        if (!depenseIds.isEmpty()) {
+            for (DepenseGenerale d : depenseGeneraleRepository.findByIdInWithDetails(depenseIds))
+                depensesMap.put(d.getId(), d);
+        }
+        java.util.Map<Long, EntreeGenerale> entreesMap = new java.util.HashMap<>();
+        if (!entreeIds.isEmpty()) {
+            for (EntreeGenerale e : entreeGeneraleRepository.findByIdInWithDetails(entreeIds))
+                entreesMap.put(e.getId(), e);
+        }
+        java.util.Map<Long, Vente> ventesMap = new java.util.HashMap<>();
+        if (!venteIds.isEmpty()) {
+            for (Vente v : venteRepository.findByIdInWithDetailsForDettes(venteIds))
+                ventesMap.put(v.getId(), v);
         }
 
-     
-        List<EntreeGenerale> entreesDette = data.entreesGenerales.stream()
-                .filter(e -> e.getSource() == SourceDepense.DETTE)
-                .filter(e -> e.getDetteType() == null || !"PAIEMENT_FACTURE".equals(e.getDetteType()))
-                .collect(Collectors.toList());
-
-        for (EntreeGenerale entree : entreesDette) {
-            DetteItemDTO dto = new DetteItemDTO();
-            dto.setId(entree.getId());
-            dto.setType("ENTREE_DETTE");
-            Double montantInitial = getValeurDouble(entree.getMontant());
-            Double montantRestant = entree.getMontantReste() != null
-                    ? getValeurDouble(entree.getMontantReste())
-                    : montantInitial;
-            dto.setMontantInitial(montantInitial);
-            dto.setMontantRestant(montantRestant);
-            dto.setDate(entree.getDateCreation());
-            dto.setDescription(entree.getDesignation());
-            dto.setNumero(entree.getNumero());
-
-            if (entree.getResponsable() != null) {
-                dto.setResponsable(entree.getResponsable().getNomComplet());
-                dto.setResponsableContact(entree.getResponsable().getPhone());
-            }
-
-            items.add(dto);
+        java.util.List<DetteItemDTO> pageContent = new java.util.ArrayList<>();
+        for (Object[] row : rows) {
+            String typ = row[1] != null ? row[1].toString() : "";
+            Long id = row[2] != null ? ((Number) row[2]).longValue() : null;
+            if (id == null) continue;
+            DetteItemDTO dto = switch (typ) {
+                case "FACTURE_IMPAYEE" -> mapFactureToDetteItemDTO(facturesMap.get(id));
+                case "DEPENSE_DETTE" -> mapDepenseToDetteItemDTO(depensesMap.get(id));
+                case "ENTREE_DETTE" -> mapEntreeToDetteItemDTO(entreesMap.get(id));
+                case "VENTE_CREDIT" -> mapVenteToDetteItemDTO(ventesMap.get(id));
+                default -> null;
+            };
+            if (dto != null) pageContent.add(dto);
         }
-
-      
-        // Filtrer uniquement les ventes à crédit des caisses fermées
-        // data.toutesVentes contient déjà uniquement les ventes des caisses fermées
-        List<Vente> ventesCredit = data.toutesVentes.stream()
-                .filter(v -> v.getModePaiement() == ModePaiement.CREDIT)
-                .collect(Collectors.toList());
-        
-        for (Vente v : ventesCredit) {
-            double total = getValeurDouble(v.getMontantTotal());
-            double rembourse = getValeurDouble(v.getMontantTotalRembourse());
-            double restant = total - rembourse;
-            if (restant <= 0) {
-                continue;
-            }
-
-            DetteItemDTO dto = new DetteItemDTO();
-            dto.setId(v.getId());
-            dto.setType("VENTE_CREDIT");
-            dto.setMontantInitial(total);
-            dto.setMontantRestant(restant);
-            dto.setDate(v.getDateVente());
-            dto.setDescription(v.getDescription());
-            double remiseGlobaleVal = v.getRemiseGlobale() != null ? v.getRemiseGlobale() : 0.0;
-            dto.setRemiseGlobale(remiseGlobaleVal);
-            dto.setVendeurId(v.getVendeur() != null ? v.getVendeur().getId() : null);
-            dto.setVendeurNom(v.getVendeur() != null ? v.getVendeur().getNomComplet() : null);
-            dto.setBoutiqueId(v.getBoutique() != null ? v.getBoutique().getId() : null);
-            dto.setBoutiqueNom(v.getBoutique() != null ? v.getBoutique().getNomBoutique() : null);
-            Long venteEntrepriseId = v.getBoutique() != null && v.getBoutique().getEntreprise() != null 
-                    ? v.getBoutique().getEntreprise().getId() : null;
-            if (venteEntrepriseId != null) {
-                factureVenteRepository.findByVenteIdAndEntrepriseId(v.getId(), venteEntrepriseId)
-                    .ifPresent(f -> dto.setNumero(f.getNumeroFacture()));
-            }
-            if (v.getClient() != null) {
-                dto.setClient(v.getClient().getNomComplet());
-                dto.setContact(v.getClient().getTelephone());
-            } else if (v.getEntrepriseClient() != null) {
-                dto.setClient(v.getEntrepriseClient().getNom());
-                dto.setContact(v.getEntrepriseClient().getTelephone());
-            } else {
-                dto.setClient(v.getClientNom());
-                dto.setContact(v.getClientNumero());
-            }
-
-            // Détail des produits vendus (dettes POS)
-            if (v.getProduits() != null && !v.getProduits().isEmpty()) {
-                java.util.List<DetteItemDTO.LigneProduitDetteDTO> lignes = v.getProduits().stream()
-                        .map(vp -> {
-                            DetteItemDTO.LigneProduitDetteDTO ligne = new DetteItemDTO.LigneProduitDetteDTO();
-                            ligne.setProduitId(vp.getProduit() != null ? vp.getProduit().getId() : null);
-                            ligne.setNomProduit(vp.getProduit() != null ? vp.getProduit().getNom() : null);
-                            ligne.setQuantite(vp.getQuantite());
-                            ligne.setPrixUnitaire(vp.getPrixUnitaire());
-                            ligne.setRemise(vp.getRemise());
-                            ligne.setMontantLigne(vp.getMontantLigne());
-                            return ligne;
-                        })
-                        .collect(Collectors.toList());
-                dto.setProduits(lignes);
-                if (remiseGlobaleVal > 0) {
-                    dto.setTypeRemise("GLOBALE");
-                } else if (lignes.stream().anyMatch(l -> l.getRemise() != null && l.getRemise() > 0)) {
-                    dto.setTypeRemise("PAR_LIGNE");
-                    dto.setRemiseGlobale(0.0);
-                } else {
-                    dto.setTypeRemise(null);
-                }
-            } else {
-                dto.setProduits(java.util.Collections.emptyList());
-                dto.setTypeRemise(remiseGlobaleVal > 0 ? "GLOBALE" : null);
-            }
-
-            items.add(dto);
-        }
-
-        items.sort((a, b) -> {
-            if (a.getDate() == null && b.getDate() == null) return 0;
-            if (a.getDate() == null) return 1;
-            if (b.getDate() == null) return -1;
-            return b.getDate().compareTo(a.getDate());
-        });
-
-        int totalElements = items.size();
-        int totalPages = (int) Math.ceil((double) totalElements / size);
-        int fromIndex = page * size;
-        int toIndex = Math.min(fromIndex + size, totalElements);
-
-        java.util.List<DetteItemDTO> pageContent =
-                (fromIndex >= totalElements) ? java.util.Collections.emptyList() : items.subList(fromIndex, toIndex);
 
         PaginatedResponseDTO<DetteItemDTO> response = new PaginatedResponseDTO<>();
         response.setContent(pageContent);
         response.setPageNumber(page);
         response.setPageSize(size);
-        response.setTotalElements(totalElements);
+        response.setTotalElements((int) totalElements);
         response.setTotalPages(totalPages);
         response.setHasNext(page < totalPages - 1);
         response.setHasPrevious(page > 0);
         response.setFirst(page == 0);
         response.setLast(page >= totalPages - 1 || totalPages == 0);
-
         return response;
     }
 
-  
-     // Récupère uniquement les dettes issues du POS (ventes à crédit).
+    private DetteItemDTO mapFactureToDetteItemDTO(FactureReelle facture) {
+        if (facture == null) return null;
+        BigDecimal totalPaye = paiementRepository.sumMontantsByFactureReelle(facture.getId());
+        if (totalPaye == null) totalPaye = BigDecimal.ZERO;
+        double montantRestant = facture.getTotalFacture() - totalPaye.doubleValue();
+        if (montantRestant <= 0) return null;
+        DetteItemDTO dto = new DetteItemDTO();
+        dto.setId(facture.getId());
+        dto.setType("FACTURE_IMPAYEE");
+        dto.setMontantInitial(facture.getTotalFacture());
+        dto.setMontantRestant(montantRestant);
+        dto.setDate(facture.getDateCreationPro() != null ? facture.getDateCreationPro()
+                : (facture.getDateCreation() != null ? facture.getDateCreation().atStartOfDay() : null));
+        dto.setDescription(facture.getDescription());
+        dto.setNumero(facture.getNumeroFacture());
+        if (facture.getClient() != null) {
+            dto.setClient(facture.getClient().getNomComplet());
+            dto.setContact(facture.getClient().getTelephone());
+        } else if (facture.getEntrepriseClient() != null) {
+            dto.setClient(facture.getEntrepriseClient().getNom());
+            dto.setContact(facture.getEntrepriseClient().getTelephone());
+        }
+        return dto;
+    }
+
+    private DetteItemDTO mapDepenseToDetteItemDTO(DepenseGenerale depense) {
+        if (depense == null) return null;
+        DetteItemDTO dto = new DetteItemDTO();
+        dto.setId(depense.getId());
+        dto.setType("DEPENSE_DETTE");
+        Double montant = getValeurDouble(depense.getMontant());
+        dto.setMontantInitial(montant);
+        dto.setMontantRestant(montant);
+        dto.setDate(depense.getDateCreation());
+        dto.setDescription(depense.getDesignation());
+        dto.setNumero(depense.getNumero());
+        if (depense.getFournisseur() != null) {
+            dto.setClient(depense.getFournisseur().getNomComplet());
+            dto.setContact(depense.getFournisseur().getTelephone());
+        }
+        return dto;
+    }
+
+    private DetteItemDTO mapEntreeToDetteItemDTO(EntreeGenerale entree) {
+        if (entree == null) return null;
+        DetteItemDTO dto = new DetteItemDTO();
+        dto.setId(entree.getId());
+        dto.setType("ENTREE_DETTE");
+        Double montantInitial = getValeurDouble(entree.getMontant());
+        Double montantRestant = entree.getMontantReste() != null ? getValeurDouble(entree.getMontantReste()) : montantInitial;
+        dto.setMontantInitial(montantInitial);
+        dto.setMontantRestant(montantRestant);
+        dto.setDate(entree.getDateCreation());
+        dto.setDescription(entree.getDesignation());
+        dto.setNumero(entree.getNumero());
+        if (entree.getResponsable() != null) {
+            dto.setResponsable(entree.getResponsable().getNomComplet());
+            dto.setResponsableContact(entree.getResponsable().getPhone());
+        }
+        return dto;
+    }
+
+    /** Délègue au bon findDettesPosIds* de VenteRepository selon sortBy/sortDir (whitelisté). */
+    private List<Long> findDettesPosIds(VenteRepository repo, Long entrepriseId, LocalDateTime dateDebut, LocalDateTime dateFin,
+                                       Long vendeurId, Long boutiqueId, String sortBy, String sortDir, int limit, int offset) {
+        String sb = sortBy != null ? sortBy.toLowerCase() : "date";
+        boolean desc = "desc".equalsIgnoreCase(sortDir != null ? sortDir : "desc");
+        return switch (sb) {
+            case "vendeur" -> desc ? repo.findDettesPosIdsOrderByVendeurDesc(entrepriseId, dateDebut, dateFin, vendeurId, boutiqueId, limit, offset)
+                    : repo.findDettesPosIdsOrderByVendeurAsc(entrepriseId, dateDebut, dateFin, vendeurId, boutiqueId, limit, offset);
+            case "boutique", "boutiquenom" -> desc ? repo.findDettesPosIdsOrderByBoutiqueDesc(entrepriseId, dateDebut, dateFin, vendeurId, boutiqueId, limit, offset)
+                    : repo.findDettesPosIdsOrderByBoutiqueAsc(entrepriseId, dateDebut, dateFin, vendeurId, boutiqueId, limit, offset);
+            case "montantrestant", "montant" -> desc ? repo.findDettesPosIdsOrderByMontantDesc(entrepriseId, dateDebut, dateFin, vendeurId, boutiqueId, limit, offset)
+                    : repo.findDettesPosIdsOrderByMontantAsc(entrepriseId, dateDebut, dateFin, vendeurId, boutiqueId, limit, offset);
+            default -> desc ? repo.findDettesPosIdsOrderByDateDesc(entrepriseId, dateDebut, dateFin, vendeurId, boutiqueId, limit, offset)
+                    : repo.findDettesPosIdsOrderByDateAsc(entrepriseId, dateDebut, dateFin, vendeurId, boutiqueId, limit, offset);
+        };
+    }
+
+     // Récupère uniquement les dettes issues du POS (ventes à crédit). Pagination côté base (scalable).
     
     @Transactional(readOnly = true)
     public PaginatedResponseDTO<DetteItemDTO> getDettesPos(HttpServletRequest request, int page, int size,
             String periode, LocalDate dateDebut, LocalDate dateFin,
             String sortBy, String sortDir, Long vendeurId, Long boutiqueId) {
         Long entrepriseId = validerEntrepriseEtPermissions(request);
+        if (page < 0) page = 0;
+        if (size <= 0) size = 20;
+        if (size > 100) size = 100;
 
-        // Charger les données avec ou sans filtre de période
-        TresorerieData data;
+        // Période : dates ou null pour "toutes"
+        java.time.LocalDateTime dateDebutLdt = null;
+        java.time.LocalDateTime dateFinLdt = null;
         if (periode != null && !periode.trim().isEmpty() && !"toutes".equalsIgnoreCase(periode.trim())) {
             PeriodeDates periodeDates = calculerDatesPeriode(periode, dateDebut, dateFin);
-            data = chargerDonneesAvecPeriode(entrepriseId, periodeDates);
-        } else {
-            data = chargerDonnees(entrepriseId);
+            if (periodeDates.filtrerParPeriode) {
+                dateDebutLdt = periodeDates.dateDebut;
+                dateFinLdt = periodeDates.dateFin;
+            }
         }
 
-        List<Vente> ventesCredit = data.toutesVentes.stream()
-                .filter(v -> v.getModePaiement() == ModePaiement.CREDIT)
-                .filter(v -> vendeurId == null || (v.getVendeur() != null && v.getVendeur().getId().equals(vendeurId)))
-                .filter(v -> boutiqueId == null || (v.getBoutique() != null && v.getBoutique().getId().equals(boutiqueId)))
-                .collect(Collectors.toList());
+        long totalElements = venteRepository.countDettesPos(
+                entrepriseId, dateDebutLdt, dateFinLdt, vendeurId, boutiqueId);
+        int totalPages = size > 0 ? (int) Math.ceil((double) totalElements / size) : 0;
 
-        java.util.List<DetteItemDTO> items = new java.util.ArrayList<>();
-        for (Vente v : ventesCredit) {
-            double total = getValeurDouble(v.getMontantTotal());
-            double rembourse = getValeurDouble(v.getMontantTotalRembourse());
-            double restant = total - rembourse;
-            if (restant <= 0) {
-                continue;
-            }
+        List<Long> ids = findDettesPosIds(venteRepository, entrepriseId, dateDebutLdt, dateFinLdt, vendeurId, boutiqueId,
+                sortBy, sortDir, size, page * size);
 
-            DetteItemDTO dto = new DetteItemDTO();
-            dto.setId(v.getId());
-            dto.setType("VENTE_CREDIT");
-            dto.setMontantInitial(total);
-            dto.setMontantRestant(restant);
-            dto.setDate(v.getDateVente());
-            dto.setDescription(v.getDescription());
-            double remiseGlobaleVal = v.getRemiseGlobale() != null ? v.getRemiseGlobale() : 0.0;
-            dto.setRemiseGlobale(remiseGlobaleVal);
-            dto.setVendeurId(v.getVendeur() != null ? v.getVendeur().getId() : null);
-            dto.setVendeurNom(v.getVendeur() != null ? v.getVendeur().getNomComplet() : null);
-            dto.setBoutiqueId(v.getBoutique() != null ? v.getBoutique().getId() : null);
-            dto.setBoutiqueNom(v.getBoutique() != null ? v.getBoutique().getNomBoutique() : null);
-            Long venteEntrepriseId = v.getBoutique() != null && v.getBoutique().getEntreprise() != null
-                    ? v.getBoutique().getEntreprise().getId() : null;
-            if (venteEntrepriseId != null) {
-                factureVenteRepository.findByVenteIdAndEntrepriseId(v.getId(), venteEntrepriseId)
-                        .ifPresent(f -> dto.setNumero(f.getNumeroFacture()));
-            }
-            if (v.getClient() != null) {
-                dto.setClient(v.getClient().getNomComplet());
-                dto.setContact(v.getClient().getTelephone());
-            } else if (v.getEntrepriseClient() != null) {
-                dto.setClient(v.getEntrepriseClient().getNom());
-                dto.setContact(v.getEntrepriseClient().getTelephone());
-            } else {
-                dto.setClient(v.getClientNom());
-                dto.setContact(v.getClientNumero());
-            }
-
-            // Détail des produits vendus (quel produit, quelle quantité, quel montant, remise)
-            if (v.getProduits() != null && !v.getProduits().isEmpty()) {
-                java.util.List<DetteItemDTO.LigneProduitDetteDTO> lignes = v.getProduits().stream()
-                        .map(vp -> {
-                            DetteItemDTO.LigneProduitDetteDTO ligne = new DetteItemDTO.LigneProduitDetteDTO();
-                            ligne.setProduitId(vp.getProduit() != null ? vp.getProduit().getId() : null);
-                            ligne.setNomProduit(vp.getProduit() != null ? vp.getProduit().getNom() : null);
-                            ligne.setQuantite(vp.getQuantite());
-                            ligne.setPrixUnitaire(vp.getPrixUnitaire());
-                            double remiseLigne = vp.getRemise();
-                            ligne.setRemise(remiseLigne);
-                            ligne.setMontantLigne(vp.getMontantLigne());
-                            return ligne;
-                        })
-                        .collect(Collectors.toList());
-                dto.setProduits(lignes);
-                // Type de remise : soit globale soit par ligne, pas les deux
-                if (remiseGlobaleVal > 0) {
-                    dto.setTypeRemise("GLOBALE");
-                } else if (lignes.stream().anyMatch(l -> l.getRemise() != null && l.getRemise() > 0)) {
-                    dto.setTypeRemise("PAR_LIGNE");
-                    dto.setRemiseGlobale(0.0);
-                } else {
-                    dto.setTypeRemise(null);
+        java.util.List<DetteItemDTO> pageContent = new java.util.ArrayList<>();
+        if (!ids.isEmpty()) {
+            List<Vente> ventes = venteRepository.findByIdInWithDetailsForDettes(ids);
+            java.util.Map<Long, Vente> ventesById = ventes.stream().collect(Collectors.toMap(Vente::getId, v -> v));
+            for (Long id : ids) {
+                Vente v = ventesById.get(id);
+                if (v != null) {
+                    DetteItemDTO dto = mapVenteToDetteItemDTO(v);
+                    if (dto != null) pageContent.add(dto);
                 }
-            } else {
-                dto.setProduits(java.util.Collections.emptyList());
-                dto.setTypeRemise(remiseGlobaleVal > 0 ? "GLOBALE" : null);
             }
-
-            items.add(dto);
         }
-
-        // Trier selon sortBy et sortDir
-        String sb = sortBy != null ? sortBy.toLowerCase() : "date";
-        String sd = sortDir != null ? sortDir : "desc";
-        items.sort((a, b) -> {
-            int comparison = 0;
-            switch (sb) {
-                case "vendeur":
-                    String v1 = a.getVendeurNom() != null ? a.getVendeurNom() : "";
-                    String v2 = b.getVendeurNom() != null ? b.getVendeurNom() : "";
-                    comparison = v1.compareToIgnoreCase(v2);
-                    if ("desc".equalsIgnoreCase(sd)) comparison = -comparison;
-                    break;
-                case "boutique":
-                case "boutiquenom":
-                    String b1 = a.getBoutiqueNom() != null ? a.getBoutiqueNom() : "";
-                    String b2 = b.getBoutiqueNom() != null ? b.getBoutiqueNom() : "";
-                    comparison = b1.compareToIgnoreCase(b2);
-                    if ("desc".equalsIgnoreCase(sd)) comparison = -comparison;
-                    break;
-                case "montantrestant":
-                case "montant":
-                    comparison = Double.compare(a.getMontantRestant() != null ? a.getMontantRestant() : 0.0,
-                            b.getMontantRestant() != null ? b.getMontantRestant() : 0.0);
-                    if ("desc".equalsIgnoreCase(sd)) comparison = -comparison;
-                    break;
-                case "date":
-                default:
-                    if (a.getDate() == null && b.getDate() == null) comparison = 0;
-                    else if (a.getDate() == null) comparison = 1;
-                    else if (b.getDate() == null) comparison = -1;
-                    else comparison = a.getDate().compareTo(b.getDate());
-                    if ("desc".equalsIgnoreCase(sd)) comparison = -comparison;
-                    break;
-            }
-            return comparison;
-        });
-
-        int totalElements = items.size();
-        int totalPages = (int) Math.ceil((double) totalElements / size);
-        int fromIndex = page * size;
-        int toIndex = Math.min(fromIndex + size, totalElements);
-
-        java.util.List<DetteItemDTO> pageContent =
-                (fromIndex >= totalElements) ? java.util.Collections.emptyList() : items.subList(fromIndex, toIndex);
 
         PaginatedResponseDTO<DetteItemDTO> response = new PaginatedResponseDTO<>();
         response.setContent(pageContent);
         response.setPageNumber(page);
         response.setPageSize(size);
-        response.setTotalElements(totalElements);
+        response.setTotalElements((int) totalElements);
         response.setTotalPages(totalPages);
         response.setHasNext(page < totalPages - 1);
         response.setHasPrevious(page > 0);
         response.setFirst(page == 0);
         response.setLast(page >= totalPages - 1 || totalPages == 0);
-
         return response;
+    }
+
+    private DetteItemDTO mapVenteToDetteItemDTO(Vente v) {
+        double total = getValeurDouble(v.getMontantTotal());
+        double rembourse = getValeurDouble(v.getMontantTotalRembourse());
+        double restant = total - rembourse;
+        if (restant <= 0) return null;
+
+        DetteItemDTO dto = new DetteItemDTO();
+        dto.setId(v.getId());
+        dto.setType("VENTE_CREDIT");
+        dto.setMontantInitial(total);
+        dto.setMontantRestant(restant);
+        dto.setDate(v.getDateVente());
+        dto.setDescription(v.getDescription());
+        double remiseGlobaleVal = v.getRemiseGlobale() != null ? v.getRemiseGlobale() : 0.0;
+        dto.setRemiseGlobale(remiseGlobaleVal);
+        dto.setVendeurId(v.getVendeur() != null ? v.getVendeur().getId() : null);
+        dto.setVendeurNom(v.getVendeur() != null ? v.getVendeur().getNomComplet() : null);
+        dto.setBoutiqueId(v.getBoutique() != null ? v.getBoutique().getId() : null);
+        dto.setBoutiqueNom(v.getBoutique() != null ? v.getBoutique().getNomBoutique() : null);
+        Long venteEntrepriseId = v.getBoutique() != null && v.getBoutique().getEntreprise() != null
+                ? v.getBoutique().getEntreprise().getId() : null;
+        if (venteEntrepriseId != null) {
+            factureVenteRepository.findByVenteIdAndEntrepriseId(v.getId(), venteEntrepriseId)
+                    .ifPresent(f -> dto.setNumero(f.getNumeroFacture()));
+        }
+        if (v.getClient() != null) {
+            dto.setClient(v.getClient().getNomComplet());
+            dto.setContact(v.getClient().getTelephone());
+        } else if (v.getEntrepriseClient() != null) {
+            dto.setClient(v.getEntrepriseClient().getNom());
+            dto.setContact(v.getEntrepriseClient().getTelephone());
+        } else {
+            dto.setClient(v.getClientNom());
+            dto.setContact(v.getClientNumero());
+        }
+        if (v.getProduits() != null && !v.getProduits().isEmpty()) {
+            java.util.List<DetteItemDTO.LigneProduitDetteDTO> lignes = v.getProduits().stream()
+                    .map(vp -> {
+                        DetteItemDTO.LigneProduitDetteDTO ligne = new DetteItemDTO.LigneProduitDetteDTO();
+                        ligne.setProduitId(vp.getProduit() != null ? vp.getProduit().getId() : null);
+                        ligne.setNomProduit(vp.getProduit() != null ? vp.getProduit().getNom() : null);
+                        ligne.setQuantite(vp.getQuantite());
+                        ligne.setPrixUnitaire(vp.getPrixUnitaire());
+                        ligne.setRemise(vp.getRemise());
+                        ligne.setMontantLigne(vp.getMontantLigne());
+                        return ligne;
+                    })
+                    .collect(Collectors.toList());
+            dto.setProduits(lignes);
+            if (remiseGlobaleVal > 0) dto.setTypeRemise("GLOBALE");
+            else if (lignes.stream().anyMatch(l -> l.getRemise() != null && l.getRemise() > 0)) {
+                dto.setTypeRemise("PAR_LIGNE");
+                dto.setRemiseGlobale(0.0);
+            } else dto.setTypeRemise(null);
+        } else {
+            dto.setProduits(java.util.Collections.emptyList());
+            dto.setTypeRemise(remiseGlobaleVal > 0 ? "GLOBALE" : null);
+        }
+        return dto;
     }
 
      // Valide l'authentification, l'appartenance à une entreprise et les permissions pour accéder à la trésorerie.

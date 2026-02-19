@@ -318,6 +318,11 @@ public class TransfertFondsService {
         return entree;
     }
 
+    /** Exposé pour la pagination comptabilité (build DTO à partir d'une entité). */
+    public TransfertFondsResponseDTO toResponseDTO(TransfertFonds transfert) {
+        return mapperVersResponseDTO(transfert);
+    }
+
     private TransfertFondsResponseDTO mapperVersResponseDTO(TransfertFonds transfert) {
         TransfertFondsResponseDTO dto = new TransfertFondsResponseDTO();
         dto.setId(transfert.getId());

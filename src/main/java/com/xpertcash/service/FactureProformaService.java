@@ -129,9 +129,7 @@ public class FactureProformaService {
         throw new RuntimeException("Accès refusé : vous n'avez pas les droits nécessaires pour créer une facture dans cette entreprise !");
     }
 
-    if (!utilitaire.isEntrepriseActive(entrepriseUtilisateur.getId())) {
-        throw new SecurityException("Votre entreprise est désactivée, opération non autorisée.");
-    }
+    
 
     moduleActivationService.verifierAccesModulePourEntreprise(entrepriseUtilisateur, "GESTION_FACTURATION");
 
@@ -364,11 +362,7 @@ public class FactureProformaService {
         if (!isAdmin && !hasPermission) {
             throw new RuntimeException("Accès refusé : vous n'avez pas les droits nécessaires pour créer une facture dans cette entreprise !");
         }
-
-        if (!utilitaire.isEntrepriseActive(entrepriseUtilisateur.getId())) {
-            throw new SecurityException("Votre entreprise est désactivée, opération non autorisée.");
-        }
-
+       
 
         //  Blocage total si facture annulée
         if (facture.getStatut() == StatutFactureProForma.ANNULE) {

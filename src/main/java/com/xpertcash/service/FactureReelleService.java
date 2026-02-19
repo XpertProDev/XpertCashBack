@@ -235,10 +235,6 @@ public class FactureReelleService {
         throw new SecurityException("Accès interdit : Vous n'avez pas les permissions nécessaires pour voir ces factures.");
     }
 
-    if (!utilitaire.isEntrepriseActive(entreprise.getId())) {
-        throw new SecurityException("Votre entreprise est désactivée, opération non autorisée.");
-    }
-
     
 
     Pageable pageable = PageRequest.of(page, size, 
@@ -283,9 +279,7 @@ public class FactureReelleService {
     if (!(isAdminOrManager || hasPermission)) {
         throw new SecurityException("Accès interdit : Vous n'avez pas les permissions nécessaires pour filtrer les factures.");
     }
-    if (!utilitaire.isEntrepriseActive(entrepriseId)) {
-        throw new SecurityException("Votre entreprise est désactivée, opération non autorisée.");
-    }
+  
 
     List<FactureReelle> factures;
 

@@ -65,6 +65,20 @@ public interface VenteRepository extends JpaRepository<Vente, Long> {
     @Query("SELECT v FROM Vente v WHERE v.boutique.entreprise.id = :entrepriseId AND v.caisse.statut = 'FERMEE' ORDER BY v.dateVente DESC")
     List<Vente> findByEntrepriseIdAndCaisseFermee(@Param("entrepriseId") Long entrepriseId);
 
+    /** Ventes par liste de caisses (pour pagination comptabilité scalable). */
+    List<Vente> findByCaisse_IdIn(List<Long> caisseIds);
+
+    /** Pour pagination dettes POS : charger ventes par IDs avec relations (évite N+1). */
+    @Query("SELECT DISTINCT v FROM Vente v " +
+           "LEFT JOIN FETCH v.produits p " +
+           "LEFT JOIN FETCH p.produit " +
+           "LEFT JOIN FETCH v.vendeur " +
+           "LEFT JOIN FETCH v.boutique " +
+           "LEFT JOIN FETCH v.client " +
+           "LEFT JOIN FETCH v.entrepriseClient " +
+           "WHERE v.id IN :ids")
+    List<Vente> findByIdInWithDetailsForDettes(@Param("ids") List<Long> ids);
+
     // Compter toutes les ventes des boutiques d'une entreprise
     @Query("SELECT COUNT(v) FROM Vente v WHERE v.boutique.entreprise.id = :entrepriseId")
     long countByEntrepriseId(@Param("entrepriseId") Long entrepriseId);
@@ -213,5 +227,104 @@ public interface VenteRepository extends JpaRepository<Vente, Long> {
             @Param("vendeurId") Long vendeurId,
             @Param("dateDebut") LocalDateTime dateDebut,
             @Param("dateFin") LocalDateTime dateFin);
+
+    // ----- Dettes POS (ventes à crédit) : pagination côté base -----
+    @Query(value = "SELECT COUNT(v.id) FROM vente v INNER JOIN caisse c ON v.caisse_id = c.id INNER JOIN boutique b ON v.boutique_id = b.id " +
+            "WHERE b.entreprise_id = :entrepriseId AND c.statut = 'FERMEE' AND v.mode_paiement = 'CREDIT' " +
+            "AND (v.montant_total - COALESCE(v.montant_total_rembourse, 0)) > 0 " +
+            "AND (:dateDebut IS NULL OR v.date_vente >= :dateDebut) AND (:dateFin IS NULL OR v.date_vente < :dateFin) " +
+            "AND (:vendeurId IS NULL OR v.vendeur_id = :vendeurId) AND (:boutiqueId IS NULL OR v.boutique_id = :boutiqueId)", nativeQuery = true)
+    long countDettesPos(
+            @Param("entrepriseId") Long entrepriseId,
+            @Param("dateDebut") LocalDateTime dateDebut,
+            @Param("dateFin") LocalDateTime dateFin,
+            @Param("vendeurId") Long vendeurId,
+            @Param("boutiqueId") Long boutiqueId);
+
+    @Query(value = "SELECT v.id FROM vente v INNER JOIN caisse c ON v.caisse_id = c.id INNER JOIN boutique b ON v.boutique_id = b.id " +
+            "WHERE b.entreprise_id = :entrepriseId AND c.statut = 'FERMEE' AND v.mode_paiement = 'CREDIT' " +
+            "AND (v.montant_total - COALESCE(v.montant_total_rembourse, 0)) > 0 " +
+            "AND (:dateDebut IS NULL OR v.date_vente >= :dateDebut) AND (:dateFin IS NULL OR v.date_vente < :dateFin) " +
+            "AND (:vendeurId IS NULL OR v.vendeur_id = :vendeurId) AND (:boutiqueId IS NULL OR v.boutique_id = :boutiqueId) " +
+            "ORDER BY v.date_vente ASC, v.id DESC LIMIT :limit OFFSET :offset", nativeQuery = true)
+    List<Long> findDettesPosIdsOrderByDateAsc(
+            @Param("entrepriseId") Long entrepriseId, @Param("dateDebut") LocalDateTime dateDebut,
+            @Param("dateFin") LocalDateTime dateFin, @Param("vendeurId") Long vendeurId, @Param("boutiqueId") Long boutiqueId,
+            @Param("limit") int limit, @Param("offset") int offset);
+    @Query(value = "SELECT v.id FROM vente v INNER JOIN caisse c ON v.caisse_id = c.id INNER JOIN boutique b ON v.boutique_id = b.id " +
+            "WHERE b.entreprise_id = :entrepriseId AND c.statut = 'FERMEE' AND v.mode_paiement = 'CREDIT' " +
+            "AND (v.montant_total - COALESCE(v.montant_total_rembourse, 0)) > 0 " +
+            "AND (:dateDebut IS NULL OR v.date_vente >= :dateDebut) AND (:dateFin IS NULL OR v.date_vente < :dateFin) " +
+            "AND (:vendeurId IS NULL OR v.vendeur_id = :vendeurId) AND (:boutiqueId IS NULL OR v.boutique_id = :boutiqueId) " +
+            "ORDER BY v.date_vente DESC, v.id DESC LIMIT :limit OFFSET :offset", nativeQuery = true)
+    List<Long> findDettesPosIdsOrderByDateDesc(
+            @Param("entrepriseId") Long entrepriseId, @Param("dateDebut") LocalDateTime dateDebut,
+            @Param("dateFin") LocalDateTime dateFin, @Param("vendeurId") Long vendeurId, @Param("boutiqueId") Long boutiqueId,
+            @Param("limit") int limit, @Param("offset") int offset);
+
+    @Query(value = "SELECT v.id FROM vente v INNER JOIN caisse c ON v.caisse_id = c.id INNER JOIN boutique b ON v.boutique_id = b.id " +
+            "LEFT JOIN user u ON v.vendeur_id = u.id " +
+            "WHERE b.entreprise_id = :entrepriseId AND c.statut = 'FERMEE' AND v.mode_paiement = 'CREDIT' " +
+            "AND (v.montant_total - COALESCE(v.montant_total_rembourse, 0)) > 0 " +
+            "AND (:dateDebut IS NULL OR v.date_vente >= :dateDebut) AND (:dateFin IS NULL OR v.date_vente < :dateFin) " +
+            "AND (:vendeurId IS NULL OR v.vendeur_id = :vendeurId) AND (:boutiqueId IS NULL OR v.boutique_id = :boutiqueId) " +
+            "ORDER BY u.nom_complet ASC, v.id DESC LIMIT :limit OFFSET :offset", nativeQuery = true)
+    List<Long> findDettesPosIdsOrderByVendeurAsc(
+            @Param("entrepriseId") Long entrepriseId, @Param("dateDebut") LocalDateTime dateDebut,
+            @Param("dateFin") LocalDateTime dateFin, @Param("vendeurId") Long vendeurId, @Param("boutiqueId") Long boutiqueId,
+            @Param("limit") int limit, @Param("offset") int offset);
+    @Query(value = "SELECT v.id FROM vente v INNER JOIN caisse c ON v.caisse_id = c.id INNER JOIN boutique b ON v.boutique_id = b.id " +
+            "LEFT JOIN user u ON v.vendeur_id = u.id " +
+            "WHERE b.entreprise_id = :entrepriseId AND c.statut = 'FERMEE' AND v.mode_paiement = 'CREDIT' " +
+            "AND (v.montant_total - COALESCE(v.montant_total_rembourse, 0)) > 0 " +
+            "AND (:dateDebut IS NULL OR v.date_vente >= :dateDebut) AND (:dateFin IS NULL OR v.date_vente < :dateFin) " +
+            "AND (:vendeurId IS NULL OR v.vendeur_id = :vendeurId) AND (:boutiqueId IS NULL OR v.boutique_id = :boutiqueId) " +
+            "ORDER BY u.nom_complet DESC, v.id DESC LIMIT :limit OFFSET :offset", nativeQuery = true)
+    List<Long> findDettesPosIdsOrderByVendeurDesc(
+            @Param("entrepriseId") Long entrepriseId, @Param("dateDebut") LocalDateTime dateDebut,
+            @Param("dateFin") LocalDateTime dateFin, @Param("vendeurId") Long vendeurId, @Param("boutiqueId") Long boutiqueId,
+            @Param("limit") int limit, @Param("offset") int offset);
+
+    @Query(value = "SELECT v.id FROM vente v INNER JOIN caisse c ON v.caisse_id = c.id INNER JOIN boutique b ON v.boutique_id = b.id " +
+            "WHERE b.entreprise_id = :entrepriseId AND c.statut = 'FERMEE' AND v.mode_paiement = 'CREDIT' " +
+            "AND (v.montant_total - COALESCE(v.montant_total_rembourse, 0)) > 0 " +
+            "AND (:dateDebut IS NULL OR v.date_vente >= :dateDebut) AND (:dateFin IS NULL OR v.date_vente < :dateFin) " +
+            "AND (:vendeurId IS NULL OR v.vendeur_id = :vendeurId) AND (:boutiqueId IS NULL OR v.boutique_id = :boutiqueId) " +
+            "ORDER BY b.nom_boutique ASC, v.id DESC LIMIT :limit OFFSET :offset", nativeQuery = true)
+    List<Long> findDettesPosIdsOrderByBoutiqueAsc(
+            @Param("entrepriseId") Long entrepriseId, @Param("dateDebut") LocalDateTime dateDebut,
+            @Param("dateFin") LocalDateTime dateFin, @Param("vendeurId") Long vendeurId, @Param("boutiqueId") Long boutiqueId,
+            @Param("limit") int limit, @Param("offset") int offset);
+    @Query(value = "SELECT v.id FROM vente v INNER JOIN caisse c ON v.caisse_id = c.id INNER JOIN boutique b ON v.boutique_id = b.id " +
+            "WHERE b.entreprise_id = :entrepriseId AND c.statut = 'FERMEE' AND v.mode_paiement = 'CREDIT' " +
+            "AND (v.montant_total - COALESCE(v.montant_total_rembourse, 0)) > 0 " +
+            "AND (:dateDebut IS NULL OR v.date_vente >= :dateDebut) AND (:dateFin IS NULL OR v.date_vente < :dateFin) " +
+            "AND (:vendeurId IS NULL OR v.vendeur_id = :vendeurId) AND (:boutiqueId IS NULL OR v.boutique_id = :boutiqueId) " +
+            "ORDER BY b.nom_boutique DESC, v.id DESC LIMIT :limit OFFSET :offset", nativeQuery = true)
+    List<Long> findDettesPosIdsOrderByBoutiqueDesc(
+            @Param("entrepriseId") Long entrepriseId, @Param("dateDebut") LocalDateTime dateDebut,
+            @Param("dateFin") LocalDateTime dateFin, @Param("vendeurId") Long vendeurId, @Param("boutiqueId") Long boutiqueId,
+            @Param("limit") int limit, @Param("offset") int offset);
+
+    @Query(value = "SELECT v.id FROM vente v INNER JOIN caisse c ON v.caisse_id = c.id INNER JOIN boutique b ON v.boutique_id = b.id " +
+            "WHERE b.entreprise_id = :entrepriseId AND c.statut = 'FERMEE' AND v.mode_paiement = 'CREDIT' " +
+            "AND (v.montant_total - COALESCE(v.montant_total_rembourse, 0)) > 0 " +
+            "AND (:dateDebut IS NULL OR v.date_vente >= :dateDebut) AND (:dateFin IS NULL OR v.date_vente < :dateFin) " +
+            "AND (:vendeurId IS NULL OR v.vendeur_id = :vendeurId) AND (:boutiqueId IS NULL OR v.boutique_id = :boutiqueId) " +
+            "ORDER BY (v.montant_total - COALESCE(v.montant_total_rembourse, 0)) ASC, v.id DESC LIMIT :limit OFFSET :offset", nativeQuery = true)
+    List<Long> findDettesPosIdsOrderByMontantAsc(
+            @Param("entrepriseId") Long entrepriseId, @Param("dateDebut") LocalDateTime dateDebut,
+            @Param("dateFin") LocalDateTime dateFin, @Param("vendeurId") Long vendeurId, @Param("boutiqueId") Long boutiqueId,
+            @Param("limit") int limit, @Param("offset") int offset);
+    @Query(value = "SELECT v.id FROM vente v INNER JOIN caisse c ON v.caisse_id = c.id INNER JOIN boutique b ON v.boutique_id = b.id " +
+            "WHERE b.entreprise_id = :entrepriseId AND c.statut = 'FERMEE' AND v.mode_paiement = 'CREDIT' " +
+            "AND (v.montant_total - COALESCE(v.montant_total_rembourse, 0)) > 0 " +
+            "AND (:dateDebut IS NULL OR v.date_vente >= :dateDebut) AND (:dateFin IS NULL OR v.date_vente < :dateFin) " +
+            "AND (:vendeurId IS NULL OR v.vendeur_id = :vendeurId) AND (:boutiqueId IS NULL OR v.boutique_id = :boutiqueId) " +
+            "ORDER BY (v.montant_total - COALESCE(v.montant_total_rembourse, 0)) DESC, v.id DESC LIMIT :limit OFFSET :offset", nativeQuery = true)
+    List<Long> findDettesPosIdsOrderByMontantDesc(
+            @Param("entrepriseId") Long entrepriseId, @Param("dateDebut") LocalDateTime dateDebut,
+            @Param("dateFin") LocalDateTime dateFin, @Param("vendeurId") Long vendeurId, @Param("boutiqueId") Long boutiqueId,
+            @Param("limit") int limit, @Param("offset") int offset);
 
 }

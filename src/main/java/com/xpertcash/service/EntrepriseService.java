@@ -9,7 +9,9 @@ import org.springframework.web.multipart.MultipartFile;
 
 import com.xpertcash.DTOs.UpdateEntrepriseDTO;
 import com.xpertcash.entity.Entreprise;
+import com.xpertcash.entity.User;
 import com.xpertcash.repository.EntrepriseRepository;
+import com.xpertcash.repository.UsersRepository;
 import com.xpertcash.service.IMAGES.ImageStorageService;
 
 import java.nio.file.Path;
@@ -26,7 +28,10 @@ public class EntrepriseService {
     @Autowired
     private EntrepriseRepository entrepriseRepository;
 
-     @Autowired
+    @Autowired
+    private UsersRepository usersRepository;
+
+    @Autowired
     private ImageStorageService imageStorageService;
 
 
@@ -162,8 +167,24 @@ public class EntrepriseService {
 
     System.out.println("DTO reçu dans le controller : " + dto);
 
-
     entrepriseRepository.save(entreprise);
+
+    // Synchroniser téléphone et pays sur l'admin de l'entreprise pour que getEntrepriseOfConnectedUser() et le profil restent cohérents
+    User admin = entreprise.getAdmin();
+    if (admin != null) {
+        boolean adminUpdated = false;
+        if (dto.getTelephone() != null) {
+            admin.setPhone(dto.getTelephone());
+            adminUpdated = true;
+        }
+        if (dto.getPays() != null) {
+            admin.setPays(dto.getPays());
+            adminUpdated = true;
+        }
+        if (adminUpdated) {
+            usersRepository.save(admin);
+        }
+    }
 }
 
 }
