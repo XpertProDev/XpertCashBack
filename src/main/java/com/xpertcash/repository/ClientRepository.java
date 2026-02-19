@@ -3,6 +3,8 @@ package com.xpertcash.repository;
 import java.util.List;
 import java.util.Optional;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -40,6 +42,20 @@ public interface ClientRepository extends JpaRepository<Client, Long>{
            "WHERE (e.id = :entrepriseId) " +
            "OR (ec IS NOT NULL AND ece.id = :entrepriseId)")
     List<Client> findClientsByEntrepriseOrEntrepriseClient(@Param("entrepriseId") Long entrepriseId);
+
+    /** Pagination côté base : clients de l'entreprise (tenant). */
+    @Query(value = "SELECT c FROM Client c " +
+           "LEFT JOIN c.entreprise e " +
+           "LEFT JOIN c.entrepriseClient ec " +
+           "LEFT JOIN ec.entreprise ece " +
+           "WHERE (e.id = :entrepriseId) OR (ec IS NOT NULL AND ece.id = :entrepriseId)",
+           countQuery = "SELECT COUNT(c) FROM Client c " +
+           "LEFT JOIN c.entreprise e " +
+           "LEFT JOIN c.entrepriseClient ec " +
+           "LEFT JOIN ec.entreprise ece " +
+           "WHERE (e.id = :entrepriseId) OR (ec IS NOT NULL AND ece.id = :entrepriseId)")
+    Page<Client> findClientsByEntrepriseOrEntrepriseClientPaginated(
+            @Param("entrepriseId") Long entrepriseId, Pageable pageable);
 
     // Compter séparément les clients rattachés directement à l'entreprise (PARTICULIERS)
     @Query("SELECT COUNT(c) FROM Client c " +

@@ -17,10 +17,12 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.xpertcash.DTOs.PaginatedResponseDTO;
 import com.xpertcash.entity.Client;
 import com.xpertcash.entity.EntrepriseClient;
 import com.xpertcash.service.ClientService;
@@ -74,10 +76,15 @@ public class ClientController {
     }
 
     @GetMapping("/clients")
-    public ResponseEntity<?> getAllClients(HttpServletRequest request) {
+    public ResponseEntity<?> getAllClients(
+            HttpServletRequest request,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false) String sortBy,
+            @RequestParam(required = false) String sortDir) {
         try {
-            List<Client> clients = clientService.getAllClients(request);
-            return ResponseEntity.ok(clients);
+            PaginatedResponseDTO<Client> paginated = clientService.getAllClientsPaginated(request, page, size, sortBy, sortDir);
+            return ResponseEntity.ok(paginated);
         } catch (RuntimeException e) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(Collections.singletonMap("error", e.getMessage()));
