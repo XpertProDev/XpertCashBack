@@ -1436,32 +1436,32 @@ public class ProduitService {
 
     // Méthode scalable avec pagination pour récupérer les produits d'une entreprise
     public ProduitEntreprisePaginatedResponseDTO getProduitsParEntreprisePaginated(
-            Long entrepriseId,
-            int page,
-            int size,
+            Long entrepriseId, 
+            int page, 
+            int size, 
             String sortBy,
             String sortDir,
             HttpServletRequest request) {
-
+        
         if (page < 0) page = 0;
         if (size <= 0) size = 20;
         if (size > 100) size = 100;
-
+        
         if (entrepriseId == null) {
             throw new RuntimeException("L'ID de l'entreprise ne peut pas être null");
         }
-
+        
         String token = request.getHeader("Authorization");
         if (token == null || !token.startsWith("Bearer ")) {
             throw new RuntimeException("Token JWT manquant ou mal formaté");
         }
 
         User user = authHelper.getAuthenticatedUserWithFallback(request);
-
+        
         if (user.getEntreprise() == null) {
             throw new RuntimeException("Aucune entreprise associée à l'utilisateur ID: " + user.getId());
         }
-
+        
         Entreprise entreprise = user.getEntreprise();
         if (entreprise.getId() == null) {
             throw new RuntimeException("L'ID de l'entreprise de l'utilisateur est null");
@@ -1490,32 +1490,32 @@ public class ProduitService {
             produitsDTOs = new ArrayList<>();
         } else {
             List<Produit> produits = produitRepository.findByEntrepriseIdAndCodeGeneriqueIn(entrepriseId, codeGeneriquesPage);
-            Map<String, ProduitDTO> produitsUniques = new HashMap<>();
+        Map<String, ProduitDTO> produitsUniques = new HashMap<>();
 
             for (Produit produit : produits) {
-                if (Boolean.TRUE.equals(produit.getDeleted())) continue;
+            if (Boolean.TRUE.equals(produit.getDeleted())) continue;
 
-                Boutique boutique = produit.getBoutique();
-                if (boutique != null && boutique.isActif()) {
-                    String codeGenerique = produit.getCodeGenerique();
+            Boutique boutique = produit.getBoutique();
+            if (boutique != null && boutique.isActif()) {
+                String codeGenerique = produit.getCodeGenerique();
 
-                    ProduitDTO produitDTO = produitsUniques.computeIfAbsent(codeGenerique, k -> {
-                        ProduitDTO dto = convertToProduitDTO(produit);
-                        dto.setBoutiques(new ArrayList<>());
-                        dto.setQuantite(0);
-                        return dto;
-                    });
+                ProduitDTO produitDTO = produitsUniques.computeIfAbsent(codeGenerique, k -> {
+                    ProduitDTO dto = convertToProduitDTO(produit);
+                    dto.setBoutiques(new ArrayList<>());
+                    dto.setQuantite(0);
+                    return dto;
+                });
 
-                    Map<String, Object> boutiqueInfo = new HashMap<>();
-                    boutiqueInfo.put("nom", boutique.getNomBoutique());
-                    boutiqueInfo.put("id", boutique.getId());
-                    boutiqueInfo.put("typeBoutique", boutique.getTypeBoutique());
-                    boutiqueInfo.put("quantite", produit.getQuantite());
+                Map<String, Object> boutiqueInfo = new HashMap<>();
+                boutiqueInfo.put("nom", boutique.getNomBoutique());
+                boutiqueInfo.put("id", boutique.getId());
+                boutiqueInfo.put("typeBoutique", boutique.getTypeBoutique());
+                boutiqueInfo.put("quantite", produit.getQuantite());
 
-                    produitDTO.getBoutiques().add(boutiqueInfo);
-                    produitDTO.setQuantite(produitDTO.getQuantite() + produit.getQuantite());
-                }
+                produitDTO.getBoutiques().add(boutiqueInfo);
+                produitDTO.setQuantite(produitDTO.getQuantite() + produit.getQuantite());
             }
+        }
 
             // Conserver l'ordre de la page (codeGeneriques)
             produitsDTOs = new ArrayList<>();

@@ -14,6 +14,11 @@ public interface VenteProduitRepository extends JpaRepository<VenteProduit, Long
 
     Optional<VenteProduit> findByVenteIdAndProduitId(Long venteId, Long produitId);
 
+    /** Charge toutes les lignes (avec produit) pour une liste de ventes (évite N+1 en liste paginée). */
+    @Query("SELECT vp FROM VenteProduit vp JOIN FETCH vp.produit p WHERE vp.vente.id IN :venteIds")
+    List<VenteProduit> findByVenteIdInWithProduit(@Param("venteIds") List<Long> venteIds);
+
+
     // Récupérer les 3 meilleurs produits vendus par entreprise (optimisé avec requête native)
     // Exclut les produits remboursés et groupe par produit
     // Optimisé pour de grandes quantités de données avec index sur les clés étrangères

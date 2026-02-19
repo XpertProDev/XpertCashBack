@@ -388,10 +388,14 @@ public class TresorerieService {
         if (!ids.isEmpty()) {
             List<Vente> ventes = venteRepository.findByIdInWithDetailsForDettes(ids);
             java.util.Map<Long, Vente> ventesById = ventes.stream().collect(Collectors.toMap(Vente::getId, v -> v));
+            // Chargement en lot des numéros de facture (évite N+1)
+            java.util.Map<Long, String> numeroByVenteId = factureVenteRepository.findByVenteIdInAndEntrepriseId(ids, entrepriseId)
+                    .stream()
+                    .collect(Collectors.toMap(f -> f.getVente().getId(), FactureVente::getNumeroFacture, (a, b) -> a));
             for (Long id : ids) {
                 Vente v = ventesById.get(id);
                 if (v != null) {
-                    DetteItemDTO dto = mapVenteToDetteItemDTO(v);
+                    DetteItemDTO dto = mapVenteToDetteItemDTO(v, numeroByVenteId);
                     if (dto != null) pageContent.add(dto);
                 }
             }
@@ -411,6 +415,10 @@ public class TresorerieService {
     }
 
     private DetteItemDTO mapVenteToDetteItemDTO(Vente v) {
+        return mapVenteToDetteItemDTO(v, null);
+    }
+
+    private DetteItemDTO mapVenteToDetteItemDTO(Vente v, java.util.Map<Long, String> numeroByVenteId) {
             double total = getValeurDouble(v.getMontantTotal());
             double rembourse = getValeurDouble(v.getMontantTotalRembourse());
             double restant = total - rembourse;
@@ -429,11 +437,15 @@ public class TresorerieService {
             dto.setVendeurNom(v.getVendeur() != null ? v.getVendeur().getNomComplet() : null);
             dto.setBoutiqueId(v.getBoutique() != null ? v.getBoutique().getId() : null);
             dto.setBoutiqueNom(v.getBoutique() != null ? v.getBoutique().getNomBoutique() : null);
-            Long venteEntrepriseId = v.getBoutique() != null && v.getBoutique().getEntreprise() != null
-                    ? v.getBoutique().getEntreprise().getId() : null;
-            if (venteEntrepriseId != null) {
-                factureVenteRepository.findByVenteIdAndEntrepriseId(v.getId(), venteEntrepriseId)
-                        .ifPresent(f -> dto.setNumero(f.getNumeroFacture()));
+            if (numeroByVenteId != null && numeroByVenteId.containsKey(v.getId())) {
+                dto.setNumero(numeroByVenteId.get(v.getId()));
+            } else {
+                Long venteEntrepriseId = v.getBoutique() != null && v.getBoutique().getEntreprise() != null
+                        ? v.getBoutique().getEntreprise().getId() : null;
+                if (venteEntrepriseId != null) {
+                    factureVenteRepository.findByVenteIdAndEntrepriseId(v.getId(), venteEntrepriseId)
+                            .ifPresent(f -> dto.setNumero(f.getNumeroFacture()));
+                }
             }
             if (v.getClient() != null) {
                 dto.setClient(v.getClient().getNomComplet());

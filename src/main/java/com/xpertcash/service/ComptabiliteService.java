@@ -2366,40 +2366,40 @@ public class ComptabiliteService {
     }
 
     private PaiementDTO mapPaiementToDTO(Paiement p) {
-        PaiementDTO dto = new PaiementDTO(p);
-        dto.setTypeTransaction("PAIEMENT_FACTURE");
-        if (p.getFactureReelle() != null) {
-            FactureReelle facture = p.getFactureReelle();
+                    PaiementDTO dto = new PaiementDTO(p);
+                    dto.setTypeTransaction("PAIEMENT_FACTURE");
+                    if (p.getFactureReelle() != null) {
+                        FactureReelle facture = p.getFactureReelle();
             if (facture.getLignesFacture() != null) org.hibernate.Hibernate.initialize(facture.getLignesFacture());
-            dto.setNumeroFacture(facture.getNumeroFacture());
+                        dto.setNumeroFacture(facture.getNumeroFacture());
             String objetFacture = facture.getDescription() != null && !facture.getDescription().trim().isEmpty() ? facture.getDescription() : null;
-            dto.setObjet(objetFacture);
+                        dto.setObjet(objetFacture);
             if (facture.getLignesFacture() != null && !facture.getLignesFacture().isEmpty())
                 dto.setLignesFacture(facture.getLignesFacture().stream().map(LigneFactureDTO::new).collect(Collectors.toList()));
             else dto.setLignesFacture(new ArrayList<>());
-            String description = "Paiement facture " + facture.getNumeroFacture();
+                        String description = "Paiement facture " + facture.getNumeroFacture();
             if (objetFacture != null) description += " - " + objetFacture;
-            String statutFacture = facture.getStatutPaiement() != null ? facture.getStatutPaiement().name() : "INCONNU";
-            if ("PARTIELLEMENT_PAYEE".equals(statutFacture)) {
-                java.math.BigDecimal totalPaye = paiementRepository.sumMontantsByFactureReelle(facture.getId());
-                if (totalPaye == null) totalPaye = java.math.BigDecimal.ZERO;
+                        String statutFacture = facture.getStatutPaiement() != null ? facture.getStatutPaiement().name() : "INCONNU";
+                        if ("PARTIELLEMENT_PAYEE".equals(statutFacture)) {
+                            java.math.BigDecimal totalPaye = paiementRepository.sumMontantsByFactureReelle(facture.getId());
+                            if (totalPaye == null) totalPaye = java.math.BigDecimal.ZERO;
                 description += " (Montant restant: " + (facture.getTotalFacture() - totalPaye.doubleValue()) + ")";
-            }
-            dto.setDescription(description);
-            dto.setStatut(statutFacture);
-            dto.setOrigine("FACTURATION");
-            dto.setRemise(Math.round(facture.getRemise() * 100.0) / 100.0);
-            dto.setTauxRemise(facture.getTauxRemise() != null ? Math.round(facture.getTauxRemise() * 100.0) / 100.0 : null);
-            dto.setTva(facture.isTva());
-            dto.setTotalHT(facture.getTotalHT());
-            dto.setTotalTTC(facture.getTotalFacture());
+                        }
+                        dto.setDescription(description);
+                        dto.setStatut(statutFacture);
+                        dto.setOrigine("FACTURATION");
+                        dto.setRemise(Math.round(facture.getRemise() * 100.0) / 100.0);
+                        dto.setTauxRemise(facture.getTauxRemise() != null ? Math.round(facture.getTauxRemise() * 100.0) / 100.0 : null);
+                        dto.setTva(facture.isTva());
+                        dto.setTotalHT(facture.getTotalHT());
+                        dto.setTotalTTC(facture.getTotalFacture());
             if (facture.getClient() != null) { dto.setClientNom(facture.getClient().getNomComplet()); dto.setClientContact(facture.getClient().getTelephone()); }
             else if (facture.getEntrepriseClient() != null) { dto.setClientNom(facture.getEntrepriseClient().getNom()); dto.setClientContact(facture.getEntrepriseClient().getTelephone()); }
-        } else {
-            dto.setDescription("Paiement sans facture associée");
+                    } else {
+                        dto.setDescription("Paiement sans facture associée");
             dto.setObjet(null); dto.setNumeroFacture(null); dto.setStatut("INCONNU"); dto.setOrigine("FACTURATION"); dto.setLignesFacture(new ArrayList<>());
         }
-        return dto;
+                    return dto;
     }
 
     private LocalDateTime getDateFromTransaction(Object transaction) {
