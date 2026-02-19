@@ -282,58 +282,58 @@ public class TresorerieService {
         if (totalPaye == null) totalPaye = BigDecimal.ZERO;
         double montantRestant = facture.getTotalFacture() - totalPaye.doubleValue();
         if (montantRestant <= 0) return null;
-        DetteItemDTO dto = new DetteItemDTO();
-        dto.setId(facture.getId());
-        dto.setType("FACTURE_IMPAYEE");
-        dto.setMontantInitial(facture.getTotalFacture());
-        dto.setMontantRestant(montantRestant);
+                DetteItemDTO dto = new DetteItemDTO();
+                dto.setId(facture.getId());
+                dto.setType("FACTURE_IMPAYEE");
+                dto.setMontantInitial(facture.getTotalFacture());
+                dto.setMontantRestant(montantRestant);
         dto.setDate(facture.getDateCreationPro() != null ? facture.getDateCreationPro()
-                : (facture.getDateCreation() != null ? facture.getDateCreation().atStartOfDay() : null));
-        dto.setDescription(facture.getDescription());
-        dto.setNumero(facture.getNumeroFacture());
-        if (facture.getClient() != null) {
-            dto.setClient(facture.getClient().getNomComplet());
-            dto.setContact(facture.getClient().getTelephone());
-        } else if (facture.getEntrepriseClient() != null) {
-            dto.setClient(facture.getEntrepriseClient().getNom());
-            dto.setContact(facture.getEntrepriseClient().getTelephone());
-        }
+                        : (facture.getDateCreation() != null ? facture.getDateCreation().atStartOfDay() : null));
+                dto.setDescription(facture.getDescription());
+                dto.setNumero(facture.getNumeroFacture());
+                if (facture.getClient() != null) {
+                    dto.setClient(facture.getClient().getNomComplet());
+                    dto.setContact(facture.getClient().getTelephone());
+                } else if (facture.getEntrepriseClient() != null) {
+                    dto.setClient(facture.getEntrepriseClient().getNom());
+                    dto.setContact(facture.getEntrepriseClient().getTelephone());
+                }
         return dto;
     }
 
     private DetteItemDTO mapDepenseToDetteItemDTO(DepenseGenerale depense) {
         if (depense == null) return null;
-        DetteItemDTO dto = new DetteItemDTO();
-        dto.setId(depense.getId());
-        dto.setType("DEPENSE_DETTE");
-        Double montant = getValeurDouble(depense.getMontant());
-        dto.setMontantInitial(montant);
-        dto.setMontantRestant(montant);
-        dto.setDate(depense.getDateCreation());
-        dto.setDescription(depense.getDesignation());
-        dto.setNumero(depense.getNumero());
-        if (depense.getFournisseur() != null) {
-            dto.setClient(depense.getFournisseur().getNomComplet());
-            dto.setContact(depense.getFournisseur().getTelephone());
-        }
+            DetteItemDTO dto = new DetteItemDTO();
+            dto.setId(depense.getId());
+            dto.setType("DEPENSE_DETTE");
+            Double montant = getValeurDouble(depense.getMontant());
+            dto.setMontantInitial(montant);
+            dto.setMontantRestant(montant);
+            dto.setDate(depense.getDateCreation());
+            dto.setDescription(depense.getDesignation());
+            dto.setNumero(depense.getNumero());
+            if (depense.getFournisseur() != null) {
+                dto.setClient(depense.getFournisseur().getNomComplet());
+                dto.setContact(depense.getFournisseur().getTelephone());
+            }
         return dto;
     }
 
     private DetteItemDTO mapEntreeToDetteItemDTO(EntreeGenerale entree) {
         if (entree == null) return null;
-        DetteItemDTO dto = new DetteItemDTO();
-        dto.setId(entree.getId());
-        dto.setType("ENTREE_DETTE");
-        Double montantInitial = getValeurDouble(entree.getMontant());
+            DetteItemDTO dto = new DetteItemDTO();
+            dto.setId(entree.getId());
+            dto.setType("ENTREE_DETTE");
+            Double montantInitial = getValeurDouble(entree.getMontant());
         Double montantRestant = entree.getMontantReste() != null ? getValeurDouble(entree.getMontantReste()) : montantInitial;
-        dto.setMontantInitial(montantInitial);
-        dto.setMontantRestant(montantRestant);
-        dto.setDate(entree.getDateCreation());
-        dto.setDescription(entree.getDesignation());
-        dto.setNumero(entree.getNumero());
-        if (entree.getResponsable() != null) {
-            dto.setResponsable(entree.getResponsable().getNomComplet());
-            dto.setResponsableContact(entree.getResponsable().getPhone());
+            dto.setMontantInitial(montantInitial);
+            dto.setMontantRestant(montantRestant);
+            dto.setDate(entree.getDateCreation());
+            dto.setDescription(entree.getDesignation());
+            dto.setNumero(entree.getNumero());
+            if (entree.getResponsable() != null) {
+                dto.setResponsable(entree.getResponsable().getNomComplet());
+                dto.setResponsableContact(entree.getResponsable().getPhone());
         }
         return dto;
     }
@@ -411,63 +411,63 @@ public class TresorerieService {
     }
 
     private DetteItemDTO mapVenteToDetteItemDTO(Vente v) {
-        double total = getValeurDouble(v.getMontantTotal());
-        double rembourse = getValeurDouble(v.getMontantTotalRembourse());
-        double restant = total - rembourse;
+            double total = getValeurDouble(v.getMontantTotal());
+            double rembourse = getValeurDouble(v.getMontantTotalRembourse());
+            double restant = total - rembourse;
         if (restant <= 0) return null;
 
-        DetteItemDTO dto = new DetteItemDTO();
-        dto.setId(v.getId());
-        dto.setType("VENTE_CREDIT");
-        dto.setMontantInitial(total);
-        dto.setMontantRestant(restant);
-        dto.setDate(v.getDateVente());
-        dto.setDescription(v.getDescription());
-        double remiseGlobaleVal = v.getRemiseGlobale() != null ? v.getRemiseGlobale() : 0.0;
-        dto.setRemiseGlobale(remiseGlobaleVal);
-        dto.setVendeurId(v.getVendeur() != null ? v.getVendeur().getId() : null);
-        dto.setVendeurNom(v.getVendeur() != null ? v.getVendeur().getNomComplet() : null);
-        dto.setBoutiqueId(v.getBoutique() != null ? v.getBoutique().getId() : null);
-        dto.setBoutiqueNom(v.getBoutique() != null ? v.getBoutique().getNomBoutique() : null);
-        Long venteEntrepriseId = v.getBoutique() != null && v.getBoutique().getEntreprise() != null
-                ? v.getBoutique().getEntreprise().getId() : null;
-        if (venteEntrepriseId != null) {
-            factureVenteRepository.findByVenteIdAndEntrepriseId(v.getId(), venteEntrepriseId)
-                    .ifPresent(f -> dto.setNumero(f.getNumeroFacture()));
-        }
-        if (v.getClient() != null) {
-            dto.setClient(v.getClient().getNomComplet());
-            dto.setContact(v.getClient().getTelephone());
-        } else if (v.getEntrepriseClient() != null) {
-            dto.setClient(v.getEntrepriseClient().getNom());
-            dto.setContact(v.getEntrepriseClient().getTelephone());
-        } else {
-            dto.setClient(v.getClientNom());
-            dto.setContact(v.getClientNumero());
-        }
-        if (v.getProduits() != null && !v.getProduits().isEmpty()) {
-            java.util.List<DetteItemDTO.LigneProduitDetteDTO> lignes = v.getProduits().stream()
-                    .map(vp -> {
-                        DetteItemDTO.LigneProduitDetteDTO ligne = new DetteItemDTO.LigneProduitDetteDTO();
-                        ligne.setProduitId(vp.getProduit() != null ? vp.getProduit().getId() : null);
-                        ligne.setNomProduit(vp.getProduit() != null ? vp.getProduit().getNom() : null);
-                        ligne.setQuantite(vp.getQuantite());
-                        ligne.setPrixUnitaire(vp.getPrixUnitaire());
+            DetteItemDTO dto = new DetteItemDTO();
+            dto.setId(v.getId());
+            dto.setType("VENTE_CREDIT");
+            dto.setMontantInitial(total);
+            dto.setMontantRestant(restant);
+            dto.setDate(v.getDateVente());
+            dto.setDescription(v.getDescription());
+            double remiseGlobaleVal = v.getRemiseGlobale() != null ? v.getRemiseGlobale() : 0.0;
+            dto.setRemiseGlobale(remiseGlobaleVal);
+            dto.setVendeurId(v.getVendeur() != null ? v.getVendeur().getId() : null);
+            dto.setVendeurNom(v.getVendeur() != null ? v.getVendeur().getNomComplet() : null);
+            dto.setBoutiqueId(v.getBoutique() != null ? v.getBoutique().getId() : null);
+            dto.setBoutiqueNom(v.getBoutique() != null ? v.getBoutique().getNomBoutique() : null);
+            Long venteEntrepriseId = v.getBoutique() != null && v.getBoutique().getEntreprise() != null
+                    ? v.getBoutique().getEntreprise().getId() : null;
+            if (venteEntrepriseId != null) {
+                factureVenteRepository.findByVenteIdAndEntrepriseId(v.getId(), venteEntrepriseId)
+                        .ifPresent(f -> dto.setNumero(f.getNumeroFacture()));
+            }
+            if (v.getClient() != null) {
+                dto.setClient(v.getClient().getNomComplet());
+                dto.setContact(v.getClient().getTelephone());
+            } else if (v.getEntrepriseClient() != null) {
+                dto.setClient(v.getEntrepriseClient().getNom());
+                dto.setContact(v.getEntrepriseClient().getTelephone());
+            } else {
+                dto.setClient(v.getClientNom());
+                dto.setContact(v.getClientNumero());
+            }
+            if (v.getProduits() != null && !v.getProduits().isEmpty()) {
+                java.util.List<DetteItemDTO.LigneProduitDetteDTO> lignes = v.getProduits().stream()
+                        .map(vp -> {
+                            DetteItemDTO.LigneProduitDetteDTO ligne = new DetteItemDTO.LigneProduitDetteDTO();
+                            ligne.setProduitId(vp.getProduit() != null ? vp.getProduit().getId() : null);
+                            ligne.setNomProduit(vp.getProduit() != null ? vp.getProduit().getNom() : null);
+                            ligne.setQuantite(vp.getQuantite());
+                            ligne.setPrixUnitaire(vp.getPrixUnitaire());
                         ligne.setRemise(vp.getRemise());
-                        ligne.setMontantLigne(vp.getMontantLigne());
-                        return ligne;
-                    })
-                    .collect(Collectors.toList());
-            dto.setProduits(lignes);
+                            ligne.setMontantLigne(vp.getMontantLigne());
+                            return ligne;
+                        })
+                        .collect(Collectors.toList());
+                dto.setProduits(lignes);
             if (remiseGlobaleVal > 0) dto.setTypeRemise("GLOBALE");
             else if (lignes.stream().anyMatch(l -> l.getRemise() != null && l.getRemise() > 0)) {
-                dto.setTypeRemise("PAR_LIGNE");
-                dto.setRemiseGlobale(0.0);
+                    dto.setTypeRemise("PAR_LIGNE");
+                    dto.setRemiseGlobale(0.0);
             } else dto.setTypeRemise(null);
-        } else {
-            dto.setProduits(java.util.Collections.emptyList());
-            dto.setTypeRemise(remiseGlobaleVal > 0 ? "GLOBALE" : null);
-        }
+            } else {
+                dto.setProduits(java.util.Collections.emptyList());
+                dto.setTypeRemise(remiseGlobaleVal > 0 ? "GLOBALE" : null);
+            }
         return dto;
     }
 

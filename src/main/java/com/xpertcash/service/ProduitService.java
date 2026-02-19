@@ -1057,23 +1057,26 @@ public class ProduitService {
             }
         }
 
-        // Favoris en premier (favoriPourVente DESC), puis ordreFavori, puis tri demandé (ex. nom)
-        Sort sort = Sort.by(
-                Sort.Order.desc("favoriPourVente"),
-                Sort.Order.asc("ordreFavori").nullsLast()
-        ).and(parseSortParam(sortParam));
         String searchTerm = (search != null && !search.isBlank()) ? search.trim() : null;
-        Pageable pageable = PageRequest.of(page, size, sort);
+        long totalEnStock = produitRepository.countProduitsEnStockByBoutiqueIdForVenteWithSearch(boutiqueId, searchTerm);
 
-        Page<Produit> produitsPage = produitRepository.findProduitsEnStockByBoutiqueIdForVentePaginated(
-                boutiqueId, searchTerm, pageable);
+        List<Long> ids = findProduitsEnStockIdsForVente(produitRepository, boutiqueId, searchTerm, sortParam, size, page * size);
 
-        long totalEnStock = produitsPage.getTotalElements();
+        List<ProduitDTO> dtos;
+        if (ids.isEmpty()) {
+            dtos = new ArrayList<>();
+        } else {
+            List<Produit> produits = produitRepository.findByIdInWithDetailsForVente(ids);
+            java.util.Map<Long, Produit> byId = produits.stream().collect(Collectors.toMap(Produit::getId, p -> p));
+            List<Produit> ordered = new ArrayList<>();
+            for (Long id : ids) {
+                Produit p = byId.get(id);
+                if (p != null) ordered.add(p);
+            }
+            dtos = ordered.stream().map(this::convertToProduitDTO).collect(Collectors.toList());
+        }
 
-        List<ProduitDTO> dtos = produitsPage.getContent().stream()
-                .map(this::convertToProduitDTO)
-                .collect(Collectors.toList());
-
+        Pageable pageable = PageRequest.of(page, size);
         Page<ProduitDTO> dtoPage = new PageImpl<>(dtos, pageable, totalEnStock);
 
         return ProduitStockPaginatedResponseDTO.fromPage(
@@ -1081,6 +1084,41 @@ public class ProduitService {
                 totalEnStock,
                 totalEnStock,
                 0L);
+    }
+
+    /** Délègue au bon findProduitsEnStockIdsForVente* selon sortParam (whitelisté). */
+    private List<Long> findProduitsEnStockIdsForVente(ProduitRepository repo, Long boutiqueId, String search,
+            String sortParam, int limit, int offset) {
+        boolean asc = parseSortDirection(sortParam);
+        String property = parseSortProperty(sortParam);
+        return switch (property) {
+            case "nom" -> asc ? repo.findProduitsEnStockIdsForVenteOrderByNomAsc(boutiqueId, search, limit, offset)
+                    : repo.findProduitsEnStockIdsForVenteOrderByNomDesc(boutiqueId, search, limit, offset);
+            case "createdAt" -> asc ? repo.findProduitsEnStockIdsForVenteOrderByCreatedAtAsc(boutiqueId, search, limit, offset)
+                    : repo.findProduitsEnStockIdsForVenteOrderByCreatedAtDesc(boutiqueId, search, limit, offset);
+            case "prixVente" -> asc ? repo.findProduitsEnStockIdsForVenteOrderByPrixVenteAsc(boutiqueId, search, limit, offset)
+                    : repo.findProduitsEnStockIdsForVenteOrderByPrixVenteDesc(boutiqueId, search, limit, offset);
+            case "codeGenerique" -> asc ? repo.findProduitsEnStockIdsForVenteOrderByCodeGeneriqueAsc(boutiqueId, search, limit, offset)
+                    : repo.findProduitsEnStockIdsForVenteOrderByCodeGeneriqueDesc(boutiqueId, search, limit, offset);
+            default -> repo.findProduitsEnStockIdsForVenteOrderByCreatedAtDesc(boutiqueId, search, limit, offset);
+        };
+    }
+
+    private static String parseSortProperty(String sortParam) {
+        if (sortParam == null || sortParam.isBlank()) return "createdAt";
+        String[] parts = sortParam.split(",");
+        String p = parts[0].trim();
+        if ("nom".equalsIgnoreCase(p)) return "nom";
+        if ("prixvente".equalsIgnoreCase(p)) return "prixVente";
+        if ("codegenerique".equalsIgnoreCase(p)) return "codeGenerique";
+        if ("createdat".equalsIgnoreCase(p) || "created_at".equalsIgnoreCase(p.replace(" ", ""))) return "createdAt";
+        return "createdAt";
+    }
+
+    private static boolean parseSortDirection(String sortParam) {
+        if (sortParam == null || sortParam.isBlank()) return false;
+        String[] parts = sortParam.split(",");
+        return parts.length > 1 && "asc".equalsIgnoreCase(parts[1].trim());
     }
 
     /**

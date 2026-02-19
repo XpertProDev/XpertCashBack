@@ -308,19 +308,72 @@ long countProduitsEnStockByBoutiqueId(@Param("boutiqueId") Long boutiqueId);
        "AND (p.enStock = false OR p.enStock IS NULL)")
 long countProduitsHorsStockByBoutiqueId(@Param("boutiqueId") Long boutiqueId);
 
-// --- POS / Vente : produits en stock uniquement, avec pagination, tri et recherche ---
-@Query("SELECT DISTINCT p FROM Produit p " +
-       "LEFT JOIN FETCH p.categorie c " +
-       "LEFT JOIN FETCH p.uniteDeMesure u " +
-       "LEFT JOIN FETCH p.boutique b " +
+// --- POS / Vente : produits en stock uniquement, pagination côté base (IDs puis chargement) ---
+@Query("SELECT COUNT(p) FROM Produit p " +
+       "INNER JOIN p.boutique b " +
        "WHERE b.id = :boutiqueId " +
        "AND (p.deleted IS NULL OR p.deleted = false) " +
        "AND p.enStock = true " +
        "AND ( :search IS NULL OR :search = '' OR LOWER(p.nom) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(p.codeGenerique) LIKE LOWER(CONCAT('%', :search, '%')) )")
-Page<Produit> findProduitsEnStockByBoutiqueIdForVentePaginated(
-    @Param("boutiqueId") Long boutiqueId,
-    @Param("search") String search,
-    Pageable pageable);
+long countProduitsEnStockByBoutiqueIdForVenteWithSearch(
+        @Param("boutiqueId") Long boutiqueId, @Param("search") String search);
+
+@Query(value = "SELECT p.id FROM produit p WHERE p.boutique_id = :boutiqueId " +
+        "AND (p.deleted IS NULL OR p.deleted = false) AND p.en_stock = true " +
+        "AND (:search IS NULL OR :search = '' OR LOWER(p.nom) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(p.code_generique) LIKE LOWER(CONCAT('%', :search, '%'))) " +
+        "ORDER BY p.favori_pour_vente DESC, (p.ordre_favori IS NULL), p.ordre_favori ASC, p.nom ASC, p.id ASC LIMIT :limit OFFSET :offset", nativeQuery = true)
+List<Long> findProduitsEnStockIdsForVenteOrderByNomAsc(
+        @Param("boutiqueId") Long boutiqueId, @Param("search") String search, @Param("limit") int limit, @Param("offset") int offset);
+@Query(value = "SELECT p.id FROM produit p WHERE p.boutique_id = :boutiqueId " +
+        "AND (p.deleted IS NULL OR p.deleted = false) AND p.en_stock = true " +
+        "AND (:search IS NULL OR :search = '' OR LOWER(p.nom) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(p.code_generique) LIKE LOWER(CONCAT('%', :search, '%'))) " +
+        "ORDER BY p.favori_pour_vente DESC, (p.ordre_favori IS NULL), p.ordre_favori ASC, p.nom DESC, p.id DESC LIMIT :limit OFFSET :offset", nativeQuery = true)
+List<Long> findProduitsEnStockIdsForVenteOrderByNomDesc(
+        @Param("boutiqueId") Long boutiqueId, @Param("search") String search, @Param("limit") int limit, @Param("offset") int offset);
+@Query(value = "SELECT p.id FROM produit p WHERE p.boutique_id = :boutiqueId " +
+        "AND (p.deleted IS NULL OR p.deleted = false) AND p.en_stock = true " +
+        "AND (:search IS NULL OR :search = '' OR LOWER(p.nom) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(p.code_generique) LIKE LOWER(CONCAT('%', :search, '%'))) " +
+        "ORDER BY p.favori_pour_vente DESC, (p.ordre_favori IS NULL), p.ordre_favori ASC, p.created_at ASC, p.id ASC LIMIT :limit OFFSET :offset", nativeQuery = true)
+List<Long> findProduitsEnStockIdsForVenteOrderByCreatedAtAsc(
+        @Param("boutiqueId") Long boutiqueId, @Param("search") String search, @Param("limit") int limit, @Param("offset") int offset);
+@Query(value = "SELECT p.id FROM produit p WHERE p.boutique_id = :boutiqueId " +
+        "AND (p.deleted IS NULL OR p.deleted = false) AND p.en_stock = true " +
+        "AND (:search IS NULL OR :search = '' OR LOWER(p.nom) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(p.code_generique) LIKE LOWER(CONCAT('%', :search, '%'))) " +
+        "ORDER BY p.favori_pour_vente DESC, (p.ordre_favori IS NULL), p.ordre_favori ASC, p.created_at DESC, p.id DESC LIMIT :limit OFFSET :offset", nativeQuery = true)
+List<Long> findProduitsEnStockIdsForVenteOrderByCreatedAtDesc(
+        @Param("boutiqueId") Long boutiqueId, @Param("search") String search, @Param("limit") int limit, @Param("offset") int offset);
+@Query(value = "SELECT p.id FROM produit p WHERE p.boutique_id = :boutiqueId " +
+        "AND (p.deleted IS NULL OR p.deleted = false) AND p.en_stock = true " +
+        "AND (:search IS NULL OR :search = '' OR LOWER(p.nom) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(p.code_generique) LIKE LOWER(CONCAT('%', :search, '%'))) " +
+        "ORDER BY p.favori_pour_vente DESC, (p.ordre_favori IS NULL), p.ordre_favori ASC, p.prix_vente ASC, p.id ASC LIMIT :limit OFFSET :offset", nativeQuery = true)
+List<Long> findProduitsEnStockIdsForVenteOrderByPrixVenteAsc(
+        @Param("boutiqueId") Long boutiqueId, @Param("search") String search, @Param("limit") int limit, @Param("offset") int offset);
+@Query(value = "SELECT p.id FROM produit p WHERE p.boutique_id = :boutiqueId " +
+        "AND (p.deleted IS NULL OR p.deleted = false) AND p.en_stock = true " +
+        "AND (:search IS NULL OR :search = '' OR LOWER(p.nom) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(p.code_generique) LIKE LOWER(CONCAT('%', :search, '%'))) " +
+        "ORDER BY p.favori_pour_vente DESC, (p.ordre_favori IS NULL), p.ordre_favori ASC, p.prix_vente DESC, p.id DESC LIMIT :limit OFFSET :offset", nativeQuery = true)
+List<Long> findProduitsEnStockIdsForVenteOrderByPrixVenteDesc(
+        @Param("boutiqueId") Long boutiqueId, @Param("search") String search, @Param("limit") int limit, @Param("offset") int offset);
+@Query(value = "SELECT p.id FROM produit p WHERE p.boutique_id = :boutiqueId " +
+        "AND (p.deleted IS NULL OR p.deleted = false) AND p.en_stock = true " +
+        "AND (:search IS NULL OR :search = '' OR LOWER(p.nom) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(p.code_generique) LIKE LOWER(CONCAT('%', :search, '%'))) " +
+        "ORDER BY p.favori_pour_vente DESC, (p.ordre_favori IS NULL), p.ordre_favori ASC, p.code_generique ASC, p.id ASC LIMIT :limit OFFSET :offset", nativeQuery = true)
+List<Long> findProduitsEnStockIdsForVenteOrderByCodeGeneriqueAsc(
+        @Param("boutiqueId") Long boutiqueId, @Param("search") String search, @Param("limit") int limit, @Param("offset") int offset);
+@Query(value = "SELECT p.id FROM produit p WHERE p.boutique_id = :boutiqueId " +
+        "AND (p.deleted IS NULL OR p.deleted = false) AND p.en_stock = true " +
+        "AND (:search IS NULL OR :search = '' OR LOWER(p.nom) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(p.code_generique) LIKE LOWER(CONCAT('%', :search, '%'))) " +
+        "ORDER BY p.favori_pour_vente DESC, (p.ordre_favori IS NULL), p.ordre_favori ASC, p.code_generique DESC, p.id DESC LIMIT :limit OFFSET :offset", nativeQuery = true)
+List<Long> findProduitsEnStockIdsForVenteOrderByCodeGeneriqueDesc(
+        @Param("boutiqueId") Long boutiqueId, @Param("search") String search, @Param("limit") int limit, @Param("offset") int offset);
+
+/** Charge les produits par IDs avec relations pour POS (categorie, uniteDeMesure, boutique). */
+@Query("SELECT DISTINCT p FROM Produit p " +
+       "LEFT JOIN FETCH p.categorie c " +
+       "LEFT JOIN FETCH p.uniteDeMesure u " +
+       "LEFT JOIN FETCH p.boutique b " +
+       "WHERE p.id IN :ids")
+List<Produit> findByIdInWithDetailsForVente(@Param("ids") List<Long> ids);
 
 }
 

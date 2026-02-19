@@ -29,7 +29,12 @@ public interface MouvementCaisseRepository extends JpaRepository<MouvementCaisse
     // Récupère les mouvements pour plusieurs caisses sans filtre de date
     List<MouvementCaisse> findByCaisseIdInAndTypeMouvement(
         List<Long> caisseIds, TypeMouvementCaisse typeMouvement);
-    
+
+    /** Charge les dépenses pour plusieurs caisses en une requête (évite N+1). */
+    @Query("SELECT DISTINCT m FROM MouvementCaisse m JOIN FETCH m.caisse c LEFT JOIN FETCH c.vendeur LEFT JOIN FETCH c.boutique WHERE m.caisse.id IN :caisseIds AND m.typeMouvement = :type")
+    List<MouvementCaisse> findByCaisseIdInAndTypeMouvementWithCaisseAndVendeurAndBoutique(
+        @Param("caisseIds") List<Long> caisseIds, @Param("type") TypeMouvementCaisse typeMouvement);
+
     // Récupère tous les mouvements d'une caisse (tous types confondus)
     List<MouvementCaisse> findByCaisseId(Long caisseId);
 }
