@@ -214,8 +214,19 @@ public class ClientService {
         return dto;
     }
 
-    public List<Client> getClientsByEntreprise(Long entrepriseId) {
-        return clientRepository.findByEntrepriseClientId(entrepriseId);
+    /**
+     * Retourne les clients de l'entreprise (tenant) d'id entrepriseId.
+     * Sécurisé : l'utilisateur ne peut accéder qu'aux clients de sa propre entreprise.
+     */
+    public List<Client> getClientsByEntreprise(Long entrepriseId, HttpServletRequest request) {
+        User user = authHelper.getAuthenticatedUserWithFallback(request);
+        if (user.getEntreprise() == null) {
+            throw new RuntimeException("Aucune entreprise associée à cet utilisateur.");
+        }
+        if (!user.getEntreprise().getId().equals(entrepriseId)) {
+            throw new RuntimeException("Accès refusé : vous ne pouvez consulter que les clients de votre entreprise.");
+        }
+        return clientRepository.findClientsByEntrepriseOrEntrepriseClient(entrepriseId);
     }
 
 

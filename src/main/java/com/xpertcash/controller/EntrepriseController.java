@@ -40,9 +40,14 @@ public class EntrepriseController {
                 dto = new ObjectMapper().readValue(entrepriseJson, UpdateEntrepriseDTO.class);
             }
     
-            entrepriseService.updateEntreprise(entrepriseId, dto, imageLogoFile, imageSignatureFile, imageCachetFile);
+            entrepriseService.updateEntreprise(entrepriseId, dto, imageLogoFile, imageSignatureFile, imageCachetFile, request);
     
             return ResponseEntity.ok("Entreprise mise à jour avec succès !");
+        } catch (RuntimeException e) {
+            if (e.getMessage() != null && e.getMessage().contains("Accès refusé")) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
+            }
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Erreur : " + e.getMessage());
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Erreur : " + e.getMessage());
         }

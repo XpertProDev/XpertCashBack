@@ -86,8 +86,13 @@ public class ClientController {
 
 
     @GetMapping("/clients/entreprise/{entrepriseId}")
-    public List<Client> getClientsByEntreprise(@PathVariable Long entrepriseId) {
-        return clientService.getClientsByEntreprise(entrepriseId);
+    public ResponseEntity<?> getClientsByEntreprise(@PathVariable Long entrepriseId, HttpServletRequest request) {
+        try {
+            List<Client> clients = clientService.getClientsByEntreprise(entrepriseId, request);
+            return ResponseEntity.ok(clients);
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Collections.singletonMap("error", e.getMessage()));
+        }
     }
 
     @GetMapping("/clients-and-entreprises")
