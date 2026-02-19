@@ -89,6 +89,20 @@ public interface FactureReelleRepository extends JpaRepository<FactureReelle, Lo
             @Param("entrepriseId") Long entrepriseId, 
             Pageable pageable);
 
+    /** Pagination avec toutes les relations ManyToOne chargées (évite N+1 pour listerMesFacturesReellesPaginated). */
+    @Query("SELECT DISTINCT fr FROM FactureReelle fr " +
+           "LEFT JOIN FETCH fr.entreprise e " +
+           "LEFT JOIN FETCH fr.utilisateurCreateur " +
+           "LEFT JOIN FETCH fr.utilisateurValidateur " +
+           "LEFT JOIN FETCH fr.client " +
+           "LEFT JOIN FETCH fr.entrepriseClient " +
+           "LEFT JOIN FETCH fr.factureProForma " +
+           "WHERE e.id = :entrepriseId " +
+           "ORDER BY fr.dateCreation DESC, fr.id DESC")
+    Page<FactureReelle> findByEntrepriseOrderByDateCreationDescPaginatedWithRelations(
+            @Param("entrepriseId") Long entrepriseId,
+            Pageable pageable);
+
     @Query("SELECT DISTINCT f FROM FactureReelle f " +
            "LEFT JOIN FETCH f.entreprise e " +
            "WHERE e.id = :entrepriseId " +
