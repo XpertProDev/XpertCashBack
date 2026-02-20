@@ -10,9 +10,11 @@ import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -104,24 +106,16 @@ public class ComptabiliteController {
         return handleRequest(() -> comptabiliteService.listerEntreesGenerales(request));
     }
 
+    /** Comptabilité complète paginée, avec filtre de période (même paramètres que GET /tresorerie). */
     @GetMapping("/comptabilite/complete")
     public ResponseEntity<?> getComptabiliteComplete(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false, defaultValue = "aujourdhui") String periode,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateDebut,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateFin,
             HttpServletRequest request) {
-    
-        try {
-            // Appel du service
-            Object result = comptabiliteService.getComptabiliteCompletePaginated(request, page, size);
-            return ResponseEntity.ok(result);
-        } catch (Exception e) {
-            // Log immédiat pour debug
-            System.out.println("===== EXCEPTION DANS getComptabiliteComplete =====");
-            e.printStackTrace();
-    
-            // Relance pour que le GlobalExceptionLogger la capture
-            throw e;
-        }
+        return handleRequest(() -> comptabiliteService.getComptabiliteCompletePaginated(request, page, size, periode, dateDebut, dateFin));
     }
     
 

@@ -75,15 +75,17 @@ public class ClientController {
         }
     }
 
+    /** Liste paginée des clients. search : filtre par nom, email ou téléphone (côté serveur). */
     @GetMapping("/clients")
     public ResponseEntity<?> getAllClients(
             HttpServletRequest request,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
             @RequestParam(required = false) String sortBy,
-            @RequestParam(required = false) String sortDir) {
+            @RequestParam(required = false) String sortDir,
+            @RequestParam(required = false) String search) {
         try {
-            PaginatedResponseDTO<Client> paginated = clientService.getAllClientsPaginated(request, page, size, sortBy, sortDir);
+            PaginatedResponseDTO<Client> paginated = clientService.getAllClientsPaginated(request, page, size, sortBy, sortDir, search);
             return ResponseEntity.ok(paginated);
         } catch (RuntimeException e) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)

@@ -238,10 +238,11 @@ public class ClientService {
 
 
     /**
-     * Liste paginée des clients de l'entreprise de l'utilisateur connecté (côté base).
+     * Liste paginée des clients de l'entreprise (côté base).
+     * search : si non vide, filtre par nom complet, email ou téléphone (insensible à la casse) — trouve le client même en page N.
      */
     public PaginatedResponseDTO<Client> getAllClientsPaginated(HttpServletRequest request,
-            int page, int size, String sortBy, String sortDir) {
+            int page, int size, String sortBy, String sortDir, String search) {
         User user = authHelper.getAuthenticatedUserWithFallback(request);
         Entreprise entreprise = user.getEntreprise();
         if (entreprise == null) {
@@ -256,13 +257,19 @@ public class ClientService {
         Sort sort = Sort.by(direction, property).and(Sort.by(Sort.Direction.ASC, "id"));
         Pageable pageable = PageRequest.of(page, size, sort);
 
-        Page<Client> clientPage = clientRepository.findClientsByEntrepriseOrEntrepriseClientPaginated(entreprise.getId(), pageable);
+        Page<Client> clientPage;
+        String searchTrimmed = (search != null) ? search.trim() : "";
+        if (searchTrimmed.isEmpty()) {
+            clientPage = clientRepository.findClientsByEntrepriseOrEntrepriseClientPaginated(entreprise.getId(), pageable);
+        } else {
+            clientPage = clientRepository.findClientsByEntrepriseOrEntrepriseClientPaginatedWithSearch(entreprise.getId(), searchTrimmed, pageable);
+        }
         return PaginatedResponseDTO.fromPage(clientPage);
     }
 
     /** Retourne la première page (20 éléments par défaut) pour compatibilité. */
     public List<Client> getAllClients(HttpServletRequest request) {
-        return getAllClientsPaginated(request, 0, 20, "nomComplet", "asc").getContent();
+        return getAllClientsPaginated(request, 0, 20, "nomComplet", "asc", null).getContent();
     }
 
     public List<EntrepriseClient> getAllEntrepriseClients(HttpServletRequest request) {
