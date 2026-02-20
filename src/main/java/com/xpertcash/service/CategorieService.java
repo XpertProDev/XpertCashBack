@@ -28,6 +28,7 @@ import com.xpertcash.entity.Produit;
 import com.xpertcash.entity.User;
 import com.xpertcash.entity.UserBoutique;
 import com.xpertcash.entity.Enum.TypeProduit;
+import com.xpertcash.repository.BoutiqueRepository;
 import com.xpertcash.repository.CategorieRepository;
 import com.xpertcash.repository.EntrepriseRepository;
 import com.xpertcash.repository.ProduitRepository;
@@ -45,7 +46,11 @@ public class CategorieService {
     @Autowired
     private ProduitRepository produitRepository;
 
-    @Autowired EntrepriseRepository entrepriseRepository;
+    @Autowired
+    private BoutiqueRepository boutiqueRepository;
+
+    @Autowired
+    private EntrepriseRepository entrepriseRepository;
 
   public Categorie createCategorie(String nom, HttpServletRequest request) {
     String token = request.getHeader("Authorization");
@@ -434,5 +439,45 @@ private ProduitDetailsResponseDTO toProduitDTO(Produit produit) {
         return result;
     }
 
+    /**
+     * Catégories avec nombre de produits par boutique (isolation multi-tenant).
+     * Valide que la boutique appartient à l'entreprise de l'utilisateur.
+     * Une seule requête de comptage par boutique (optimisé).
+     */
+    public List<Map<String, Object>> getCategoriesWithProductCountByBoutique(Long boutiqueId, HttpServletRequest request) {
+        User user = authHelper.getAuthenticatedUserWithFallback(request);
+        Entreprise entreprise = user.getEntreprise();
+        if (entreprise == null) {
+            throw new RuntimeException("Aucune entreprise associée à cet utilisateur");
+        }
+
+        boolean isAdminOrManager = CentralAccess.isAdminOrManagerOfEntreprise(user, entreprise.getId());
+        boolean hasPermissionGestionProduits = user.getRole().hasPermission(PermissionType.GERER_PRODUITS);
+        boolean isVendeur = user.getRole().hasPermission(PermissionType.VENDRE_PRODUITS);
+        if (!isAdminOrManager && !hasPermissionGestionProduits && !isVendeur) {
+            throw new RuntimeException("Accès refusé");
+        }
+
+        // Isolation multi-tenant : la boutique doit appartenir à l'entreprise
+        boutiqueRepository.findByIdAndEntrepriseId(boutiqueId, entreprise.getId())
+                .orElseThrow(() -> new RuntimeException("Boutique introuvable ou n'appartient pas à votre entreprise"));
+
+        List<Categorie> categories = categorieRepository.findByEntrepriseId(entreprise.getId());
+        Map<Long, Long> produitCountMap = produitRepository.countProduitsParCategorieByBoutique(boutiqueId)
+                .stream()
+                .collect(Collectors.toMap(obj -> (Long) obj[0], obj -> (Long) obj[1]));
+
+        List<Map<String, Object>> result = new ArrayList<>(categories.size());
+        for (Categorie c : categories) {
+            Map<String, Object> row = new HashMap<>();
+            row.put("id", c.getId());
+            row.put("nom", c.getNom());
+            row.put("produitCount", produitCountMap.getOrDefault(c.getId(), 0L));
+            row.put("createdAt", c.getCreatedAt());
+            row.put("origineCreation", c.getOrigineCreation());
+            result.add(row);
+        }
+        return result;
+    }
 
 }

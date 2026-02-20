@@ -204,6 +204,17 @@ List<Object[]> countProduitsParCategorie(@Param("entrepriseId") Long entrepriseI
        "ORDER BY COUNT(p) DESC")
 List<Object[]> countProduitsParCategorieExcluantService(@Param("entrepriseId") Long entrepriseId);
 
+// Compter les produits par catégorie pour une boutique (isolation multi-tenant : valider boutique ∈ entreprise côté service)
+@Query("SELECT p.categorie.id, COUNT(p) FROM Produit p " +
+       "INNER JOIN p.boutique b " +
+       "WHERE b.id = :boutiqueId " +
+       "AND (p.deleted IS NULL OR p.deleted = false) " +
+       "AND p.categorie.id IS NOT NULL " +
+       "AND (p.typeProduit IS NULL OR p.typeProduit != 'SERVICE') " +
+       "GROUP BY p.categorie.id " +
+       "ORDER BY COUNT(p) DESC")
+List<Object[]> countProduitsParCategorieByBoutique(@Param("boutiqueId") Long boutiqueId);
+
 // Compter les produits par catégorie pour une liste spécifique de catégories
 @Query("SELECT p.categorie.id, COUNT(p) FROM Produit p " +
        "INNER JOIN p.boutique b " +

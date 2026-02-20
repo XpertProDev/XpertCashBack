@@ -154,8 +154,23 @@ public class CategorieController {
             }
         }
 
-     
-    
+        //Catégories avec nombre de produits pour une boutique (isolation multi-tenant)
+       
+        @GetMapping("/{boutiqueId}/categories/count")
+        public ResponseEntity<List<Map<String, Object>>> getCategoriesWithProductCountByBoutique(
+                @PathVariable Long boutiqueId,
+                HttpServletRequest request) {
+            try {
+                List<Map<String, Object>> categoriesWithCount = categorieService.getCategoriesWithProductCountByBoutique(boutiqueId, request);
+                return ResponseEntity.ok(categoriesWithCount);
+            } catch (RuntimeException e) {
+                System.err.println("Erreur catégories par boutique : " + e.getMessage());
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(null);
+            } catch (Exception e) {
+                System.err.println("Erreur interne catégories par boutique : " + e.getMessage());
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
+            }
+        }
 
     // Supprimer une catégorie
     @DeleteMapping("/deleteCategory/{id}")
