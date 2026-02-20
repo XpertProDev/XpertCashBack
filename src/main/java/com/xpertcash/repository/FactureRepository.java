@@ -2,6 +2,8 @@ package com.xpertcash.repository;
 
 import java.util.List;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -59,5 +61,26 @@ public interface FactureRepository extends JpaRepository<Facture, Long>{
           "LEFT JOIN FETCH f.user u " +
           "WHERE e.id = :entrepriseId")
    List<Facture> findAllByEntrepriseId(@Param("entrepriseId") Long entrepriseId);
+
+   /** Pagination côté base : factures par entreprise (isolation multi-tenant). */
+   @Query(value = "SELECT DISTINCT f FROM Facture f " +
+          "LEFT JOIN FETCH f.boutique b " +
+          "LEFT JOIN FETCH f.user u " +
+          "LEFT JOIN FETCH f.fournisseur four " +
+          "WHERE b.entreprise.id = :entrepriseId",
+          countQuery = "SELECT COUNT(DISTINCT f) FROM Facture f JOIN f.boutique b JOIN b.entreprise e WHERE e.id = :entrepriseId")
+   Page<Facture> findAllByEntrepriseIdPaginated(@Param("entrepriseId") Long entrepriseId, Pageable pageable);
+
+   /** Pagination côté base : factures par boutique et entreprise (isolation multi-tenant). */
+   @Query(value = "SELECT DISTINCT f FROM Facture f " +
+          "LEFT JOIN FETCH f.boutique b " +
+          "LEFT JOIN FETCH f.user u " +
+          "LEFT JOIN FETCH f.fournisseur four " +
+          "WHERE b.id = :boutiqueId AND b.entreprise.id = :entrepriseId",
+          countQuery = "SELECT COUNT(f) FROM Facture f JOIN f.boutique b JOIN b.entreprise e WHERE b.id = :boutiqueId AND e.id = :entrepriseId")
+   Page<Facture> findByBoutiqueIdAndEntrepriseIdPaginated(
+           @Param("boutiqueId") Long boutiqueId,
+           @Param("entrepriseId") Long entrepriseId,
+           Pageable pageable);
 
 }

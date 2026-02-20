@@ -2,6 +2,8 @@ package com.xpertcash.repository;
 
 import java.util.List;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -21,5 +23,11 @@ public interface StockHistoryRepository  extends JpaRepository<StockHistory, Lon
     @Transactional
     @Query("DELETE FROM StockHistory s WHERE s.stock = :stock")
     void deleteByStock(@Param("stock") Stock stock);
+
+    /** Pagination côté base : historique de stock par entreprise (isolation multi-tenant). */
+    @Query(value = "SELECT DISTINCT sh FROM StockHistory sh LEFT JOIN FETCH sh.user " +
+            "JOIN sh.stock s JOIN s.boutique b JOIN b.entreprise e WHERE e.id = :entrepriseId",
+            countQuery = "SELECT COUNT(DISTINCT sh) FROM StockHistory sh JOIN sh.stock s JOIN s.boutique b JOIN b.entreprise e WHERE e.id = :entrepriseId")
+    Page<StockHistory> findByStock_Boutique_Entreprise_Id(@Param("entrepriseId") Long entrepriseId, Pageable pageable);
 
 }
