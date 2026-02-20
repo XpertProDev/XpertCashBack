@@ -21,10 +21,8 @@ import com.xpertcash.DTOs.ProduitDTO;
 import com.xpertcash.DTOs.TransfertDTO;
 import com.xpertcash.DTOs.Boutique.BoutiqueResponse;
 import com.xpertcash.entity.Boutique;
-import com.xpertcash.entity.Transfert;
 import com.xpertcash.entity.Enum.TypeBoutique;
 import com.xpertcash.service.BoutiqueService;
-import com.xpertcash.repository.TransfertRepository;
 
 import jakarta.servlet.http.HttpServletRequest;
 
@@ -36,8 +34,6 @@ public class BoutiqueController {
    
     @Autowired
     private BoutiqueService boutiqueService;
-    @Autowired
-    private TransfertRepository transfertRepository;
 
     // Ajouter une boutique (requête JSON)
     @PostMapping("/ajouterBoutique")
@@ -246,36 +242,30 @@ public class BoutiqueController {
     return ResponseEntity.ok(produitsDTO);
 }
 
+    /**
+     * Liste des transferts de l'entreprise de l'utilisateur (isolation multi-tenant).
+     * Optionnel : ?boutiqueId= pour filtrer par boutique (doit appartenir à l'entreprise).
+     */
     @GetMapping("/transferts")
     public ResponseEntity<Object> getTransferts(
+            HttpServletRequest request,
             @RequestParam(required = false) Long boutiqueId) {
-        List<Transfert> transferts;
-        if (boutiqueId != null) {
-            transferts = transfertRepository.findByBoutiqueSourceIdOrBoutiqueDestinationId(boutiqueId, boutiqueId);
-        } else {
-            transferts = transfertRepository.findAll();
+        try {
+            List<TransfertDTO> transfertDTOs = boutiqueService.getTransferts(request, boutiqueId);
+            if (transfertDTOs.isEmpty()) {
+                Map<String, String> response = new HashMap<>();
+                response.put("message", "Aucun transfert trouvé.");
+                return ResponseEntity.ok(response);
+            }
+            return ResponseEntity.ok(transfertDTOs);
+        } catch (RuntimeException e) {
+            Map<String, String> error = new HashMap<>();
+            error.put("error", e.getMessage());
+            if (e.getMessage() != null && (e.getMessage().contains("Token JWT") || e.getMessage().contains("Utilisateur non rattaché") || e.getMessage().contains("Boutique introuvable"))) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error);
+            }
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error);
         }
-
-        if (transferts.isEmpty()) {
-            Map<String, String> response = new HashMap<>();
-            response.put("message", "Aucun transfert trouvé.");
-            return ResponseEntity.ok(response);
-        }
-
-        // Convertir les entités Transfert en DTO
-        List<TransfertDTO> transfertDTOs = transferts.stream().map(transfert -> {
-            TransfertDTO dto = new TransfertDTO();
-            dto.setId(transfert.getId());
-            dto.setProduitNom(transfert.getProduit().getNom());
-            dto.setProduitCodeGenerique(transfert.getProduit().getCodeGenerique());
-            dto.setBoutiqueSourceNom(transfert.getBoutiqueSource().getNomBoutique());
-            dto.setBoutiqueDestinationNom(transfert.getBoutiqueDestination().getNomBoutique());
-            dto.setQuantite(transfert.getQuantite());
-            dto.setDateTransfert(transfert.getDateTransfert().toString());
-            return dto; 
-        }).toList();
-
-        return ResponseEntity.ok(transfertDTOs);
     }
 
     // Endpoint pour Desactiver une boutique

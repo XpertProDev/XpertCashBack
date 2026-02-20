@@ -8,10 +8,15 @@ import com.xpertcash.repository.VENTE.VenteRepository;
 import com.xpertcash.repository.VENTE.VersementComptableRepository;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import jakarta.servlet.http.HttpServletRequest;
 
+import com.xpertcash.DTOs.PaginatedResponseDTO;
 import com.xpertcash.DTOs.VENTE.CaisseResponseDTO;
 import com.xpertcash.DTOs.VENTE.DepenseRequest;
 import com.xpertcash.DTOs.VENTE.DepenseResponseDTO;
@@ -21,8 +26,11 @@ import com.xpertcash.composant.Utilitaire;
 import com.xpertcash.configuration.JwtUtil;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 import com.xpertcash.entity.Enum.RoleType;
 import com.xpertcash.entity.VENTE.MouvementCaisse;
 import com.xpertcash.entity.VENTE.StatutCaisse;
@@ -224,44 +232,73 @@ public FermerCaisseResponseDTO fermerCaisse(FermerCaisseRequest request, HttpSer
 }
 
 
-    public List<Caisse> getToutesLesCaisses(Long boutiqueId, HttpServletRequest request) {
+    /**
+     * Liste paginée de toutes les caisses d'une boutique (admin/manager, côté base).
+     */
+    public PaginatedResponseDTO<Caisse> getToutesLesCaissesPaginated(Long boutiqueId, HttpServletRequest request,
+            int page, int size, String sortBy, String sortDir) {
         User user = getUserFromRequest(request);
-        
-        Boutique boutique = boutiqueRepository.findById(boutiqueId)
-                .orElseThrow(() -> new RuntimeException("Boutique inentrouvable"));
-
-        if (!boutique.getEntreprise().getId().equals(user.getEntreprise().getId())) {
-            throw new RuntimeException("Accès interdit : cette boutique n'appartient pas à votre entreprise.");
-        }
-
-        RoleType role = user.getRole().getName();
-        boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
-    if (!isAdminOrManager) {
-            throw new RuntimeException("Vous n'avez pas les droits nécessaires pour consulter les caisses !");
-        }
-
-        return caisseRepository.findByBoutiqueId(boutiqueId);
-    }
-
-    public List<Caisse> getMesCaisses(Long boutiqueId, HttpServletRequest request) {
-        User user = getUserFromRequest(request);
-        
         Boutique boutique = boutiqueRepository.findById(boutiqueId)
                 .orElseThrow(() -> new RuntimeException("Boutique introuvable"));
-
         if (!boutique.getEntreprise().getId().equals(user.getEntreprise().getId())) {
             throw new RuntimeException("Accès interdit : cette boutique n'appartient pas à votre entreprise.");
         }
+        RoleType role = user.getRole().getName();
+        boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
+        if (!isAdminOrManager) {
+            throw new RuntimeException("Vous n'avez pas les droits nécessaires pour consulter les caisses !");
+        }
+        if (page < 0) page = 0;
+        if (size <= 0) size = 20;
+        if (size > 100) size = 100;
 
+        Sort.Direction direction = "desc".equalsIgnoreCase(sortDir != null ? sortDir : "asc") ? Sort.Direction.DESC : Sort.Direction.ASC;
+        String property = (sortBy != null && !sortBy.isBlank()) ? sortBy.trim() : "dateOuverture";
+        Sort sort = Sort.by(direction, property).and(Sort.by(Sort.Direction.ASC, "id"));
+        Pageable pageable = PageRequest.of(page, size, sort);
+
+        Page<Caisse> caissePage = caisseRepository.findByBoutiqueIdWithVendeurAndBoutique(boutiqueId, pageable);
+        return PaginatedResponseDTO.fromPage(caissePage);
+    }
+
+    /** Retourne la première page (20 éléments par défaut) pour compatibilité. */
+    public List<Caisse> getToutesLesCaisses(Long boutiqueId, HttpServletRequest request) {
+        return getToutesLesCaissesPaginated(boutiqueId, request, 0, 20, "dateOuverture", "desc").getContent();
+    }
+
+    /**
+     * Liste paginée des caisses du vendeur pour une boutique (côté base).
+     */
+    public PaginatedResponseDTO<Caisse> getMesCaissesPaginated(Long boutiqueId, HttpServletRequest request,
+            int page, int size, String sortBy, String sortDir) {
+        User user = getUserFromRequest(request);
+        Boutique boutique = boutiqueRepository.findById(boutiqueId)
+                .orElseThrow(() -> new RuntimeException("Boutique introuvable"));
+        if (!boutique.getEntreprise().getId().equals(user.getEntreprise().getId())) {
+            throw new RuntimeException("Accès interdit : cette boutique n'appartient pas à votre entreprise.");
+        }
         RoleType role = user.getRole().getName();
         boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
         boolean hasPermission = user.getRole().hasPermission(PermissionType.VENDRE_PRODUITS);
-        
         if (!isAdminOrManager && !hasPermission) {
             throw new RuntimeException("Vous n'avez pas les droits nécessaires pour consulter vos caisses !");
         }
+        if (page < 0) page = 0;
+        if (size <= 0) size = 20;
+        if (size > 100) size = 100;
 
-        return caisseRepository.findByVendeurIdAndBoutiqueId(user.getId(), boutiqueId);
+        Sort.Direction direction = "desc".equalsIgnoreCase(sortDir != null ? sortDir : "asc") ? Sort.Direction.DESC : Sort.Direction.ASC;
+        String property = (sortBy != null && !sortBy.isBlank()) ? sortBy.trim() : "dateOuverture";
+        Sort sort = Sort.by(direction, property).and(Sort.by(Sort.Direction.ASC, "id"));
+        Pageable pageable = PageRequest.of(page, size, sort);
+
+        Page<Caisse> caissePage = caisseRepository.findByVendeurIdAndBoutiqueIdWithVendeurAndBoutique(user.getId(), boutiqueId, pageable);
+        return PaginatedResponseDTO.fromPage(caissePage);
+    }
+
+    /** Retourne la première page (20 éléments par défaut) pour compatibilité. */
+    public List<Caisse> getMesCaisses(Long boutiqueId, HttpServletRequest request) {
+        return getMesCaissesPaginated(boutiqueId, request, 0, 20, "dateOuverture", "desc").getContent();
     }
 
     public Optional<CaisseResponseDTO> getDerniereCaisseVendeur(Long boutiqueId, HttpServletRequest request) {
@@ -540,6 +577,43 @@ public FermerCaisseResponseDTO fermerCaisse(FermerCaisseRequest request, HttpSer
         }
 
         return depenses;
+    }
+
+    /**
+     * Charge les dépenses pour plusieurs caisses en une requête (évite N+1 sur les endpoints paginés).
+     * À utiliser quand on affiche une page de caisses : on passe les IDs de la page et on récupère
+     * une map caisseId -> liste des dépenses.
+     */
+    public Map<Long, List<DepenseResponseDTO>> listerDepensesCaissesBatch(List<Long> caisseIds, HttpServletRequest request) { 
+        Map<Long, List<DepenseResponseDTO>> result = new LinkedHashMap<>();
+        if (caisseIds == null || caisseIds.isEmpty()) {
+            return result;
+        }
+        User user = getUserFromRequest(request);
+        RoleType role = user.getRole().getName();
+        boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
+        boolean hasPermission = user.getRole().hasPermission(PermissionType.VENDRE_PRODUITS);
+        if (!isAdminOrManager && !hasPermission) {
+            return result;
+        }
+        List<MouvementCaisse> mouvements = mouvementCaisseRepository.findByCaisseIdInAndTypeMouvementWithCaisseAndVendeurAndBoutique(
+                caisseIds, TypeMouvementCaisse.DEPENSE);
+        for (Long cid : caisseIds) {
+            result.put(cid, new ArrayList<>());
+        }
+        for (MouvementCaisse mouvement : mouvements) {
+            Long cid = mouvement.getCaisse().getId();
+            DepenseResponseDTO dto = new DepenseResponseDTO();
+            dto.setId(mouvement.getId());
+            dto.setCaisseId(cid);
+            dto.setMontant(mouvement.getMontant());
+            dto.setDescription(mouvement.getDescription());
+            dto.setDateMouvement(mouvement.getDateMouvement());
+            dto.setNomVendeur(mouvement.getCaisse().getVendeur() != null ? mouvement.getCaisse().getVendeur().getNomComplet() : null);
+            dto.setNomBoutique(mouvement.getCaisse().getBoutique() != null ? mouvement.getCaisse().getBoutique().getNomBoutique() : null);
+            result.get(cid).add(dto);
+        }
+        return result;
     }
 
   

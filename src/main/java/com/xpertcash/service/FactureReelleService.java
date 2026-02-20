@@ -5,11 +5,12 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 import java.util.Comparator;
 
 import org.hibernate.Hibernate;
@@ -235,28 +236,32 @@ public class FactureReelleService {
         throw new SecurityException("Accès interdit : Vous n'avez pas les permissions nécessaires pour voir ces factures.");
     }
 
-    if (!utilitaire.isEntrepriseActive(entreprise.getId())) {
-        throw new SecurityException("Votre entreprise est désactivée, opération non autorisée.");
-    }
-
     
 
-    Pageable pageable = PageRequest.of(page, size, 
+    Pageable pageable = PageRequest.of(page, size,
         Sort.by("dateCreation").descending().and(Sort.by("id").descending()));
 
-    Page<FactureReelle> facturesPage = factureReelleRepository.findByEntrepriseOrderByDateCreationDescPaginated(
+    Page<FactureReelle> facturesPage = factureReelleRepository.findByEntrepriseOrderByDateCreationDescPaginatedWithRelations(
             entreprise.getId(), pageable);
 
     List<Long> factureIds = facturesPage.getContent().stream()
             .map(FactureReelle::getId)
             .collect(Collectors.toList());
-    
+
     Map<Long, BigDecimal> paiementsMap = paiementRepository.sumMontantsByFactureReelleIds(factureIds)
             .stream()
             .collect(Collectors.toMap(
                 obj -> (Long) obj[0],
                 obj -> (BigDecimal) obj[1]
             ));
+
+    // Chargement en batch des lignes pour éviter N+1
+    Map<Long, List<LigneFactureReelle>> lignesByFactureId = factureIds.isEmpty() ? Collections.emptyMap()
+            : ligneFactureReelleRepository.findByFactureReelleIdIn(factureIds).stream()
+                    .collect(Collectors.groupingBy(l -> l.getFactureReelle().getId()));
+
+    facturesPage.getContent().forEach(f -> f.setLignesFacture(
+            lignesByFactureId.getOrDefault(f.getId(), Collections.emptyList())));
 
     Page<FactureReelleDTO> facturesDTO = facturesPage.map(facture -> {
         BigDecimal totalFacture = BigDecimal.valueOf(facture.getTotalFacture());
@@ -283,9 +288,7 @@ public class FactureReelleService {
     if (!(isAdminOrManager || hasPermission)) {
         throw new SecurityException("Accès interdit : Vous n'avez pas les permissions nécessaires pour filtrer les factures.");
     }
-    if (!utilitaire.isEntrepriseActive(entrepriseId)) {
-        throw new SecurityException("Votre entreprise est désactivée, opération non autorisée.");
-    }
+  
 
     List<FactureReelle> factures;
 

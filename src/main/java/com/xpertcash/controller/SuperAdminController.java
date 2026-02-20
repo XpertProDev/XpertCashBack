@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.xpertcash.DTOs.SuperAdminDashboardStatsDTO;
 import com.xpertcash.DTOs.SuperAdminEntrepriseStatsDTO;
 import com.xpertcash.entity.User;
 import com.xpertcash.service.AuthenticationHelper;
@@ -32,6 +33,21 @@ public class SuperAdminController {
 
     @Autowired
     private AuthenticationHelper authHelper;
+
+     // Chiffres des cartes du dashboard Super Admin (sans recalcul à partir de la liste paginée).
+    @GetMapping("/superadmin/stats")
+    public ResponseEntity<?> getDashboardStats(HttpServletRequest request) {
+        try {
+            User user = authHelper.getAuthenticatedUserWithFallback(request);
+            SuperAdminDashboardStatsDTO stats = superAdminService.getDashboardStats(user);
+            return ResponseEntity.ok(stats);
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Erreur interne : " + e.getMessage()));
+        }
+    }
 
      // Retourne les infos de l'utilisateur SUPER_ADMIN connecté.
   
@@ -72,9 +88,20 @@ public class SuperAdminController {
                     .mapToLong(dto -> dto.getNombreUtilisateursEntreprise())
                     .sum();
 
+            int totalPages = entreprisesPage.getTotalPages();
+            int pageNumber = entreprisesPage.getNumber();
+            int pageSize = entreprisesPage.getSize();
+
             return ResponseEntity.ok(Map.of(
                     "totalEntreprises", entreprisesPage.getTotalElements(),
                     "totalUsersAllEntreprises", totalUsersAllEntreprises,
+                    "totalPages", totalPages,
+                    "pageNumber", pageNumber,
+                    "pageSize", pageSize,
+                    "hasNext", entreprisesPage.hasNext(),
+                    "hasPrevious", entreprisesPage.hasPrevious(),
+                    "isFirst", entreprisesPage.isFirst(),
+                    "isLast", entreprisesPage.isLast(),
                     "content", entreprisesPage.getContent()
             ));
         } catch (RuntimeException e) {
@@ -87,7 +114,6 @@ public class SuperAdminController {
     }
 
      // Désactiver une entreprise (réservé au SUPER_ADMIN).
-  
     @PatchMapping("/entreprises/{entrepriseId}/desactiver")
     public ResponseEntity<?> desactiverEntreprise(@PathVariable Long entrepriseId, HttpServletRequest request) {
         try {

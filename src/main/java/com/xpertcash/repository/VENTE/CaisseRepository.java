@@ -2,6 +2,9 @@ package com.xpertcash.repository.VENTE;
 
 import com.xpertcash.entity.Caisse;
 import com.xpertcash.entity.VENTE.StatutCaisse;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -20,6 +23,15 @@ public interface CaisseRepository extends JpaRepository<Caisse, Long> {
     Optional<Caisse> findFirstByBoutiqueIdAndVendeurIdAndStatut(Long boutiqueId, Long vendeurId, StatutCaisse statut);
 
     List<Caisse> findByBoutiqueId(Long boutiqueId);
+
+    /** Pagination côté base : toutes les caisses d'une boutique. */
+    Page<Caisse> findByBoutiqueId(Long boutiqueId, Pageable pageable);
+
+    /** Idem avec vendeur et boutique chargés (évite N+1). */
+    @Query("SELECT c FROM Caisse c WHERE c.boutique.id = :boutiqueId")
+    @EntityGraph(attributePaths = {"vendeur", "boutique"})
+    Page<Caisse> findByBoutiqueIdWithVendeurAndBoutique(@Param("boutiqueId") Long boutiqueId, Pageable pageable);
+
     List<Caisse> findByVendeurId(Long vendeurId);
 
     Optional<Caisse> findTopByBoutiqueIdAndVendeurIdOrderByDateOuvertureDesc(Long boutiqueId, Long vendeurId);
@@ -31,7 +43,15 @@ public interface CaisseRepository extends JpaRepository<Caisse, Long> {
     Optional<Caisse> findByVendeurIdAndStatutAndBoutiqueId(Long vendeurId, StatutCaisse statut, Long boutiqueId);
 
     List<Caisse> findByVendeurIdAndBoutiqueId(Long vendeurId, Long boutiqueId);
-    
+
+    /** Pagination côté base : caisses du vendeur pour une boutique. */
+    Page<Caisse> findByVendeurIdAndBoutiqueId(Long vendeurId, Long boutiqueId, Pageable pageable);
+
+    /** Idem avec vendeur et boutique chargés (évite N+1). */
+    @Query("SELECT c FROM Caisse c WHERE c.vendeur.id = :vendeurId AND c.boutique.id = :boutiqueId")
+    @EntityGraph(attributePaths = {"vendeur", "boutique"})
+    Page<Caisse> findByVendeurIdAndBoutiqueIdWithVendeurAndBoutique(@Param("vendeurId") Long vendeurId, @Param("boutiqueId") Long boutiqueId, Pageable pageable);
+
     List<Caisse> findByVendeur_Id(Long vendeurId);
 
     @Query("SELECT c FROM Caisse c WHERE c.boutique.entreprise.id = :entrepriseId AND c.statut = :statut")

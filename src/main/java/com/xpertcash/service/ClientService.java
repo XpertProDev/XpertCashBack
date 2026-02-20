@@ -9,9 +9,16 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
+
+import com.xpertcash.DTOs.PaginatedResponseDTO;
 import com.xpertcash.configuration.CentralAccess;
 
 import com.xpertcash.entity.Client;
@@ -214,54 +221,49 @@ public class ClientService {
         return dto;
     }
 
-    public List<Client> getClientsByEntreprise(Long entrepriseId) {
-        return clientRepository.findByEntrepriseClientId(entrepriseId);
+    /**
+     * Retourne les clients de l'entreprise (tenant) d'id entrepriseId.
+     * Sécurisé : l'utilisateur ne peut accéder qu'aux clients de sa propre entreprise.
+     */
+    public List<Client> getClientsByEntreprise(Long entrepriseId, HttpServletRequest request) {
+        User user = authHelper.getAuthenticatedUserWithFallback(request);
+        if (user.getEntreprise() == null) {
+            throw new RuntimeException("Aucune entreprise associée à cet utilisateur.");
+        }
+        if (!user.getEntreprise().getId().equals(entrepriseId)) {
+            throw new RuntimeException("Accès refusé : vous ne pouvez consulter que les clients de votre entreprise.");
+        }
+        return clientRepository.findClientsByEntrepriseOrEntrepriseClient(entrepriseId);
     }
 
 
+    /**
+     * Liste paginée des clients de l'entreprise de l'utilisateur connecté (côté base).
+     */
+    public PaginatedResponseDTO<Client> getAllClientsPaginated(HttpServletRequest request,
+            int page, int size, String sortBy, String sortDir) {
+        User user = authHelper.getAuthenticatedUserWithFallback(request);
+        Entreprise entreprise = user.getEntreprise();
+        if (entreprise == null) {
+            throw new RuntimeException("Aucune entreprise associée à cet utilisateur");
+        }
+        if (page < 0) page = 0;
+        if (size <= 0) size = 20;
+        if (size > 100) size = 100;
+
+        Sort.Direction direction = "desc".equalsIgnoreCase(sortDir != null ? sortDir : "asc") ? Sort.Direction.DESC : Sort.Direction.ASC;
+        String property = (sortBy != null && !sortBy.isBlank()) ? sortBy.trim() : "nomComplet";
+        Sort sort = Sort.by(direction, property).and(Sort.by(Sort.Direction.ASC, "id"));
+        Pageable pageable = PageRequest.of(page, size, sort);
+
+        Page<Client> clientPage = clientRepository.findClientsByEntrepriseOrEntrepriseClientPaginated(entreprise.getId(), pageable);
+        return PaginatedResponseDTO.fromPage(clientPage);
+    }
+
+    /** Retourne la première page (20 éléments par défaut) pour compatibilité. */
     public List<Client> getAllClients(HttpServletRequest request) {
-    User user = authHelper.getAuthenticatedUserWithFallback(request);
-
-    Entreprise entreprise = user.getEntreprise();
-    if (entreprise == null) {
-        throw new RuntimeException("Aucune entreprise associée à cet utilisateur");
+        return getAllClientsPaginated(request, 0, 20, "nomComplet", "asc").getContent();
     }
-
-    // 2. Vérification des droits
-    // boolean isAdminOrManager = CentralAccess.isAdminOrManagerOfEntreprise(user, entreprise.getId());
-    // boolean hasPermissionGestionClients = user.getRole().hasPermission(PermissionType.GERER_CLIENTS);
-    // boolean hasPermissionGestionFacturation = user.getRole().hasPermission(PermissionType.GESTION_FACTURATION);
-    
-
-
-    // // Si l'utilisateur n'est ni Admin, ni Manager, ni n'a la permission de gérer les clients
-    // if (!isAdminOrManager && !hasPermissionGestionClients && !hasPermissionGestionFacturation) {
-    //     throw new RuntimeException("Accès refusé : vous n'avez pas les droits nécessaires pour consulter les clients.");
-    // }
-
-    if (!entreprise.getId().equals(user.getEntreprise().getId())) {
-        throw new RuntimeException("Accès refusé : vous ne pouvez pas accéder aux clients d'une autre entreprise.");
-    }
-
-    List<Client> clients = clientRepository.findClientsByEntrepriseOrEntrepriseClient(entreprise.getId());
-    
-    
-    // if (clients.isEmpty()) {
-        
-    //     List<Client> clientsSansEntreprise = clientRepository.findAll().stream()
-    //             .filter(c -> c.getEntreprise() == null && 
-    //                        (c.getEntrepriseClient() == null || c.getEntrepriseClient().getEntreprise() == null))
-    //             .collect(java.util.stream.Collectors.toList());
-        
-    //     if (!clientsSansEntreprise.isEmpty()) {
-    //         System.out.println(" ATTENTION: " + clientsSansEntreprise.size() + 
-    //                          " clients sans entreprise détectés dans la base !");
-    //         System.out.println(" Ces clients doivent être associés à une entreprise pour être visibles.");
-    //     }
-    // }
-    
-    return clients;
-}
 
     public List<EntrepriseClient> getAllEntrepriseClients(HttpServletRequest request) {
     User user = authHelper.getAuthenticatedUserWithFallback(request);

@@ -11,8 +11,12 @@ import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 
 import java.util.Comparator;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
+import com.xpertcash.DTOs.SuperAdminDashboardStatsDTO;
 import com.xpertcash.DTOs.SuperAdminEntrepriseListDTO;
 import com.xpertcash.DTOs.SuperAdminEntrepriseStatsDTO;
 import com.xpertcash.entity.Entreprise;
@@ -93,9 +97,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.io.IOException;
+import java.time.DayOfWeek;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.List;
-
 
 @Service
 public class SuperAdminService {
@@ -230,13 +234,29 @@ public class SuperAdminService {
 
         if (page < 0) page = 0;
         if (size <= 0) size = 20;
-        if (size > 100) size = 100;
+        if (size > 20) size = 20;
 
         Pageable pageable = PageRequest.of(page, size);
 
-        // Exclure l'entreprise technique du SUPER_ADMIN de la liste
-        String superAdminEntrepriseName = "XpertCash Super Admin";
-        Page<Entreprise> entreprisesPage = entrepriseRepository.findAllExcludingNomEntreprise(superAdminEntrepriseName, pageable);
+        // Exclure l'entreprise du Super Admin (celle dont l'admin a le rôle SUPER_ADMIN)
+        Page<Entreprise> entreprisesPage = entrepriseRepository.findAllExcludingAdminRole(RoleType.SUPER_ADMIN, pageable);
+
+        List<Entreprise> content = entreprisesPage.getContent();
+        List<Long> ids = content.stream().map(Entreprise::getId).collect(Collectors.toList());
+
+        Map<Long, Long> countByEntreprise = new HashMap<>();
+        Map<Long, LocalDateTime> lastActivityByEntreprise = new HashMap<>();
+        if (!ids.isEmpty()) {
+            for (Object[] row : usersRepository.countByEntrepriseIdIn(ids, RoleType.SUPER_ADMIN)) {
+                countByEntreprise.put((Long) row[0], (Long) row[1]);
+            }
+            for (Object[] row : usersRepository.findMaxLastActivityByEntrepriseIdIn(ids)) {
+                lastActivityByEntreprise.put((Long) row[0], (LocalDateTime) row[1]);
+            }
+        }
+
+        final Map<Long, Long> countMap = countByEntreprise;
+        final Map<Long, LocalDateTime> lastActivityMap = lastActivityByEntreprise;
 
         return entreprisesPage.map(entreprise -> {
             String adminId = entreprise.getAdmin() != null ? entreprise.getAdmin().getId().toString() : null;
@@ -244,11 +264,13 @@ public class SuperAdminService {
             String adminPhone = entreprise.getAdmin() != null ? entreprise.getAdmin().getPhone() : null;
             String adminEmail = entreprise.getAdmin() != null ? entreprise.getAdmin().getEmail() : null;
 
-            long nombreUtilisateursEntreprise = usersRepository.countByEntrepriseId(entreprise.getId());
+            long nombreUtilisateursEntreprise = countMap.getOrDefault(entreprise.getId(), 0L);
+            LocalDateTime derniereConnexion = lastActivityMap.get(entreprise.getId());
 
             return new SuperAdminEntrepriseListDTO(
                     entreprise.getId(),
                     entreprise.getNomEntreprise(),
+                    Boolean.TRUE.equals(entreprise.getActive()),
                     entreprise.getCreatedAt(),
                     entreprise.getPays(),
                     entreprise.getSecteur(),
@@ -256,9 +278,36 @@ public class SuperAdminService {
                     adminNom,
                     adminPhone,
                     adminEmail,
-                    nombreUtilisateursEntreprise
+                    nombreUtilisateursEntreprise,
+                    derniereConnexion
             );
         });
+    }
+
+    /**
+     * Chiffres des cartes du dashboard Super Admin (sans recalcul à partir de la liste paginée).
+     */
+    public SuperAdminDashboardStatsDTO getDashboardStats(User superAdmin) {
+        ensureSuperAdmin(superAdmin);
+
+        long totalEntreprises = entrepriseRepository.countExcludingAdminRole(RoleType.SUPER_ADMIN);
+        long totalActives = entrepriseRepository.countExcludingAdminRoleAndActiveTrue(RoleType.SUPER_ADMIN);
+        long totalDesactivees = entrepriseRepository.countExcludingAdminRoleAndActiveFalse(RoleType.SUPER_ADMIN);
+        long totalUsersAllEntreprises = usersRepository.countUsersInNonSuperAdminEntreprises(RoleType.SUPER_ADMIN);
+
+        LocalDateTime startOfWeek = LocalDate.now().with(DayOfWeek.MONDAY).atStartOfDay();
+        LocalDateTime startOfMonth = LocalDate.now().withDayOfMonth(1).atStartOfDay();
+        long nouvellesCetteSemaine = entrepriseRepository.countExcludingAdminRoleAndCreatedAtAfter(RoleType.SUPER_ADMIN, startOfWeek);
+        long nouvellesCeMois = entrepriseRepository.countExcludingAdminRoleAndCreatedAtAfter(RoleType.SUPER_ADMIN, startOfMonth);
+
+        return new SuperAdminDashboardStatsDTO(
+                totalEntreprises,
+                totalActives,
+                totalDesactivees,
+                totalUsersAllEntreprises,
+                nouvellesCetteSemaine,
+                nouvellesCeMois
+        );
     }
 
   

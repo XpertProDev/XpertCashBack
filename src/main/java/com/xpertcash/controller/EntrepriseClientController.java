@@ -13,8 +13,10 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.xpertcash.DTOs.PaginatedResponseDTO;
 import com.xpertcash.entity.EntrepriseClient;
 import com.xpertcash.entity.PROSPECT.Interaction;
 import com.xpertcash.service.EntrepriseClientService;
@@ -70,15 +72,19 @@ public class EntrepriseClientController {
     }
 
    @GetMapping("/entreprises")
-    public ResponseEntity<?> getAllEntreprises(HttpServletRequest request) {
-        List<EntrepriseClient> entreprises = entrepriseClientService.getAllEntreprises(request);
-
-        if (entreprises.isEmpty()) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body("Aucune entreprise cliente trouvée.");
+    public ResponseEntity<?> getAllEntreprises(
+            HttpServletRequest request,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false) String sortBy,
+            @RequestParam(required = false) String sortDir) {
+        try {
+            PaginatedResponseDTO<EntrepriseClient> paginated = entrepriseClientService.getAllEntreprisesPaginated(request, page, size, sortBy, sortDir);
+            return ResponseEntity.ok(paginated);
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(e.getMessage());
         }
-
-        return ResponseEntity.ok(entreprises);
     }
 
 

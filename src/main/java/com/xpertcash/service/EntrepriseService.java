@@ -9,8 +9,12 @@ import org.springframework.web.multipart.MultipartFile;
 
 import com.xpertcash.DTOs.UpdateEntrepriseDTO;
 import com.xpertcash.entity.Entreprise;
+import com.xpertcash.entity.User;
 import com.xpertcash.repository.EntrepriseRepository;
+import com.xpertcash.repository.UsersRepository;
 import com.xpertcash.service.IMAGES.ImageStorageService;
+
+import jakarta.servlet.http.HttpServletRequest;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -26,9 +30,14 @@ public class EntrepriseService {
     @Autowired
     private EntrepriseRepository entrepriseRepository;
 
-     @Autowired
+    @Autowired
+    private UsersRepository usersRepository;
+
+    @Autowired
     private ImageStorageService imageStorageService;
 
+    @Autowired
+    private AuthenticationHelper authHelper;
 
     // Méthode pour  Récupérer une entreprise par son id.
      
@@ -39,11 +48,19 @@ public class EntrepriseService {
    
     @Transactional
     public void updateEntreprise(Long id, UpdateEntrepriseDTO dto, MultipartFile logoFile,
-    MultipartFile imageSignatureFile, MultipartFile imageCachetFile) {
-    Entreprise entreprise = entrepriseRepository.findById(id)
-        .orElseThrow(() -> new RuntimeException("Entreprise non trouvée"));
+            MultipartFile imageSignatureFile, MultipartFile imageCachetFile, HttpServletRequest request) {
+        User user = authHelper.getAuthenticatedUserWithFallback(request);
+        if (user.getEntreprise() == null) {
+            throw new RuntimeException("Aucune entreprise associée à cet utilisateur.");
+        }
+        if (!user.getEntreprise().getId().equals(id)) {
+            throw new RuntimeException("Accès refusé : vous ne pouvez modifier que les données de votre propre entreprise.");
+        }
 
-    if (dto.getNom() != null) {
+        Entreprise entreprise = entrepriseRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Entreprise non trouvée"));
+
+        if (dto.getNom() != null) {
         entreprise.setNomEntreprise(dto.getNom());
     }
 
@@ -162,8 +179,24 @@ public class EntrepriseService {
 
     System.out.println("DTO reçu dans le controller : " + dto);
 
-
     entrepriseRepository.save(entreprise);
+
+    // Synchroniser téléphone et pays sur l'admin de l'entreprise pour que getEntrepriseOfConnectedUser() et le profil restent cohérents
+    User admin = entreprise.getAdmin();
+    if (admin != null) {
+        boolean adminUpdated = false;
+        if (dto.getTelephone() != null) {
+            admin.setPhone(dto.getTelephone());
+            adminUpdated = true;
+        }
+        if (dto.getPays() != null) {
+            admin.setPays(dto.getPays());
+            adminUpdated = true;
+        }
+        if (adminUpdated) {
+            usersRepository.save(admin);
+        }
+    }
 }
 
 }

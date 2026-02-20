@@ -4,16 +4,22 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Random;
+import java.util.Collections;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
+
+import com.xpertcash.entity.VENTE.VenteProduit;
 
 import com.xpertcash.DTOs.VENTE.FactureVenteResponseDTO;
 import com.xpertcash.DTOs.VENTE.FactureVentePaginatedDTO;
@@ -191,118 +197,90 @@ public FactureVentePaginatedDTO getAllFacturesWithPagination(
 
     // Calculer les dates selon la période
     PeriodeDates periodeDates = calculerDatesPeriode(periode, dateDebut, dateFin);
-    
-    // Récupérer les factures selon la période
-    List<FactureVente> allFactures;
-    if (periodeDates.filtrerParPeriode) {
-        allFactures = factureVenteRepository.findAllByEntrepriseIdAndDateEmissionBetween(
-                entrepriseId, periodeDates.dateDebut, periodeDates.dateFin);
-    } else {
-        allFactures = factureVenteRepository.findAllByEntrepriseId(entrepriseId);
-    }
-    
-    // Filtrer par vendeur et/ou boutique si fournis
-    if (vendeurId != null) {
-        allFactures = allFactures.stream()
-                .filter(f -> f.getVente() != null && f.getVente().getVendeur() != null 
-                        && vendeurId.equals(f.getVente().getVendeur().getId()))
-                .collect(Collectors.toList());
-    }
-    if (boutiqueId != null) {
-        allFactures = allFactures.stream()
-                .filter(f -> f.getVente() != null && f.getVente().getBoutique() != null 
-                        && boutiqueId.equals(f.getVente().getBoutique().getId()))
-                .collect(Collectors.toList());
-    }
-    
-    List<FactureVenteResponseDTO> allItems = allFactures.stream()
-            .map(this::toResponse)
-            .collect(Collectors.toList());
-    
-    // Trier selon le critère spécifié
-    allItems.sort((item1, item2) -> {
-        int comparison = 0;
-        
+    LocalDateTime dateDebutFilter = periodeDates.filtrerParPeriode ? periodeDates.dateDebut : null;
+    LocalDateTime dateFinFilter = periodeDates.filtrerParPeriode ? periodeDates.dateFin : null;
+
+    // Tri côté base : mapper sortBy vers une propriété (ou chemin) de l'entité
+    String sortProperty = "dateEmission";
+    if (sortBy != null && !sortBy.isBlank()) {
         switch (sortBy.toLowerCase()) {
-            case "dateemission":
-            case "date":
-                if (sortDir.equalsIgnoreCase("desc")) {
-                    comparison = item2.getDateEmission().compareTo(item1.getDateEmission());
-                } else {
-                    comparison = item1.getDateEmission().compareTo(item2.getDateEmission());
-                }
-                break;
             case "vendeur":
-                String vendeur1 = item1.getVendeur() != null ? item1.getVendeur() : "";
-                String vendeur2 = item2.getVendeur() != null ? item2.getVendeur() : "";
-                comparison = vendeur1.compareToIgnoreCase(vendeur2);
-                if (sortDir.equalsIgnoreCase("desc")) {
-                    comparison = -comparison;
-                }
+                sortProperty = "vente.vendeur.nomComplet";
                 break;
             case "boutique":
             case "boutiquenom":
-                String boutique1 = item1.getBoutiqueNom() != null ? item1.getBoutiqueNom() : "";
-                String boutique2 = item2.getBoutiqueNom() != null ? item2.getBoutiqueNom() : "";
-                comparison = boutique1.compareToIgnoreCase(boutique2);
-                if (sortDir.equalsIgnoreCase("desc")) {
-                    comparison = -comparison;
-                }
+                sortProperty = "vente.boutique.nomBoutique";
                 break;
+            case "dateemission":
+            case "date":
             default:
-                // Par défaut, trier par dateEmission
-                if (sortDir.equalsIgnoreCase("desc")) {
-                    comparison = item2.getDateEmission().compareTo(item1.getDateEmission());
-                } else {
-                    comparison = item1.getDateEmission().compareTo(item2.getDateEmission());
-                }
+                sortProperty = "dateEmission";
                 break;
         }
-        
-        return comparison;
+    }
+    Sort.Direction direction = "desc".equalsIgnoreCase(sortDir != null ? sortDir : "asc") ? Sort.Direction.DESC : Sort.Direction.ASC;
+    Sort sort = Sort.by(direction, sortProperty).and(Sort.by(Sort.Direction.DESC, "id"));
+    Pageable pageable = PageRequest.of(page, size, sort);
+
+    // Pagination côté base avec filtres (une requête)
+    Page<FactureVente> facturesPage = factureVenteRepository.findAllPaginatedWithFilters(
+            entrepriseId, dateDebutFilter, dateFinFilter, vendeurId, boutiqueId, pageable);
+
+    List<FactureVente> factures = facturesPage.getContent();
+    List<Long> venteIds = factures.stream()
+            .map(f -> f.getVente() != null ? f.getVente().getId() : null)
+            .filter(id -> id != null)
+            .distinct()
+            .collect(Collectors.toList());
+
+    // Chargement en batch des lignes (produits) pour éviter N+1
+    Map<Long, List<VenteProduit>> produitsByVenteId = venteIds.isEmpty() ? Collections.emptyMap()
+            : venteProduitRepository.findByVenteIdInWithProduit(venteIds).stream()
+                    .collect(Collectors.groupingBy(vp -> vp.getVente().getId()));
+    factures.forEach(f -> {
+        if (f.getVente() != null) {
+            f.getVente().setProduits(produitsByVenteId.getOrDefault(f.getVente().getId(), Collections.emptyList()));
+        }
     });
-    
-    double totalMontantFactures = allItems.stream()
-            .mapToDouble(item -> item.getMontantTotal() != null ? item.getMontantTotal() : 0.0)
-            .sum();
-    
-    int nombreFacturesRemboursees = (int) allItems.stream()
+
+    List<FactureVenteResponseDTO> pagedItems = factures.stream()
+            .map(this::toResponse)
+            .collect(Collectors.toList());
+
+    // Stats globales (même filtres) : somme des montants
+    double totalMontantFactures = factureVenteRepository.sumMontantTotalWithFilters(
+            entrepriseId, dateDebutFilter, dateFinFilter, vendeurId, boutiqueId);
+    // Comptes par statut de remboursement sur la page courante (les totaux sur tout le filtre nécessiteraient une requête dédiée)
+    int nombreFacturesRemboursees = (int) pagedItems.stream()
             .filter(item -> "ENTIEREMENT_REMBOURSEE".equals(item.getStatutRemboursement()))
             .count();
-    
-    int nombreFacturesPartiellementRemboursees = (int) allItems.stream()
+    int nombreFacturesPartiellementRemboursees = (int) pagedItems.stream()
             .filter(item -> "PARTIELLEMENT_REMBOURSEE".equals(item.getStatutRemboursement()))
             .count();
-    
-    int nombreFacturesNormales = (int) allItems.stream()
+    int nombreFacturesNormales = (int) pagedItems.stream()
             .filter(item -> "NORMAL".equals(item.getStatutRemboursement()))
             .count();
-    
-    int totalElements = allItems.size();
-    int totalPages = (int) Math.ceil((double) totalElements / size);
-    int startIndex = page * size;
-    int endIndex = Math.min(startIndex + size, totalElements);
-    
-    List<FactureVenteResponseDTO> pagedItems = 
-        startIndex < totalElements ? allItems.subList(startIndex, endIndex) : new ArrayList<>();
-    
+
+    long totalElements = facturesPage.getTotalElements();
+    int totalPages = facturesPage.getTotalPages();
+
     FactureVentePaginatedDTO response = new FactureVentePaginatedDTO();
     response.setPage(page);
     response.setSize(size);
-    response.setTotalElements(totalElements);
+    response.setTotalElements((int) totalElements);
     response.setTotalPages(totalPages);
-    response.setFirst(page == 0);
-    response.setLast(page >= totalPages - 1);
-    response.setHasNext(page < totalPages - 1);
-    response.setHasPrevious(page > 0);
+    response.setFirst(facturesPage.isFirst());
+    response.setLast(facturesPage.isLast());
+    response.setHasNext(facturesPage.hasNext());
+    response.setHasPrevious(facturesPage.hasPrevious());
     response.setItems(pagedItems);
     response.setTotalMontantFactures(totalMontantFactures);
-    response.setNombreFactures(totalElements);
+    response.setNombreFactures((int) totalElements);
     response.setNombreFacturesRemboursees(nombreFacturesRemboursees);
     response.setNombreFacturesPartiellementRemboursees(nombreFacturesPartiellementRemboursees);
     response.setNombreFacturesNormales(nombreFacturesNormales);
     response.setVendeurs(vendeurs);
-    
+
     return response;
 }
 

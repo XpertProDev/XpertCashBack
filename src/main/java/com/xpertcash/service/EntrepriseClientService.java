@@ -1,12 +1,18 @@
 package com.xpertcash.service;
+
 import java.lang.reflect.Field;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
+import com.xpertcash.DTOs.PaginatedResponseDTO;
 import com.xpertcash.configuration.CentralAccess;
 
 import com.xpertcash.entity.Entreprise;
@@ -126,27 +132,33 @@ public class EntrepriseClientService {
        return interactionRepository.findByProspectClientIdAndProspectClientTypeOrderByOccurredAtDesc(id, "ENTREPRISE_CLIENT");
    }
 
-   public List<EntrepriseClient> getAllEntreprises(HttpServletRequest request) {
-    User user = authHelper.getAuthenticatedUserWithFallback(request);
+    /**
+     * Liste paginée des entreprises clientes de l'entreprise de l'utilisateur connecté (côté base).
+     */
+    public PaginatedResponseDTO<EntrepriseClient> getAllEntreprisesPaginated(HttpServletRequest request,
+            int page, int size, String sortBy, String sortDir) {
+        User user = authHelper.getAuthenticatedUserWithFallback(request);
+        Entreprise entreprise = user.getEntreprise();
+        if (entreprise == null) {
+            throw new RuntimeException("Aucune entreprise associée à cet utilisateur");
+        }
+        if (page < 0) page = 0;
+        if (size <= 0) size = 20;
+        if (size > 100) size = 100;
 
-    Entreprise entreprise = user.getEntreprise();
-    if (entreprise == null) {
-        throw new RuntimeException("Aucune entreprise associée à cet utilisateur");
+        Sort.Direction direction = "desc".equalsIgnoreCase(sortDir != null ? sortDir : "asc") ? Sort.Direction.DESC : Sort.Direction.ASC;
+        String property = (sortBy != null && !sortBy.isBlank()) ? sortBy.trim() : "nom";
+        Sort sort = Sort.by(direction, property).and(Sort.by(Sort.Direction.ASC, "id"));
+        Pageable pageable = PageRequest.of(page, size, sort);
+
+        Page<EntrepriseClient> entreprisePage = entrepriseClientRepository.findByEntrepriseIdPaginated(entreprise.getId(), pageable);
+        return PaginatedResponseDTO.fromPage(entreprisePage);
     }
- 
-    //  Autorisation
-    // boolean isAdminOrManager = CentralAccess.isAdminOrManagerOfEntreprise(user, entreprise.getId());
-    // boolean hasPermissionGestionClient = user.getRole().hasPermission(PermissionType.GERER_CLIENTS);
-    // boolean hasPermissionGestionFacturation = user.getRole().hasPermission(PermissionType.GESTION_FACTURATION);
 
-
-    // if (!isAdminOrManager && !hasPermissionGestionClient  && !hasPermissionGestionFacturation) {
-    //     throw new RuntimeException("Accès refusé : vous n'avez pas les droits pour voir les entreprises clientes.");
-    // }
-
-    //  Récupération filtrée
-    return entrepriseClientRepository.findByEntrepriseId(entreprise.getId());
-}
+    /** Retourne la première page (20 éléments par défaut) pour compatibilité. */
+    public List<EntrepriseClient> getAllEntreprises(HttpServletRequest request) {
+        return getAllEntreprisesPaginated(request, 0, 20, "nom", "asc").getContent();
+    }
 
 
      //Methode pour modifier une Entreprise client

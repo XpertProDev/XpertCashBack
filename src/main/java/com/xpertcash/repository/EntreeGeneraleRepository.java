@@ -64,5 +64,14 @@ public interface EntreeGeneraleRepository extends JpaRepository<EntreeGenerale, 
             @Param("entrepriseId") Long entrepriseId,
             @Param("dateDebut") LocalDateTime dateDebut,
             @Param("dateFin") LocalDateTime dateFin);
+
+    /** Pour pagination scalable : charger par IDs avec relations (évite N+1). */
+    @Query("SELECT DISTINCT e FROM EntreeGenerale e " +
+           "LEFT JOIN FETCH e.entreprise ent " +
+           "LEFT JOIN FETCH e.categorie " +
+           "LEFT JOIN FETCH e.creePar " +
+           "LEFT JOIN FETCH e.responsable " +
+           "WHERE e.id IN :ids")
+    List<EntreeGenerale> findByIdInWithDetails(@Param("ids") List<Long> ids);
 }
 

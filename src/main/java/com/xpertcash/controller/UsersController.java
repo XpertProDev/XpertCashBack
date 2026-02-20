@@ -48,6 +48,7 @@ public ResponseEntity<RegisterResponse> register(@RequestBody RegistrationReques
             request.getEmail(),
             request.getPassword(),
             request.getPhone(),
+            request.getIndicatif(),
             request.getPays(),
             request.getNomEntreprise(),
             request.getNomBoutique()

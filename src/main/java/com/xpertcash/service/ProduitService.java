@@ -27,9 +27,11 @@ import org.springframework.web.multipart.MultipartFile;
 import com.xpertcash.DTOs.CompteurBoutiqueDTO;
 import com.xpertcash.DTOs.FactureDTO;
 import com.xpertcash.DTOs.ProduitDTO;
+import com.xpertcash.DTOs.PaginatedResponseDTO;
 import com.xpertcash.DTOs.ProduitEntreprisePaginatedResponseDTO;
 import com.xpertcash.DTOs.ProduitStockPaginatedResponseDTO;
 import com.xpertcash.DTOs.StockHistoryDTO;
+import com.xpertcash.DTOs.StockListDTO;
 import com.xpertcash.DTOs.PRODUIT.ProduitRequest;
 import com.xpertcash.configuration.CentralAccess;
 
@@ -564,72 +566,92 @@ public class ProduitService {
 }
 
 
-    public List<StockHistoryDTO> getAllStockHistory(HttpServletRequest request) {
+    /**
+     * Historique des mouvements de stock de l'entreprise, paginé en base (isolation multi-tenant).
+     */
+    @Transactional(readOnly = true)
+    public PaginatedResponseDTO<StockHistoryDTO> getStockHistoryPaginated(HttpServletRequest request, int page, int size) {
+        if (page < 0) page = 0;
+        if (size <= 0) size = 20;
+        if (size > 100) size = 100;
 
-    User user = authHelper.getAuthenticatedUserWithFallback(request);
-
-    if (user.getEntreprise() == null) {
-        throw new RuntimeException("Utilisateur non rattaché à une entreprise.");
-    }
-
-    Long entrepriseId = user.getEntreprise().getId();
-
-    //  Récupérer tous les historiques filtrés par entreprise
-    List<StockHistory> stockHistories = stockHistoryRepository.findAll()
-        .stream()
-        .filter(history -> {
-            Stock stock = history.getStock();
-            Produit produit = (stock != null) ? stock.getProduit() : null;
-            Boutique boutique = (produit != null) ? produit.getBoutique() : null;
-            Entreprise entreprise = (boutique != null) ? boutique.getEntreprise() : null;
-            return entreprise != null && entrepriseId.equals(entreprise.getId());
-        })
-        .collect(Collectors.toList());
-
-    return stockHistories.stream()
-            .map(stockHistory -> {
-                StockHistoryDTO dto = new StockHistoryDTO();
-                dto.setId(stockHistory.getId());
-                dto.setAction(stockHistory.getAction());
-                dto.setQuantite(stockHistory.getQuantite());
-                dto.setStockAvant(stockHistory.getStockAvant());
-                dto.setStockApres(stockHistory.getStockApres());
-                dto.setDescription(stockHistory.getDescription());
-                dto.setCreatedAt(stockHistory.getCreatedAt());
-
-                User historiqueUser = stockHistory.getUser();
-                if (historiqueUser != null) {
-                    dto.setNomComplet(historiqueUser.getNomComplet());
-                    dto.setPhone(historiqueUser.getPhone());
-                    if (historiqueUser.getRole() != null) {
-                        dto.setRole(historiqueUser.getRole().getName());
-                    }
-                }
-
-                return dto;
-            })
-            .collect(Collectors.toList());
-}
-
-
-   //Lister Stock
-    public List<Stock> getAllStocks(HttpServletRequest request) {
         User user = authHelper.getAuthenticatedUserWithFallback(request);
-
         if (user.getEntreprise() == null) {
             throw new RuntimeException("Utilisateur non rattaché à une entreprise.");
         }
-
         Long entrepriseId = user.getEntreprise().getId();
 
-        return stockRepository.findAll().stream()
-                .filter(stock -> {
-                    Produit produit = stock.getProduit();
-                    Boutique boutique = (produit != null) ? produit.getBoutique() : null;
-                    Entreprise entreprise = (boutique != null) ? boutique.getEntreprise() : null;
-                    return entreprise != null && entreprise.getId().equals(entrepriseId);
-                })
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+        Page<StockHistory> historyPage = stockHistoryRepository.findByStock_Boutique_Entreprise_Id(entrepriseId, pageable);
+        List<StockHistoryDTO> content = historyPage.getContent().stream()
+                .map(this::mapStockHistoryToDTO)
                 .collect(Collectors.toList());
+        Page<StockHistoryDTO> dtoPage = new PageImpl<>(content, historyPage.getPageable(), historyPage.getTotalElements());
+        return PaginatedResponseDTO.fromPage(dtoPage);
+    }
+
+    private StockHistoryDTO mapStockHistoryToDTO(StockHistory sh) {
+        StockHistoryDTO dto = new StockHistoryDTO();
+        dto.setId(sh.getId());
+        dto.setAction(sh.getAction());
+        dto.setQuantite(sh.getQuantite());
+        dto.setStockAvant(sh.getStockAvant());
+        dto.setStockApres(sh.getStockApres());
+        dto.setDescription(sh.getDescription());
+        dto.setCreatedAt(sh.getCreatedAt());
+        User u = sh.getUser();
+        if (u != null) {
+            dto.setNomComplet(u.getNomComplet());
+            dto.setPhone(u.getPhone());
+            if (u.getRole() != null) dto.setRole(u.getRole().getName());
+        }
+        dto.setCodeFournisseur(sh.getCodeFournisseur());
+        if (sh.getFournisseur() != null) {
+            dto.setNomFournisseur(sh.getFournisseur().getNomComplet() != null ? sh.getFournisseur().getNomComplet() : sh.getFournisseur().getNomSociete());
+        }
+        return dto;
+    }
+
+    /**
+     * Liste des stocks de l'entreprise, paginée en base (isolation multi-tenant).
+     */
+    @Transactional(readOnly = true)
+    public PaginatedResponseDTO<StockListDTO> getStocksPaginated(HttpServletRequest request, int page, int size) {
+        if (page < 0) page = 0;
+        if (size <= 0) size = 20;
+        if (size > 100) size = 100;
+
+        User user = authHelper.getAuthenticatedUserWithFallback(request);
+        if (user.getEntreprise() == null) {
+            throw new RuntimeException("Utilisateur non rattaché à une entreprise.");
+        }
+        Long entrepriseId = user.getEntreprise().getId();
+
+        Pageable pageable = PageRequest.of(page, size, Sort.by("id").ascending());
+        Page<Stock> stockPage = stockRepository.findByEntrepriseIdPaginated(entrepriseId, pageable);
+        List<StockListDTO> content = stockPage.getContent().stream()
+                .map(this::mapStockToStockListDTO)
+                .collect(Collectors.toList());
+        Page<StockListDTO> dtoPage = new PageImpl<>(content, stockPage.getPageable(), stockPage.getTotalElements());
+        return PaginatedResponseDTO.fromPage(dtoPage);
+    }
+
+    private StockListDTO mapStockToStockListDTO(Stock s) {
+        StockListDTO dto = new StockListDTO();
+        dto.setId(s.getId());
+        dto.setStockActuel(s.getStockActuel());
+        dto.setSeuilAlert(s.getSeuilAlert());
+        dto.setDatePreemption(s.getDatePreemption());
+        if (s.getProduit() != null) {
+            dto.setProduitId(s.getProduit().getId());
+            dto.setProduitNom(s.getProduit().getNom());
+            dto.setCodeGenerique(s.getProduit().getCodeGenerique());
+        }
+        if (s.getBoutique() != null) {
+            dto.setBoutiqueId(s.getBoutique().getId());
+            dto.setBoutiqueNom(s.getBoutique().getNomBoutique());
+        }
+        return dto;
     }
 
 
@@ -1057,23 +1079,26 @@ public class ProduitService {
             }
         }
 
-        // Favoris en premier (favoriPourVente DESC), puis ordreFavori, puis tri demandé (ex. nom)
-        Sort sort = Sort.by(
-                Sort.Order.desc("favoriPourVente"),
-                Sort.Order.asc("ordreFavori").nullsLast()
-        ).and(parseSortParam(sortParam));
         String searchTerm = (search != null && !search.isBlank()) ? search.trim() : null;
-        Pageable pageable = PageRequest.of(page, size, sort);
+        long totalEnStock = produitRepository.countProduitsEnStockByBoutiqueIdForVenteWithSearch(boutiqueId, searchTerm);
 
-        Page<Produit> produitsPage = produitRepository.findProduitsEnStockByBoutiqueIdForVentePaginated(
-                boutiqueId, searchTerm, pageable);
+        List<Long> ids = findProduitsEnStockIdsForVente(produitRepository, boutiqueId, searchTerm, sortParam, size, page * size);
 
-        long totalEnStock = produitsPage.getTotalElements();
+        List<ProduitDTO> dtos;
+        if (ids.isEmpty()) {
+            dtos = new ArrayList<>();
+        } else {
+            List<Produit> produits = produitRepository.findByIdInWithDetailsForVente(ids);
+            java.util.Map<Long, Produit> byId = produits.stream().collect(Collectors.toMap(Produit::getId, p -> p));
+            List<Produit> ordered = new ArrayList<>();
+            for (Long id : ids) {
+                Produit p = byId.get(id);
+                if (p != null) ordered.add(p);
+            }
+            dtos = ordered.stream().map(this::convertToProduitDTO).collect(Collectors.toList());
+        }
 
-        List<ProduitDTO> dtos = produitsPage.getContent().stream()
-                .map(this::convertToProduitDTO)
-                .collect(Collectors.toList());
-
+        Pageable pageable = PageRequest.of(page, size);
         Page<ProduitDTO> dtoPage = new PageImpl<>(dtos, pageable, totalEnStock);
 
         return ProduitStockPaginatedResponseDTO.fromPage(
@@ -1081,6 +1106,41 @@ public class ProduitService {
                 totalEnStock,
                 totalEnStock,
                 0L);
+    }
+
+    /** Délègue au bon findProduitsEnStockIdsForVente* selon sortParam (whitelisté). */
+    private List<Long> findProduitsEnStockIdsForVente(ProduitRepository repo, Long boutiqueId, String search,
+            String sortParam, int limit, int offset) {
+        boolean asc = parseSortDirection(sortParam);
+        String property = parseSortProperty(sortParam);
+        return switch (property) {
+            case "nom" -> asc ? repo.findProduitsEnStockIdsForVenteOrderByNomAsc(boutiqueId, search, limit, offset)
+                    : repo.findProduitsEnStockIdsForVenteOrderByNomDesc(boutiqueId, search, limit, offset);
+            case "createdAt" -> asc ? repo.findProduitsEnStockIdsForVenteOrderByCreatedAtAsc(boutiqueId, search, limit, offset)
+                    : repo.findProduitsEnStockIdsForVenteOrderByCreatedAtDesc(boutiqueId, search, limit, offset);
+            case "prixVente" -> asc ? repo.findProduitsEnStockIdsForVenteOrderByPrixVenteAsc(boutiqueId, search, limit, offset)
+                    : repo.findProduitsEnStockIdsForVenteOrderByPrixVenteDesc(boutiqueId, search, limit, offset);
+            case "codeGenerique" -> asc ? repo.findProduitsEnStockIdsForVenteOrderByCodeGeneriqueAsc(boutiqueId, search, limit, offset)
+                    : repo.findProduitsEnStockIdsForVenteOrderByCodeGeneriqueDesc(boutiqueId, search, limit, offset);
+            default -> repo.findProduitsEnStockIdsForVenteOrderByCreatedAtDesc(boutiqueId, search, limit, offset);
+        };
+    }
+
+    private static String parseSortProperty(String sortParam) {
+        if (sortParam == null || sortParam.isBlank()) return "createdAt";
+        String[] parts = sortParam.split(",");
+        String p = parts[0].trim();
+        if ("nom".equalsIgnoreCase(p)) return "nom";
+        if ("prixvente".equalsIgnoreCase(p)) return "prixVente";
+        if ("codegenerique".equalsIgnoreCase(p)) return "codeGenerique";
+        if ("createdat".equalsIgnoreCase(p) || "created_at".equalsIgnoreCase(p.replace(" ", ""))) return "createdAt";
+        return "createdAt";
+    }
+
+    private static boolean parseSortDirection(String sortParam) {
+        if (sortParam == null || sortParam.isBlank()) return false;
+        String[] parts = sortParam.split(",");
+        return parts.length > 1 && "asc".equalsIgnoreCase(parts[1].trim());
     }
 
     /**
@@ -1151,6 +1211,18 @@ public class ProduitService {
             return Sort.by(direction, sortBy.trim());
         }
         return Sort.by(Sort.Direction.ASC, defaultProp1).and(Sort.by(Sort.Direction.ASC, defaultProp2));
+    }
+
+    /** Délègue au bon findCodeGeneriquesPage* selon sortBy/sortDir (whitelisté). */
+    private List<String> findCodeGeneriquesPage(ProduitRepository repo, Long entrepriseId, String sortBy, String sortDir, int limit, int offset) {
+        boolean desc = "desc".equalsIgnoreCase(sortDir != null ? sortDir : "asc");
+        boolean byNom = sortBy != null && "nom".equalsIgnoreCase(sortBy.trim());
+        if (byNom) {
+            return desc ? repo.findCodeGeneriquesPageOrderByNomDesc(entrepriseId, limit, offset)
+                    : repo.findCodeGeneriquesPageOrderByNom(entrepriseId, limit, offset);
+        }
+        return desc ? repo.findCodeGeneriquesPageOrderByCodeGeneriqueDesc(entrepriseId, limit, offset)
+                : repo.findCodeGeneriquesPageOrderByCodeGenerique(entrepriseId, limit, offset);
     }
 
     /** Résout l'utilisateur depuis le token JWT et valide entreprise (isolation multi-tenant). */
@@ -1386,32 +1458,32 @@ public class ProduitService {
 
     // Méthode scalable avec pagination pour récupérer les produits d'une entreprise
     public ProduitEntreprisePaginatedResponseDTO getProduitsParEntreprisePaginated(
-            Long entrepriseId,
-            int page,
-            int size,
+            Long entrepriseId, 
+            int page, 
+            int size, 
             String sortBy,
             String sortDir,
             HttpServletRequest request) {
-
+        
         if (page < 0) page = 0;
         if (size <= 0) size = 20;
         if (size > 100) size = 100;
-
+        
         if (entrepriseId == null) {
             throw new RuntimeException("L'ID de l'entreprise ne peut pas être null");
         }
-
+        
         String token = request.getHeader("Authorization");
         if (token == null || !token.startsWith("Bearer ")) {
             throw new RuntimeException("Token JWT manquant ou mal formaté");
         }
 
         User user = authHelper.getAuthenticatedUserWithFallback(request);
-
+        
         if (user.getEntreprise() == null) {
             throw new RuntimeException("Aucune entreprise associée à l'utilisateur ID: " + user.getId());
         }
-
+        
         Entreprise entreprise = user.getEntreprise();
         if (entreprise.getId() == null) {
             throw new RuntimeException("L'ID de l'entreprise de l'utilisateur est null");
@@ -1430,17 +1502,19 @@ public class ProduitService {
             throw new RuntimeException("Accès refusé : vous ne pouvez pas accéder aux produits d'une autre entreprise. Votre entreprise: " + entreprise.getId() + ", Demandée: " + entrepriseId);
         }
 
-        Sort sort = buildSort(sortBy, sortDir, "codeGenerique", "nom");
-        Pageable pageable = PageRequest.of(page, size, sort);
-
-        Page<Produit> produitsPage = produitRepository.findProduitsByEntrepriseIdPaginated(entrepriseId, pageable);
-
         long totalProduitsUniques = produitRepository.countProduitsUniquesByEntrepriseId(entrepriseId);
         long totalBoutiques = produitRepository.countBoutiquesActivesByEntrepriseId(entrepriseId);
 
+        List<String> codeGeneriquesPage = findCodeGeneriquesPage(produitRepository, entrepriseId, sortBy, sortDir, size, page * size);
+
+        List<ProduitDTO> produitsDTOs;
+        if (codeGeneriquesPage.isEmpty()) {
+            produitsDTOs = new ArrayList<>();
+        } else {
+            List<Produit> produits = produitRepository.findByEntrepriseIdAndCodeGeneriqueIn(entrepriseId, codeGeneriquesPage);
         Map<String, ProduitDTO> produitsUniques = new HashMap<>();
 
-        for (Produit produit : produitsPage.getContent()) {
+            for (Produit produit : produits) {
             if (Boolean.TRUE.equals(produit.getDeleted())) continue;
 
             Boutique boutique = produit.getBoutique();
@@ -1465,7 +1539,17 @@ public class ProduitService {
             }
         }
 
-        List<ProduitDTO> produitsDTOs = new ArrayList<>(produitsUniques.values());
+            // Conserver l'ordre de la page (codeGeneriques)
+            produitsDTOs = new ArrayList<>();
+            for (String code : codeGeneriquesPage) {
+                ProduitDTO dto = produitsUniques.get(code);
+                if (dto != null) {
+                    produitsDTOs.add(dto);
+                }
+            }
+        }
+
+        Pageable pageable = PageRequest.of(page, size);
         Page<ProduitDTO> dtoPage = new PageImpl<>(
                 produitsDTOs,
                 pageable,

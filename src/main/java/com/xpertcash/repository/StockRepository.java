@@ -2,6 +2,8 @@ package com.xpertcash.repository;
 
 import java.util.List;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
@@ -78,5 +80,13 @@ public interface StockRepository extends JpaRepository<Stock, Long> {
            "INNER JOIN b.entreprise e " +
            "WHERE e.id = :entrepriseId")
     long countByEntrepriseId(@Param("entrepriseId") Long entrepriseId);
+
+    /** Pagination côté base : stocks par entreprise (isolation multi-tenant). */
+    @Query(value = "SELECT DISTINCT s FROM Stock s " +
+            "LEFT JOIN FETCH s.boutique b " +
+            "LEFT JOIN FETCH s.produit p " +
+            "WHERE b.entreprise.id = :entrepriseId",
+            countQuery = "SELECT COUNT(DISTINCT s) FROM Stock s INNER JOIN s.boutique b INNER JOIN b.entreprise e WHERE e.id = :entrepriseId")
+    Page<Stock> findByEntrepriseIdPaginated(@Param("entrepriseId") Long entrepriseId, Pageable pageable);
 }
 

@@ -26,12 +26,13 @@ import com.xpertcash.DTOs.FavoriVenteRequest;
 import com.xpertcash.DTOs.FactureDTO;
 import com.xpertcash.DTOs.ProduitDTO;
 import com.xpertcash.DTOs.ProduitEntreprisePaginatedResponseDTO;
+import com.xpertcash.DTOs.PaginatedResponseDTO;
 import com.xpertcash.DTOs.ProduitStockPaginatedResponseDTO;
 import com.xpertcash.DTOs.RetirerStockRequest;
 import com.xpertcash.DTOs.StockHistoryDTO;
+import com.xpertcash.DTOs.StockListDTO;
 import com.xpertcash.DTOs.PRODUIT.ProduitRequest;
 import com.xpertcash.entity.Facture;
-import com.xpertcash.entity.Stock;
 import com.xpertcash.exceptions.DuplicateProductException;
 import com.xpertcash.service.ProduitService;
 import com.xpertcash.service.IMAGES.ImageStorageService;
@@ -352,12 +353,15 @@ public ResponseEntity<?> updateProduit(
     }
     
 
-    // Endpoint pour récupérer l'historique général des mouvements de stock
+    /** Historique des mouvements de stock de l'entreprise, paginé en base (isolation multi-tenant). */
     @GetMapping("/stockhistorique")
-    public ResponseEntity<?> getAllStockHistory(HttpServletRequest request) {
+    public ResponseEntity<?> getStockHistoryPaginated(
+            HttpServletRequest request,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
         try {
-            List<StockHistoryDTO> historique = produitService.getAllStockHistory(request);
-            return ResponseEntity.ok(historique);
+            PaginatedResponseDTO<StockHistoryDTO> result = produitService.getStockHistoryPaginated(request, page, size);
+            return ResponseEntity.ok(result);
         } catch (RuntimeException e) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
         }
@@ -390,16 +394,19 @@ public ResponseEntity<?> updateProduit(
             }
         }
         
-        //Endpoint List des Stock
-        @GetMapping("/getAllStock")
-        public ResponseEntity<?> getAllStocks(HttpServletRequest request) {
-            try {
-                List<Stock> stocks = produitService.getAllStocks(request);
-                return ResponseEntity.ok(stocks);
-            } catch (RuntimeException e) {
-                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
-            }
+    /** Liste des stocks de l'entreprise, paginée en base (isolation multi-tenant). */
+    @GetMapping("/getAllStock")
+    public ResponseEntity<?> getStocksPaginated(
+            HttpServletRequest request,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        try {
+            PaginatedResponseDTO<StockListDTO> result = produitService.getStocksPaginated(request, page, size);
+            return ResponseEntity.ok(result);
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(e.getMessage());
         }
+    }
 
         /** Produits de l'entreprise de l'utilisateur connecté (entreprise issue du token JWT uniquement). Pagination comme TresorerieController. Isolation multi-tenant. */
         @GetMapping("/produits/entreprise/paginated")

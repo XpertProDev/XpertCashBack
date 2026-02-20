@@ -12,6 +12,7 @@ import com.xpertcash.DTOs.USER.UserDTO;
 import com.xpertcash.DTOs.USER.UserRequest;
 import com.xpertcash.DTOs.USER.VendeurDTO;
 import com.xpertcash.DTOs.UserOptimalDTO;
+import com.xpertcash.composant.Utilitaire;
 import com.xpertcash.configuration.CentralAccess;
 import com.xpertcash.configuration.JwtConfig;
 import com.xpertcash.configuration.JwtUtil;
@@ -211,8 +212,16 @@ public class UsersService {
 
 
    @Transactional(noRollbackFor = MessagingException.class)
-    public RegisterResponse registerUsers(String nomComplet, String email, String password, String phone, String pays, String nomEntreprise, String nomBoutique) {
+    public RegisterResponse registerUsers(String nomComplet, String email, String password, String phone, String indicatifPays, String pays, String nomEntreprise, String nomBoutique) {
         RegisterResponse response = new RegisterResponse();
+
+        // Enregistrer le numero avec l'indicatif (+223 etc.) : champ indicatif envoye par le front, sinon derive du pays
+        if (phone != null && !phone.isBlank() && !phone.trim().startsWith("+")) {
+            String indicatif = (indicatifPays != null && !indicatifPays.isBlank())
+                    ? (indicatifPays.startsWith("+") ? indicatifPays.trim() : "+" + indicatifPays.trim())
+                    : Utilitaire.getIndicatifPays(pays);
+            if (indicatif != null) phone = indicatif + " " + phone.trim();
+        }
 
         if (usersRepository.findByEmail(email).isPresent()) {
             throw new RuntimeException("Cet email est déjà utilisé.");
@@ -257,8 +266,8 @@ public class UsersService {
         entreprise.setNif("");
         entreprise.setBanque("");
         entreprise.setEmail("");
-        entreprise.setTelephone("");
-        entreprise.setPays("");
+        entreprise.setTelephone(phone != null ? phone : "");
+        entreprise.setPays(pays != null ? pays : "");
         entreprise.setSecteur("");
         entreprise.setRccm("");
         entreprise.setSignataireNom("Fournisseur");
@@ -1608,8 +1617,18 @@ public class UsersService {
     dto.setNif(entreprise.getNif());
     dto.setBanque(entreprise.getBanque());
     dto.setEmail(entreprise.getEmail());
-    dto.setTelephone(entreprise.getTelephone());
-    dto.setPays(entreprise.getPays());
+    // Téléphone et pays : priorité à l'entreprise, sinon ceux de l'admin (fournis à l'inscription)
+    String telephone = (entreprise.getTelephone() != null && !entreprise.getTelephone().isBlank())
+            ? entreprise.getTelephone() : user.getPhone();
+    String paysEntreprise = (entreprise.getPays() != null && !entreprise.getPays().isBlank())
+            ? entreprise.getPays() : user.getPays();
+    // Préfixer l'indicatif pays (+223, etc.) si le numéro ne commence pas déjà par +
+    if (telephone != null && !telephone.isBlank() && !telephone.trim().startsWith("+")) {
+        String indicatif = Utilitaire.getIndicatifPays(paysEntreprise);
+        if (indicatif != null) telephone = indicatif + " " + telephone.trim();
+    }
+    dto.setTelephone(telephone);
+    dto.setPays(paysEntreprise);
     dto.setSecteur(entreprise.getSecteur());
     dto.setRccm(entreprise.getRccm());
     dto.setSiteWeb(entreprise.getSiteWeb());

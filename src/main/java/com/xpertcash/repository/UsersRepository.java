@@ -65,6 +65,29 @@ public interface UsersRepository extends JpaRepository<User, Long> {
            "WHERE e.id = :entrepriseId")
     long countByEntrepriseId(@Param("entrepriseId") Long entrepriseId);
 
+    /** Dernière activité (connexion) parmi tous les utilisateurs de l'entreprise. */
+    @Query("SELECT MAX(u.lastActivity) FROM User u WHERE u.entreprise.id = :entrepriseId")
+    Optional<LocalDateTime> findMaxLastActivityByEntrepriseId(@Param("entrepriseId") Long entrepriseId);
+
+    /** Batch : count par entreprise pour une liste d'IDs (évite N requêtes). Retourne [entrepriseId, count]. */
+    @Query("SELECT u.entreprise.id, COUNT(u) FROM User u " +
+           "WHERE u.entreprise.id IN :ids AND u.role.name <> :excludedRole " +
+           "GROUP BY u.entreprise.id")
+    List<Object[]> countByEntrepriseIdIn(@Param("ids") List<Long> ids,
+                                         @Param("excludedRole") RoleType excludedRole);
+
+    /** Batch : max lastActivity par entreprise pour une liste d'IDs. Retourne [entrepriseId, maxLastActivity]. */
+    @Query("SELECT u.entreprise.id, MAX(u.lastActivity) FROM User u WHERE u.entreprise.id IN :ids GROUP BY u.entreprise.id")
+    List<Object[]> findMaxLastActivityByEntrepriseIdIn(@Param("ids") List<Long> ids);
+
+    /** Total utilisateurs (hors SUPER_ADMIN) dans les entreprises dont l'admin n'est pas SUPER_ADMIN (dashboard). */
+    @Query("SELECT COUNT(u) FROM User u " +
+           "JOIN u.entreprise e " +
+           "LEFT JOIN e.admin a " +
+           "LEFT JOIN a.role r " +
+           "WHERE u.role.name <> :excludedRole AND (a IS NULL OR r.name <> :excludedRole)")
+    long countUsersInNonSuperAdminEntreprises(@Param("excludedRole") RoleType excludedRole);
+
     // Récupérer tous les utilisateurs d'une entreprise sauf l'ADMIN (optimisé avec JOIN FETCH)
     @Query("SELECT DISTINCT u FROM User u " +
            "LEFT JOIN FETCH u.entreprise e " +

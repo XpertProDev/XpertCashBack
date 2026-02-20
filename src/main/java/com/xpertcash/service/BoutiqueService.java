@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.xpertcash.DTOs.ProduitDTO;
+import com.xpertcash.DTOs.TransfertDTO;
 import com.xpertcash.configuration.CentralAccess;
 
 import com.xpertcash.entity.Boutique;
@@ -554,6 +555,38 @@ public class BoutiqueService {
         return ResponseEntity.ok(response);
     }
 
+    /**
+     * Liste des transferts pour l'entreprise de l'utilisateur connecté (isolation multi-tenant).
+     * Si boutiqueId est fourni, seuls les transferts impliquant cette boutique sont retournés
+     * (la boutique doit appartenir à l'entreprise de l'utilisateur).
+     */
+    public List<TransfertDTO> getTransferts(HttpServletRequest request, Long boutiqueId) {
+        User user = authHelper.getAuthenticatedUserWithFallback(request);
+        if (user.getEntreprise() == null) {
+            throw new RuntimeException("Utilisateur non rattaché à une entreprise.");
+        }
+        Long entrepriseId = user.getEntreprise().getId();
 
+        List<Transfert> transferts;
+        if (boutiqueId != null) {
+            boutiqueRepository.findByIdAndEntrepriseId(boutiqueId, entrepriseId)
+                    .orElseThrow(() -> new RuntimeException("Boutique introuvable ou n'appartient pas à votre entreprise."));
+            transferts = transfertRepository.findByBoutiqueSourceIdOrBoutiqueDestinationId(boutiqueId, boutiqueId);
+        } else {
+            transferts = transfertRepository.findByBoutiqueSource_Entreprise_IdOrBoutiqueDestination_Entreprise_Id(entrepriseId, entrepriseId);
+        }
+
+        return transferts.stream().map(t -> {
+            TransfertDTO dto = new TransfertDTO();
+            dto.setId(t.getId());
+            dto.setProduitNom(t.getProduit() != null ? t.getProduit().getNom() : null);
+            dto.setProduitCodeGenerique(t.getProduit() != null ? t.getProduit().getCodeGenerique() : null);
+            dto.setBoutiqueSourceNom(t.getBoutiqueSource() != null ? t.getBoutiqueSource().getNomBoutique() : null);
+            dto.setBoutiqueDestinationNom(t.getBoutiqueDestination() != null ? t.getBoutiqueDestination().getNomBoutique() : null);
+            dto.setQuantite(t.getQuantite());
+            dto.setDateTransfert(t.getDateTransfert() != null ? t.getDateTransfert().toString() : null);
+            return dto;
+        }).collect(Collectors.toList());
+    }
 
 }

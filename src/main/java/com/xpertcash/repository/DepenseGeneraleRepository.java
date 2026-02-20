@@ -65,5 +65,15 @@ public interface DepenseGeneraleRepository extends JpaRepository<DepenseGenerale
             @Param("entrepriseId") Long entrepriseId,
             @Param("dateDebut") LocalDateTime dateDebut,
             @Param("dateFin") LocalDateTime dateFin);
+
+    /** Pour pagination scalable : charger par IDs avec relations (évite N+1). */
+    @Query("SELECT DISTINCT d FROM DepenseGenerale d " +
+           "LEFT JOIN FETCH d.entreprise e " +
+           "LEFT JOIN FETCH d.categorie " +
+           "LEFT JOIN FETCH d.categorieLiee " +
+           "LEFT JOIN FETCH d.ordonnateur " +
+           "LEFT JOIN FETCH d.creePar " +
+           "WHERE d.id IN :ids")
+    List<DepenseGenerale> findByIdInWithDetails(@Param("ids") List<Long> ids);
 }
 

@@ -1,10 +1,15 @@
 package com.xpertcash.repository;
+
 import java.util.List;
 import java.util.Optional;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+
 import com.xpertcash.entity.EntrepriseClient;
 
 @Repository
@@ -41,5 +46,15 @@ public interface EntrepriseClientRepository extends JpaRepository<EntrepriseClie
            "LEFT JOIN FETCH e.entreprise ent " +
            "WHERE ent.id = :entrepriseId")
     List<EntrepriseClient> findByEntrepriseId(@Param("entrepriseId") Long entrepriseId);
+
+    /** Pagination côté base : entreprises clientes de l'entreprise (tenant). */
+    @Query(value = "SELECT e FROM EntrepriseClient e " +
+           "LEFT JOIN e.entreprise ent " +
+           "WHERE ent.id = :entrepriseId",
+           countQuery = "SELECT COUNT(e) FROM EntrepriseClient e " +
+           "LEFT JOIN e.entreprise ent " +
+           "WHERE ent.id = :entrepriseId")
+    Page<EntrepriseClient> findByEntrepriseIdPaginated(
+            @Param("entrepriseId") Long entrepriseId, Pageable pageable);
 
 }

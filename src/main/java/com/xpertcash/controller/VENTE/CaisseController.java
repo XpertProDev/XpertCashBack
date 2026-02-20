@@ -7,6 +7,7 @@ import com.xpertcash.DTOs.VENTE.OuvrirCaisseRequest;
 import com.xpertcash.DTOs.VENTE.GetCaisseActiveRequest;
 import com.xpertcash.DTOs.VENTE.DepenseRequest;
 import com.xpertcash.DTOs.VENTE.DepenseResponseDTO;
+import com.xpertcash.DTOs.PaginatedResponseDTO;
 import com.xpertcash.DTOs.VENTE.FermerCaisseRequest;
 import com.xpertcash.DTOs.VENTE.FermerCaisseResponseDTO;
 import jakarta.servlet.http.HttpServletRequest;
@@ -14,6 +15,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -127,49 +129,22 @@ public class CaisseController {
     return ResponseEntity.ok(dtos);
 }
 
-    //Get tout les caisse
+    //Get toutes les caisses de la boutique (paginé)
     @GetMapping("/boutique/{boutiqueId}/caisses")
     public ResponseEntity<?> getToutesLesCaisses(
             @PathVariable Long boutiqueId,
-            HttpServletRequest request
-    ) {
-        List<Caisse> caisses = caisseService.getToutesLesCaisses(boutiqueId, request);
-
-        List<CaisseResponseDTO> dtos = caisses.stream().map(c -> {
-            CaisseResponseDTO dto = new CaisseResponseDTO();
-            dto.setId(c.getId());
-            dto.setMontantInitial(c.getMontantInitial());
-            dto.setMontantCourant(c.getMontantCourant());
-            dto.setMontantEnMain(c.getMontantEnMain());
-            dto.setEcart(c.getEcart());
-            dto.setStatut(c.getStatut().name());
-            dto.setDateOuverture(c.getDateOuverture());
-            dto.setDateFermeture(c.getDateFermeture());
-            dto.setVendeurId(c.getVendeur() != null ? c.getVendeur().getId() : null);
-            dto.setNomVendeur(c.getVendeur() != null ? c.getVendeur().getNomComplet() : null);
-            dto.setBoutiqueId(c.getBoutique() != null ? c.getBoutique().getId() : null);
-            dto.setNomBoutique(c.getBoutique() != null ? c.getBoutique().getNomBoutique() : null);
-            dto.setDepenses(getDepensesForCaisse(c.getId(), request));
-            return dto;
-        }).toList();
-
-        return ResponseEntity.ok(dtos);
-    }
-
-    //Get mes propres caisses
-    @GetMapping("/boutique/{boutiqueId}/mes-caisses")
-    public ResponseEntity<?> getMesCaisses(
-            @PathVariable Long boutiqueId,
-            HttpServletRequest request
+            HttpServletRequest request,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false) String sortBy,
+            @RequestParam(required = false) String sortDir
     ) {
         try {
-            List<Caisse> caisses = caisseService.getMesCaisses(boutiqueId, request);
+            PaginatedResponseDTO<Caisse> paginated = caisseService.getToutesLesCaissesPaginated(boutiqueId, request, page, size, sortBy, sortDir);
+            List<Long> caisseIds = paginated.getContent().stream().map(Caisse::getId).toList();
+            Map<Long, List<DepenseResponseDTO>> depensesByCaisse = caisseService.listerDepensesCaissesBatch(caisseIds, request);
 
-            if (caisses.isEmpty()) {
-                return ResponseEntity.ok(Map.of("message", "Aucune caisse trouvée pour vous dans cette boutique."));
-            }
-
-            List<CaisseResponseDTO> dtos = caisses.stream().map(c -> {
+            List<CaisseResponseDTO> dtos = paginated.getContent().stream().map(c -> {
                 CaisseResponseDTO dto = new CaisseResponseDTO();
                 dto.setId(c.getId());
                 dto.setMontantInitial(c.getMontantInitial());
@@ -183,11 +158,74 @@ public class CaisseController {
                 dto.setNomVendeur(c.getVendeur() != null ? c.getVendeur().getNomComplet() : null);
                 dto.setBoutiqueId(c.getBoutique() != null ? c.getBoutique().getId() : null);
                 dto.setNomBoutique(c.getBoutique() != null ? c.getBoutique().getNomBoutique() : null);
-                dto.setDepenses(getDepensesForCaisse(c.getId(), request));
+                dto.setDepenses(depensesByCaisse.getOrDefault(c.getId(), Collections.emptyList()));
                 return dto;
             }).toList();
 
-            return ResponseEntity.ok(dtos);
+            PaginatedResponseDTO<CaisseResponseDTO> response = new PaginatedResponseDTO<>(
+                    dtos,
+                    paginated.getPageNumber(),
+                    paginated.getPageSize(),
+                    paginated.getTotalElements(),
+                    paginated.getTotalPages(),
+                    paginated.isHasNext(),
+                    paginated.isHasPrevious(),
+                    paginated.isFirst(),
+                    paginated.isLast()
+            );
+            return ResponseEntity.ok(response);
+        } catch (RuntimeException e) {
+            HashMap<String, String> error = new HashMap<>();
+            error.put("error", e.getMessage());
+            return ResponseEntity.badRequest().body(error);
+        }
+    }
+
+    //Get mes propres caisses (paginé)
+    @GetMapping("/boutique/{boutiqueId}/mes-caisses")
+    public ResponseEntity<?> getMesCaisses(
+            @PathVariable Long boutiqueId,
+            HttpServletRequest request,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false) String sortBy,
+            @RequestParam(required = false) String sortDir
+    ) {
+        try {
+            PaginatedResponseDTO<Caisse> paginated = caisseService.getMesCaissesPaginated(boutiqueId, request, page, size, sortBy, sortDir);
+            List<Long> caisseIds = paginated.getContent().stream().map(Caisse::getId).toList();
+            Map<Long, List<DepenseResponseDTO>> depensesByCaisse = caisseService.listerDepensesCaissesBatch(caisseIds, request);
+
+            List<CaisseResponseDTO> dtos = paginated.getContent().stream().map(c -> {
+                CaisseResponseDTO dto = new CaisseResponseDTO();
+                dto.setId(c.getId());
+                dto.setMontantInitial(c.getMontantInitial());
+                dto.setMontantCourant(c.getMontantCourant());
+                dto.setMontantEnMain(c.getMontantEnMain());
+                dto.setEcart(c.getEcart());
+                dto.setStatut(c.getStatut().name());
+                dto.setDateOuverture(c.getDateOuverture());
+                dto.setDateFermeture(c.getDateFermeture());
+                dto.setVendeurId(c.getVendeur() != null ? c.getVendeur().getId() : null);
+                dto.setNomVendeur(c.getVendeur() != null ? c.getVendeur().getNomComplet() : null);
+                dto.setBoutiqueId(c.getBoutique() != null ? c.getBoutique().getId() : null);
+                dto.setNomBoutique(c.getBoutique() != null ? c.getBoutique().getNomBoutique() : null);
+                dto.setDepenses(depensesByCaisse.getOrDefault(c.getId(), Collections.emptyList()));
+                return dto;
+            }).toList();
+
+            PaginatedResponseDTO<CaisseResponseDTO> response = new PaginatedResponseDTO<>(
+                    dtos,
+                    paginated.getPageNumber(),
+                    paginated.getPageSize(),
+                    paginated.getTotalElements(),
+                    paginated.getTotalPages(),
+                    paginated.isHasNext(),
+                    paginated.isHasPrevious(),
+                    paginated.isFirst(),
+                    paginated.isLast()
+            );
+            return ResponseEntity.ok(response);
         } catch (RuntimeException e) {
             HashMap<String, String> error = new HashMap<>();
             error.put("error", e.getMessage());

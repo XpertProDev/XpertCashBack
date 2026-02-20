@@ -69,11 +69,62 @@ public class Utilitaire {
     }
 
     //verifier si son Entreprise est active
-    public boolean isEntrepriseActive(Long entrepriseId) {
-        Entreprise entreprise = entrepriseRepository.findById(entrepriseId)
-                .orElseThrow(() -> new RuntimeException("Entreprise introuvable"));
-        return Boolean.TRUE.equals(entreprise.getActive());
+    // public boolean isEntrepriseActive(Long entrepriseId) {
+    //     Entreprise entreprise = entrepriseRepository.findById(entrepriseId)
+    //             .orElseThrow(() -> new RuntimeException("Entreprise introuvable"));
+    //     return Boolean.TRUE.equals(entreprise.getActive());
 
+    // }
+
+    /**
+     * Retourne l'indicatif téléphonique international pour un pays (ex: Mali -> "+223").
+     * Accepte le nom du pays, le code ISO (2 lettres) ou un indicatif déjà formaté (+223, 223).
+     */
+    public static String getIndicatifPays(String pays) {
+        if (pays == null || pays.isBlank()) return null;
+        String p = pays.trim();
+        if (p.isEmpty()) return null;
+        // Déjà au format +XXX
+        if (p.startsWith("+") && p.length() > 1 && p.substring(1).matches("[0-9]+")) return p;
+        // Uniquement des chiffres (ex: 223)
+        if (p.matches("[0-9]+")) return "+" + p;
+        String lower = p.toLowerCase();
+        switch (lower) {
+            case "mali": case "ml": return "+223";
+            case "sénégal": case "senegal": case "sn": return "+221";
+            case "guinée": case "guinee": case "gn": return "+224";
+            case "burkina faso": case "bf": return "+226";
+            case "côte d'ivoire": case "cote d'ivoire": case "ci": case "ivoire": return "+225";
+            case "bénin": case "benin": case "bj": return "+229";
+            case "togo": case "tg": return "+228";
+            case "niger": case "ne": return "+227";
+            case "ghana": case "gh": return "+233";
+            case "nigeria": case "ng": return "+234";
+            case "cameroun": case "cm": return "+237";
+            case "tchad": case "td": return "+235";
+            case "gabon": case "ga": return "+241";
+            case "congo": case "cg": return "+242";
+            case "rdc": case "république démocratique du congo": case "cd": return "+243";
+            case "france": case "fr": return "+33";
+            default: break;
+        }
+        // Fallback: si le libellé contient le nom du pays (ex: "République du Mali", "Mali ")
+        if (lower.contains("mali")) return "+223";
+        if (lower.contains("senegal") || lower.contains("sénégal")) return "+221";
+        if (lower.contains("guinee") || lower.contains("guinée")) return "+224";
+        if (lower.contains("burkina")) return "+226";
+        if (lower.contains("ivoire") || lower.contains("côte d") || lower.contains("cote d")) return "+225";
+        if (lower.contains("benin") || lower.contains("bénin")) return "+229";
+        if (lower.contains("togo")) return "+228";
+        if (lower.contains("niger") && !lower.contains("nigeria")) return "+227";
+        if (lower.contains("ghana")) return "+233";
+        if (lower.contains("nigeria")) return "+234";
+        if (lower.contains("cameroun")) return "+237";
+        if (lower.contains("tchad")) return "+235";
+        if (lower.contains("gabon")) return "+241";
+        if (lower.contains("congo") || lower.contains("rdc")) return "+243";
+        if (lower.contains("france")) return "+33";
+        return null;
     }
 
 }
