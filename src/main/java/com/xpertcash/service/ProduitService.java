@@ -940,29 +940,28 @@ public class ProduitService {
     }
 
     // Lister Produit par boutique (excluant les produits dans la corbeille)
-    @Transactional
+    @Transactional(readOnly = true)
     public List<ProduitDTO> getProduitsParStock(Long boutiqueId, HttpServletRequest request) {
-        return getProduitsParStockPaginated(boutiqueId, 0, Integer.MAX_VALUE, request).getContent();
+        return getProduitsParStockPaginated(boutiqueId, 0, Integer.MAX_VALUE, null, request).getContent();
     }
 
-    // Méthode scalable avec pagination pour récupérer les produits d'une boutique
-    @Transactional
+    // Méthode scalable avec pagination pour récupérer les produits d'une boutique (recherche optionnelle : nom, codeGenerique, codeBare, catégorie).
+    @Transactional(readOnly = true)
     public ProduitStockPaginatedResponseDTO getProduitsParStockPaginated(
-            Long boutiqueId, 
-            int page, 
-            int size, 
+            Long boutiqueId,
+            int page,
+            int size,
+            String search,
             HttpServletRequest request) {
-        
-        
-        
+
         if (page < 0) page = 0;
         if (size <= 0) size = 10;
         if (size > 100) size = 100;
-        
+
         if (boutiqueId == null) {
             throw new RuntimeException("L'ID de la boutique ne peut pas être null");
         }
-        
+
         String token = request.getHeader("Authorization");
         if (token == null || !token.startsWith("Bearer ")) {
             throw new RuntimeException("Token JWT manquant ou mal formaté");
@@ -984,9 +983,9 @@ public class ProduitService {
         RoleType role = user.getRole().getName();
         boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
         boolean hasPermission = user.getRole().hasPermission(PermissionType.GERER_PRODUITS)
-                            || user.getRole().hasPermission(PermissionType.VENDRE_PRODUITS)
-                            || user.getRole().hasPermission(PermissionType.APPROVISIONNER_STOCK)
-                            || user.getRole().hasPermission(PermissionType.GERER_BOUTIQUE);
+                || user.getRole().hasPermission(PermissionType.VENDRE_PRODUITS)
+                || user.getRole().hasPermission(PermissionType.APPROVISIONNER_STOCK)
+                || user.getRole().hasPermission(PermissionType.GERER_BOUTIQUE);
 
         if (!isAdminOrManager && !hasPermission) {
             throw new RuntimeException("Accès interdit : vous n'avez pas les droits pour consulter les produits.");
@@ -1000,11 +999,19 @@ public class ProduitService {
             }
         }
 
+        String searchTerm = (search != null && search.length() >= 2) ? search.trim() : null;
         Pageable pageable = PageRequest.of(page, size, Sort.by("nom").ascending());
 
-        Page<Produit> produitsPage = produitRepository.findProduitsByBoutiqueIdPaginated(boutiqueId, pageable);
+        Page<Produit> produitsPage;
+        long totalProduitsActifs;
+        if (searchTerm != null && !searchTerm.isEmpty()) {
+            produitsPage = produitRepository.findProduitsByBoutiqueIdPaginatedWithSearch(boutiqueId, searchTerm, pageable);
+            totalProduitsActifs = produitRepository.countProduitsActifsByBoutiqueIdWithSearch(boutiqueId, searchTerm);
+        } else {
+            produitsPage = produitRepository.findProduitsByBoutiqueIdPaginated(boutiqueId, pageable);
+            totalProduitsActifs = produitRepository.countProduitsActifsByBoutiqueId(boutiqueId);
+        }
 
-        long totalProduitsActifs = produitRepository.countProduitsActifsByBoutiqueId(boutiqueId);
         long totalProduitsEnStock = produitRepository.countProduitsEnStockByBoutiqueId(boutiqueId);
         long totalProduitsHorsStock = produitRepository.countProduitsHorsStockByBoutiqueId(boutiqueId);
 
