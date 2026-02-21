@@ -259,6 +259,10 @@ public class ClientService {
 
         Page<Client> clientPage;
         String searchTrimmed = (search != null) ? search.trim() : "";
+        // Optimisation : recherche côté base uniquement si au moins 2 caractères (évite LIKE '%x%' coûteux)
+        if (searchTrimmed.length() < 2) {
+            searchTrimmed = "";
+        }
         if (searchTrimmed.isEmpty()) {
             clientPage = clientRepository.findClientsByEntrepriseOrEntrepriseClientPaginated(entreprise.getId(), pageable);
         } else {

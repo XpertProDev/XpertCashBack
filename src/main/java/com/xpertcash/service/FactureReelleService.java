@@ -206,12 +206,15 @@ public class FactureReelleService {
 
    // Méthode pour lister les factures réelles (ancienne version pour compatibilité)
   public List<FactureReelleDTO> listerMesFacturesReelles(HttpServletRequest request) {
-    PaginatedResponseDTO<FactureReelleDTO> result = listerMesFacturesReellesPaginated(0, 50, request);
+    PaginatedResponseDTO<FactureReelleDTO> result = listerMesFacturesReellesPaginated(0, 50, null, request);
     return result.getContent();
   }
 
-  // Méthode scalable avec pagination pour lister les factures réelles
-  public PaginatedResponseDTO<FactureReelleDTO> listerMesFacturesReellesPaginated(int page, int size, HttpServletRequest request) {
+  /**
+   * Méthode scalable avec pagination pour lister les factures réelles.
+   * search : si non vide (≥ 2 caractères), filtre par numéro de facture ou nom du client — côté base.
+   */
+  public PaginatedResponseDTO<FactureReelleDTO> listerMesFacturesReellesPaginated(int page, int size, String search, HttpServletRequest request) {
     if (page < 0) page = 0;
     if (size <= 0) size = 20;
     if (size > 100) size = 100;
@@ -236,13 +239,17 @@ public class FactureReelleService {
         throw new SecurityException("Accès interdit : Vous n'avez pas les permissions nécessaires pour voir ces factures.");
     }
 
-    
+    String searchTrimmed = (search != null) ? search.trim() : "";
+    if (searchTrimmed.length() < 2) {
+        searchTrimmed = "";
+    }
 
     Pageable pageable = PageRequest.of(page, size,
         Sort.by("dateCreation").descending().and(Sort.by("id").descending()));
 
-    Page<FactureReelle> facturesPage = factureReelleRepository.findByEntrepriseOrderByDateCreationDescPaginatedWithRelations(
-            entreprise.getId(), pageable);
+    Page<FactureReelle> facturesPage = searchTrimmed.isEmpty()
+            ? factureReelleRepository.findByEntrepriseOrderByDateCreationDescPaginatedWithRelations(entreprise.getId(), pageable)
+            : factureReelleRepository.findByEntrepriseOrderByDateCreationDescPaginatedWithRelationsAndSearch(entreprise.getId(), searchTrimmed, pageable);
 
     List<Long> factureIds = facturesPage.getContent().stream()
             .map(FactureReelle::getId)

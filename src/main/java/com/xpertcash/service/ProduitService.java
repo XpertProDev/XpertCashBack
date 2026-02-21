@@ -1514,12 +1514,16 @@ public class ProduitService {
         }
 
         String searchTrimmed = (search != null) ? search.trim() : "";
+        // Optimisation : recherche côté base uniquement si au moins 2 caractères (évite LIKE '%x%' coûteux)
+        if (searchTrimmed.length() < 2) {
+            searchTrimmed = "";
+        }
         long totalProduitsUniques = searchTrimmed.isEmpty()
                 ? produitRepository.countProduitsUniquesByEntrepriseId(entrepriseId)
                 : produitRepository.countProduitsUniquesByEntrepriseIdWithSearch(entrepriseId, searchTrimmed);
         long totalBoutiques = produitRepository.countBoutiquesActivesByEntrepriseId(entrepriseId);
 
-        List<String> codeGeneriquesPage = findCodeGeneriquesPage(produitRepository, entrepriseId, sortBy, sortDir, search, size, page * size);
+        List<String> codeGeneriquesPage = findCodeGeneriquesPage(produitRepository, entrepriseId, sortBy, sortDir, searchTrimmed, size, page * size);
 
         List<ProduitDTO> produitsDTOs;
         if (codeGeneriquesPage.isEmpty()) {

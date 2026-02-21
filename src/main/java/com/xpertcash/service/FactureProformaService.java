@@ -962,6 +962,10 @@ public class FactureProformaService {
 
         Pageable pageable = PageRequest.of(page, size, Sort.by("dateCreation").descending().and(Sort.by("id").descending()));
         String searchTrimmed = (search != null) ? search.trim() : "";
+        // Optimisation : recherche côté base uniquement si au moins 2 caractères (évite LIKE '%x%' coûteux)
+        if (searchTrimmed.length() < 2) {
+            searchTrimmed = "";
+        }
 
         Page<FactureProForma> facturesPage;
 
