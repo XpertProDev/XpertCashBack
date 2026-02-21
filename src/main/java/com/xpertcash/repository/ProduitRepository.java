@@ -118,6 +118,90 @@ public interface ProduitRepository extends JpaRepository<Produit, Long> {
     List<String> findCodeGeneriquesPageOrderByNomDesc(
             @Param("entrepriseId") Long entrepriseId, @Param("limit") int limit, @Param("offset") int offset);
 
+    /** Page de code_generique avec recherche par nom, code_generique, code_bare ou catégorie (insensible à la casse). */
+    @Query(value = """
+        SELECT p.code_generique FROM produit p
+        LEFT JOIN boutique b ON p.boutique_id = b.id
+        LEFT JOIN categorie c ON p.categorie_id = c.id
+        WHERE (b.entreprise_id = :entrepriseId OR b.id IS NULL)
+          AND (p.deleted IS NULL OR p.deleted = false)
+          AND ((LOWER(COALESCE(p.nom, '')) LIKE LOWER(CONCAT('%', :search, '%'))
+            OR LOWER(COALESCE(p.code_generique, '')) LIKE LOWER(CONCAT('%', :search, '%'))
+            OR COALESCE(p.code_bare, '') LIKE CONCAT('%', :search, '%')
+            OR LOWER(COALESCE(c.nom, '')) LIKE LOWER(CONCAT('%', :search, '%'))))
+        GROUP BY p.code_generique
+        ORDER BY p.code_generique ASC
+        LIMIT :limit OFFSET :offset
+        """, nativeQuery = true)
+    List<String> findCodeGeneriquesPageOrderByCodeGeneriqueWithSearch(
+            @Param("entrepriseId") Long entrepriseId, @Param("search") String search, @Param("limit") int limit, @Param("offset") int offset);
+
+    @Query(value = """
+        SELECT p.code_generique FROM produit p
+        LEFT JOIN boutique b ON p.boutique_id = b.id
+        LEFT JOIN categorie c ON p.categorie_id = c.id
+        WHERE (b.entreprise_id = :entrepriseId OR b.id IS NULL)
+          AND (p.deleted IS NULL OR p.deleted = false)
+          AND ((LOWER(COALESCE(p.nom, '')) LIKE LOWER(CONCAT('%', :search, '%'))
+            OR LOWER(COALESCE(p.code_generique, '')) LIKE LOWER(CONCAT('%', :search, '%'))
+            OR COALESCE(p.code_bare, '') LIKE CONCAT('%', :search, '%')
+            OR LOWER(COALESCE(c.nom, '')) LIKE LOWER(CONCAT('%', :search, '%'))))
+        GROUP BY p.code_generique
+        ORDER BY p.code_generique DESC
+        LIMIT :limit OFFSET :offset
+        """, nativeQuery = true)
+    List<String> findCodeGeneriquesPageOrderByCodeGeneriqueDescWithSearch(
+            @Param("entrepriseId") Long entrepriseId, @Param("search") String search, @Param("limit") int limit, @Param("offset") int offset);
+
+    @Query(value = """
+        SELECT p.code_generique FROM produit p
+        LEFT JOIN boutique b ON p.boutique_id = b.id
+        LEFT JOIN categorie c ON p.categorie_id = c.id
+        WHERE (b.entreprise_id = :entrepriseId OR b.id IS NULL)
+          AND (p.deleted IS NULL OR p.deleted = false)
+          AND ((LOWER(COALESCE(p.nom, '')) LIKE LOWER(CONCAT('%', :search, '%'))
+            OR LOWER(COALESCE(p.code_generique, '')) LIKE LOWER(CONCAT('%', :search, '%'))
+            OR COALESCE(p.code_bare, '') LIKE CONCAT('%', :search, '%')
+            OR LOWER(COALESCE(c.nom, '')) LIKE LOWER(CONCAT('%', :search, '%'))))
+        GROUP BY p.code_generique
+        ORDER BY MIN(p.nom) ASC, p.code_generique ASC
+        LIMIT :limit OFFSET :offset
+        """, nativeQuery = true)
+    List<String> findCodeGeneriquesPageOrderByNomWithSearch(
+            @Param("entrepriseId") Long entrepriseId, @Param("search") String search, @Param("limit") int limit, @Param("offset") int offset);
+
+    @Query(value = """
+        SELECT p.code_generique FROM produit p
+        LEFT JOIN boutique b ON p.boutique_id = b.id
+        LEFT JOIN categorie c ON p.categorie_id = c.id
+        WHERE (b.entreprise_id = :entrepriseId OR b.id IS NULL)
+          AND (p.deleted IS NULL OR p.deleted = false)
+          AND ((LOWER(COALESCE(p.nom, '')) LIKE LOWER(CONCAT('%', :search, '%'))
+            OR LOWER(COALESCE(p.code_generique, '')) LIKE LOWER(CONCAT('%', :search, '%'))
+            OR COALESCE(p.code_bare, '') LIKE CONCAT('%', :search, '%')
+            OR LOWER(COALESCE(c.nom, '')) LIKE LOWER(CONCAT('%', :search, '%'))))
+        GROUP BY p.code_generique
+        ORDER BY MIN(p.nom) DESC, p.code_generique ASC
+        LIMIT :limit OFFSET :offset
+        """, nativeQuery = true)
+    List<String> findCodeGeneriquesPageOrderByNomDescWithSearch(
+            @Param("entrepriseId") Long entrepriseId, @Param("search") String search, @Param("limit") int limit, @Param("offset") int offset);
+
+    /** Nombre de code_generique distincts correspondant à la recherche (nom, code, code_bare ou catégorie). */
+    @Query(value = """
+        SELECT COUNT(DISTINCT p.code_generique) FROM produit p
+        LEFT JOIN boutique b ON p.boutique_id = b.id
+        LEFT JOIN categorie c ON p.categorie_id = c.id
+        WHERE (b.entreprise_id = :entrepriseId OR b.id IS NULL)
+          AND (p.deleted IS NULL OR p.deleted = false)
+          AND ((LOWER(COALESCE(p.nom, '')) LIKE LOWER(CONCAT('%', :search, '%'))
+            OR LOWER(COALESCE(p.code_generique, '')) LIKE LOWER(CONCAT('%', :search, '%'))
+            OR COALESCE(p.code_bare, '') LIKE CONCAT('%', :search, '%')
+            OR LOWER(COALESCE(c.nom, '')) LIKE LOWER(CONCAT('%', :search, '%'))))
+        """, nativeQuery = true)
+    long countProduitsUniquesByEntrepriseIdWithSearch(
+            @Param("entrepriseId") Long entrepriseId, @Param("search") String search);
+
     /** Charge les produits d'une entreprise par liste de codeGenerique (pagination produits uniques). */
     @Query("SELECT DISTINCT p FROM Produit p " +
            "LEFT JOIN FETCH p.boutique b " +

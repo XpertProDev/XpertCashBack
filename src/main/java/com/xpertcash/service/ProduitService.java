@@ -1213,10 +1213,19 @@ public class ProduitService {
         return Sort.by(Sort.Direction.ASC, defaultProp1).and(Sort.by(Sort.Direction.ASC, defaultProp2));
     }
 
-    /** Délègue au bon findCodeGeneriquesPage* selon sortBy/sortDir (whitelisté). */
-    private List<String> findCodeGeneriquesPage(ProduitRepository repo, Long entrepriseId, String sortBy, String sortDir, int limit, int offset) {
+    /** Délègue au bon findCodeGeneriquesPage* selon sortBy/sortDir. search optionnel : filtre par nom, code_generique, code_bare ou catégorie (côté base). */
+    private List<String> findCodeGeneriquesPage(ProduitRepository repo, Long entrepriseId, String sortBy, String sortDir, String search, int limit, int offset) {
         boolean desc = "desc".equalsIgnoreCase(sortDir != null ? sortDir : "asc");
         boolean byNom = sortBy != null && "nom".equalsIgnoreCase(sortBy.trim());
+        String searchTrimmed = (search != null) ? search.trim() : "";
+        if (!searchTrimmed.isEmpty()) {
+            if (byNom) {
+                return desc ? repo.findCodeGeneriquesPageOrderByNomDescWithSearch(entrepriseId, searchTrimmed, limit, offset)
+                        : repo.findCodeGeneriquesPageOrderByNomWithSearch(entrepriseId, searchTrimmed, limit, offset);
+            }
+            return desc ? repo.findCodeGeneriquesPageOrderByCodeGeneriqueDescWithSearch(entrepriseId, searchTrimmed, limit, offset)
+                    : repo.findCodeGeneriquesPageOrderByCodeGeneriqueWithSearch(entrepriseId, searchTrimmed, limit, offset);
+        }
         if (byNom) {
             return desc ? repo.findCodeGeneriquesPageOrderByNomDesc(entrepriseId, limit, offset)
                     : repo.findCodeGeneriquesPageOrderByNom(entrepriseId, limit, offset);
@@ -1438,31 +1447,33 @@ public class ProduitService {
 
     // Méthode pour récupérer tous les produits de toutes les boutiques d'une entreprise
     public List<ProduitDTO> getProduitsParEntreprise(Long entrepriseId, HttpServletRequest request) {
-        return getProduitsParEntreprisePaginated(entrepriseId, 0, Integer.MAX_VALUE, null, null, request).getContent();
+        return getProduitsParEntreprisePaginated(entrepriseId, 0, Integer.MAX_VALUE, null, null, null, request).getContent();
     }
 
     /**
      * Récupère les produits de l'entreprise de l'utilisateur connecté (entreprise issue du token JWT uniquement).
-     * Isolation multi-tenant : aucun entrepriseId n'est accepté depuis le client.
+     * search : si non vide, filtre par nom, code_generique, code_bare ou catégorie (côté base). Isolation multi-tenant.
      */
     public ProduitEntreprisePaginatedResponseDTO getProduitsEntreprisePaginated(
             HttpServletRequest request,
             int page,
             int size,
             String sortBy,
-            String sortDir) {
+            String sortDir,
+            String search) {
         User user = resolveUserAndValidateToken(request);
         Long entrepriseId = user.getEntreprise().getId();
-        return getProduitsParEntreprisePaginated(entrepriseId, page, size, sortBy, sortDir, request);
+        return getProduitsParEntreprisePaginated(entrepriseId, page, size, sortBy, sortDir, search, request);
     }
 
-    // Méthode scalable avec pagination pour récupérer les produits d'une entreprise
+    // Méthode scalable avec pagination pour récupérer les produits d'une entreprise (search optionnel)
     public ProduitEntreprisePaginatedResponseDTO getProduitsParEntreprisePaginated(
-            Long entrepriseId, 
-            int page, 
-            int size, 
+            Long entrepriseId,
+            int page,
+            int size,
             String sortBy,
             String sortDir,
+            String search,
             HttpServletRequest request) {
         
         if (page < 0) page = 0;
@@ -1502,10 +1513,13 @@ public class ProduitService {
             throw new RuntimeException("Accès refusé : vous ne pouvez pas accéder aux produits d'une autre entreprise. Votre entreprise: " + entreprise.getId() + ", Demandée: " + entrepriseId);
         }
 
-        long totalProduitsUniques = produitRepository.countProduitsUniquesByEntrepriseId(entrepriseId);
+        String searchTrimmed = (search != null) ? search.trim() : "";
+        long totalProduitsUniques = searchTrimmed.isEmpty()
+                ? produitRepository.countProduitsUniquesByEntrepriseId(entrepriseId)
+                : produitRepository.countProduitsUniquesByEntrepriseIdWithSearch(entrepriseId, searchTrimmed);
         long totalBoutiques = produitRepository.countBoutiquesActivesByEntrepriseId(entrepriseId);
 
-        List<String> codeGeneriquesPage = findCodeGeneriquesPage(produitRepository, entrepriseId, sortBy, sortDir, size, page * size);
+        List<String> codeGeneriquesPage = findCodeGeneriquesPage(produitRepository, entrepriseId, sortBy, sortDir, search, size, page * size);
 
         List<ProduitDTO> produitsDTOs;
         if (codeGeneriquesPage.isEmpty()) {

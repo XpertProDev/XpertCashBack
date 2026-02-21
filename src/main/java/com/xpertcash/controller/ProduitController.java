@@ -408,15 +408,16 @@ public ResponseEntity<?> updateProduit(
         }
     }
 
-        /** Produits de l'entreprise de l'utilisateur connecté (entreprise issue du token JWT uniquement). Pagination comme TresorerieController. Isolation multi-tenant. */
+        /** Produits de l'entreprise paginés. search : filtre par nom, code_generique, code_bare ou catégorie (côté serveur). Isolation multi-tenant. */
         @GetMapping("/produits/entreprise/paginated")
         public ResponseEntity<?> getProduitsEntreprisePaginated(
                 HttpServletRequest request,
                 @RequestParam(defaultValue = "0") int page,
                 @RequestParam(defaultValue = "20") int size,
                 @RequestParam(defaultValue = "codeGenerique") String sortBy,
-                @RequestParam(defaultValue = "asc") String sortDir) {
-            return handleRequest(() -> produitService.getProduitsEntreprisePaginated(request, page, size, sortBy, sortDir));
+                @RequestParam(defaultValue = "asc") String sortDir,
+                @RequestParam(required = false) String search) {
+            return handleRequest(() -> produitService.getProduitsEntreprisePaginated(request, page, size, sortBy, sortDir, search));
         }
 
 
