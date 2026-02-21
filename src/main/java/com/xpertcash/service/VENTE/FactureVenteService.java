@@ -156,20 +156,22 @@ private FactureVenteResponseDTO toResponse(FactureVente facture) {
 
 /**
  * Récupère toutes les factures de vente avec pagination pour l'entreprise de l'utilisateur connecté.
- * Filtres optionnels : période (periode / dateDebut-dateFin), vendeurId, boutiqueId.
+ * Filtres optionnels : période, vendeurId, boutiqueId.
+ * search : si ≥ 2 caractères, filtre par numéro facture, nom vendeur ou nom client — côté base.
  */
 public FactureVentePaginatedDTO getAllFacturesWithPagination(
-        int page, 
-        int size, 
-        String sortBy, 
+        int page,
+        int size,
+        String sortBy,
         String sortDir,
         String periode,
         LocalDate dateDebut,
         LocalDate dateFin,
         Long vendeurId,
         Long boutiqueId,
+        String search,
         HttpServletRequest request) {
-    
+
     String token = request.getHeader("Authorization");
     if (token == null || !token.startsWith("Bearer ")) {
         throw new RuntimeException("Token JWT manquant ou invalide");
@@ -180,7 +182,6 @@ public FactureVentePaginatedDTO getAllFacturesWithPagination(
 
     Long entrepriseId = user.getEntreprise().getId();
 
-    // Multi-tenant : vérifier que vendeur et boutique appartiennent à l'entreprise
     if (vendeurId != null && !usersRepository.findByIdAndEntrepriseId(vendeurId, entrepriseId).isPresent()) {
         throw new RuntimeException("Vendeur invalide ou n'appartient pas à votre entreprise.");
     }
@@ -188,19 +189,21 @@ public FactureVentePaginatedDTO getAllFacturesWithPagination(
         throw new RuntimeException("Boutique invalide ou n'appartient pas à votre entreprise.");
     }
 
-    // Récupérer tous les vendeurs de l'entreprise (même ceux qui n'ont pas encore vendu)
     List<User> allUsersEntreprise = usersRepository.findByEntrepriseId(entrepriseId);
     List<VendeurFactureDTO> vendeurs = allUsersEntreprise.stream()
             .filter(u -> u.getRole() != null && u.getRole().getName() == RoleType.VENDEUR)
             .map(u -> new VendeurFactureDTO(u.getId(), u.getNomComplet()))
             .collect(Collectors.toList());
 
-    // Calculer les dates selon la période
     PeriodeDates periodeDates = calculerDatesPeriode(periode, dateDebut, dateFin);
     LocalDateTime dateDebutFilter = periodeDates.filtrerParPeriode ? periodeDates.dateDebut : null;
     LocalDateTime dateFinFilter = periodeDates.filtrerParPeriode ? periodeDates.dateFin : null;
 
-    // Tri côté base : mapper sortBy vers une propriété (ou chemin) de l'entité
+    String searchTrimmed = (search != null) ? search.trim() : "";
+    if (searchTrimmed.length() < 2) {
+        searchTrimmed = "";
+    }
+
     String sortProperty = "dateEmission";
     if (sortBy != null && !sortBy.isBlank()) {
         switch (sortBy.toLowerCase()) {
@@ -222,9 +225,11 @@ public FactureVentePaginatedDTO getAllFacturesWithPagination(
     Sort sort = Sort.by(direction, sortProperty).and(Sort.by(Sort.Direction.DESC, "id"));
     Pageable pageable = PageRequest.of(page, size, sort);
 
-    // Pagination côté base avec filtres (une requête)
-    Page<FactureVente> facturesPage = factureVenteRepository.findAllPaginatedWithFilters(
-            entrepriseId, dateDebutFilter, dateFinFilter, vendeurId, boutiqueId, pageable);
+    Page<FactureVente> facturesPage = searchTrimmed.isEmpty()
+            ? factureVenteRepository.findAllPaginatedWithFilters(
+                    entrepriseId, dateDebutFilter, dateFinFilter, vendeurId, boutiqueId, pageable)
+            : factureVenteRepository.findAllPaginatedWithFiltersAndSearch(
+                    entrepriseId, dateDebutFilter, dateFinFilter, vendeurId, boutiqueId, searchTrimmed, pageable);
 
     List<FactureVente> factures = facturesPage.getContent();
     List<Long> venteIds = factures.stream()
@@ -247,9 +252,12 @@ public FactureVentePaginatedDTO getAllFacturesWithPagination(
             .map(this::toResponse)
             .collect(Collectors.toList());
 
-    // Stats globales (même filtres) : somme des montants
-    double totalMontantFactures = factureVenteRepository.sumMontantTotalWithFilters(
-            entrepriseId, dateDebutFilter, dateFinFilter, vendeurId, boutiqueId);
+    // Stats globales (même filtres + search si actif) : somme des montants
+    double totalMontantFactures = searchTrimmed.isEmpty()
+            ? factureVenteRepository.sumMontantTotalWithFilters(
+                    entrepriseId, dateDebutFilter, dateFinFilter, vendeurId, boutiqueId)
+            : factureVenteRepository.sumMontantTotalWithFiltersAndSearch(
+                    entrepriseId, dateDebutFilter, dateFinFilter, vendeurId, boutiqueId, searchTrimmed);
     // Comptes par statut de remboursement sur la page courante (les totaux sur tout le filtre nécessiteraient une requête dédiée)
     int nombreFacturesRemboursees = (int) pagedItems.stream()
             .filter(item -> "ENTIEREMENT_REMBOURSEE".equals(item.getStatutRemboursement()))
