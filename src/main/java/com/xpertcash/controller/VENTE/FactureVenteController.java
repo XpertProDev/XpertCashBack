@@ -37,9 +37,7 @@ public class FactureVenteController {
 
     
 
-    /**
-     * Factures de vente paginées, avec filtres optionnels (vendeur, période, boutique).
-     */
+    /** Factures de vente paginées. search : filtre par numéro facture, nom vendeur ou nom client (côté serveur, ≥ 2 car.). */
     @GetMapping("/factureVente/entreprise/paginated")
     public ResponseEntity<FactureVentePaginatedDTO> getFacturesForEntrepriseWithPagination(
             @RequestParam(defaultValue = "0") int page,
@@ -51,10 +49,11 @@ public class FactureVenteController {
             @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate dateFin,
             @RequestParam(required = false) Long vendeurId,
             @RequestParam(required = false) Long boutiqueId,
+            @RequestParam(required = false) String search,
             HttpServletRequest request) {
-        
+
         FactureVentePaginatedDTO factures = factureVenteService.getAllFacturesWithPagination(
-            page, size, sortBy, sortDir, periode, dateDebut, dateFin, vendeurId, boutiqueId, request);
+            page, size, sortBy, sortDir, periode, dateDebut, dateFin, vendeurId, boutiqueId, search, request);
         return ResponseEntity.ok(factures);
     }
 

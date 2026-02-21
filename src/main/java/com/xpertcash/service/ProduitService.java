@@ -1825,17 +1825,17 @@ public class ProduitService {
     }
 
     /**
-     * Récupère ou crée la catégorie "Sans Category" si elle n'existe pas
+     * Récupère ou crée la catégorie "Sans Catégorie" si elle n'existe pas
      */
     private Categorie getOrCreateSansCategory(Entreprise entreprise) {
-        Categorie sansCategory = categorieRepository.findByNomAndEntrepriseId("Sans Category", entreprise.getId());
+        Categorie sansCategory = categorieRepository.findByNomAndEntrepriseId("Sans Catégorie", entreprise.getId());
         
         if (sansCategory != null) {
             return sansCategory;
         }
         
         sansCategory = new Categorie();
-        sansCategory.setNom("Sans Category");
+        sansCategory.setNom("Sans Catégorie");
         sansCategory.setCreatedAt(LocalDateTime.now());
         sansCategory.setProduitCount(0);
         sansCategory.setEntreprise(entreprise);

@@ -64,6 +64,49 @@ public interface FactureVenteRepository extends JpaRepository<FactureVente, Long
             @Param("boutiqueId") Long boutiqueId,
             Pageable pageable);
 
+    /** Pagination + recherche par numéro facture, nom vendeur ou nom client (côté base). LEFT JOIN + FETCH client/entrepriseClient pour éviter N+1. */
+    @Query(value = "SELECT DISTINCT f FROM FactureVente f " +
+           "LEFT JOIN FETCH f.vente v " +
+           "LEFT JOIN FETCH v.boutique b " +
+           "LEFT JOIN FETCH v.vendeur vendeur " +
+           "LEFT JOIN FETCH v.caisse " +
+           "LEFT JOIN FETCH v.client vclient " +
+           "LEFT JOIN FETCH v.entrepriseClient vec " +
+           "LEFT JOIN b.entreprise e " +
+           "WHERE e.id = :entrepriseId " +
+           "AND (:dateDebut IS NULL OR f.dateEmission >= :dateDebut) " +
+           "AND (:dateFin IS NULL OR f.dateEmission < :dateFin) " +
+           "AND (:vendeurId IS NULL OR vendeur.id = :vendeurId) " +
+           "AND (:boutiqueId IS NULL OR b.id = :boutiqueId) " +
+           "AND (LOWER(COALESCE(f.numeroFacture, '')) LIKE LOWER(CONCAT(CONCAT('%', :search), '%')) " +
+           "     OR (vendeur IS NOT NULL AND LOWER(COALESCE(vendeur.nomComplet, '')) LIKE LOWER(CONCAT(CONCAT('%', :search), '%'))) " +
+           "     OR (vclient IS NOT NULL AND LOWER(COALESCE(vclient.nomComplet, '')) LIKE LOWER(CONCAT(CONCAT('%', :search), '%'))) " +
+           "     OR (vec IS NOT NULL AND LOWER(COALESCE(vec.nom, '')) LIKE LOWER(CONCAT(CONCAT('%', :search), '%'))))",
+           countQuery = "SELECT COUNT(DISTINCT f) FROM FactureVente f " +
+           "LEFT JOIN f.vente v " +
+           "LEFT JOIN v.boutique b " +
+           "LEFT JOIN v.vendeur vendeur " +
+           "LEFT JOIN v.client vclient " +
+           "LEFT JOIN v.entrepriseClient vec " +
+           "LEFT JOIN b.entreprise e " +
+           "WHERE e.id = :entrepriseId " +
+           "AND (:dateDebut IS NULL OR f.dateEmission >= :dateDebut) " +
+           "AND (:dateFin IS NULL OR f.dateEmission < :dateFin) " +
+           "AND (:vendeurId IS NULL OR vendeur.id = :vendeurId) " +
+           "AND (:boutiqueId IS NULL OR b.id = :boutiqueId) " +
+           "AND (LOWER(COALESCE(f.numeroFacture, '')) LIKE LOWER(CONCAT(CONCAT('%', :search), '%')) " +
+           "     OR (vendeur IS NOT NULL AND LOWER(COALESCE(vendeur.nomComplet, '')) LIKE LOWER(CONCAT(CONCAT('%', :search), '%'))) " +
+           "     OR (vclient IS NOT NULL AND LOWER(COALESCE(vclient.nomComplet, '')) LIKE LOWER(CONCAT(CONCAT('%', :search), '%'))) " +
+           "     OR (vec IS NOT NULL AND LOWER(COALESCE(vec.nom, '')) LIKE LOWER(CONCAT(CONCAT('%', :search), '%'))))")
+    Page<FactureVente> findAllPaginatedWithFiltersAndSearch(
+            @Param("entrepriseId") Long entrepriseId,
+            @Param("dateDebut") LocalDateTime dateDebut,
+            @Param("dateFin") LocalDateTime dateFin,
+            @Param("vendeurId") Long vendeurId,
+            @Param("boutiqueId") Long boutiqueId,
+            @Param("search") String search,
+            Pageable pageable);
+
     /** Somme des montants totaux pour les factures correspondant aux mêmes filtres (pour stats globales). */
     @Query("SELECT COALESCE(SUM(f.montantTotal), 0) FROM FactureVente f " +
            "LEFT JOIN f.vente v " +
@@ -80,6 +123,31 @@ public interface FactureVenteRepository extends JpaRepository<FactureVente, Long
             @Param("dateFin") LocalDateTime dateFin,
             @Param("vendeurId") Long vendeurId,
             @Param("boutiqueId") Long boutiqueId);
+
+    /** Somme des montants avec le même filtre + recherche. LEFT JOIN vendeur/client/entrepriseClient pour cohérence. */
+    @Query("SELECT COALESCE(SUM(f.montantTotal), 0) FROM FactureVente f " +
+           "LEFT JOIN f.vente v " +
+           "LEFT JOIN v.boutique b " +
+           "LEFT JOIN v.vendeur vendeur " +
+           "LEFT JOIN v.client vclient " +
+           "LEFT JOIN v.entrepriseClient vec " +
+           "LEFT JOIN b.entreprise e " +
+           "WHERE e.id = :entrepriseId " +
+           "AND (:dateDebut IS NULL OR f.dateEmission >= :dateDebut) " +
+           "AND (:dateFin IS NULL OR f.dateEmission < :dateFin) " +
+           "AND (:vendeurId IS NULL OR vendeur.id = :vendeurId) " +
+           "AND (:boutiqueId IS NULL OR b.id = :boutiqueId) " +
+           "AND (LOWER(COALESCE(f.numeroFacture, '')) LIKE LOWER(CONCAT(CONCAT('%', :search), '%')) " +
+           "     OR (vendeur IS NOT NULL AND LOWER(COALESCE(vendeur.nomComplet, '')) LIKE LOWER(CONCAT(CONCAT('%', :search), '%'))) " +
+           "     OR (vclient IS NOT NULL AND LOWER(COALESCE(vclient.nomComplet, '')) LIKE LOWER(CONCAT(CONCAT('%', :search), '%'))) " +
+           "     OR (vec IS NOT NULL AND LOWER(COALESCE(vec.nom, '')) LIKE LOWER(CONCAT(CONCAT('%', :search), '%'))))")
+    double sumMontantTotalWithFiltersAndSearch(
+            @Param("entrepriseId") Long entrepriseId,
+            @Param("dateDebut") LocalDateTime dateDebut,
+            @Param("dateFin") LocalDateTime dateFin,
+            @Param("vendeurId") Long vendeurId,
+            @Param("boutiqueId") Long boutiqueId,
+            @Param("search") String search);
 
     // Recherche par vente et entreprise (pour isolation)
     @Query("SELECT DISTINCT f FROM FactureVente f " +
