@@ -16,7 +16,14 @@ import lombok.Setter;
 @Getter
 @Setter
 @Table(
-    uniqueConstraints = @UniqueConstraint(columnNames = {"codeGenerique", "boutique_id"})
+    uniqueConstraints = @UniqueConstraint(columnNames = {"codeGenerique", "boutique_id"}),
+    indexes = {
+        @Index(name = "idx_produit_nom", columnList = "nom"),
+        @Index(name = "idx_produit_code_generique", columnList = "code_generique"),
+        @Index(name = "idx_produit_code_bare", columnList = "code_bare"),
+        @Index(name = "idx_produit_categorie_id", columnList = "categorie_id"),
+        @Index(name = "idx_produit_boutique_id", columnList = "boutique_id")
+    }
 )
 public class Produit {
 

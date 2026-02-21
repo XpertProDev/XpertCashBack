@@ -362,28 +362,27 @@ public ResponseEntity<?> getFacturesParPeriode(
 }
 
 
-    // Endpoint scalable avec pagination pour récupérer les factures proforma de l'utilisateur connecté
+    /** Factures proforma paginées. search : filtre par numéro de facture ou nom du client (côté serveur). */
     @GetMapping("/mes-factures/paginated")
     public ResponseEntity<FactureProformaPaginatedResponseDTO> getFacturesParEntrepriseParUtilisateurPaginated(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false) String search,
             HttpServletRequest request) {
-        
+
         try {
-            // Validation des paramètres
             if (page < 0) page = 0;
             if (size <= 0) size = 20;
-            if (size > 100) size = 100; // Limite maximale
-            
-            // Récupérer l'ID de l'utilisateur depuis le token
+            if (size > 100) size = 100;
+
             User currentUser = authHelper.getAuthenticatedUserWithFallback(request);
             Long userId = currentUser.getId();
-            
+
             FactureProformaPaginatedResponseDTO response = factureProformaService.getFacturesParEntrepriseParUtilisateurPaginated(
-                    userId, page, size, request);
-            
+                    userId, page, size, search, request);
+
             return ResponseEntity.ok(response);
-            
+
         } catch (Exception e) {
             e.printStackTrace();
             throw new RuntimeException("Erreur lors de la récupération des factures paginées: " + e.getMessage());

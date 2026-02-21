@@ -11,10 +11,13 @@ import java.util.List;
 import jakarta.persistence.*;
 
 @Entity
+@Table(indexes = {
+    @Index(name = "idx_entreprise_client_entreprise_id", columnList = "entreprise_id"),
+    @Index(name = "idx_entreprise_client_nom", columnList = "nom")
+})
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-
 public class EntrepriseClient {
 
      @Id

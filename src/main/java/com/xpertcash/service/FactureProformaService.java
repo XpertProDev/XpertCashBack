@@ -929,18 +929,22 @@ public class FactureProformaService {
     //     return getFacturesParEntrepriseParUtilisateurPaginated(userIdRequete, 0, Integer.MAX_VALUE, request).getContent();
     // }
 
-    // Méthode scalable avec pagination pour récupérer les factures proforma d'une entreprise
+    /**
+     * Méthode scalable avec pagination pour récupérer les factures proforma d'une entreprise.
+     * search : si non vide, filtre par numéro de facture ou nom du client (personne ou entreprise) — côté base.
+     */
     @Transactional
     public FactureProformaPaginatedResponseDTO getFacturesParEntrepriseParUtilisateurPaginated(
-            Long userIdRequete, 
-            int page, 
-            int size, 
+            Long userIdRequete,
+            int page,
+            int size,
+            String search,
             HttpServletRequest request) {
-        
+
         if (page < 0) page = 0;
         if (size <= 0) size = 20;
         if (size > 100) size = 100;
-        
+
         User currentUser = authHelper.getAuthenticatedUserWithFallback(request);
         Entreprise entrepriseCourante = currentUser.getEntreprise();
         if (entrepriseCourante == null) {
@@ -957,22 +961,29 @@ public class FactureProformaService {
         boolean isApprover = factureProformaRepository.existsByApprobateursAndEntrepriseId(currentUser, entrepriseCourante.getId());
 
         Pageable pageable = PageRequest.of(page, size, Sort.by("dateCreation").descending().and(Sort.by("id").descending()));
+        String searchTrimmed = (search != null) ? search.trim() : "";
+        // Optimisation : recherche côté base uniquement si au moins 2 caractères (évite LIKE '%x%' coûteux)
+        if (searchTrimmed.length() < 2) {
+            searchTrimmed = "";
+        }
 
         Page<FactureProForma> facturesPage;
-        
+
         if (isAdmin || isManager) {
-            facturesPage = factureProformaRepository.findFacturesAvecRelationsParEntreprisePaginated(
-                    entrepriseCourante.getId(), pageable);
+            facturesPage = searchTrimmed.isEmpty()
+                    ? factureProformaRepository.findFacturesAvecRelationsParEntreprisePaginated(entrepriseCourante.getId(), pageable)
+                    : factureProformaRepository.findFacturesAvecRelationsParEntreprisePaginatedWithSearch(entrepriseCourante.getId(), searchTrimmed, pageable);
         } else if (hasPermission || isApprover) {
-            // Utilisateur avec permission facturation : voit créées + approbées + assignées par note
-            facturesPage = factureProformaRepository.findFacturesAvecRelationsParEntrepriseEtUtilisateurAvecNotesPaginated(
-                    entrepriseCourante.getId(), currentUser.getId(), pageable);
+            facturesPage = searchTrimmed.isEmpty()
+                    ? factureProformaRepository.findFacturesAvecRelationsParEntrepriseEtUtilisateurAvecNotesPaginated(entrepriseCourante.getId(), currentUser.getId(), pageable)
+                    : factureProformaRepository.findFacturesAvecRelationsParEntrepriseEtUtilisateurAvecNotesPaginatedWithSearch(entrepriseCourante.getId(), currentUser.getId(), searchTrimmed, pageable);
         } else {
             if (!Objects.equals(currentUser.getId(), userIdRequete)) {
                 throw new RuntimeException("Vous ne pouvez voir que vos propres factures.");
             }
-            facturesPage = factureProformaRepository.findFacturesAvecRelationsParEntrepriseEtUtilisateurPaginated(
-                    entrepriseCourante.getId(), currentUser.getId(), pageable);
+            facturesPage = searchTrimmed.isEmpty()
+                    ? factureProformaRepository.findFacturesAvecRelationsParEntrepriseEtUtilisateurPaginated(entrepriseCourante.getId(), currentUser.getId(), pageable)
+                    : factureProformaRepository.findFacturesAvecRelationsParEntrepriseEtUtilisateurPaginatedWithSearch(entrepriseCourante.getId(), currentUser.getId(), searchTrimmed, pageable);
         }
 
         long totalFactures = factureProformaRepository.countFacturesByEntrepriseId(entrepriseCourante.getId());

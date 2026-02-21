@@ -18,8 +18,10 @@ import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.JoinTable;
+import jakarta.persistence.Table;
 import jakarta.persistence.ManyToMany;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
@@ -30,6 +32,11 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 @Entity
+@Table(indexes = {
+    @Index(name = "idx_facture_proforma_entreprise_id", columnList = "entreprise_id"),
+    @Index(name = "idx_facture_proforma_numero", columnList = "numero_facture"),
+    @Index(name = "idx_facture_proforma_date_creation", columnList = "date_creation")
+})
 @Getter
 @Setter
 @NoArgsConstructor

@@ -8,6 +8,10 @@ import jakarta.persistence.*;
 import lombok.Data;
 
 @Entity
+@Table(indexes = {
+    @Index(name = "idx_categorie_entreprise_id", columnList = "entreprise_id"),
+    @Index(name = "idx_categorie_nom", columnList = "nom")
+})
 @Data
 public class Categorie {
     @Id

@@ -187,7 +187,24 @@ List<FactureProForma> findFacturesAvecRelationsParEntrepriseEtPeriode(
        "WHERE f.entreprise.id = :entrepriseId " +
        "ORDER BY f.dateCreation DESC, f.id DESC")
 Page<FactureProForma> findFacturesAvecRelationsParEntreprisePaginated(
-    @Param("entrepriseId") Long entrepriseId, 
+    @Param("entrepriseId") Long entrepriseId,
+    Pageable pageable);
+
+// Pagination avec recherche par numéro ou nom client (personne ou entreprise)
+@Query("SELECT f FROM FactureProForma f " +
+       "LEFT JOIN FETCH f.approbateurs a " +
+       "LEFT JOIN FETCH f.utilisateurCreateur u " +
+       "LEFT JOIN FETCH f.client c " +
+       "LEFT JOIN FETCH f.entrepriseClient ec " +
+       "LEFT JOIN FETCH f.entreprise e " +
+       "WHERE f.entreprise.id = :entrepriseId " +
+       "AND (LOWER(COALESCE(f.numeroFacture, '')) LIKE LOWER(CONCAT(CONCAT('%', :search), '%')) " +
+       "     OR (f.client IS NOT NULL AND LOWER(COALESCE(f.client.nomComplet, '')) LIKE LOWER(CONCAT(CONCAT('%', :search), '%'))) " +
+       "     OR (f.entrepriseClient IS NOT NULL AND LOWER(COALESCE(f.entrepriseClient.nom, '')) LIKE LOWER(CONCAT(CONCAT('%', :search), '%')))) " +
+       "ORDER BY f.dateCreation DESC, f.id DESC")
+Page<FactureProForma> findFacturesAvecRelationsParEntreprisePaginatedWithSearch(
+    @Param("entrepriseId") Long entrepriseId,
+    @Param("search") String search,
     Pageable pageable);
 
 // Méthode de pagination avec filtrage par utilisateur (créateur ou approbateur)
@@ -207,6 +224,26 @@ Page<FactureProForma> findFacturesAvecRelationsParEntrepriseEtUtilisateurPaginat
     @Param("userId") Long userId,
     Pageable pageable);
 
+@Query("SELECT DISTINCT f FROM FactureProForma f " +
+       "LEFT JOIN FETCH f.approbateurs a " +
+       "LEFT JOIN FETCH f.utilisateurCreateur u " +
+       "LEFT JOIN FETCH f.client c " +
+       "LEFT JOIN FETCH f.entrepriseClient ec " +
+       "LEFT JOIN FETCH f.entreprise e " +
+       "WHERE f.entreprise.id = :entrepriseId " +
+       "AND (f.utilisateurCreateur.id = :userId " +
+       "     OR f.utilisateurApprobateur.id = :userId " +
+       "     OR :userId IN (SELECT u2.id FROM f.approbateurs u2)) " +
+       "AND (LOWER(COALESCE(f.numeroFacture, '')) LIKE LOWER(CONCAT(CONCAT('%', :search), '%')) " +
+       "     OR (f.client IS NOT NULL AND LOWER(COALESCE(f.client.nomComplet, '')) LIKE LOWER(CONCAT(CONCAT('%', :search), '%'))) " +
+       "     OR (f.entrepriseClient IS NOT NULL AND LOWER(COALESCE(f.entrepriseClient.nom, '')) LIKE LOWER(CONCAT(CONCAT('%', :search), '%')))) " +
+       "ORDER BY f.dateCreation DESC, f.id DESC")
+Page<FactureProForma> findFacturesAvecRelationsParEntrepriseEtUtilisateurPaginatedWithSearch(
+    @Param("entrepriseId") Long entrepriseId,
+    @Param("userId") Long userId,
+    @Param("search") String search,
+    Pageable pageable);
+
 // Méthode de pagination pour utilisateur avec permission facturation (créateur, approbateur ou destinataire de note)
 @Query("SELECT DISTINCT f FROM FactureProForma f " +
        "LEFT JOIN FETCH f.approbateurs a " +
@@ -223,6 +260,27 @@ Page<FactureProForma> findFacturesAvecRelationsParEntrepriseEtUtilisateurPaginat
 Page<FactureProForma> findFacturesAvecRelationsParEntrepriseEtUtilisateurAvecNotesPaginated(
     @Param("entrepriseId") Long entrepriseId,
     @Param("userId") Long userId,
+    Pageable pageable);
+
+@Query("SELECT DISTINCT f FROM FactureProForma f " +
+       "LEFT JOIN FETCH f.approbateurs a " +
+       "LEFT JOIN FETCH f.utilisateurCreateur u " +
+       "LEFT JOIN FETCH f.client c " +
+       "LEFT JOIN FETCH f.entrepriseClient ec " +
+       "LEFT JOIN FETCH f.entreprise e " +
+       "WHERE f.entreprise.id = :entrepriseId " +
+       "AND (f.utilisateurCreateur.id = :userId " +
+       "     OR f.utilisateurApprobateur.id = :userId " +
+       "     OR :userId IN (SELECT u2.id FROM f.approbateurs u2) " +
+       "     OR f.id IN (SELECT n.facture.id FROM NoteFactureProForma n WHERE n.destinataire.id = :userId)) " +
+       "AND (LOWER(COALESCE(f.numeroFacture, '')) LIKE LOWER(CONCAT(CONCAT('%', :search), '%')) " +
+       "     OR (f.client IS NOT NULL AND LOWER(COALESCE(f.client.nomComplet, '')) LIKE LOWER(CONCAT(CONCAT('%', :search), '%'))) " +
+       "     OR (f.entrepriseClient IS NOT NULL AND LOWER(COALESCE(f.entrepriseClient.nom, '')) LIKE LOWER(CONCAT(CONCAT('%', :search), '%')))) " +
+       "ORDER BY f.dateCreation DESC, f.id DESC")
+Page<FactureProForma> findFacturesAvecRelationsParEntrepriseEtUtilisateurAvecNotesPaginatedWithSearch(
+    @Param("entrepriseId") Long entrepriseId,
+    @Param("userId") Long userId,
+    @Param("search") String search,
     Pageable pageable);
 
 // Compter le nombre total de factures par entreprise

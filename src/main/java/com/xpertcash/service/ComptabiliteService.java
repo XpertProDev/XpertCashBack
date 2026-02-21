@@ -2254,28 +2254,53 @@ public class ComptabiliteService {
     }
 
     /**
-     * Récupère toutes les données comptables paginées de l'entreprise
+     * Récupère toutes les données comptables paginées de l'entreprise (sans filtre de période).
      */
     @Transactional(readOnly = true)
     public ComptabiliteCompletePaginatedDTO getComptabiliteCompletePaginated(HttpServletRequest httpRequest, int page, int size) {
+        return getComptabiliteCompletePaginated(httpRequest, page, size, null, null, null);
+    }
+
+    /**
+     * Récupère les données comptables paginées avec filtre de période (même sémantique que trésorerie).
+     * periode: "aujourdhui", "hier", "semaine", "mois", "annee", "personnalise". Si personnalise, dateDebut et dateFin requis.
+     */
+    @Transactional(readOnly = true)
+    public ComptabiliteCompletePaginatedDTO getComptabiliteCompletePaginated(
+            HttpServletRequest httpRequest, int page, int size,
+            String periode, LocalDate dateDebut, LocalDate dateFin) {
         if (page < 0) page = 0;
         if (size <= 0) size = 20;
-        if (size > 100) size = 100; 
+        if (size > 100) size = 100;
 
         User user = validateComptabilitePermission(httpRequest);
-        
         Long entrepriseId = user.getEntreprise().getId();
-
 
         List<CategorieDepenseDTO> categoriesDepense = listerCategoriesDepense(httpRequest);
         List<CategorieResponseDTO> categoriesEntree = categorieService.getAllCategoriesWithProduitCount(httpRequest);
         TransactionSummaryDTO transactionSummary = transactionSummaryService.getTransactionSummary(httpRequest);
         transactionSummary.setTransactions(Collections.emptyList());
 
-        // Pagination scalable : requêtes dans le repository (UNION + LIMIT/OFFSET côté base)
-        long totalElements = comptabilitePaginationRepository.countTransactions(entrepriseId);
+        long totalElements;
+        List<Object[]> rows;
+        LocalDateTime periodStart = null;
+        LocalDateTime periodEnd = null;
+        if (periode != null && !periode.trim().isEmpty() && !"toutes".equalsIgnoreCase(periode.trim())) {
+            Object[] period = calculerDatesPeriodeComptabilite(periode, dateDebut, dateFin);
+            if (period != null) {
+                periodStart = (LocalDateTime) period[0];
+                periodEnd = (LocalDateTime) period[1];
+            }
+        }
+        if (periodStart != null && periodEnd != null) {
+            totalElements = comptabilitePaginationRepository.countTransactionsWithPeriod(entrepriseId, periodStart, periodEnd);
+            rows = comptabilitePaginationRepository.findTransactionPageWithPeriod(entrepriseId, periodStart, periodEnd, size, page * size);
+        } else {
+            totalElements = comptabilitePaginationRepository.countTransactions(entrepriseId);
+            rows = comptabilitePaginationRepository.findTransactionPage(entrepriseId, size, page * size);
+        }
+
         int totalPages = size > 0 ? (int) Math.ceil((double) totalElements / size) : 0;
-        List<Object[]> rows = comptabilitePaginationRepository.findTransactionPage(entrepriseId, size, page * size);
 
         List<Long> depenseIds = new ArrayList<>(), entreeIds = new ArrayList<>(), fermetureIds = new ArrayList<>(), paiementIds = new ArrayList<>();
         List<Long> transfertIds = new ArrayList<>();
@@ -2363,6 +2388,54 @@ public class ComptabiliteService {
         result.setFirst(page == 0);
         result.setLast(page >= totalPages - 1);
         return result;
+    }
+
+    /**
+     * Calcule les dates de période (même sémantique que TresorerieService).
+     * Retourne [dateDebut, dateFin] (dateFin exclu) ou null si pas de filtre.
+     */
+    private Object[] calculerDatesPeriodeComptabilite(String periode, LocalDate dateDebut, LocalDate dateFin) {
+        if (dateDebut != null && dateFin != null) {
+            return new Object[]{ dateDebut.atStartOfDay(), dateFin.plusDays(1).atStartOfDay() };
+        }
+        if (periode == null || periode.trim().isEmpty()) {
+            periode = "aujourdhui";
+        }
+        LocalDateTime dateStart;
+        LocalDateTime dateEnd;
+        switch (periode.toLowerCase()) {
+            case "aujourdhui":
+                dateStart = LocalDate.now().atStartOfDay();
+                dateEnd = dateStart.plusDays(1);
+                break;
+            case "hier":
+                dateStart = LocalDate.now().minusDays(1).atStartOfDay();
+                dateEnd = dateStart.plusDays(1);
+                break;
+            case "semaine":
+                LocalDate aujourdhui = LocalDate.now();
+                dateStart = aujourdhui.minusDays(aujourdhui.getDayOfWeek().getValue() - 1).atStartOfDay();
+                dateEnd = dateStart.plusWeeks(1);
+                break;
+            case "mois":
+                dateStart = LocalDate.now().withDayOfMonth(1).atStartOfDay();
+                dateEnd = dateStart.plusMonths(1);
+                break;
+            case "annee":
+                dateStart = LocalDate.now().withDayOfYear(1).atStartOfDay();
+                dateEnd = dateStart.plusYears(1);
+                break;
+            case "personnalise":
+                if (dateDebut == null || dateFin == null) {
+                    throw new RuntimeException("Les dates de début et de fin sont requises pour une période personnalisée.");
+                }
+                dateStart = dateDebut.atStartOfDay();
+                dateEnd = dateFin.plusDays(1).atStartOfDay();
+                break;
+            default:
+                return null;
+        }
+        return new Object[]{ dateStart, dateEnd };
     }
 
     private PaiementDTO mapPaiementToDTO(Paiement p) {

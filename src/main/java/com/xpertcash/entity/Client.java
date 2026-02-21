@@ -7,11 +7,14 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 @Entity
-@Data 
+@Table(indexes = {
+    @Index(name = "idx_client_entreprise_id", columnList = "entreprise_id"),
+    @Index(name = "idx_client_nom_complet", columnList = "nom_complet"),
+    @Index(name = "idx_client_entreprise_client_id", columnList = "entreprise_client_id")
+})
+@Data
 @AllArgsConstructor
 @NoArgsConstructor
-
-
 public class Client {
 
     @Id

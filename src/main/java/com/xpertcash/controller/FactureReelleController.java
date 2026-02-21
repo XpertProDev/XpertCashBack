@@ -47,14 +47,15 @@ public class FactureReelleController {
         return ResponseEntity.ok(factures);
     }
 
-    // Endpoint scalable avec pagination pour lister les factures réelles
+    /** Factures réelles paginées. search : filtre par numéro de facture ou nom du client (côté serveur, ≥ 2 caractères). */
     @GetMapping("/mes-factures-reelles/paginated")
     public ResponseEntity<PaginatedResponseDTO<FactureReelleDTO>> getMesFacturesReellesPaginated(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false) String search,
             HttpServletRequest request) {
         try {
-            PaginatedResponseDTO<FactureReelleDTO> factures = factureReelleService.listerMesFacturesReellesPaginated(page, size, request);
+            PaginatedResponseDTO<FactureReelleDTO> factures = factureReelleService.listerMesFacturesReellesPaginated(page, size, search, request);
             return ResponseEntity.ok(factures);
         } catch (SecurityException e) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN)

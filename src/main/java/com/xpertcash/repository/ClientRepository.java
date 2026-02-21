@@ -57,6 +57,26 @@ public interface ClientRepository extends JpaRepository<Client, Long>{
     Page<Client> findClientsByEntrepriseOrEntrepriseClientPaginated(
             @Param("entrepriseId") Long entrepriseId, Pageable pageable);
 
+    /** Pagination + recherche côté base : nom, email ou téléphone contient le terme (insensible à la casse). */
+    @Query(value = "SELECT c FROM Client c " +
+           "LEFT JOIN c.entreprise e " +
+           "LEFT JOIN c.entrepriseClient ec " +
+           "LEFT JOIN ec.entreprise ece " +
+           "WHERE ((e.id = :entrepriseId) OR (ec IS NOT NULL AND ece.id = :entrepriseId)) " +
+           "AND (LOWER(COALESCE(c.nomComplet, '')) LIKE LOWER(CONCAT('%', :search, '%')) " +
+           "OR LOWER(COALESCE(c.email, '')) LIKE LOWER(CONCAT('%', :search, '%')) " +
+           "OR COALESCE(c.telephone, '') LIKE CONCAT('%', :search, '%'))",
+           countQuery = "SELECT COUNT(c) FROM Client c " +
+           "LEFT JOIN c.entreprise e " +
+           "LEFT JOIN c.entrepriseClient ec " +
+           "LEFT JOIN ec.entreprise ece " +
+           "WHERE ((e.id = :entrepriseId) OR (ec IS NOT NULL AND ece.id = :entrepriseId)) " +
+           "AND (LOWER(COALESCE(c.nomComplet, '')) LIKE LOWER(CONCAT('%', :search, '%')) " +
+           "OR LOWER(COALESCE(c.email, '')) LIKE LOWER(CONCAT('%', :search, '%')) " +
+           "OR COALESCE(c.telephone, '') LIKE CONCAT('%', :search, '%'))")
+    Page<Client> findClientsByEntrepriseOrEntrepriseClientPaginatedWithSearch(
+            @Param("entrepriseId") Long entrepriseId, @Param("search") String search, Pageable pageable);
+
     // Compter séparément les clients rattachés directement à l'entreprise (PARTICULIERS)
     @Query("SELECT COUNT(c) FROM Client c " +
            "INNER JOIN c.entreprise e " +
