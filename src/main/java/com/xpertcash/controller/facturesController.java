@@ -42,14 +42,15 @@ public class facturesController {
     @Autowired
     private AuthenticationHelper authHelper;
 
-    /** Factures de l'entreprise, paginées en base (isolation multi-tenant). */
+    /** Factures de l'entreprise, paginées en base (20 par défaut), avec recherche optionnelle (isolation multi-tenant). */
     @GetMapping("/factures")
     public ResponseEntity<?> getFacturesPaginated(
             HttpServletRequest request,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
             @RequestParam(defaultValue = "dateFacture") String sortBy,
-            @RequestParam(defaultValue = "desc") String sortDir) {
+            @RequestParam(defaultValue = "desc") String sortDir,
+            @RequestParam(required = false) String search) {
         User user = authHelper.getAuthenticatedUserWithFallback(request);
         Entreprise entreprise = user.getEntreprise();
         if (entreprise == null) {
@@ -62,14 +63,22 @@ public class facturesController {
 
         Sort sort = "asc".equalsIgnoreCase(sortDir) ? Sort.by(sortBy).ascending() : Sort.by(sortBy).descending();
         Pageable pageable = PageRequest.of(page, size, sort);
-        Page<Facture> facturePage = factureRepository.findAllByEntrepriseIdPaginated(entreprise.getId(), pageable);
+
+        String searchTerm = (search != null && search.trim().length() >= 2) ? search.trim() : null;
+        Page<Facture> facturePage;
+        if (searchTerm != null && !searchTerm.isEmpty()) {
+            facturePage = factureRepository.findAllByEntrepriseIdPaginatedWithSearch(entreprise.getId(), searchTerm, pageable);
+        } else {
+            facturePage = factureRepository.findAllByEntrepriseIdPaginated(entreprise.getId(), pageable);
+        }
+
         List<FactureDTO> content = facturePage.getContent().stream().map(FactureDTO::new).collect(Collectors.toList());
         Page<FactureDTO> dtoPage = new PageImpl<>(content, facturePage.getPageable(), facturePage.getTotalElements());
         PaginatedResponseDTO<FactureDTO> result = PaginatedResponseDTO.fromPage(dtoPage);
         return ResponseEntity.ok(result);
     }
 
-    /** Factures d'une boutique de l'entreprise, paginées en base (isolation multi-tenant). */
+    /** Factures d'une boutique de l'entreprise, paginées en base (20 par défaut), avec recherche optionnelle (isolation multi-tenant). */
     @GetMapping("/factures/{boutiqueId}")
     public ResponseEntity<?> getFacturesByBoutiquePaginated(
             @PathVariable Long boutiqueId,
@@ -77,7 +86,8 @@ public class facturesController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
             @RequestParam(defaultValue = "dateFacture") String sortBy,
-            @RequestParam(defaultValue = "desc") String sortDir) {
+            @RequestParam(defaultValue = "desc") String sortDir,
+            @RequestParam(required = false) String search) {
         User user = authHelper.getAuthenticatedUserWithFallback(request);
         Entreprise entreprise = user.getEntreprise();
         if (entreprise == null) {
@@ -94,7 +104,16 @@ public class facturesController {
 
         Sort sort = "asc".equalsIgnoreCase(sortDir) ? Sort.by(sortBy).ascending() : Sort.by(sortBy).descending();
         Pageable pageable = PageRequest.of(page, size, sort);
-        Page<Facture> facturePage = factureRepository.findByBoutiqueIdAndEntrepriseIdPaginated(boutiqueId, entreprise.getId(), pageable);
+
+        String searchTerm = (search != null && search.trim().length() >= 2) ? search.trim() : null;
+        Page<Facture> facturePage;
+        if (searchTerm != null && !searchTerm.isEmpty()) {
+            facturePage = factureRepository.findByBoutiqueIdAndEntrepriseIdPaginatedWithSearch(
+                    boutiqueId, entreprise.getId(), searchTerm, pageable);
+        } else {
+            facturePage = factureRepository.findByBoutiqueIdAndEntrepriseIdPaginated(boutiqueId, entreprise.getId(), pageable);
+        }
+
         List<FactureDTO> content = facturePage.getContent().stream().map(FactureDTO::new).collect(Collectors.toList());
         Page<FactureDTO> dtoPage = new PageImpl<>(content, facturePage.getPageable(), facturePage.getTotalElements());
         PaginatedResponseDTO<FactureDTO> result = PaginatedResponseDTO.fromPage(dtoPage);

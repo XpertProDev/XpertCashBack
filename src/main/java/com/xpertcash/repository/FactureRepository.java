@@ -71,6 +71,32 @@ public interface FactureRepository extends JpaRepository<Facture, Long>{
           countQuery = "SELECT COUNT(DISTINCT f) FROM Facture f JOIN f.boutique b JOIN b.entreprise e WHERE e.id = :entrepriseId")
    Page<Facture> findAllByEntrepriseIdPaginated(@Param("entrepriseId") Long entrepriseId, Pageable pageable);
 
+   /** Pagination + recherche : factures par entreprise, filtre sur numeroFacture, type, description, codeFournisseur, nom fournisseur. */
+   @Query(value = "SELECT DISTINCT f FROM Facture f " +
+          "LEFT JOIN FETCH f.boutique b " +
+          "LEFT JOIN FETCH f.user u " +
+          "LEFT JOIN FETCH f.fournisseur four " +
+          "WHERE b.entreprise.id = :entrepriseId " +
+          "AND (LOWER(COALESCE(f.numeroFacture, '')) LIKE LOWER(CONCAT('%', :search, '%')) " +
+          "OR LOWER(COALESCE(f.type, '')) LIKE LOWER(CONCAT('%', :search, '%')) " +
+          "OR LOWER(COALESCE(f.description, '')) LIKE LOWER(CONCAT('%', :search, '%')) " +
+          "OR LOWER(COALESCE(f.codeFournisseur, '')) LIKE LOWER(CONCAT('%', :search, '%')) " +
+          "OR LOWER(COALESCE(four.nomSociete, '')) LIKE LOWER(CONCAT('%', :search, '%')) " +
+          "OR LOWER(COALESCE(four.nomComplet, '')) LIKE LOWER(CONCAT('%', :search, '%')))",
+          countQuery = "SELECT COUNT(f) FROM Facture f JOIN f.boutique b JOIN b.entreprise e " +
+          "LEFT JOIN f.fournisseur four " +
+          "WHERE e.id = :entrepriseId " +
+          "AND (LOWER(COALESCE(f.numeroFacture, '')) LIKE LOWER(CONCAT('%', :search, '%')) " +
+          "OR LOWER(COALESCE(f.type, '')) LIKE LOWER(CONCAT('%', :search, '%')) " +
+          "OR LOWER(COALESCE(f.description, '')) LIKE LOWER(CONCAT('%', :search, '%')) " +
+          "OR LOWER(COALESCE(f.codeFournisseur, '')) LIKE LOWER(CONCAT('%', :search, '%')) " +
+          "OR LOWER(COALESCE(four.nomSociete, '')) LIKE LOWER(CONCAT('%', :search, '%')) " +
+          "OR LOWER(COALESCE(four.nomComplet, '')) LIKE LOWER(CONCAT('%', :search, '%')))")
+   Page<Facture> findAllByEntrepriseIdPaginatedWithSearch(
+           @Param("entrepriseId") Long entrepriseId,
+           @Param("search") String search,
+           Pageable pageable);
+
    /** Pagination côté base : factures par boutique et entreprise (isolation multi-tenant). */
    @Query(value = "SELECT DISTINCT f FROM Facture f " +
           "LEFT JOIN FETCH f.boutique b " +
@@ -81,6 +107,33 @@ public interface FactureRepository extends JpaRepository<Facture, Long>{
    Page<Facture> findByBoutiqueIdAndEntrepriseIdPaginated(
            @Param("boutiqueId") Long boutiqueId,
            @Param("entrepriseId") Long entrepriseId,
+           Pageable pageable);
+
+   /** Pagination + recherche : factures par boutique/entreprise, filtre sur numeroFacture, type, description, codeFournisseur, nom fournisseur. */
+   @Query(value = "SELECT DISTINCT f FROM Facture f " +
+          "LEFT JOIN FETCH f.boutique b " +
+          "LEFT JOIN FETCH f.user u " +
+          "LEFT JOIN FETCH f.fournisseur four " +
+          "WHERE b.id = :boutiqueId AND b.entreprise.id = :entrepriseId " +
+          "AND (LOWER(COALESCE(f.numeroFacture, '')) LIKE LOWER(CONCAT('%', :search, '%')) " +
+          "OR LOWER(COALESCE(f.type, '')) LIKE LOWER(CONCAT('%', :search, '%')) " +
+          "OR LOWER(COALESCE(f.description, '')) LIKE LOWER(CONCAT('%', :search, '%')) " +
+          "OR LOWER(COALESCE(f.codeFournisseur, '')) LIKE LOWER(CONCAT('%', :search, '%')) " +
+          "OR LOWER(COALESCE(four.nomSociete, '')) LIKE LOWER(CONCAT('%', :search, '%')) " +
+          "OR LOWER(COALESCE(four.nomComplet, '')) LIKE LOWER(CONCAT('%', :search, '%')))",
+          countQuery = "SELECT COUNT(f) FROM Facture f JOIN f.boutique b JOIN b.entreprise e " +
+          "LEFT JOIN f.fournisseur four " +
+          "WHERE b.id = :boutiqueId AND e.id = :entrepriseId " +
+          "AND (LOWER(COALESCE(f.numeroFacture, '')) LIKE LOWER(CONCAT('%', :search, '%')) " +
+          "OR LOWER(COALESCE(f.type, '')) LIKE LOWER(CONCAT('%', :search, '%')) " +
+          "OR LOWER(COALESCE(f.description, '')) LIKE LOWER(CONCAT('%', :search, '%')) " +
+          "OR LOWER(COALESCE(f.codeFournisseur, '')) LIKE LOWER(CONCAT('%', :search, '%')) " +
+          "OR LOWER(COALESCE(four.nomSociete, '')) LIKE LOWER(CONCAT('%', :search, '%')) " +
+          "OR LOWER(COALESCE(four.nomComplet, '')) LIKE LOWER(CONCAT('%', :search, '%')))")
+   Page<Facture> findByBoutiqueIdAndEntrepriseIdPaginatedWithSearch(
+           @Param("boutiqueId") Long boutiqueId,
+           @Param("entrepriseId") Long entrepriseId,
+           @Param("search") String search,
            Pageable pageable);
 
 }
