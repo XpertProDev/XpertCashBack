@@ -537,24 +537,23 @@ public ResponseEntity<?> updateProduit(
         }
     }
 
-    // Endpoint  avec pagination pour récupérer les produits d'une boutique
+    // Endpoint avec pagination et recherche pour les produits d'une boutique (search : nom, codeGenerique, codeBare, catégorie)
     @GetMapping("/boutique/{boutiqueId}/produits/paginated")
     public ResponseEntity<ProduitStockPaginatedResponseDTO> getProduitsParStockPaginated(
             @PathVariable Long boutiqueId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
+            @RequestParam(required = false) String search,
             HttpServletRequest request) {
-        
         try {
             if (page < 0) page = 0;
             if (size <= 0) size = 10;
-            if (size > 100) size = 100; 
-            
+            if (size > 100) size = 100;
+
             ProduitStockPaginatedResponseDTO response = produitService.getProduitsParStockPaginated(
-                    boutiqueId, page, size, request);
-            
+                    boutiqueId, page, size, search, request);
+
             return ResponseEntity.ok(response);
-            
         } catch (Exception e) {
             e.printStackTrace();
             throw new RuntimeException("Erreur lors de la récupération des produits paginés: " + e.getMessage());

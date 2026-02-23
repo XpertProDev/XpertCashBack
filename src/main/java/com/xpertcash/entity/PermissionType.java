@@ -7,6 +7,8 @@ public enum PermissionType {
     VENDRE_PRODUITS,
     APPROVISIONNER_STOCK,
     GESTION_FACTURATION,
+    /** Valeur conservée pour compatibilité avec les données existantes (équivalent à GESTION_FACTURATION). */
+    Gestion_Facture,
     GERER_CLIENTS,
     GERER_FOURNISSEURS,
     GERER_UTILISATEURS,
