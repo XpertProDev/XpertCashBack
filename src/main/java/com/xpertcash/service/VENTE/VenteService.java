@@ -616,12 +616,12 @@ public List<VenteResponse> getVentesByVendeur(Long vendeurId, HttpServletRequest
 }
 
     /**
-     * Pagination côté DB + recherche (nom client, numéro client, numéro facture).
-     * Même règles d'accès que getVentesByVendeur ; recherche active uniquement si search trim ≥ 2 caractères.
+     * Pagination (20 par 20) + recherche (nom client, numéro client, numéro facture).
+     * Pas de tri par date ; ordre stable par id.
      */
     @Transactional(readOnly = true)
     public PaginatedResponseDTO<VenteResponse> getVentesByVendeurPaginated(
-            Long vendeurId, int page, int size, String sortBy, String sortDir, String search, HttpServletRequest request) {
+            Long vendeurId, int page, int size, String search, HttpServletRequest request) {
         User user = utilitaire.getAuthenticatedUser(request);
 
         User vendeur = usersRepository.findById(vendeurId)
@@ -645,12 +645,7 @@ public List<VenteResponse> getVentesByVendeur(Long vendeurId, HttpServletRequest
         if (size <= 0) size = 20;
         if (size > 100) size = 100;
 
-        Sort sort = Sort.by("dateVente").descending().and(Sort.by("id").descending());
-        if (sortBy != null && !sortBy.trim().isEmpty()) {
-            boolean desc = "desc".equalsIgnoreCase(sortDir != null ? sortDir.trim() : "asc");
-            sort = Sort.by(Sort.Direction.fromString(desc ? "desc" : "asc"), sortBy.trim()).and(Sort.by("id").descending());
-        }
-        Pageable pageable = PageRequest.of(page, size, sort);
+        Pageable pageable = PageRequest.of(page, size, Sort.by("id").descending());
 
         String searchTrimmed = (search != null) ? search.trim() : "";
         if (searchTrimmed.length() < 2) {

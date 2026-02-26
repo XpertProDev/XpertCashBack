@@ -103,17 +103,15 @@ public class VenteController {
 //             return ResponseEntity.ok(ventes);
 //         }
 
-    /** Pagination côté DB + recherche (nom client, numéro client, numéro facture). */
+    /** Pagination 20 par 20 + recherche (nom client, numéro client, numéro facture). Pas de tri par date. */
     @GetMapping("/vente/vendeur/{vendeurId}/paginated")
     public ResponseEntity<PaginatedResponseDTO<VenteResponse>> getVentesByVendeurPaginated(
             @PathVariable Long vendeurId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
-            @RequestParam(required = false, defaultValue = "dateVente") String sortBy,
-            @RequestParam(required = false, defaultValue = "desc") String sortDir,
             @RequestParam(required = false) String search,
             HttpServletRequest request) {
-        PaginatedResponseDTO<VenteResponse> result = venteService.getVentesByVendeurPaginated(vendeurId, page, size, sortBy, sortDir, search, request);
+        PaginatedResponseDTO<VenteResponse> result = venteService.getVentesByVendeurPaginated(vendeurId, page, size, search, request);
         return ResponseEntity.ok(result);
     }
 
