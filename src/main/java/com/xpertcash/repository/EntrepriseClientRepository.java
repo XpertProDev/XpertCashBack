@@ -57,4 +57,7 @@ public interface EntrepriseClientRepository extends JpaRepository<EntrepriseClie
     Page<EntrepriseClient> findByEntrepriseIdPaginated(
             @Param("entrepriseId") Long entrepriseId, Pageable pageable);
 
+    /** Batch : max createdAt par entreprise (dernière utilisation métier). Retourne [entrepriseId, maxDate]. */
+    @Query("SELECT ec.entreprise.id, MAX(ec.createdAt) FROM EntrepriseClient ec WHERE ec.entreprise.id IN :ids GROUP BY ec.entreprise.id")
+    List<Object[]> findMaxCreatedAtByEntrepriseIdIn(@Param("ids") List<Long> ids);
 }

@@ -75,5 +75,9 @@ public interface DepenseGeneraleRepository extends JpaRepository<DepenseGenerale
            "LEFT JOIN FETCH d.creePar " +
            "WHERE d.id IN :ids")
     List<DepenseGenerale> findByIdInWithDetails(@Param("ids") List<Long> ids);
+
+    /** Batch : max dateCreation par entreprise (dernière utilisation métier). Retourne [entrepriseId, maxDate]. */
+    @Query("SELECT d.entreprise.id, MAX(d.dateCreation) FROM DepenseGenerale d WHERE d.entreprise.id IN :ids GROUP BY d.entreprise.id")
+    List<Object[]> findMaxDateCreationByEntrepriseIdIn(@Param("ids") List<Long> ids);
 }
 

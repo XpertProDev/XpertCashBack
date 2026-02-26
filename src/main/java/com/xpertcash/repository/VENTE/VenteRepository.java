@@ -3,6 +3,8 @@ package com.xpertcash.repository.VENTE;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -26,6 +28,41 @@ public interface VenteRepository extends JpaRepository<Vente, Long> {
     );
 
     List<Vente> findByVendeurId(Long vendeurId);
+
+    /** Pagination côté DB : ventes d'un vendeur avec relations chargées (évite N+1). */
+    @Query(value = "SELECT DISTINCT v FROM Vente v " +
+            "LEFT JOIN FETCH v.boutique " +
+            "LEFT JOIN FETCH v.vendeur " +
+            "LEFT JOIN FETCH v.caisse " +
+            "LEFT JOIN FETCH v.client vclient " +
+            "LEFT JOIN FETCH v.entrepriseClient vec " +
+            "WHERE v.vendeur.id = :vendeurId",
+            countQuery = "SELECT COUNT(v) FROM Vente v WHERE v.vendeur.id = :vendeurId")
+    Page<Vente> findByVendeurIdPaginated(@Param("vendeurId") Long vendeurId, Pageable pageable);
+
+    /** Pagination + recherche : par nom client (clientNom, clientNumero, client.nomComplet, entrepriseClient.nom) ou numéro facture. */
+    @Query(value = "SELECT DISTINCT v FROM Vente v " +
+            "LEFT JOIN FETCH v.boutique " +
+            "LEFT JOIN FETCH v.vendeur " +
+            "LEFT JOIN FETCH v.caisse " +
+            "LEFT JOIN FETCH v.client vclient " +
+            "LEFT JOIN FETCH v.entrepriseClient vec " +
+            "WHERE v.vendeur.id = :vendeurId " +
+            "AND (LOWER(COALESCE(v.clientNom, '')) LIKE LOWER(CONCAT(CONCAT('%', :search), '%')) " +
+            "     OR LOWER(COALESCE(v.clientNumero, '')) LIKE LOWER(CONCAT(CONCAT('%', :search), '%')) " +
+            "     OR (vclient IS NOT NULL AND LOWER(COALESCE(vclient.nomComplet, '')) LIKE LOWER(CONCAT(CONCAT('%', :search), '%'))) " +
+            "     OR (vec IS NOT NULL AND LOWER(COALESCE(vec.nom, '')) LIKE LOWER(CONCAT(CONCAT('%', :search), '%'))) " +
+            "     OR EXISTS (SELECT 1 FROM com.xpertcash.entity.FactureVente fv WHERE fv.vente.id = v.id AND LOWER(COALESCE(fv.numeroFacture, '')) LIKE LOWER(CONCAT(CONCAT('%', :search), '%'))))",
+            countQuery = "SELECT COUNT(DISTINCT v) FROM Vente v " +
+            "LEFT JOIN v.client vclient " +
+            "LEFT JOIN v.entrepriseClient vec " +
+            "WHERE v.vendeur.id = :vendeurId " +
+            "AND (LOWER(COALESCE(v.clientNom, '')) LIKE LOWER(CONCAT(CONCAT('%', :search), '%')) " +
+            "     OR LOWER(COALESCE(v.clientNumero, '')) LIKE LOWER(CONCAT(CONCAT('%', :search), '%')) " +
+            "     OR (vclient IS NOT NULL AND LOWER(COALESCE(vclient.nomComplet, '')) LIKE LOWER(CONCAT(CONCAT('%', :search), '%'))) " +
+            "     OR (vec IS NOT NULL AND LOWER(COALESCE(vec.nom, '')) LIKE LOWER(CONCAT(CONCAT('%', :search), '%'))) " +
+            "     OR EXISTS (SELECT 1 FROM com.xpertcash.entity.FactureVente fv WHERE fv.vente.id = v.id AND LOWER(COALESCE(fv.numeroFacture, '')) LIKE LOWER(CONCAT(CONCAT('%', :search), '%'))))")
+    Page<Vente> findByVendeurIdPaginatedWithSearch(@Param("vendeurId") Long vendeurId, @Param("search") String search, Pageable pageable);
 
     // Récupère toutes les ventes d'un vendeur
     List<Vente> findByVendeur(User vendeur);
@@ -56,6 +93,10 @@ public interface VenteRepository extends JpaRepository<Vente, Long> {
     // Récupère toutes les ventes des boutiques d'une entreprise
     @Query("SELECT v FROM Vente v WHERE v.boutique.entreprise.id = :entrepriseId")
     List<Vente> findAllByEntrepriseId(@Param("entrepriseId") Long entrepriseId);
+
+    /** Batch : max dateVente par entreprise (dernière utilisation métier). Retourne [entrepriseId, maxDate]. */
+    @Query("SELECT v.boutique.entreprise.id, MAX(v.dateVente) FROM Vente v WHERE v.boutique.entreprise.id IN :ids GROUP BY v.boutique.entreprise.id")
+    List<Object[]> findMaxDateVenteByEntrepriseIdIn(@Param("ids") List<Long> ids);
 
     // Récupère les ventes récentes d'une entreprise (triées par date décroissante)
     @Query("SELECT v FROM Vente v WHERE v.boutique.entreprise.id = :entrepriseId ORDER BY v.dateVente DESC")
