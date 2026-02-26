@@ -1729,13 +1729,13 @@ public class ProduitService {
 
             String categorieNom = getStringValue(row, 2, dataFormatter);
             if (categorieNom != null && !categorieNom.isEmpty()) {
-                Categorie categorie = categorieRepository.findByNomAndEntrepriseId(categorieNom, entreprise.getId());
+                Categorie categorie = categorieRepository.findByNomAndEntrepriseIdAndOrigineCreation(categorieNom.trim(), entreprise.getId(), "PRODUIT");
 
                 if (categorie != null) {
                     request.setCategorieId(categorie.getId());
                 } else {
                     Categorie newCategorie = new Categorie();
-                    newCategorie.setNom(categorieNom);
+                    newCategorie.setNom(categorieNom.trim());
                     newCategorie.setEntreprise(entreprise);
                     newCategorie.setCreatedAt(LocalDateTime.now());
                     newCategorie.setProduitCount(0);
@@ -1835,7 +1835,7 @@ public class ProduitService {
      * Récupère ou crée la catégorie "Sans Catégorie" si elle n'existe pas
      */
     private Categorie getOrCreateSansCategory(Entreprise entreprise) {
-        Categorie sansCategory = categorieRepository.findByNomAndEntrepriseId("Sans Catégorie", entreprise.getId());
+        Categorie sansCategory = categorieRepository.findByNomAndEntrepriseIdAndOrigineCreation("Sans Catégorie", entreprise.getId(), "PRODUIT");
         
         if (sansCategory != null) {
             return sansCategory;

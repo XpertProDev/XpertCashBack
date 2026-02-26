@@ -1505,7 +1505,8 @@ public class ComptabiliteService {
         }
         
         String nomTrim = nom.trim();
-        Categorie categorieExistante = categorieRepository.findByNomAndEntrepriseId(nomTrim, user.getEntreprise().getId());
+        String origineCreation = "COMPTABILITE";
+        Categorie categorieExistante = categorieRepository.findByNomAndEntrepriseIdAndOrigineCreation(nomTrim, user.getEntreprise().getId(), origineCreation);
         if (categorieExistante != null) {
             if (description != null && !description.trim().isEmpty()) {
                 categorieExistante.setDescription(description.trim());
@@ -1520,7 +1521,7 @@ public class ComptabiliteService {
         categorie.setEntreprise(user.getEntreprise());
         categorie.setCreatedAt(LocalDateTime.now());
         categorie.setProduitCount(0);
-        categorie.setOrigineCreation("COMPTABILITE");
+        categorie.setOrigineCreation(origineCreation);
         
         categorie = categorieRepository.save(categorie);
         return mapCategorieToCategorieEntreeDTO(categorie);
@@ -2014,7 +2015,8 @@ public class ComptabiliteService {
         
         if (request.getNouvelleCategorieNom() != null && !request.getNouvelleCategorieNom().trim().isEmpty()) {
             String nomCategorie = request.getNouvelleCategorieNom().trim();
-            Categorie categorie = categorieRepository.findByNomAndEntrepriseId(nomCategorie, user.getEntreprise().getId());
+            String origineCreation = "COMPTABILITE";
+            Categorie categorie = categorieRepository.findByNomAndEntrepriseIdAndOrigineCreation(nomCategorie, user.getEntreprise().getId(), origineCreation);
             
             if (categorie == null) {
                 categorie = new Categorie();
@@ -2022,7 +2024,7 @@ public class ComptabiliteService {
                 categorie.setEntreprise(user.getEntreprise());
                 categorie.setCreatedAt(LocalDateTime.now());
                 categorie.setProduitCount(0);
-                categorie.setOrigineCreation("COMPTABILITE");
+                categorie.setOrigineCreation(origineCreation);
                 categorie = categorieRepository.save(categorie);
             }
             return categorie;
