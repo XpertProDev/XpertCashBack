@@ -8,10 +8,14 @@ import jakarta.persistence.*;
 import lombok.Data;
 
 @Entity
-@Table(indexes = {
-    @Index(name = "idx_categorie_entreprise_id", columnList = "entreprise_id"),
-    @Index(name = "idx_categorie_nom", columnList = "nom")
-})
+@Table(
+    indexes = {
+        @Index(name = "idx_categorie_entreprise_id", columnList = "entreprise_id"),
+        @Index(name = "idx_categorie_nom", columnList = "nom"),
+        @Index(name = "idx_categorie_nom_ent_origine", columnList = "nom,entreprise_id,origine_creation")
+    },
+    uniqueConstraints = @UniqueConstraint(name = "uk_categorie_nom_ent_origine", columnNames = {"nom", "entreprise_id", "origine_creation"})
+)
 @Data
 public class Categorie {
     @Id

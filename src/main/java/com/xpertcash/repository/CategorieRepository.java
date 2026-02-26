@@ -28,6 +28,13 @@ public interface CategorieRepository extends JpaRepository<Categorie, Long>{
            "WHERE c.nom = :nom AND e.id = :entrepriseId")
     Categorie findByNomAndEntrepriseId(@Param("nom") String nom, @Param("entrepriseId") Long entrepriseId);
 
+    /** Unicité par (nom, entreprise, origineCreation) : même nom autorisé si origine différente (PRODUIT vs COMPTABILITE). */
+    @Query("SELECT c FROM Categorie c " +
+           "LEFT JOIN FETCH c.entreprise e " +
+           "WHERE c.nom = :nom AND e.id = :entrepriseId AND c.origineCreation = :origineCreation")
+    Categorie findByNomAndEntrepriseIdAndOrigineCreation(
+            @Param("nom") String nom, @Param("entrepriseId") Long entrepriseId, @Param("origineCreation") String origineCreation);
+
     // Méthode de pagination par entreprise (optimisé avec JOIN FETCH)
     @Query("SELECT DISTINCT c FROM Categorie c " +
            "LEFT JOIN FETCH c.entreprise e " +

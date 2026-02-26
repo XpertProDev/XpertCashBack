@@ -287,6 +287,10 @@ Page<FactureProForma> findFacturesAvecRelationsParEntrepriseEtUtilisateurAvecNot
 @Query("SELECT COUNT(f) FROM FactureProForma f WHERE f.entreprise.id = :entrepriseId")
 long countFacturesByEntrepriseId(@Param("entrepriseId") Long entrepriseId);
 
+    /** Batch : max dateCreation par entreprise (pour dernière utilisation métier). Retourne [entrepriseId, maxDate]. */
+    @Query("SELECT f.entreprise.id, MAX(f.dateCreation) FROM FactureProForma f WHERE f.entreprise.id IN :ids GROUP BY f.entreprise.id")
+    List<Object[]> findMaxDateCreationByEntrepriseIdIn(@Param("ids") List<Long> ids);
+
 // Compter le nombre de factures par statut pour une entreprise
 @Query("SELECT COUNT(f) FROM FactureProForma f " +
        "WHERE f.entreprise.id = :entrepriseId AND f.statut = :statut")

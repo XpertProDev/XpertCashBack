@@ -64,14 +64,16 @@ public class CategorieService {
         throw new RuntimeException("Aucune entreprise associée à cet utilisateur");
     }
 
-    if (categorieRepository.existsByNomAndEntrepriseId(nom, entreprise.getId())) {
-        throw new RuntimeException("Cette catégorie existe déjà pour votre entreprise !");
+    String nomTrim = (nom != null) ? nom.trim() : "";
+    String origineCreation = "PRODUIT";
+    if (categorieRepository.findByNomAndEntrepriseIdAndOrigineCreation(nomTrim, entreprise.getId(), origineCreation) != null) {
+        throw new RuntimeException("Cette catégorie existe déjà.");
     }
 
     Categorie categorie = new Categorie();
-    categorie.setNom(nom);
+    categorie.setNom(nomTrim);
     categorie.setCreatedAt(LocalDateTime.now());
-    categorie.setOrigineCreation("PRODUIT");
+    categorie.setOrigineCreation(origineCreation);
     categorie.setEntreprise(entreprise);
 
     return categorieRepository.save(categorie);

@@ -69,6 +69,10 @@ public interface ProduitRepository extends JpaRepository<Produit, Long> {
            "WHERE p.codeGenerique = :codeGenerique AND e.id = :entrepriseId")
     List<Produit> findByCodeGeneriqueAndEntrepriseId(@Param("codeGenerique") String codeGenerique, @Param("entrepriseId") Long entrepriseId);
 
+    /** Batch : max(COALESCE(lastUpdated, createdAt)) par entreprise (dernière utilisation métier). Retourne [entrepriseId, maxDate]. */
+    @Query("SELECT p.boutique.entreprise.id, MAX(COALESCE(p.lastUpdated, p.createdAt)) FROM Produit p WHERE p.boutique.entreprise.id IN :ids GROUP BY p.boutique.entreprise.id")
+    List<Object[]> findMaxLastUpdatedByEntrepriseIdIn(@Param("ids") List<Long> ids);
+
     /** Page de codeGenerique distincts (tri par code) — pagination côté base. */
     @Query(value = """
         SELECT p.code_generique FROM produit p

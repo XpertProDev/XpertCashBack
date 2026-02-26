@@ -90,6 +90,7 @@ public interface ClientRepository extends JpaRepository<Client, Long>{
            "WHERE ece.id = :entrepriseId")
     long countClientsEntrepriseByEntrepriseId(@Param("entrepriseId") Long entrepriseId);
 
-    
-
+    /** Batch : max createdAt (clients directs) par entreprise. Retourne [entrepriseId, maxDate]. */
+    @Query("SELECT c.entreprise.id, MAX(c.createdAt) FROM Client c WHERE c.entreprise.id IN :ids GROUP BY c.entreprise.id")
+    List<Object[]> findMaxCreatedAtByEntrepriseIdIn(@Param("ids") List<Long> ids);
 }

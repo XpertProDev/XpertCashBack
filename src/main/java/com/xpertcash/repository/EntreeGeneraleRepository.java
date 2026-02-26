@@ -73,5 +73,9 @@ public interface EntreeGeneraleRepository extends JpaRepository<EntreeGenerale, 
            "LEFT JOIN FETCH e.responsable " +
            "WHERE e.id IN :ids")
     List<EntreeGenerale> findByIdInWithDetails(@Param("ids") List<Long> ids);
+
+    /** Batch : max dateCreation par entreprise (dernière utilisation métier). Retourne [entrepriseId, maxDate]. */
+    @Query("SELECT e.entreprise.id, MAX(e.dateCreation) FROM EntreeGenerale e WHERE e.entreprise.id IN :ids GROUP BY e.entreprise.id")
+    List<Object[]> findMaxDateCreationByEntrepriseIdIn(@Param("ids") List<Long> ids);
 }
 

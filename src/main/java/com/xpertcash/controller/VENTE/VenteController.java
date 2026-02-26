@@ -2,6 +2,7 @@ package com.xpertcash.controller.VENTE;
 
 import com.xpertcash.DTOs.CLIENT.ClientVenteRequest;
 import com.xpertcash.DTOs.CLIENT.VenteParClientResponse;
+import com.xpertcash.DTOs.PaginatedResponseDTO;
 import com.xpertcash.DTOs.VENTE.RemboursementRequest;
 import com.xpertcash.DTOs.VENTE.RemboursementResponse;
 import com.xpertcash.DTOs.VENTE.VenteRequest;
@@ -93,14 +94,26 @@ public class VenteController {
     }
 
 
-    @GetMapping("/vente/vendeur/{vendeurId}")
-   public ResponseEntity<List<VenteResponse>> getVentesByVendeur(
-        @PathVariable Long vendeurId,
-        HttpServletRequest request
-        ) {
-            List<VenteResponse> ventes = venteService.getVentesByVendeur(vendeurId, request);
-            return ResponseEntity.ok(ventes);
-        }
+//     @GetMapping("/vente/vendeur/{vendeurId}")
+//    public ResponseEntity<List<VenteResponse>> getVentesByVendeur(
+//         @PathVariable Long vendeurId,
+//         HttpServletRequest request
+//         ) {
+//             List<VenteResponse> ventes = venteService.getVentesByVendeur(vendeurId, request);
+//             return ResponseEntity.ok(ventes);
+//         }
+
+    /** Pagination 20 par 20 + recherche (nom client, numéro client, numéro facture). Pas de tri par date. */
+    @GetMapping("/vente/vendeur/{vendeurId}/paginated")
+    public ResponseEntity<PaginatedResponseDTO<VenteResponse>> getVentesByVendeurPaginated(
+            @PathVariable Long vendeurId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false) String search,
+            HttpServletRequest request) {
+        PaginatedResponseDTO<VenteResponse> result = venteService.getVentesByVendeurPaginated(vendeurId, page, size, search, request);
+        return ResponseEntity.ok(result);
+    }
 
           // Montant total des ventes du jour (avec remboursements)
     // @GetMapping("/vente/montant-total-jour")

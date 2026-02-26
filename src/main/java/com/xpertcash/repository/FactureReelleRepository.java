@@ -245,4 +245,7 @@ public interface FactureReelleRepository extends JpaRepository<FactureReelle, Lo
            "WHERE f.id IN :ids")
     List<FactureReelle> findByIdInWithDetailsForDettes(@Param("ids") List<Long> ids);
 
+    /** Batch : max dateCreationPro par entreprise (dernière utilisation métier). Retourne [entrepriseId, maxDate]. */
+    @Query("SELECT f.entreprise.id, MAX(f.dateCreationPro) FROM FactureReelle f WHERE f.entreprise.id IN :ids GROUP BY f.entreprise.id")
+    List<Object[]> findMaxDateCreationProByEntrepriseIdIn(@Param("ids") List<Long> ids);
 }

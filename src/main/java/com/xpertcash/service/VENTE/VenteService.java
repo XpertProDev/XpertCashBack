@@ -1,6 +1,7 @@
 package com.xpertcash.service.VENTE;
 
 import com.xpertcash.DTOs.CLIENT.VenteParClientResponse;
+import com.xpertcash.DTOs.PaginatedResponseDTO;
 import com.xpertcash.DTOs.VENTE.RemboursementRequest;
 import com.xpertcash.DTOs.VENTE.RemboursementResponse;
 import com.xpertcash.DTOs.VENTE.VenteLigneResponse;
@@ -14,6 +15,10 @@ import com.xpertcash.repository.VENTE.VenteProduitRepository;
 import com.xpertcash.repository.VENTE.VenteRepository;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,6 +27,7 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -609,6 +615,69 @@ public List<VenteResponse> getVentesByVendeur(Long vendeurId, HttpServletRequest
         return responses;
 }
 
+    /**
+     * Pagination (20 par 20) + recherche (nom client, numéro client, numéro facture).
+     * Pas de tri par date ; ordre stable par id.
+     */
+    @Transactional(readOnly = true)
+    public PaginatedResponseDTO<VenteResponse> getVentesByVendeurPaginated(
+            Long vendeurId, int page, int size, String search, HttpServletRequest request) {
+        User user = utilitaire.getAuthenticatedUser(request);
+
+        User vendeur = usersRepository.findById(vendeurId)
+                .orElseThrow(() -> new RuntimeException("Vendeur introuvable"));
+
+        RoleType role = user.getRole().getName();
+        boolean isAdminOrManager = role == RoleType.ADMIN || role == RoleType.MANAGER;
+        boolean hasPermission = user.getRole().hasPermission(PermissionType.VENDRE_PRODUITS);
+
+        if (!isAdminOrManager && !hasPermission) {
+            if (!user.getId().equals(vendeurId)) {
+                throw new RuntimeException("Vous n'avez pas les droits nécessaires pour consulter les ventes de ce vendeur !");
+            }
+        }
+
+        if (!vendeur.getEntreprise().getId().equals(user.getEntreprise().getId())) {
+            throw new RuntimeException("Accès interdit : ce vendeur n'appartient pas à votre entreprise.");
+        }
+
+        if (page < 0) page = 0;
+        if (size <= 0) size = 20;
+        if (size > 100) size = 100;
+
+        Pageable pageable = PageRequest.of(page, size, Sort.by("id").descending());
+
+        String searchTrimmed = (search != null) ? search.trim() : "";
+        if (searchTrimmed.length() < 2) {
+            searchTrimmed = "";
+        }
+
+        Page<Vente> ventesPage = searchTrimmed.isEmpty()
+                ? venteRepository.findByVendeurIdPaginated(vendeurId, pageable)
+                : venteRepository.findByVendeurIdPaginatedWithSearch(vendeurId, searchTrimmed, pageable);
+
+        List<Vente> ventes = ventesPage.getContent();
+        if (ventes.isEmpty()) {
+            return new PaginatedResponseDTO<>(
+                    Collections.emptyList(), ventesPage.getNumber(), ventesPage.getSize(),
+                    ventesPage.getTotalElements(), ventesPage.getTotalPages(),
+                    ventesPage.hasNext(), ventesPage.hasPrevious(), ventesPage.isFirst(), ventesPage.isLast());
+        }
+
+        List<Long> venteIds = ventes.stream().map(Vente::getId).collect(Collectors.toList());
+        List<VenteProduit> lignes = venteProduitRepository.findByVenteIdInWithProduit(venteIds);
+        Map<Long, List<VenteProduit>> produitsByVente = lignes.stream().collect(Collectors.groupingBy(vp -> vp.getVente().getId()));
+
+        for (Vente v : ventes) {
+            v.setProduits(produitsByVente.getOrDefault(v.getId(), Collections.emptyList()));
+        }
+
+        List<VenteResponse> content = ventes.stream().map(this::toVenteResponse).collect(Collectors.toList());
+        return new PaginatedResponseDTO<>(
+                content, ventesPage.getNumber(), ventesPage.getSize(),
+                ventesPage.getTotalElements(), ventesPage.getTotalPages(),
+                ventesPage.hasNext(), ventesPage.hasPrevious(), ventesPage.isFirst(), ventesPage.isLast());
+    }
 
     private VenteResponse toVenteResponse(Vente vente) {
         VenteResponse response = new VenteResponse();

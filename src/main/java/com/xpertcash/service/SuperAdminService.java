@@ -246,6 +246,7 @@ public class SuperAdminService {
 
         Map<Long, Long> countByEntreprise = new HashMap<>();
         Map<Long, LocalDateTime> lastActivityByEntreprise = new HashMap<>();
+        Map<Long, LocalDateTime> lastUsageByEntreprise = new HashMap<>();
         if (!ids.isEmpty()) {
             for (Object[] row : usersRepository.countByEntrepriseIdIn(ids, RoleType.SUPER_ADMIN)) {
                 countByEntreprise.put((Long) row[0], (Long) row[1]);
@@ -253,10 +254,20 @@ public class SuperAdminService {
             for (Object[] row : usersRepository.findMaxLastActivityByEntrepriseIdIn(ids)) {
                 lastActivityByEntreprise.put((Long) row[0], (LocalDateTime) row[1]);
             }
+            // Dernière utilisation métier : max parmi facturation, produits, ventes, entrées/sorties comptables, création clients
+            mergeMaxDateByEntreprise(lastUsageByEntreprise, factureProformaRepository.findMaxDateCreationByEntrepriseIdIn(ids));
+            mergeMaxDateByEntreprise(lastUsageByEntreprise, factureReelleRepository.findMaxDateCreationProByEntrepriseIdIn(ids));
+            mergeMaxDateByEntreprise(lastUsageByEntreprise, produitRepository.findMaxLastUpdatedByEntrepriseIdIn(ids));
+            mergeMaxDateByEntreprise(lastUsageByEntreprise, clientRepository.findMaxCreatedAtByEntrepriseIdIn(ids));
+            mergeMaxDateByEntreprise(lastUsageByEntreprise, entrepriseClientRepository.findMaxCreatedAtByEntrepriseIdIn(ids));
+            mergeMaxDateByEntreprise(lastUsageByEntreprise, venteRepository.findMaxDateVenteByEntrepriseIdIn(ids));
+            mergeMaxDateByEntreprise(lastUsageByEntreprise, depenseGeneraleRepository.findMaxDateCreationByEntrepriseIdIn(ids));
+            mergeMaxDateByEntreprise(lastUsageByEntreprise, entreeGeneraleRepository.findMaxDateCreationByEntrepriseIdIn(ids));
         }
 
         final Map<Long, Long> countMap = countByEntreprise;
         final Map<Long, LocalDateTime> lastActivityMap = lastActivityByEntreprise;
+        final Map<Long, LocalDateTime> lastUsageMap = lastUsageByEntreprise;
 
         return entreprisesPage.map(entreprise -> {
             String adminId = entreprise.getAdmin() != null ? entreprise.getAdmin().getId().toString() : null;
@@ -265,7 +276,11 @@ public class SuperAdminService {
             String adminEmail = entreprise.getAdmin() != null ? entreprise.getAdmin().getEmail() : null;
 
             long nombreUtilisateursEntreprise = countMap.getOrDefault(entreprise.getId(), 0L);
-            LocalDateTime derniereConnexion = lastActivityMap.get(entreprise.getId());
+            LocalDateTime lastUsage = lastUsageMap.get(entreprise.getId());
+            LocalDateTime lastActivity = lastActivityMap.get(entreprise.getId());
+            LocalDateTime derniereConnexion = (lastUsage != null && lastActivity != null)
+                    ? (lastUsage.isAfter(lastActivity) ? lastUsage : lastActivity)
+                    : (lastUsage != null ? lastUsage : lastActivity);
 
             return new SuperAdminEntrepriseListDTO(
                     entreprise.getId(),
@@ -282,6 +297,17 @@ public class SuperAdminService {
                     derniereConnexion
             );
         });
+    }
+
+    /** Fusionne les dates max par entreprise : pour chaque (entrepriseId, date), garde le max. */
+    private void mergeMaxDateByEntreprise(Map<Long, LocalDateTime> target, List<Object[]> rows) {
+        if (rows == null) return;
+        for (Object[] row : rows) {
+            if (row.length < 2 || row[1] == null) continue;
+            Long eid = (Long) row[0];
+            LocalDateTime d = (LocalDateTime) row[1];
+            target.merge(eid, d, (a, b) -> a.isAfter(b) ? a : b);
+        }
     }
 
     /**
