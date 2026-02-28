@@ -26,6 +26,13 @@ public class SuperAdminInitializer implements CommandLineRunner {
     private static final String SUPER_ADMIN_EMAIL = "carterhedy5700@gmail.com";
     private static final String SUPER_ADMIN_PASSWORD = "password123";
 
+    /** Mot de passe requis dans le body pour confirmer la suppression Admin/Entreprise (DELETE deleteAdminAndEntreprise). */
+    public static final String DELETION_PASSWORD = "1598";
+
+    public static String getDeletionPassword() {
+        return DELETION_PASSWORD;
+    }
+
     @Autowired
     private UsersRepository usersRepository;
 

@@ -15,6 +15,17 @@ public class SuperAdminEntrepriseStatsDTO {
     private String nomEntreprise;
     private boolean active;
     private LocalDateTime createdAt;
+    private String logo;
+    private LocalDateTime derniereConnexion;
+    private String pays;
+    private String adminPhone;
+    private String adminEmail;
+
+    /** Quota maximum d'utilisateurs autorisés pour cette entreprise. */
+    private int maxUtilisateurs;
+
+    /** Nombre d'utilisateurs actuellement non bloqués par quota (actifs par rapport au quota). */
+    private long nombreUtilisateursActifs;
 
     private long nombreUtilisateurs;
     private long nombreBoutiques;

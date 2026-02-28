@@ -90,6 +90,7 @@ import com.xpertcash.repository.Module.EntrepriseModuleEssaiRepository;
 import com.xpertcash.repository.Module.EntrepriseModuleAbonnementRepository;
 import com.xpertcash.repository.GlobalNotificationRepository;
 import com.xpertcash.repository.UserBoutiqueRepository;
+import com.xpertcash.exceptions.BusinessException;
 import com.xpertcash.repository.FactureRepository;
 import com.xpertcash.service.IMAGES.ImageStorageService;
 
@@ -352,6 +353,30 @@ public class SuperAdminService {
         entrepriseRepository.save(entreprise);
     }
 
+    /** Augmente ou modifie le quota d'utilisateurs d'une entreprise (réservé au Super Admin). Débloque les comptes bloqués pour quota si le nouveau quota le permet. */
+    @Transactional
+    public void setMaxUtilisateursForEntreprise(User superAdmin, Long entrepriseId, int maxUtilisateurs) {
+        ensureSuperAdmin(superAdmin);
+        if (maxUtilisateurs < 1) {
+            throw new BusinessException("Le quota doit être au moins 1.");
+        }
+        entrepriseService.getEntrepriseById(entrepriseId); // vérifier que l'entreprise existe
+        long currentCount = usersRepository.countByEntrepriseId(entrepriseId);
+        if (maxUtilisateurs < currentCount) {
+            throw new BusinessException("Le nouveau quota (" + maxUtilisateurs + ") ne peut pas être inférieur au nombre actuel d'utilisateurs (" + currentCount + ").");
+        }
+        int updated = entrepriseRepository.updateMaxUtilisateurs(entrepriseId, maxUtilisateurs);
+        if (updated == 0) {
+            throw new BusinessException("Entreprise non trouvée ou mise à jour impossible.");
+        }
+        try {
+            usersRepository.unlockUsersLockedByQuotaForEntreprise(entrepriseId);
+        } catch (Exception e) {
+            // Ne pas faire échouer la mise à jour du quota si le déblocage échoue (ex: colonne locked_by_quota absente)
+            System.err.println("Déblocage utilisateurs (quota) ignoré pour entreprise " + entrepriseId + ": " + e.getMessage());
+        }
+    }
+
  
     public SuperAdminEntrepriseStatsDTO getEntrepriseStats(User superAdmin, Long entrepriseId) {
         ensureSuperAdmin(superAdmin);
@@ -361,6 +386,7 @@ public class SuperAdminService {
         Long id = entreprise.getId();
 
         long nombreUtilisateurs = usersRepository.countByEntrepriseId(id);
+        long nombreUtilisateursActifs = usersRepository.countActiveByEntrepriseId(id);
 
         long nombreBoutiques = boutiqueRepository.countByEntrepriseId(id);
 
@@ -381,11 +407,38 @@ public class SuperAdminService {
 
         long nombreVentes = venteRepository.countByEntrepriseId(id);
 
+        // Dernière utilisation / connexion pour cette entreprise (même logique que la liste)
+        LocalDateTime lastActivity = usersRepository.findMaxLastActivityByEntrepriseId(id).orElse(null);
+        Map<Long, LocalDateTime> lastUsageByEntreprise = new HashMap<>();
+        List<Long> singletonIds = List.of(id);
+        mergeMaxDateByEntreprise(lastUsageByEntreprise, factureProformaRepository.findMaxDateCreationByEntrepriseIdIn(singletonIds));
+        mergeMaxDateByEntreprise(lastUsageByEntreprise, factureReelleRepository.findMaxDateCreationProByEntrepriseIdIn(singletonIds));
+        mergeMaxDateByEntreprise(lastUsageByEntreprise, produitRepository.findMaxLastUpdatedByEntrepriseIdIn(singletonIds));
+        mergeMaxDateByEntreprise(lastUsageByEntreprise, clientRepository.findMaxCreatedAtByEntrepriseIdIn(singletonIds));
+        mergeMaxDateByEntreprise(lastUsageByEntreprise, entrepriseClientRepository.findMaxCreatedAtByEntrepriseIdIn(singletonIds));
+        mergeMaxDateByEntreprise(lastUsageByEntreprise, venteRepository.findMaxDateVenteByEntrepriseIdIn(singletonIds));
+        mergeMaxDateByEntreprise(lastUsageByEntreprise, depenseGeneraleRepository.findMaxDateCreationByEntrepriseIdIn(singletonIds));
+        mergeMaxDateByEntreprise(lastUsageByEntreprise, entreeGeneraleRepository.findMaxDateCreationByEntrepriseIdIn(singletonIds));
+
+        LocalDateTime lastUsage = lastUsageByEntreprise.get(id);
+        LocalDateTime derniereConnexion = (lastUsage != null && lastActivity != null)
+                ? (lastUsage.isAfter(lastActivity) ? lastUsage : lastActivity)
+                : (lastUsage != null ? lastUsage : lastActivity);
+
         SuperAdminEntrepriseStatsDTO dto = new SuperAdminEntrepriseStatsDTO();
         dto.setEntrepriseId(id);
         dto.setNomEntreprise(entreprise.getNomEntreprise());
         dto.setActive(Boolean.TRUE.equals(entreprise.getActive()));
         dto.setCreatedAt(entreprise.getCreatedAt());
+        dto.setLogo(entreprise.getLogo());
+        dto.setDerniereConnexion(derniereConnexion);
+        dto.setPays(entreprise.getPays());
+        if (entreprise.getAdmin() != null) {
+            dto.setAdminPhone(entreprise.getAdmin().getPhone());
+            dto.setAdminEmail(entreprise.getAdmin().getEmail());
+        }
+        dto.setMaxUtilisateurs(entreprise.getMaxUtilisateursOrDefault());
+        dto.setNombreUtilisateursActifs(nombreUtilisateursActifs);
 
         dto.setNombreUtilisateurs(nombreUtilisateurs);
         dto.setNombreBoutiques(nombreBoutiques);
@@ -868,6 +921,16 @@ public class SuperAdminService {
             entityManager.flush();
         }
 
+        // Suppression explicite en SQL de tous les stocks liés aux produits de l'entreprise (FK stock.produit_id -> produit)
+        int stocksDeletedNative = entityManager.createNativeQuery(
+            "DELETE s FROM stock s " +
+            "INNER JOIN produit p ON s.produit_id = p.id " +
+            "INNER JOIN boutique b ON p.boutique_id = b.id " +
+            "WHERE b.entreprise_id = :entrepriseId"
+        ).setParameter("entrepriseId", entrepriseId).executeUpdate();
+        if (stocksDeletedNative > 0) {
+            entityManager.flush();
+        }
 
         int totalInteractionsProduit = entityManager.createNativeQuery(
             "DELETE i FROM interactions i " +

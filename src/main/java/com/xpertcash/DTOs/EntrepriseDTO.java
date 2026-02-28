@@ -31,6 +31,8 @@ public class EntrepriseDTO {
         private Double tauxTva;
         private String signaturNum;
         private String cachetNum;
+        private Integer maxUtilisateurs;
+        private Long nombreUtilisateurs;
 
         public EntrepriseDTO() {
         }

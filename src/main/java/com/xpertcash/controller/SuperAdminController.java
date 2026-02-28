@@ -10,10 +10,12 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.xpertcash.composant.SuperAdminInitializer;
 import com.xpertcash.DTOs.SuperAdminDashboardStatsDTO;
 import com.xpertcash.DTOs.SuperAdminEntrepriseStatsDTO;
 import com.xpertcash.entity.User;
@@ -146,6 +148,29 @@ public class SuperAdminController {
         }
     }
 
+    /** Augmenter le quota d'utilisateurs d'une entreprise (réservé au SUPER_ADMIN). Body JSON: { "maxUtilisateurs": 5 } */
+    @PatchMapping("/entreprises/{entrepriseId}/max-utilisateurs")
+    public ResponseEntity<?> setMaxUtilisateurs(
+            @PathVariable Long entrepriseId,
+            @RequestBody Map<String, Integer> body,
+            HttpServletRequest request) {
+        try {
+            Integer maxUtilisateurs = body != null ? body.get("maxUtilisateurs") : null;
+            if (maxUtilisateurs == null) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                        .body(Map.of("error", "Le champ 'maxUtilisateurs' est requis dans le body JSON."));
+            }
+            User user = authHelper.getAuthenticatedUserWithFallback(request);
+            superAdminService.setMaxUtilisateursForEntreprise(user, entrepriseId, maxUtilisateurs);
+            return ResponseEntity.ok(Map.of("message", "Quota utilisateurs mis à jour : " + maxUtilisateurs));
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Erreur : " + e.getMessage()));
+        }
+    }
+
     /**
      * Récupérer une entreprise par son id avec toutes les statistiques globales
      * (réservé au SUPER_ADMIN).
@@ -168,7 +193,19 @@ public class SuperAdminController {
      // Supprime un Admin et TOUTES les données associées à son entreprise.
   
     @DeleteMapping("/deleteAdminAndEntreprise/{adminId}")
-    public ResponseEntity<?> deleteAdminAndEntreprise(@PathVariable Long adminId, HttpServletRequest request) {
+    public ResponseEntity<?> deleteAdminAndEntreprise(
+            @PathVariable Long adminId,
+            @RequestBody(required = false) Map<String, String> body,
+            HttpServletRequest request) {
+        String confirmPassword = body != null ? body.get("confirmPassword") : null;
+        if (confirmPassword == null || confirmPassword.isBlank()) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(Map.of("error", "Mot de passe de confirmation requis (confirmPassword)."));
+        }
+        if (!confirmPassword.equals(SuperAdminInitializer.getDeletionPassword())) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("error", "Mot de passe de confirmation incorrect."));
+        }
         try {
             User user = authHelper.getAuthenticatedUserWithFallback(request);
             superAdminService.deleteAdminAndEntreprise(user, adminId);

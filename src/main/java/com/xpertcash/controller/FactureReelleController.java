@@ -136,15 +136,24 @@ public class FactureReelleController {
 
     // Endpoint pour annuler une facture réelle
     @PutMapping("/cancelFacture/{factureId}")
-    public ResponseEntity<FactureProForma> annulerFactureReelle(
+    public ResponseEntity<?> annulerFactureReelle(
             @PathVariable Long factureId,
             @RequestBody FactureReelle modifications,
             HttpServletRequest request) {
 
-        modifications.setId(factureId);
+        try {
+            modifications.setId(factureId);
+            FactureProForma factureAnnulee = factureReelleService.annulerFactureReelle(modifications, request);
 
-        FactureProForma factureAnnulee = factureReelleService.annulerFactureReelle(modifications, request);
-        return ResponseEntity.ok(factureAnnulee);
+            return ResponseEntity.ok(Map.of(
+                    "message", "Facture annulée avec succès.",
+                    "factureProformaId", factureAnnulee.getId(),
+                    "numeroFactureProforma", factureAnnulee.getNumeroFacture()
+            ));
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("error", e.getMessage()));
+        }
     }
 
 

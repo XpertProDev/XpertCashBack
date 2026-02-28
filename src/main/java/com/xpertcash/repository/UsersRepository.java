@@ -69,6 +69,10 @@ public interface UsersRepository extends JpaRepository<User, Long> {
     @Query("SELECT MAX(u.lastActivity) FROM User u WHERE u.entreprise.id = :entrepriseId")
     Optional<LocalDateTime> findMaxLastActivityByEntrepriseId(@Param("entrepriseId") Long entrepriseId);
 
+    /** Nombre d'utilisateurs non bloqués par quota pour une entreprise (utilisateurs réellement actifs par rapport au quota). */
+    @Query("SELECT COUNT(u) FROM User u WHERE u.entreprise.id = :entrepriseId AND u.lockedByQuota = false")
+    long countActiveByEntrepriseId(@Param("entrepriseId") Long entrepriseId);
+
     /** Batch : count par entreprise pour une liste d'IDs (évite N requêtes). Retourne [entrepriseId, count]. */
     @Query("SELECT u.entreprise.id, COUNT(u) FROM User u " +
            "WHERE u.entreprise.id IN :ids AND u.role.name <> :excludedRole " +
@@ -184,5 +188,9 @@ public interface UsersRepository extends JpaRepository<User, Long> {
             @Param("entrepriseId") Long entrepriseId,
             @Param("permissionType") com.xpertcash.entity.PermissionType permissionType);
 
+    /** Débloquer les utilisateurs bloqués pour dépassement de quota (après augmentation du quota par le Super Admin). */
+    @Modifying(clearAutomatically = true)
+    @Query("UPDATE User u SET u.locked = false, u.lockedByQuota = false WHERE u.entreprise.id = :entrepriseId AND u.lockedByQuota = true")
+    int unlockUsersLockedByQuotaForEntreprise(@Param("entrepriseId") Long entrepriseId);
 }
 
