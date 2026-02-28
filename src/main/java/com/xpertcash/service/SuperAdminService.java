@@ -921,6 +921,16 @@ public class SuperAdminService {
             entityManager.flush();
         }
 
+        // Suppression explicite en SQL de tous les stocks liés aux produits de l'entreprise (FK stock.produit_id -> produit)
+        int stocksDeletedNative = entityManager.createNativeQuery(
+            "DELETE s FROM stock s " +
+            "INNER JOIN produit p ON s.produit_id = p.id " +
+            "INNER JOIN boutique b ON p.boutique_id = b.id " +
+            "WHERE b.entreprise_id = :entrepriseId"
+        ).setParameter("entrepriseId", entrepriseId).executeUpdate();
+        if (stocksDeletedNative > 0) {
+            entityManager.flush();
+        }
 
         int totalInteractionsProduit = entityManager.createNativeQuery(
             "DELETE i FROM interactions i " +
