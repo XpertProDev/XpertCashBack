@@ -77,6 +77,8 @@ import org.springframework.web.multipart.MultipartFile;
 @Service
 public class UsersService {
 
+    /** Feature flag : limiter ou non le nombre d'utilisateurs par entreprise. Mettre false en dev pour désactiver temporairement. */
+    private static final boolean USER_QUOTA_ENABLED = true;
     private static final Map<PermissionType, String> PERMISSION_DESCRIPTIONS = new HashMap<>();
     private static final Map<RoleType, String> ROLE_DESCRIPTIONS = new HashMap<>();
     
@@ -282,6 +284,7 @@ public class UsersService {
         entreprise.setModulesActifs(modulesParDefaut);
 
         entreprise.setDateFinEssaiModulesPayants(LocalDateTime.now().plusDays(30));
+        entreprise.setMaxUtilisateurs(Entreprise.DEFAULT_MAX_UTILISATEURS);
 
         entreprise = entrepriseRepository.save(entreprise);
 
@@ -688,6 +691,14 @@ public class UsersService {
                 Long entrepriseId = admin.getEntreprise() != null ? admin.getEntreprise().getId() : null;
                 if (entrepriseId == null) {
                     throw new BusinessException("L'admin n'a pas d'entreprise associée.");
+                }
+
+                if (USER_QUOTA_ENABLED) {
+                    int quota = entreprise.getMaxUtilisateursOrDefault();
+                    long currentCount = usersRepository.countByEntrepriseId(entrepriseId);
+                    if (currentCount >= quota) {
+                        throw new BusinessException("Quota atteint. Contactez le Super Admin.");
+                    }
                 }
 
                 // Vérification globale de l'email (unique dans toute la base)
@@ -1639,7 +1650,8 @@ public class UsersService {
     dto.setTauxTva(entreprise.getTauxTva());
     dto.setPrefixe(entreprise.getPrefixe());
     dto.setSuffixe(entreprise.getSuffixe());
-
+    dto.setMaxUtilisateurs(entreprise.getMaxUtilisateursOrDefault());
+    dto.setNombreUtilisateurs(usersRepository.countByEntrepriseId(entreprise.getId()));
 
     return dto;
 }
@@ -1728,6 +1740,7 @@ public class UsersService {
         dashboard.setBoutiques(boutiques);
         dashboard.setUsers(users);
         dashboard.setCurrentUserRole(currentUserRole);
+        dashboard.setMaxUtilisateurs(currentUser.getEntreprise().getMaxUtilisateursOrDefault());
 
         return dashboard;
     }

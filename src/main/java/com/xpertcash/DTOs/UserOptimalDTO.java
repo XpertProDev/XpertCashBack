@@ -15,6 +15,7 @@ public class UserOptimalDTO {
     private List<BoutiqueDTO> boutiques;
     private List<UserDTO> users;
     private String currentUserRole;
+    private Integer maxUtilisateurs;
 
     @Data
     @AllArgsConstructor

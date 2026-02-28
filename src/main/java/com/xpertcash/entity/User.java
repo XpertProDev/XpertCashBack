@@ -72,6 +72,9 @@ public class User {
     private LocalDateTime lastActivity;
     private boolean locked = false;
 
+    /** Bloqué car l'entreprise a dépassé son quota (déblocage quand le Super Admin augmente le quota). */
+    @Column(name = "locked_by_quota", nullable = false)
+    private boolean lockedByQuota = false;
 
     // LES RELATIONS
 

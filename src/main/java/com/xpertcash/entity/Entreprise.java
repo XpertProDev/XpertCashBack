@@ -107,8 +107,17 @@ public class Entreprise {
     @Column(name = "date_fin_essai_modules_payants")
     private LocalDateTime dateFinEssaiModulesPayants;
 
+    /** Quota d'utilisateurs pour cette entreprise (admin inclus). Le Super Admin peut l'augmenter. */
+    @Column(name = "max_utilisateurs", nullable = true)
+    private Integer maxUtilisateurs = DEFAULT_MAX_UTILISATEURS;
 
+    /** Quota par défaut pour un nouveau compte (admin + 1 utilisateur). Source unique pour toute l'app. */
+    public static final int DEFAULT_MAX_UTILISATEURS = 2;
 
+    /** Retourne le quota effectif (jamais null pour la logique métier). */
+    public int getMaxUtilisateursOrDefault() {
+        return maxUtilisateurs != null ? maxUtilisateurs : DEFAULT_MAX_UTILISATEURS;
+    }
 
     // Générer un identifiant unique
     public static String generateIdentifiantEntreprise() {

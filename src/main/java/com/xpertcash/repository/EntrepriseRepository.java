@@ -5,6 +5,7 @@ import com.xpertcash.entity.Enum.RoleType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -75,4 +76,9 @@ public interface EntrepriseRepository extends JpaRepository<Entreprise, Long> {
            "LEFT JOIN a.role r " +
            "WHERE (a IS NULL OR r.name <> :excludedRole) AND e.createdAt >= :since")
     long countExcludingAdminRoleAndCreatedAtAfter(@Param("excludedRole") RoleType excludedRole, @Param("since") LocalDateTime since);
+
+    /** Met à jour max_utilisateurs pour une entreprise (UPDATE direct en base, évite les problèmes de contexte de persistance). */
+    @Modifying(clearAutomatically = true)
+    @Query("UPDATE Entreprise e SET e.maxUtilisateurs = :maxUtilisateurs WHERE e.id = :entrepriseId")
+    int updateMaxUtilisateurs(@Param("entrepriseId") Long entrepriseId, @Param("maxUtilisateurs") int maxUtilisateurs);
 }

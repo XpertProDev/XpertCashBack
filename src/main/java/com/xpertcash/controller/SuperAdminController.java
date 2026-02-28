@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -143,6 +144,29 @@ public class SuperAdminController {
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(Map.of("error", "Erreur interne : " + e.getMessage()));
+        }
+    }
+
+    /** Augmenter le quota d'utilisateurs d'une entreprise (réservé au SUPER_ADMIN). Body JSON: { "maxUtilisateurs": 5 } */
+    @PatchMapping("/entreprises/{entrepriseId}/max-utilisateurs")
+    public ResponseEntity<?> setMaxUtilisateurs(
+            @PathVariable Long entrepriseId,
+            @RequestBody Map<String, Integer> body,
+            HttpServletRequest request) {
+        try {
+            Integer maxUtilisateurs = body != null ? body.get("maxUtilisateurs") : null;
+            if (maxUtilisateurs == null) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                        .body(Map.of("error", "Le champ 'maxUtilisateurs' est requis dans le body JSON."));
+            }
+            User user = authHelper.getAuthenticatedUserWithFallback(request);
+            superAdminService.setMaxUtilisateursForEntreprise(user, entrepriseId, maxUtilisateurs);
+            return ResponseEntity.ok(Map.of("message", "Quota utilisateurs mis à jour : " + maxUtilisateurs));
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Erreur : " + e.getMessage()));
         }
     }
 
