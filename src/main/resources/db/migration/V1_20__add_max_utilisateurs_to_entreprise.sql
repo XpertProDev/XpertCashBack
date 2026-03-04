@@ -22,12 +22,13 @@ DEALLOCATE PREPARE stmt_user;
 
 -- 3. Bloquer les utilisateurs au-delà des 2 premiers par entreprise (ordre : created_at, id).
 -- Les 2 premiers (Admin + 2e inscrit) restent actifs ; les autres sont locked + locked_by_quota.
--- Note : ROW_NUMBER() nécessite MySQL 8+. Table `user` entre backticks (mot réservé).
+-- Note : ROW_NUMBER() nécessite MySQL 8+. Table dérivée (SELECT * FROM `user`) pour éviter
+-- "Can't specify target table for update in FROM clause" en MySQL.
 UPDATE `user` u
 INNER JOIN (
     SELECT id FROM (
         SELECT id, ROW_NUMBER() OVER (PARTITION BY entreprise_id ORDER BY created_at, id) AS rn
-        FROM `user`
+        FROM (SELECT id, entreprise_id, created_at FROM `user`) AS u2
     ) t
     WHERE rn > 2
 ) excess ON u.id = excess.id
