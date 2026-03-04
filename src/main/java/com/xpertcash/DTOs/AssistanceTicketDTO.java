@@ -20,6 +20,9 @@ public class AssistanceTicketDTO {
     private LocalDateTime closedAt;
     private boolean deleted;
 
+    /** True si le client a validé que le ticket est réellement résolu. */
+    private boolean valideParClient;
+
     private String createdByNom;
     private String createdByEmail;
     private String photo;

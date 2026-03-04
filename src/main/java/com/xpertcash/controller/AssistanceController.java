@@ -152,5 +152,18 @@ public class AssistanceController {
                     .body(Map.of("error", "Erreur lors de la suppression du ticket : " + e.getMessage()));
         }
     }
+
+    /** Validation finale d'un ticket par le client (confirme que la solution est OK). */
+    @PatchMapping("/tickets/{ticketId}/valider")
+    public ResponseEntity<?> validerTicketParClient(@PathVariable Long ticketId, HttpServletRequest request) {
+        try {
+            User user = authHelper.getAuthenticatedUserWithFallback(request);
+            AssistanceTicketDTO dto = assistanceService.validerResolutionParClient(user, ticketId);
+            return ResponseEntity.ok(dto);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("error", "Erreur lors de la validation du ticket : " + e.getMessage()));
+        }
+    }
 }
 

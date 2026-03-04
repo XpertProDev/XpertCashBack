@@ -28,8 +28,6 @@ public class SuperAdminInitializer implements CommandLineRunner {
 
     private static final String SUPPORT_EMAIL = "support@tchakeda.com";
     private static final String SUPPORT_PASSWORD = "support123";
-
-    /** Mot de passe requis dans le body pour confirmer la suppression Admin/Entreprise (DELETE deleteAdminAndEntreprise). */
     public static final String DELETION_PASSWORD = "1598";
 
     public static String getDeletionPassword() {

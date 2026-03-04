@@ -92,8 +92,10 @@ public class AssistanceService {
     @Transactional
     public AssistanceMessageDTO addMessage(User user, Long ticketId, String contenu, MultipartFile pieceJointeFile) {
         AssistanceTicket ticket = loadTicketForUser(user, ticketId);
-        if (ticket.getStatut() == AssistanceStatus.RESOLU) {
-            throw new BusinessException("Ce ticket est déjà résolu. Merci de créer un nouveau ticket pour un autre problème.");
+        // Si le ticket est déjà validé par le client, on refuse tout nouveau message
+        if (ticket.getStatut() == AssistanceStatus.RESOLU && ticket.isValideParClient()) {
+            throw new BusinessException(
+                    "Ce ticket est déjà résolu et validé. Merci de créer un nouveau ticket pour un autre problème.");
         }
         boolean isSupport = isSupportUser(user);
         String pieceJointePath = null;
@@ -113,6 +115,11 @@ public class AssistanceService {
 
         ticket.setUpdatedAt(LocalDateTime.now());
         if (isSupport && ticket.getStatut() == AssistanceStatus.EN_ATTENTE) {
+            ticket.setStatut(AssistanceStatus.EN_COURS);
+        }
+        // Si le ticket était RESOLU mais non validé, et que le client renvoie un message,
+        // on le rouvre en EN_COURS
+        if (!isSupport && ticket.getStatut() == AssistanceStatus.RESOLU && !ticket.isValideParClient()) {
             ticket.setStatut(AssistanceStatus.EN_COURS);
         }
         ticketRepository.save(ticket);
@@ -139,7 +146,20 @@ public class AssistanceService {
         ticket.setStatut(newStatus);
         if (newStatus == AssistanceStatus.RESOLU) {
             ticket.setClosedAt(LocalDateTime.now());
+            ticket.setValideParClient(false);
         }
+        ticket.setUpdatedAt(LocalDateTime.now());
+        return toTicketDTO(ticketRepository.save(ticket), false);
+    }
+
+    /** Validation finale par le client : confirme que la résolution est correcte. */
+    @Transactional
+    public AssistanceTicketDTO validerResolutionParClient(User user, Long ticketId) {
+        AssistanceTicket ticket = loadTicketForUser(user, ticketId);
+        if (ticket.getStatut() != AssistanceStatus.RESOLU) {
+            throw new BusinessException("Le ticket doit être en statut RESOLU pour être validé.");
+        }
+        ticket.setValideParClient(true);
         ticket.setUpdatedAt(LocalDateTime.now());
         return toTicketDTO(ticketRepository.save(ticket), false);
     }
@@ -206,6 +226,7 @@ public class AssistanceService {
         dto.setUpdatedAt(ticket.getUpdatedAt());
         dto.setClosedAt(ticket.getClosedAt());
         dto.setDeleted(ticket.isDeleted());
+        dto.setValideParClient(ticket.isValideParClient());
         dto.setCreatedByNom(ticket.getCreatedBy() != null ? ticket.getCreatedBy().getNomComplet() : null);
         dto.setCreatedByEmail(ticket.getCreatedBy() != null ? ticket.getCreatedBy().getEmail() : null);
         if (includeMessages) {
