@@ -26,6 +26,9 @@ public class SuperAdminInitializer implements CommandLineRunner {
     private static final String SUPER_ADMIN_EMAIL = "carterhedy5700@gmail.com";
     private static final String SUPER_ADMIN_PASSWORD = "password123";
 
+    private static final String SUPPORT_EMAIL = "support@tchakeda.com";
+    private static final String SUPPORT_PASSWORD = "support123";
+
     /** Mot de passe requis dans le body pour confirmer la suppression Admin/Entreprise (DELETE deleteAdminAndEntreprise). */
     public static final String DELETION_PASSWORD = "1598";
 
@@ -50,6 +53,11 @@ public class SuperAdminInitializer implements CommandLineRunner {
 
     @Override
     public void run(String... args) {
+        initSuperAdmin();
+        initSupportUser();
+    }
+
+    private void initSuperAdmin() {
         if (usersRepository.findByEmail(SUPER_ADMIN_EMAIL).isPresent()) {
             System.out.println(" SUPER_ADMIN déjà présent, aucune initialisation nécessaire.");
             return;
@@ -131,6 +139,73 @@ public class SuperAdminInitializer implements CommandLineRunner {
         }
 
         System.out.println(" Compte SUPER_ADMIN initialisé avec succès : " + SUPER_ADMIN_EMAIL);
+    }
+
+    private void initSupportUser() {
+        if (usersRepository.findByEmail(SUPPORT_EMAIL).isPresent()) {
+            System.out.println(" Compte SUPPORT déjà présent, aucune initialisation nécessaire.");
+            return;
+        }
+
+        System.out.println("Initialisation du compte SUPPORT...");
+
+        // Rôle SUPPORT : on le crée s'il n'existe pas encore
+        Role supportRole = roleRepository.findFirstByName(RoleType.SUPPORT)
+                .orElseGet(() -> {
+                    Role role = new Role();
+                    role.setName(RoleType.SUPPORT);
+                    return roleRepository.save(role);
+                });
+
+        // On rattache le support à la même entreprise que le SUPER_ADMIN (ou on en crée une si besoin)
+        String nomEntreprise = "Tchakeda Super Admin";
+        Entreprise entrepriseSupport = entrepriseRepository.findByNomEntreprise(nomEntreprise)
+                .orElseGet(() -> {
+                    Entreprise e = new Entreprise();
+                    e.setNomEntreprise(nomEntreprise);
+                    String identifiantUnique;
+                    do {
+                        identifiantUnique = Entreprise.generateIdentifiantEntreprise();
+                    } while (entrepriseRepository.existsByIdentifiantEntreprise(identifiantUnique));
+                    e.setIdentifiantEntreprise(identifiantUnique);
+                    e.setCreatedAt(LocalDateTime.now());
+                    e.setAdresse("");
+                    e.setTelephone("");
+                    e.setPays("");
+                    e.setSecteur("");
+                    e.setEmail("");
+                    e.setLogo("");
+                    e.setSiege("Ville");
+                    e.setActive(true);
+                    return entrepriseRepository.save(e);
+                });
+
+        String personalCode;
+        boolean isUnique;
+        Random random = new Random();
+        do {
+            personalCode = String.format("%04d", random.nextInt(10000));
+            isUnique = !usersRepository.existsByPersonalCode(personalCode);
+        } while (!isUnique);
+
+        User support = new User();
+        support.setUuid(UUID.randomUUID().toString());
+        support.setPersonalCode(personalCode);
+        support.setNomComplet("Support XpertCash");
+        support.setEmail(SUPPORT_EMAIL);
+        support.setPassword(passwordEncoder.encode(SUPPORT_PASSWORD));
+        support.setPhone("0000000001");
+        support.setPays("ML");
+        support.setCreatedAt(LocalDateTime.now());
+        support.setActivatedLien(true);
+        support.setEnabledLien(true);
+        support.setLocked(false);
+        support.setEntreprise(entrepriseSupport);
+        support.setRole(supportRole);
+
+        support = usersRepository.save(support);
+
+        System.out.println(" Compte SUPPORT initialisé avec succès : " + SUPPORT_EMAIL);
     }
 }
 
