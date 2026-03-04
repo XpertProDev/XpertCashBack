@@ -2,6 +2,7 @@ package com.xpertcash.entity.Enum;
 
 public enum RoleType {
     SUPER_ADMIN,
+    SUPPORT,
     ADMIN,
     UTILISATEUR,
     VENDEUR,
@@ -11,5 +12,4 @@ public enum RoleType {
     RH,
     COMPTABLE,
     GERER_MARKETING,
-    
 }

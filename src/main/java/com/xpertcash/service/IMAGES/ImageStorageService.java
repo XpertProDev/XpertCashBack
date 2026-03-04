@@ -284,5 +284,49 @@ public class ImageStorageService {
         }
     }
 
+    // Gestion pièce jointe pour l'assistance/support (captures, documents)
+    public String saveSupportPieceJointe(MultipartFile pieceJointeFile) {
+        if (pieceJointeFile == null || pieceJointeFile.isEmpty()) {
+            throw new NotFoundException("Le fichier pièce jointe est vide ou invalide.");
+        }
+        try {
+            Path supportRootLocation = Paths.get("src/main/resources/static/supportUpload");
+            if (!Files.exists(supportRootLocation)) {
+                Files.createDirectories(supportRootLocation);
+            }
+
+            String fileName = UUID.randomUUID().toString() + "_" + pieceJointeFile.getOriginalFilename();
+            Path filePath = supportRootLocation.resolve(fileName);
+            Files.copy(pieceJointeFile.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
+
+            String fileUrl = "/supportUpload/" + fileName;
+            System.out.println(" Pièce jointe support sauvegardée : " + fileUrl);
+            return fileUrl;
+        } catch (IOException e) {
+            System.out.println(" ERREUR lors de l'enregistrement de la pièce jointe support : " + e.getMessage());
+            throw new NotFoundException("Erreur lors de l'enregistrement de la pièce jointe support : " + e.getMessage());
+        }
+    }
+
+    public void deleteSupportPieceJointe(String supportFileUrl) {
+        if (supportFileUrl == null || supportFileUrl.isBlank()) {
+            return;
+        }
+        try {
+            String fileName = Paths.get(supportFileUrl).getFileName().toString();
+            Path supportRootLocation = Paths.get("src/main/resources/static/supportUpload");
+            Path filePath = supportRootLocation.resolve(fileName);
+            if (Files.exists(filePath)) {
+                Files.delete(filePath);
+                System.out.println(" Pièce jointe support supprimée : " + fileName);
+            } else {
+                System.out.println(" Fichier support introuvable : " + fileName);
+            }
+        } catch (IOException e) {
+            System.err.println(" Erreur lors de la suppression de la pièce jointe support : " + e.getMessage());
+            throw new RuntimeException("Impossible de supprimer la pièce jointe support : " + e.getMessage(), e);
+        }
+    }
+
 }
 

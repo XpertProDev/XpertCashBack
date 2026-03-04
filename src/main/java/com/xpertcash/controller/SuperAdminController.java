@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.xpertcash.composant.SuperAdminInitializer;
 import com.xpertcash.DTOs.SuperAdminDashboardStatsDTO;
 import com.xpertcash.DTOs.SuperAdminEntrepriseStatsDTO;
 import com.xpertcash.entity.User;
@@ -189,10 +190,21 @@ public class SuperAdminController {
         }
     }
 
-     // Supprime un Admin et TOUTES les données associées à son entreprise.
-  
+    /** Supprime un Admin et TOUTES les données de son entreprise. Body JSON requis : { "confirmPassword": "1598" }. */
     @DeleteMapping("/deleteAdminAndEntreprise/{adminId}")
-    public ResponseEntity<?> deleteAdminAndEntreprise(@PathVariable Long adminId, HttpServletRequest request) {
+    public ResponseEntity<?> deleteAdminAndEntreprise(
+            @PathVariable Long adminId,
+            @RequestBody(required = false) Map<String, String> body,
+            HttpServletRequest request) {
+        String confirmPassword = body != null ? body.get("confirmPassword") : null;
+        if (confirmPassword == null || confirmPassword.isBlank()) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(Map.of("error", "Mot de passe de confirmation requis (confirmPassword)."));
+        }
+        if (!confirmPassword.equals(SuperAdminInitializer.getDeletionPassword())) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("error", "Mot de passe de confirmation incorrect."));
+        }
         try {
             User user = authHelper.getAuthenticatedUserWithFallback(request);
             superAdminService.deleteAdminAndEntreprise(user, adminId);

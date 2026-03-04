@@ -1,6 +1,8 @@
 package com.xpertcash.DTOs;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -43,6 +45,9 @@ public class SuperAdminEntrepriseStatsDTO {
 
     private long nombreCaissesOuvertes;
     private long nombreVentes;
+
+    /** Liste des utilisateurs de l'entreprise (pour la vue détail Super Admin). */
+    private List<SuperAdminUserSummaryDTO> utilisateurs = new ArrayList<>();
 }
 
 
