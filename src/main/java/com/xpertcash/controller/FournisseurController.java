@@ -15,12 +15,14 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.xpertcash.DTOs.FOURNISSEUR.FournisseurDTO;
 import com.xpertcash.DTOs.FOURNISSEUR.FournisseurResponseDTO;
+import com.xpertcash.DTOs.PaginatedResponseDTO;
 import com.xpertcash.service.AuthenticationHelper;
 import com.xpertcash.entity.Facture;
 import com.xpertcash.entity.Fournisseur;
@@ -131,6 +133,18 @@ public class FournisseurController {
             return map;
         }).collect(Collectors.toList());
 
+        return ResponseEntity.ok(result);
+    }
+
+    /** Fournisseurs paginés + recherche (nom, société, email, téléphone), pagination DB. */
+    @GetMapping("/get-fournisseurs/paginated")
+    public ResponseEntity<PaginatedResponseDTO<Map<String, Object>>> getFournisseursByEntreprisePaginated(
+            HttpServletRequest request,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false) String search) {
+        PaginatedResponseDTO<Map<String, Object>> result =
+                fournisseurService.getFournisseursByEntreprisePaginated(request, page, size, search);
         return ResponseEntity.ok(result);
     }
 

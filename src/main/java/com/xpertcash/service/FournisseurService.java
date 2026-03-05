@@ -10,10 +10,14 @@ import java.util.List;
 import java.util.Map;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 
+import com.xpertcash.DTOs.PaginatedResponseDTO;
 import com.xpertcash.entity.Entreprise;
 import com.xpertcash.entity.Fournisseur;
 import com.xpertcash.entity.User;
@@ -102,16 +106,75 @@ public class FournisseurService {
     }
 
     public List<Fournisseur> getFournisseursByEntreprise(HttpServletRequest request) {
-        
-    User user = authHelper.getAuthenticatedUserWithFallback(request);
+        User user = authHelper.getAuthenticatedUserWithFallback(request);
 
-    Entreprise entreprise = user.getEntreprise();
-    if (entreprise == null) {
-        throw new RuntimeException("L'utilisateur n'a pas d'entreprise associée.");
+        Entreprise entreprise = user.getEntreprise();
+        if (entreprise == null) {
+            throw new RuntimeException("L'utilisateur n'a pas d'entreprise associée.");
+        }
+
+        return fournisseurRepository.findByEntrepriseId(entreprise.getId());
     }
 
-    return fournisseurRepository.findByEntrepriseId(entreprise.getId());
-}
+    /**
+     * Fournisseurs paginés pour l'entreprise de l'utilisateur connecté.
+     * Recherche côté base (nom complet, société, email, téléphone) avec longueur minimale de 2 caractères.
+     */
+    public PaginatedResponseDTO<Map<String, Object>> getFournisseursByEntreprisePaginated(
+            HttpServletRequest request,
+            int page,
+            int size,
+            String search) {
+
+        if (page < 0) page = 0;
+        if (size <= 0) size = 20;
+        if (size > 100) size = 100;
+
+        User user = authHelper.getAuthenticatedUserWithFallback(request);
+        Entreprise entreprise = user.getEntreprise();
+        if (entreprise == null) {
+            throw new RuntimeException("L'utilisateur n'a pas d'entreprise associée.");
+        }
+
+        Pageable pageable = PageRequest.of(page, size);
+
+        String searchTrimmed = (search != null) ? search.trim() : "";
+        if (searchTrimmed.length() < 2) {
+            searchTrimmed = "";
+        }
+
+        Page<Fournisseur> pageFournisseurs = searchTrimmed.isEmpty()
+                ? fournisseurRepository.findByEntreprise_Id(entreprise.getId(), pageable)
+                : fournisseurRepository.findByEntrepriseIdWithSearch(entreprise.getId(), searchTrimmed, pageable);
+
+        List<Map<String, Object>> content = new ArrayList<>();
+        for (Fournisseur fournisseur : pageFournisseurs.getContent()) {
+            Map<String, Object> map = new HashMap<>();
+            map.put("id", fournisseur.getId());
+            map.put("nomComplet", fournisseur.getNomComplet());
+            map.put("nomSociete", fournisseur.getNomSociete());
+            map.put("description", fournisseur.getDescription());
+            map.put("adresse", fournisseur.getAdresse());
+            map.put("pays", fournisseur.getPays());
+            map.put("ville", fournisseur.getVille());
+            map.put("telephone", fournisseur.getTelephone());
+            map.put("email", fournisseur.getEmail());
+            map.put("createdAt", fournisseur.getCreatedAt());
+            map.put("photo", fournisseur.getPhoto());
+            content.add(map);
+        }
+        return new PaginatedResponseDTO<>(
+                content,
+                pageFournisseurs.getNumber(),
+                pageFournisseurs.getSize(),
+                pageFournisseurs.getTotalElements(),
+                pageFournisseurs.getTotalPages(),
+                pageFournisseurs.hasNext(),
+                pageFournisseurs.hasPrevious(),
+                pageFournisseurs.isFirst(),
+                pageFournisseurs.isLast()
+        );
+    }
 
     // Get fournisseur by id
   public Fournisseur getFournisseurById(Long fournisseurId, HttpServletRequest request) {
@@ -205,10 +268,9 @@ private User getUserFromRequest(HttpServletRequest request) {
     HttpServletRequest request) {
     User user = authHelper.getAuthenticatedUserWithFallback(request);
 
-    Fournisseur fournisseur = fournisseurRepository.findByIdAndEntrepriseId(
+    fournisseurRepository.findByIdAndEntrepriseId(
             fournisseurId, user.getEntreprise().getId())
             .orElseThrow(() -> new RuntimeException("Fournisseur introuvable ou n'appartient pas à votre entreprise !"));
-
 
         List<Object[]> rows = stockProduitFournisseurRepository.findNomProduitEtQuantiteAjoutee(fournisseurId);
         List<Map<String, Object>> result = new ArrayList<>();

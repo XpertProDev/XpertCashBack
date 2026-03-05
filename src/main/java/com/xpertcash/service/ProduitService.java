@@ -1275,9 +1275,9 @@ public class ProduitService {
             produitDTO.setEnStock(produit.getEnStock());
             produitDTO.setFavoriPourVente(Boolean.TRUE.equals(produit.getFavoriPourVente()));
             produitDTO.setOrdreFavori(produit.getOrdreFavori());
-
             produitDTO.setCreatedAt(produit.getCreatedAt());
             produitDTO.setLastUpdated(produit.getLastUpdated());
+            produitDTO.setDatePreemption(produit.getDatePreemption());
 
 
             produitDTO.setNomCategorie(produit.getCategorie() != null ? produit.getCategorie().getNom() : null);

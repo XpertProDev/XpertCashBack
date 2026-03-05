@@ -1,12 +1,14 @@
 package com.xpertcash.controller;
 
 import com.xpertcash.DTOs.AlerteStockDTO;
+import com.xpertcash.DTOs.PaginatedResponseDTO;
 import com.xpertcash.service.AlertesService;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.HashMap;
@@ -20,12 +22,15 @@ public class AlertesController {
     @Autowired
     private AlertesService alertesService;
 
-     // Endpoint pour récupérer les alertes de stock faible
- 
-    @GetMapping("/alertes/stock-faible")
-    public ResponseEntity<?> getAlertesStockFaible(HttpServletRequest request) {
+    // Version paginée des alertes de stock faible
+    @GetMapping("/alertes/stock-faible/paginated")
+    public ResponseEntity<?> getAlertesStockFaiblePaginated(
+            HttpServletRequest request,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
         try {
-            List<AlerteStockDTO> alertes = alertesService.getAlertesStockFaible(request);
+            PaginatedResponseDTO<AlerteStockDTO> alertes =
+                    alertesService.getAlertesStockFaiblePaginated(request, page, size);
             return ResponseEntity.ok(alertes);
         } catch (RuntimeException e) {
             Map<String, String> error = new HashMap<>();

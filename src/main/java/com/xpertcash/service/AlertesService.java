@@ -1,10 +1,12 @@
 package com.xpertcash.service;
 
 import com.xpertcash.DTOs.AlerteStockDTO;
+import com.xpertcash.DTOs.PaginatedResponseDTO;
 import com.xpertcash.entity.Produit;
 import com.xpertcash.entity.Stock;
 import com.xpertcash.entity.User;
 import com.xpertcash.entity.Enum.RoleType;
+import com.xpertcash.entity.Enum.TypeProduit;
 import com.xpertcash.repository.ProduitRepository;
 import com.xpertcash.repository.StockRepository;
 import jakarta.servlet.http.HttpServletRequest;
@@ -52,6 +54,7 @@ public class AlertesService {
         List<Produit> produitsActifs = produitRepository.findAllByEntrepriseId(entrepriseId)
                 .stream()
                 .filter(p -> p.getDeleted() == null || !p.getDeleted())
+                .filter(p -> p.getTypeProduit() == null || p.getTypeProduit() == TypeProduit.PHYSIQUE)
                 .toList();
 
         List<AlerteStockDTO> alertes = new ArrayList<>();
@@ -87,6 +90,56 @@ public class AlertesService {
         alertes.sort((a1, a2) -> Integer.compare(a1.getStockActuel(), a2.getStockActuel()));
 
         return alertes;
+    }
+
+    /**
+     * Version paginée en mémoire des alertes de stock faible.
+     * Utile pour les grands écrans listes, tout en réutilisant la logique existante.
+     */
+    @Transactional(readOnly = true)
+    public PaginatedResponseDTO<AlerteStockDTO> getAlertesStockFaiblePaginated(
+            HttpServletRequest request,
+            int page,
+            int size) {
+
+        if (page < 0) page = 0;
+        if (size <= 0) size = 20;
+        if (size > 100) size = 100;
+
+        List<AlerteStockDTO> allAlertes = getAlertesStockFaible(request);
+        int total = allAlertes.size();
+
+        int fromIndex = page * size;
+        if (fromIndex >= total) {
+            return new PaginatedResponseDTO<>(
+                    new ArrayList<>(),
+                    page,
+                    size,
+                    total,
+                    (int) Math.ceil(total / (double) size),
+                    false,
+                    page > 0,
+                    page == 0,
+                    true
+            );
+        }
+
+        int toIndex = Math.min(fromIndex + size, total);
+        List<AlerteStockDTO> content = allAlertes.subList(fromIndex, toIndex);
+
+        int totalPages = (int) Math.ceil(total / (double) size);
+
+        return new PaginatedResponseDTO<>(
+                content,
+                page,
+                size,
+                total,
+                totalPages,
+                page < totalPages - 1,
+                page > 0,
+                page == 0,
+                page >= totalPages - 1
+        );
     }
 }
 

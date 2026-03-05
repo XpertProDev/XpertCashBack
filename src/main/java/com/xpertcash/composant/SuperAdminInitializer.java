@@ -25,10 +25,11 @@ public class SuperAdminInitializer implements CommandLineRunner {
 
     private static final String SUPER_ADMIN_EMAIL = "carterhedy5700@gmail.com";
     private static final String SUPER_ADMIN_PASSWORD = "password123";
+    public static final String DELETION_PASSWORD = "1598";
+
 
     private static final String SUPPORT_EMAIL = "support@tchakeda.com";
     private static final String SUPPORT_PASSWORD = "support123";
-    public static final String DELETION_PASSWORD = "1598";
 
     public static String getDeletionPassword() {
         return DELETION_PASSWORD;
@@ -189,7 +190,7 @@ public class SuperAdminInitializer implements CommandLineRunner {
         User support = new User();
         support.setUuid(UUID.randomUUID().toString());
         support.setPersonalCode(personalCode);
-        support.setNomComplet("Support XpertCash");
+        support.setNomComplet("Support Tchakeda");
         support.setEmail(SUPPORT_EMAIL);
         support.setPassword(passwordEncoder.encode(SUPPORT_PASSWORD));
         support.setPhone("0000000001");

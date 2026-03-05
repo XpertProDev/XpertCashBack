@@ -9,7 +9,8 @@ Ce document décrit comment le frontend doit utiliser le module d'assistance (ti
 - **Statut** (`AssistanceStatus`) :
   - `EN_ATTENTE` : le ticket vient d'être créé, le support n'a pas encore répondu.
   - `EN_COURS` : le support a commencé à traiter le ticket.
-  - `RESOLU` : le problème est résolu.
+  - `RESOLU` : le support considère que le problème est résolu (en attente de validation client).
+  - `CONTESTE` : le client a indiqué qu'il n'est pas d'accord (clic sur **Non** ou nouveau message après `RESOLU` non validé).
 - **Pièce jointe** : capture d'écran ou document, stocké dans `supportUpload`, référencé par une URL (`/supportUpload/xxxx.png`).
 
 Tous les endpoints sont protégés par l'authentification existante (JWT) et utilisent l'utilisateur connecté renvoyé par `AuthenticationHelper`.
@@ -196,11 +197,13 @@ Un `AssistanceMessageDTO` (même format que ci-dessus).
 - Si c'est un **utilisateur normal** : il peut envoyer des messages seulement sur **SES** tickets.
 - Si c'est un **utilisateur SUPPORT** :
   - Il peut répondre aux tickets de son entreprise support.
-  - Si le ticket est en `EN_ATTENTE` et que le support répond, le statut passe automatiquement à `EN_COURS`.
+  - Si le ticket est en `EN_ATTENTE` ou `CONTESTE` et que le support répond, le statut passe automatiquement à `EN_COURS`.
 - Si le ticket est en `RESOLU` :
-  - L'API renvoie une erreur métier avec un message du type  
-    `"Ce ticket est déjà résolu. Merci de créer un nouveau ticket pour un autre problème."`
-  - Le frontend doit alors proposer à l'utilisateur de **créer un nouveau ticket** s'il a un nouveau souci.
+  - Tant que le client **n'a pas validé**, il peut :
+    - soit cliquer sur **Non** (voir endpoint de refus ci‑dessous),
+    - soit renvoyer un nouveau message, ce qui met le ticket en statut `CONTESTE`.
+  - Si le client a **validé** (`valider`), toute nouvelle tentative de message renvoie une erreur métier :
+    `"Ce ticket est déjà résolu et validé. Merci de créer un nouveau ticket pour un autre problème."`
 
 ---
 
@@ -208,7 +211,80 @@ Un `AssistanceMessageDTO` (même format que ci-dessus).
 
 Le compte support identifié dans le backend a le rôle `SUPPORT` (créé dans `SuperAdminInitializer`).
 
-#### 7.1. Lister les tickets à traiter
+**Récap : ce que le support peut faire**
+
+| Action | Endpoint | Description |
+|--------|----------|-------------|
+| Voir le rapport / statistiques | `GET /api/auth/admin/rapport` | Chiffres pour le dashboard (total, en attente, en cours, résolus validés, nouveaux 7j/30j). |
+| Lister tous les tickets | `GET /api/auth/admin/tickets` | Liste (optionnel : filtre par `status`). |
+| Voir les messages d’un ticket | `GET /api/auth/tickets/{ticketId}/messages` | Même route que le client. |
+| Répondre dans un ticket | `POST /api/auth/tickets/{ticketId}/messages` | Même route que le client (multipart : `message`, `pieceJointe`). |
+| Changer le statut (ex. Résolu) | `PATCH /api/auth/admin/tickets/{ticketId}/status` | Body : `{ "status": "RESOLU" }`. |
+| Supprimer un ticket | `DELETE /api/auth/admin/tickets/{ticketId}` | Suppression définitive (ticket + messages + pièces jointes). |
+
+#### 7.0. Rapport / statistiques (dashboard support)
+
+**Endpoint**
+
+- `GET /api/auth/admin/rapport`
+
+**Réponse (JSON)**
+
+```json
+{
+  "totalTickets": 42,
+  "enAttente": 5,
+  "enCours": 8,
+  "contestes": 3,
+  "resolusEnAttenteValidation": 12,
+  "resolusValides": 17,
+  "nouveauxCetteSemaine": 6,
+  "nouveauxCeMois": 22
+}
+```
+
+- `totalTickets` : nombre total de tickets non supprimés.
+- `enAttente` : statut EN_ATTENTE.
+- `enCours` : statut EN_COURS.
+- `contestes` : statut CONTESTE (tickets où le client n’est pas d’accord).
+- `resolusEnAttenteValidation` : statut RESOLU, client n’a pas encore validé.
+- `resolusValides` : statut RESOLU et client a validé.
+- `nouveauxCetteSemaine` / `nouveauxCeMois` : tickets créés sur les 7 ou 30 derniers jours.
+
+Le front peut utiliser ces données pour des cartes ou graphiques sur la page dashboard support.
+
+#### 7.1. Rapport historique (par jour)
+
+**Endpoint**
+
+- `GET /api/auth/admin/rapport/historique?periode=SEMAINE|MOIS`
+
+**Paramètres**
+
+- `periode` (query param, optionnel) :
+  - `SEMAINE` (par défaut) : les 7 derniers jours.
+  - `MOIS` : les 30 derniers jours.
+
+**Réponse (JSON)**
+
+Tableau de lignes agrégées **par jour** :
+
+```json
+[
+  { "date": "2026-03-01", "nouveaux": 3, "enCours": 5, "resolus": 2, "contestes": 1 },
+  { "date": "2026-03-02", "nouveaux": 1, "enCours": 4, "resolus": 3, "contestes": 0 }
+]
+```
+
+- `date` : jour au format `YYYY-MM-DD`.
+- `nouveaux` : nombre de tickets créés ce jour-là.
+- `enCours` : nombre de tickets passés en `EN_COURS` ce jour-là.
+- `resolus` : nombre de tickets résolus (statut `RESOLU`) ce jour-là.
+- `contestes` : nombre de tickets passés en `CONTESTE` ce jour-là (client non satisfait).
+
+Le frontend peut utiliser ce tableau pour tracer un **graphique en courbe** ou **barres empilées** sur le temps.
+
+#### 7.2. Lister les tickets à traiter
 
 **Endpoint**
 
@@ -225,7 +301,7 @@ Exemple body (optionnel) :
 
 Liste de `AssistanceTicketDTO` (comme pour l'utilisateur, mais pour tous les tickets de l'entreprise support).
 
-#### 7.2. Changer le statut d'un ticket
+#### 7.3. Changer le statut d'un ticket
 
 **Endpoint**
 
@@ -239,7 +315,7 @@ Liste de `AssistanceTicketDTO` (comme pour l'utilisateur, mais pour tous les tic
 
 Statuts possibles : `EN_ATTENTE`, `EN_COURS`, `RESOLU`.
 
-#### 7.3. Supprimer (archiver) un ticket
+#### 7.4. Supprimer un ticket
 
 **Endpoint**
 
@@ -247,17 +323,33 @@ Statuts possibles : `EN_ATTENTE`, `EN_COURS`, `RESOLU`.
 
 **Effets côté backend**
 
-- Met `deleted = true` sur le ticket (ne remonte plus dans les listes par défaut).
-- Supprime physiquement toutes les pièces jointes associées à ce ticket dans `supportUpload`.
+- Suppression **définitive** du ticket et de tous ses messages en base (CASCADE).
+- Suppression physique des pièces jointes associées dans `supportUpload`.
 
 ---
 
-### 8. Upload des pièces jointes – Rappel
+### 8. Validation / refus côté client
+
+Sur un ticket en statut `RESOLU`, le client a deux actions possibles :
+
+- **Valider** (le problème est bien résolu) :
+  - Endpoint : `PATCH /api/auth/tickets/{ticketId}/valider`
+  - Effet : `valideParClient = true`, le ticket devient **fermement clôturé**.
+  - Toute nouvelle tentative de message renvoie une erreur métier.
+
+- **Refuser** (il n’est pas satisfait, clic sur **Non**) :
+  - Endpoint : `PATCH /api/auth/tickets/{ticketId}/refuser`
+  - Effet : le statut passe à `CONTESTE`, `valideParClient = false`.
+  - Le support voit clairement que le ticket est **contesté** et peut reprendre en main le dossier (une réponse du support remettra le ticket en `EN_COURS`).
+
+---
+
+### 9. Upload des pièces jointes – Rappel
 
 Pas de route d'upload séparée : l'upload est intégré dans les mêmes requêtes que :
 
-- **Création de ticket** (`POST /api/assistance/tickets`, multipart/form-data).
-- **Ajout d'un message** (`POST /api/assistance/tickets/{ticketId}/messages`, multipart/form-data).
+- **Création de ticket** (`POST /api/auth/tickets`, multipart/form-data).
+- **Ajout d'un message** (`POST /api/auth/tickets/{ticketId}/messages`, multipart/form-data).
 
 Le backend :
 
@@ -266,7 +358,7 @@ Le backend :
 
 ---
 
-### 9. Mapping UI ↔ API (comme l'image fournie)
+### 10. Mapping UI ↔ API (comme l'image fournie)
 
 Pour chaque carte de ticket dans l'écran Assistance :
 
@@ -282,7 +374,7 @@ Pour chaque carte de ticket dans l'écran Assistance :
 
 Pour la vue détail (chat) :
 
-- Utiliser `/api/assistance/tickets/{ticketId}/messages`.
+- Utiliser `/api/auth/tickets/{ticketId}/messages`.
 - Bulle alignée à droite + couleur support si `support = true`.
 - Bulle alignée à gauche + couleur classique sinon.
 - Si `pieceJointePath` non nul, afficher l'image ou un lien sous le message.
