@@ -47,6 +47,9 @@ public class ClientService {
     private ClientRepository clientRepository;
 
     @Autowired
+    private com.xpertcash.repository.UsersRepository usersRepository;
+
+    @Autowired
     private EntrepriseClientRepository entrepriseClientRepository;
 
     @Autowired
@@ -443,6 +446,22 @@ public class ClientService {
 
         if (!isAdminOrManager && !hasPermissionGestionClient) {
             throw new RuntimeException("Accès refusé : vous n'avez pas les permissions pour supprimer un client.");
+        }
+
+        // Empêcher la suppression si ce client correspond aussi à un employé de l'entreprise
+        boolean hasLinkedEmployee = false;
+        if (client.getEmail() != null && !client.getEmail().isBlank()) {
+            hasLinkedEmployee = usersRepository
+                    .findByEmailAndEntrepriseId(client.getEmail(), entreprise.getId())
+                    .isPresent();
+        }
+        if (!hasLinkedEmployee && client.getTelephone() != null && !client.getTelephone().isBlank()) {
+            hasLinkedEmployee = usersRepository
+                    .findByPhoneAndEntrepriseId(client.getTelephone(), entreprise.getId())
+                    .isPresent();
+        }
+        if (hasLinkedEmployee) {
+            throw new RuntimeException("Impossible de supprimer ce client car il est aussi un employé de l'entreprise. Supprimez d'abord l'employé.");
         }
 
         boolean hasFactures = factureProformaRepository.existsByClientIdAndEntrepriseId(clientId, entreprise.getId());

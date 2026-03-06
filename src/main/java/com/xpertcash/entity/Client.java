@@ -31,6 +31,14 @@ public class Client {
     private String photo;
     private LocalDateTime createdAt;
     
+    /**
+     * Indique si ce client provient automatiquement d'un employé (User).
+     * null ou false = client normal créé manuellement.
+     * true = client lié à un employé.
+     */
+    @Column(name = "from_user", nullable = true)
+    private Boolean fromUser;
+    
    @ManyToOne
     @JoinColumn(name = "entreprise_client_id")
    @JsonIgnoreProperties("clientts")
