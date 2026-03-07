@@ -681,45 +681,26 @@ public class TresorerieService {
                 ));
     }
 
+    /**
+     * Détail caisse : aligné sur la comptabilité.
+     * - montantTotal = somme des montants réellement fermés (montantEnMain), pas le théorique des ventes.
+     * - entrees = montantTotal (fermetures) + entrées générales CAISSE (ex. paiements dettes écart) + paiements factures espèces.
+     * On n'ajoute pas les mouvements VENTE/AJOUT des caisses fermées : l'argent réel est déjà dans montantEnMain
+     * (sinon on double-compterait : vente 2 500 alors qu'on a fermé avec 1 500 + paiements dette 1 000 = 2 500).
+     */
     private TresorerieDTO.CaisseDetail calculerCaisse(TresorerieData data) {
         if (data.boutiqueIds.isEmpty()) {
             return creerCaisseDetailVide();
         }
 
         double montantTotalCaisse = calculerMontantTotalCaisses(data.caissesFermees);
-        
-        List<Long> caisseIdsFermees = data.caissesFermees.stream().map(Caisse::getId).collect(Collectors.toList());
-        
-        double entreesMouvementsVente = 0.0;
-        double entreesMouvementsAjout = 0.0;
-        if (!caisseIdsFermees.isEmpty()) {
-            List<MouvementCaisse> mouvementsVente = mouvementCaisseRepository.findByCaisseIdInAndTypeMouvement(
-                caisseIdsFermees, TypeMouvementCaisse.VENTE);
-            //  Inclure ESPECES et MOBILE_MONEY (OrangeMoney) dans la caisse
-            entreesMouvementsVente = mouvementsVente.stream()
-                    .filter(m -> m.getModePaiement() == ModePaiement.ESPECES 
-                            || m.getModePaiement() == ModePaiement.MOBILE_MONEY)
-                    .mapToDouble(m -> getValeurDouble(m.getMontant()))
-                    .sum();
-            
-            List<MouvementCaisse> mouvementsAjout = mouvementCaisseRepository.findByCaisseIdInAndTypeMouvement(
-                caisseIdsFermees, TypeMouvementCaisse.AJOUT);
-            //  Inclure ESPECES et MOBILE_MONEY (OrangeMoney) dans la caisse
-            entreesMouvementsAjout = mouvementsAjout.stream()
-                    .filter(m -> m.getModePaiement() == ModePaiement.ESPECES 
-                            || m.getModePaiement() == ModePaiement.MOBILE_MONEY)
-                    .mapToDouble(m -> getValeurDouble(m.getMontant()))
-                    .sum();
-        }
-        
-        
+
         double entreesPaiementsEspeces = calculerEntreesPaiementsFactures(data, ModePaiement.ESPECES, null);
         double entreesGeneralesCaisse = calculerEntreesGeneralesCaisse(data);
-        
 
-        double entrees = entreesMouvementsVente + entreesMouvementsAjout + entreesPaiementsEspeces 
-                + entreesGeneralesCaisse;
-        
+        // Entrées réelles = montant fermé (montantEnMain) + paiements dettes (ex. écart) + paiements factures espèces
+        double entrees = montantTotalCaisse + entreesGeneralesCaisse + entreesPaiementsEspeces;
+
         double sorties = calculerSortiesCaisse(data);
 
         TresorerieDTO.CaisseDetail detail = new TresorerieDTO.CaisseDetail();
@@ -730,9 +711,15 @@ public class TresorerieService {
         return detail;
     }
 
+    /**
+     * Montant total caisse = somme des montants réellement fermés (montantEnMain).
+     * Aligné sur la comptabilité : une ligne = une fermeture avec montantEnMain.
+     * Les caisses fermées à 0 F sont exclues (comme en comptabilité).
+     */
     private double calculerMontantTotalCaisses(List<Caisse> caisses) {
         return caisses.stream()
-                .mapToDouble(c -> getValeurDouble(c.getMontantCourant()))
+                .filter(c -> c.getMontantEnMain() != null && c.getMontantEnMain() != 0)
+                .mapToDouble(Caisse::getMontantEnMain)
                 .sum();
     }
 
@@ -1045,11 +1032,16 @@ public class TresorerieService {
         return detail;
     }
 
+    /**
+     * Somme des entrées générales qui font entrer de l'argent en caisse :
+     * - ENTREE_DETTE (paiements dettes, ex. écart caisse) et entrées manuelles (detteType null).
+     * Exclut PAIEMENT_FACTURE (déjà dans paiements factures), transferts et tout autre type pour éviter double compte.
+     */
     private double calculerEntreesGeneralesCaisse(TresorerieData data) {
-
         return data.entreesGenerales.stream()
                 .filter(e -> e.getSource() == SourceDepense.CAISSE)
-                .filter(e -> e.getDetteType() == null || !"PAIEMENT_FACTURE".equals(e.getDetteType()))
+                .filter(e -> e.getDetteType() == null || "ENTREE_DETTE".equals(e.getDetteType()))
+                .filter(e -> !estEntreeDeTransfert(e.getDesignation()))
                 .mapToDouble(e -> getValeurDouble(e.getMontant()))
                 .sum();
     }
@@ -1102,28 +1094,24 @@ public class TresorerieService {
     }
 
     /**
-     * Calcule le CA (Chiffre d'Affaires) d'aujourd'hui.
-     * Inclut : ventes d'aujourd'hui + paiements factures d'aujourd'hui + entrées générales d'aujourd'hui
-     * Exclut : les transferts de fonds
+     * Calcule le CA (entrées) d'aujourd'hui, aligné sur la comptabilité.
+     * Inclut : fermetures de caisse aujourd'hui (montantEnMain) + paiements factures + entrées générales.
+     * Une fermeture = une ligne en compta avec montantEnMain (montant réel déposé).
      */
     private double calculerCAAujourdhui(TresorerieData data, Long entrepriseId) {
         double ca = 0.0;
 
-        // Ventes d'aujourd'hui (toutes les ventes, pas seulement celles des caisses fermées)
-        List<Vente> ventesAujourdhui = venteRepository.findAllByEntrepriseId(entrepriseId).stream()
-                .filter(v -> estAujourdhui(v.getDateVente()))
-                .filter(v -> v.getStatus() != VenteStatus.REMBOURSEE)
-                .collect(Collectors.toList());
-
-        for (Vente vente : ventesAujourdhui) {
-            ca += getValeurDouble(vente.getMontantTotal());
+        // Fermetures de caisse aujourd'hui : montant réel (montantEnMain), comme en comptabilité
+        for (Caisse c : data.caissesFermees) {
+            if (estAujourdhui(c.getDateFermeture()) && c.getMontantEnMain() != null && c.getMontantEnMain() != 0) {
+                ca += c.getMontantEnMain();
+            }
         }
 
         // Paiements factures d'aujourd'hui
         List<Paiement> paiementsAujourdhui = paiementRepository.findByEntrepriseId(entrepriseId).stream()
                 .filter(p -> estAujourdhui(p.getDatePaiement()))
                 .collect(Collectors.toList());
-
         for (Paiement paiement : paiementsAujourdhui) {
             ca += getValeurDouble(paiement.getMontant());
         }
@@ -1132,7 +1120,8 @@ public class TresorerieService {
         for (EntreeGenerale entree : data.entreesGenerales) {
             if (estAujourdhui(entree.getDateCreation()) 
                     && !estEntreeDeTransfert(entree.getDesignation())
-                    && (entree.getDetteType() == null || !"PAIEMENT_FACTURE".equals(entree.getDetteType()))) {
+                    && (entree.getDetteType() == null || !"PAIEMENT_FACTURE".equals(entree.getDetteType()))
+                    && (entree.getDetteType() == null || !"ECART_CAISSE".equals(entree.getDetteType()))) {
                 ca += getValeurDouble(entree.getMontant());
             }
         }
@@ -1254,22 +1243,25 @@ public class TresorerieService {
     }
 
     /**
-     * Calcule le CA (Chiffre d'Affaires) pour une période donnée.
-     * Inclut : ventes + paiements factures + entrées générales
-     * Exclut : les transferts de fonds
+     * Calcule le CA (entrées) pour une période, aligné sur la comptabilité.
+     * Inclut : fermetures de caisse dans la période (montantEnMain) + paiements factures + entrées générales.
      */
     private double calculerCAPeriode(TresorerieData data, Long entrepriseId, PeriodeDates periodeDates) {
         double ca = 0.0;
 
-        // Ventes de la période (déjà filtrées dans chargerDonneesAvecPeriode)
-        for (Vente vente : data.toutesVentes) {
-            if (vente.getStatus() != VenteStatus.REMBOURSEE) {
-                ca += getValeurDouble(vente.getMontantTotal());
+        // Fermetures de caisse dans la période : montant réel (montantEnMain)
+        if (periodeDates != null && periodeDates.filtrerParPeriode) {
+            for (Caisse c : data.caissesFermees) {
+                if (c.getDateFermeture() != null && c.getMontantEnMain() != null && c.getMontantEnMain() != 0
+                        && !c.getDateFermeture().isBefore(periodeDates.dateDebut)
+                        && c.getDateFermeture().isBefore(periodeDates.dateFin)) {
+                    ca += c.getMontantEnMain();
+                }
             }
         }
 
         // Paiements factures de la période
-        if (periodeDates.filtrerParPeriode) {
+        if (periodeDates != null && periodeDates.filtrerParPeriode) {
             List<Paiement> paiementsPeriode = paiementRepository.findByEntrepriseIdAndDatePaiementBetween(
                     entrepriseId, periodeDates.dateDebut, periodeDates.dateFin);
             for (Paiement paiement : paiementsPeriode) {
@@ -1277,10 +1269,10 @@ public class TresorerieService {
             }
         }
 
-        // Entrées générales de la période (en excluant les transferts et les paiements de factures)
+        // Entrées générales de la période (en excluant transferts, paiements factures, écarts caisse)
         for (EntreeGenerale entree : data.entreesGenerales) {
             if (!estEntreeDeTransfert(entree.getDesignation())
-                    && (entree.getDetteType() == null || !"PAIEMENT_FACTURE".equals(entree.getDetteType()))) {
+                    && (entree.getDetteType() == null || (!"PAIEMENT_FACTURE".equals(entree.getDetteType()) && !"ECART_CAISSE".equals(entree.getDetteType())))) {
                 ca += getValeurDouble(entree.getMontant());
             }
         }

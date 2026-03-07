@@ -4,7 +4,6 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -56,8 +55,14 @@ public class ClientController {
 
 
     @GetMapping("/clients/{id}")
-    public Optional<Client> getClientById(@PathVariable Long id) {
-        return clientService.getClientById(id);
+    public ResponseEntity<?> getClientById(@PathVariable Long id, HttpServletRequest request) {
+        try {
+            return clientService.getClientById(id, request)
+                    .map(ResponseEntity::ok)
+                    .orElse(ResponseEntity.notFound().build());
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Collections.singletonMap("error", e.getMessage()));
+        }
     }
     
     @GetMapping("/clients/{id}/interactions")

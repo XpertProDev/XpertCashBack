@@ -77,5 +77,27 @@ public interface EntreeGeneraleRepository extends JpaRepository<EntreeGenerale, 
     /** Batch : max dateCreation par entreprise (dernière utilisation métier). Retourne [entrepriseId, maxDate]. */
     @Query("SELECT e.entreprise.id, MAX(e.dateCreation) FROM EntreeGenerale e WHERE e.entreprise.id IN :ids GROUP BY e.entreprise.id")
     List<Object[]> findMaxDateCreationByEntrepriseIdIn(@Param("ids") List<Long> ids);
+
+    /** Trouve les entrées de type dette (ex. ECART_CAISSE) dont detteId est dans la liste (ex. IDs de caisses). */
+    @Query("SELECT e FROM EntreeGenerale e WHERE e.detteType = :detteType AND e.detteId IN :detteIds")
+    List<EntreeGenerale> findByDetteTypeAndDetteIdIn(
+            @Param("detteType") String detteType,
+            @Param("detteIds") List<Long> detteIds);
+
+    /** Somme du montant restant dû (écart caisse) pour un responsable et une entreprise. */
+    @Query(value = "SELECT COALESCE(SUM(e.montant_reste), 0) FROM entree_generale e " +
+           "WHERE e.entreprise_id = :entrepriseId AND e.responsable_id = :responsableId " +
+           "AND e.dette_type = 'ECART_CAISSE' AND e.source = 'DETTE'", nativeQuery = true)
+    Double sumMontantResteEcartCaisseByResponsableAndEntreprise(
+            @Param("responsableId") Long responsableId,
+            @Param("entrepriseId") Long entrepriseId);
+
+    /** Liste des dettes écart caisse (non soldées) pour un responsable et une entreprise, par date décroissante. */
+    @Query("SELECT e FROM EntreeGenerale e WHERE e.entreprise.id = :entrepriseId AND e.responsable.id = :responsableId " +
+           "AND e.detteType = 'ECART_CAISSE' AND e.source = :source ORDER BY e.dateCreation DESC")
+    List<EntreeGenerale> findEcartCaisseByResponsableAndEntreprise(
+            @Param("responsableId") Long responsableId,
+            @Param("entrepriseId") Long entrepriseId,
+            @Param("source") com.xpertcash.entity.Enum.SourceDepense source);
 }
 

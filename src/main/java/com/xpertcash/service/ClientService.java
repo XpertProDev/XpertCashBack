@@ -18,10 +18,13 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.xpertcash.DTOs.ClientDetailResponseDTO;
+import com.xpertcash.DTOs.EcartCaisseItemDTO;
 import com.xpertcash.DTOs.PaginatedResponseDTO;
 import com.xpertcash.configuration.CentralAccess;
 
 import com.xpertcash.entity.Client;
+import com.xpertcash.entity.Enum.SourceDepense;
 import com.xpertcash.DTOs.PROSPECT.InteractionDTO;
 import com.xpertcash.entity.Entreprise;
 import com.xpertcash.entity.EntrepriseClient;
@@ -30,6 +33,7 @@ import com.xpertcash.entity.User;
 import com.xpertcash.entity.PROSPECT.Interaction;
 import com.xpertcash.repository.ClientRepository;
 import com.xpertcash.repository.EntrepriseClientRepository;
+import com.xpertcash.repository.EntreeGeneraleRepository;
 import com.xpertcash.repository.FactureProformaRepository;
 import com.xpertcash.repository.FactureReelleRepository;
 import com.xpertcash.repository.VENTE.VenteRepository;
@@ -69,6 +73,9 @@ public class ClientService {
 
     @Autowired
     private VenteRepository venteRepository;
+
+    @Autowired
+    private EntreeGeneraleRepository entreeGeneraleRepository;
 
 
     public Client saveClient(Client client,  HttpServletRequest request) {
@@ -197,8 +204,66 @@ public class ClientService {
     }
 
 
-    public Optional<Client> getClientById(Long id) {
-        return clientRepository.findById(id);
+    /**
+     * Retourne le détail d'un client par id (appartenance à l'entreprise vérifiée).
+     * Inclut fromUser, hasEcart, montantEcartRestant et la liste des écarts caisse (ecarts) avec les infos nécessaires.
+     */
+    public Optional<ClientDetailResponseDTO> getClientById(Long id, HttpServletRequest request) {
+        User user = authHelper.getAuthenticatedUserWithFallback(request);
+        Entreprise entreprise = user.getEntreprise();
+        if (entreprise == null) {
+            throw new RuntimeException("Aucune entreprise associée à cet utilisateur.");
+        }
+        return clientRepository.findByIdAndEntrepriseId(id, entreprise.getId())
+                .map(client -> {
+                    if (client.getFromUser() == null) {
+                        client.setFromUser(false);
+                    }
+                    List<EcartCaisseItemDTO> ecarts = remplirEcartClient(client, entreprise.getId());
+                    return new ClientDetailResponseDTO(client, ecarts);
+                });
+    }
+
+    /**
+     * Remplit hasEcart, nombreEcarts et montantEcartRestant sur le client (paiements déjà pris en compte via montant_reste)
+     * et retourne la liste des dettes écart caisse.
+     */
+    private List<EcartCaisseItemDTO> remplirEcartClient(Client client, Long entrepriseId) {
+        client.setHasEcart(false);
+        client.setNombreEcarts(0);
+        client.setMontantEcartRestant(0.0);
+        List<EcartCaisseItemDTO> ecarts = new ArrayList<>();
+        Optional<User> linkedUser = Optional.empty();
+        if (client.getEmail() != null && !client.getEmail().isBlank()) {
+            linkedUser = usersRepository.findByEmailAndEntrepriseId(client.getEmail().trim(), entrepriseId);
+        }
+        if (linkedUser.isEmpty() && client.getTelephone() != null && !client.getTelephone().isBlank()) {
+            linkedUser = usersRepository.findByPhoneAndEntrepriseId(client.getTelephone().trim(), entrepriseId);
+        }
+        if (linkedUser.isPresent()) {
+            List<com.xpertcash.entity.EntreeGenerale> entreesEcart = entreeGeneraleRepository.findEcartCaisseByResponsableAndEntreprise(
+                    linkedUser.get().getId(), entrepriseId, SourceDepense.DETTE);
+            for (com.xpertcash.entity.EntreeGenerale e : entreesEcart) {
+                EcartCaisseItemDTO item = new EcartCaisseItemDTO();
+                item.setId(e.getId());
+                item.setNumero(e.getNumero());
+                item.setDesignation(e.getDesignation());
+                item.setDateCreation(e.getDateCreation());
+                item.setMontant(e.getMontant() != null ? e.getMontant() : 0.0);
+                item.setMontantReste(e.getMontantReste() != null ? e.getMontantReste() : 0.0);
+                item.setCaisseId(e.getDetteId());
+                item.setDetteNumero(e.getDetteNumero());
+                ecarts.add(item);
+            }
+            Double restant = entreeGeneraleRepository.sumMontantResteEcartCaisseByResponsableAndEntreprise(
+                    linkedUser.get().getId(), entrepriseId);
+            client.setNombreEcarts(ecarts.size());
+            if (restant != null && restant > 1e-6) {
+                client.setHasEcart(true);
+                client.setMontantEcartRestant(Math.round(restant * 100.0) / 100.0);
+            }
+        }
+        return ecarts;
     }
     
     public List<Interaction> getClientInteractions(Long id) {

@@ -49,6 +49,15 @@ public class Client {
     @JoinColumn(name = "entreprise_id")
     @JsonIgnoreProperties({"facturesProforma", "identifiantEntreprise", "utilisateurs", "adresse", "boutiques", "createdAt", "logo", "admin"})
     private Entreprise entreprise;
-    
+
+    /** Présence d'écart caisse à son compte (rempli côté service pour le détail client). Non persisté. */
+    @Transient
+    private Boolean hasEcart;
+    /** Nombre d'écarts caisse non soldés (rempli côté service). Non persisté. */
+    @Transient
+    private Integer nombreEcarts;
+    /** Montant restant à régler au titre des écarts caisse, après prise en compte des paiements (rempli côté service). Non persisté. */
+    @Transient
+    private Double montantEcartRestant;
 
 }

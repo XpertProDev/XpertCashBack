@@ -223,16 +223,20 @@ public interface VenteRepository extends JpaRepository<Vente, Long> {
             @Param("dateDebut") LocalDateTime dateDebut,
             @Param("dateFin") LocalDateTime dateFin);
 
+    // montant_ouverte = somme des ventes dans caisses OUVERTES ; montant_fermee = somme des montant_en_main des caisses FERMEES (montant réel à la fermeture)
     @Query(value = "SELECT " +
-           "COALESCE(SUM(CASE WHEN c.statut = 'OUVERTE' THEN (v.montant_total - COALESCE(v.montant_total_rembourse, 0)) ELSE 0 END), 0) as montant_ouverte, " +
-           "COALESCE(SUM(CASE WHEN c.statut = 'FERMEE' THEN (v.montant_total - COALESCE(v.montant_total_rembourse, 0)) ELSE 0 END), 0) as montant_fermee " +
-           "FROM vente v " +
-           "INNER JOIN boutique b ON v.boutique_id = b.id " +
-           "INNER JOIN caisse c ON v.caisse_id = c.id " +
-           "WHERE b.entreprise_id = :entrepriseId " +
-           "AND v.date_vente >= :dateDebut AND v.date_vente < :dateFin " +
-           "AND (:vendeurId IS NULL OR v.vendeur_id = :vendeurId) " +
-           "AND (:boutiqueId IS NULL OR v.boutique_id = :boutiqueId)", nativeQuery = true)
+           "(SELECT COALESCE(SUM(v.montant_total - COALESCE(v.montant_total_rembourse, 0)), 0) " +
+           " FROM vente v INNER JOIN caisse c ON v.caisse_id = c.id INNER JOIN boutique b ON v.boutique_id = b.id " +
+           " WHERE b.entreprise_id = :entrepriseId AND c.statut = 'OUVERTE' " +
+           " AND v.date_vente >= :dateDebut AND v.date_vente < :dateFin " +
+           " AND (:vendeurId IS NULL OR v.vendeur_id = :vendeurId) AND (:boutiqueId IS NULL OR v.boutique_id = :boutiqueId)) AS montant_ouverte, " +
+           "(SELECT COALESCE(SUM(c.montant_en_main), 0) " +
+           " FROM caisse c INNER JOIN boutique b ON c.boutique_id = b.id " +
+           " WHERE b.entreprise_id = :entrepriseId AND c.statut = 'FERMEE' " +
+           " AND c.date_fermeture >= :dateDebut AND c.date_fermeture < :dateFin " +
+           " AND c.montant_en_main IS NOT NULL AND c.montant_en_main != 0 " +
+           " AND (:vendeurId IS NULL OR c.vendeur_id = :vendeurId) AND (:boutiqueId IS NULL OR c.boutique_id = :boutiqueId)) AS montant_fermee",
+            nativeQuery = true)
     List<Object[]> sumMontantParStatutCaisseByEntrepriseIdAndPeriodeAndFilters(
             @Param("entrepriseId") Long entrepriseId,
             @Param("dateDebut") LocalDateTime dateDebut,
@@ -259,17 +263,19 @@ public interface VenteRepository extends JpaRepository<Vente, Long> {
             @Param("dateDebut") LocalDateTime dateDebut,
             @Param("dateFin") LocalDateTime dateFin);
 
-    // Montants des ventes d'un vendeur par statut de caisse (OUVERTE et FERMEE), net des remboursements
+    // montant_ouverte = somme des ventes en caisses OUVERTES ; montant_fermee = somme des montant_en_main des caisses FERMEES par ce vendeur
     // Retourne: [0] = montantCaisseOuverte, [1] = montantCaisseFermee
     @Query(value = "SELECT " +
-           "COALESCE(SUM(CASE WHEN c.statut = 'OUVERTE' THEN (v.montant_total - COALESCE(v.montant_total_rembourse, 0)) ELSE 0 END), 0) as montant_ouverte, " +
-           "COALESCE(SUM(CASE WHEN c.statut = 'FERMEE' THEN (v.montant_total - COALESCE(v.montant_total_rembourse, 0)) ELSE 0 END), 0) as montant_fermee " +
-           "FROM vente v " +
-           "INNER JOIN boutique b ON v.boutique_id = b.id " +
-           "INNER JOIN caisse c ON v.caisse_id = c.id " +
-           "WHERE b.entreprise_id = :entrepriseId " +
-           "AND v.vendeur_id = :vendeurId " +
-           "AND v.date_vente >= :dateDebut AND v.date_vente < :dateFin", nativeQuery = true)
+           "(SELECT COALESCE(SUM(v.montant_total - COALESCE(v.montant_total_rembourse, 0)), 0) " +
+           " FROM vente v INNER JOIN caisse c ON v.caisse_id = c.id INNER JOIN boutique b ON v.boutique_id = b.id " +
+           " WHERE b.entreprise_id = :entrepriseId AND c.statut = 'OUVERTE' AND v.vendeur_id = :vendeurId " +
+           " AND v.date_vente >= :dateDebut AND v.date_vente < :dateFin) AS montant_ouverte, " +
+           "(SELECT COALESCE(SUM(c.montant_en_main), 0) " +
+           " FROM caisse c INNER JOIN boutique b ON c.boutique_id = b.id " +
+           " WHERE b.entreprise_id = :entrepriseId AND c.statut = 'FERMEE' AND c.vendeur_id = :vendeurId " +
+           " AND c.date_fermeture >= :dateDebut AND c.date_fermeture < :dateFin " +
+           " AND c.montant_en_main IS NOT NULL AND c.montant_en_main != 0) AS montant_fermee",
+            nativeQuery = true)
     List<Object[]> sumMontantParStatutCaisseByVendeurAndPeriode(
             @Param("entrepriseId") Long entrepriseId,
             @Param("vendeurId") Long vendeurId,

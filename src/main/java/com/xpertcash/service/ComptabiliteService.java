@@ -247,9 +247,10 @@ public class ComptabiliteService {
         entree.setCreePar(user);
         entree.setResponsable(user);
         
-        //  Lier l'entrée à la dette payée
+        //  Lier l'entrée à la dette payée et mémoriser le type (évite une requête en lecture)
         entree.setDetteId(vente.getId());
         entree.setDetteType("VENTE_CREDIT");
+        entree.setDetteTypeOrigine("VENTE_CREDIT");
         Long venteEntrepriseId = vente.getBoutique() != null && vente.getBoutique().getEntreprise() != null 
                 ? vente.getBoutique().getEntreprise().getId() : null;
         if (venteEntrepriseId != null) {
@@ -350,6 +351,16 @@ public class ComptabiliteService {
                 (entreeDette.getDesignation() != null ? entreeDette.getDesignation() : "Encaissement dette")
                         + " (paiement)");
         encaissement.setCategorie(entreeDette.getCategorie());
+        // Si paiement d'une dette écart caisse et pas de catégorie sur la dette, attribuer la catégorie "Écart caisse"
+        if ("ECART_CAISSE".equals(entreeDette.getDetteType()) && encaissement.getCategorie() == null) {
+            Categorie catEcart = categorieRepository.findByNomAndEntrepriseId("Écart caisse", user.getEntreprise().getId());
+            if (catEcart == null) {
+                catEcart = categorieRepository.findByNomAndEntrepriseId("Ecart caisse", user.getEntreprise().getId());
+            }
+            if (catEcart != null) {
+                encaissement.setCategorie(catEcart);
+            }
+        }
         encaissement.setPrixUnitaire(montantPaiement);
         encaissement.setQuantite(1);
         encaissement.setMontant(montantPaiement);
@@ -361,10 +372,11 @@ public class ComptabiliteService {
         encaissement.setCreePar(user);
         encaissement.setResponsable(entreeDette.getResponsable() != null ? entreeDette.getResponsable() : user);
         
-        //  Lier l'entrée à la dette payée
+        //  Lier l'entrée à la dette payée et mémoriser le type de dette (évite une requête en lecture)
         encaissement.setDetteId(entreeDette.getId());
         encaissement.setDetteType("ENTREE_DETTE");
         encaissement.setDetteNumero(entreeDette.getNumero());
+        encaissement.setDetteTypeOrigine(entreeDette.getDetteType());
         
         entreeGeneraleRepository.save(encaissement);
 
@@ -2118,7 +2130,8 @@ public class ComptabiliteService {
     }
 
     /**
-     * Mappe une EntreeGenerale vers EntreeGeneraleResponseDTO
+     * Mappe une EntreeGenerale vers EntreeGeneraleResponseDTO.
+     * Utilise detteTypeOrigine (renseigné à l'enregistrement du paiement) pour afficher categorieNom sans requête supplémentaire.
      */
     private EntreeGeneraleResponseDTO mapEntreeGeneraleToResponse(EntreeGenerale entree) {
         EntreeGeneraleResponseDTO dto = new EntreeGeneraleResponseDTO();
@@ -2129,6 +2142,8 @@ public class ComptabiliteService {
             dto.setCategorieId(entree.getCategorie().getId());
             dto.setCategorieNom(entree.getCategorie().getNom());
             dto.setCategorieDescription(entree.getCategorie().getDescription());
+        } else if ("ENTREE_DETTE".equals(entree.getDetteType()) && "ECART_CAISSE".equals(entree.getDetteTypeOrigine())) {
+            dto.setCategorieNom("Écart caisse");
         }
         dto.setPrixUnitaire(entree.getPrixUnitaire());
         dto.setQuantite(entree.getQuantite());
@@ -2153,8 +2168,14 @@ public class ComptabiliteService {
         }
         dto.setDateCreation(entree.getDateCreation());
         if (entree.getSource() == SourceDepense.DETTE) {
-            dto.setTypeTransaction("DETTE");
-            dto.setOrigine("COMPTABILITE");
+            if ("ECART_CAISSE".equals(entree.getDetteType())) {
+                dto.setTypeTransaction("DETTE");
+                dto.setOrigine("Écart caisse");
+                dto.setCategorieNom("Écart caisse");
+            } else {
+                dto.setTypeTransaction("DETTE");
+                dto.setOrigine("COMPTABILITE");
+            }
         } else {
             dto.setTypeTransaction("ENTREE");
             if (entree.getDetteId() != null && entree.getDetteType() != null) {
@@ -2165,6 +2186,8 @@ public class ComptabiliteService {
                     dto.setOrigine(nomBoutique != null ? nomBoutique : "PAIEMENT_DETTE");
                 } else if ("ENTREE_DETTE".equals(entree.getDetteType())) {
                     dto.setOrigine("PAIEMENT_DETTE");
+                } else if ("ECART_CAISSE".equals(entree.getDetteType())) {
+                    dto.setOrigine("Écart caisse");
                 } else {
                     dto.setOrigine("COMPTABILITE");
                 }
@@ -2329,17 +2352,31 @@ public class ComptabiliteService {
         }
         Map<Long, EntreeGeneraleResponseDTO> entreesMap = new HashMap<>();
         if (!entreeIds.isEmpty()) {
-            for (EntreeGenerale e : entreeGeneraleRepository.findByIdInWithDetails(entreeIds))
+            for (EntreeGenerale e : entreeGeneraleRepository.findByIdInWithDetails(entreeIds)) {
                 entreesMap.put(e.getId(), mapEntreeGeneraleToResponse(e));
+            }
         }
         Map<Long, FermetureCaisseResponseDTO> fermeturesMap = new HashMap<>();
         if (!fermetureIds.isEmpty()) {
             List<Caisse> caisses = caisseRepository.findAllById(fermetureIds);
             List<Vente> ventesCaisses = venteRepository.findByCaisse_IdIn(fermetureIds);
             Map<Long, List<Vente>> ventesParCaisse = ventesCaisses.stream().filter(v -> v.getCaisse() != null).collect(Collectors.groupingBy(v -> v.getCaisse().getId()));
+            // Caisse IDs ayant un écart non nul → vérifier si la dette écart a été soldée
+            List<Long> caisseIdsAvecEcart = caisses.stream()
+                    .filter(c -> c.getEcart() != null && Math.abs(c.getEcart()) > 1e-6)
+                    .map(Caisse::getId)
+                    .collect(Collectors.toList());
+            Set<Long> caisseIdsEcartSoldée = new HashSet<>();
+            if (!caisseIdsAvecEcart.isEmpty()) {
+                List<EntreeGenerale> dettesEcart = entreeGeneraleRepository.findByDetteTypeAndDetteIdIn("ECART_CAISSE", caisseIdsAvecEcart);
+                for (EntreeGenerale e : dettesEcart) {
+                    if (e.getDetteId() != null && (e.getMontantReste() == null || e.getMontantReste() <= 1e-6 || e.getSource() != SourceDepense.DETTE))
+                        caisseIdsEcartSoldée.add(e.getDetteId());
+                }
+            }
             for (Caisse c : caisses) {
                 List<Vente> ventes = ventesParCaisse.getOrDefault(c.getId(), Collections.emptyList());
-                fermeturesMap.put(c.getId(), mapCaisseFermeeToResponse(c, ventes, entrepriseId));
+                fermeturesMap.put(c.getId(), mapCaisseFermeeToResponse(c, ventes, entrepriseId, caisseIdsEcartSoldée));
             }
         }
         Map<Long, PaiementDTO> paiementsMap = new HashMap<>();
@@ -2501,9 +2538,10 @@ public class ComptabiliteService {
     }
 
     /**
-     * Mappe une caisse fermée avec ses ventes vers FermetureCaisseResponseDTO
+     * Mappe une caisse fermée avec ses ventes vers FermetureCaisseResponseDTO.
+     * caisseIdsEcartSoldée IDs des caisses dont la dette d'écart a été entièrement payée (peut être null).
      */
-    private FermetureCaisseResponseDTO mapCaisseFermeeToResponse(Caisse caisse, List<Vente> ventes, Long entrepriseId) {
+    private FermetureCaisseResponseDTO mapCaisseFermeeToResponse(Caisse caisse, List<Vente> ventes, Long entrepriseId, Set<Long> caisseIdsEcartSoldée) {
         FermetureCaisseResponseDTO dto = new FermetureCaisseResponseDTO();
         
         dto.setCaisseId(caisse.getId());
@@ -2513,6 +2551,13 @@ public class ComptabiliteService {
         dto.setMontantCourant(caisse.getMontantCourant());
         dto.setMontantEnMain(caisse.getMontantEnMain());
         dto.setEcart(caisse.getEcart());
+        
+        // Indicateur "Dette soldée" : true si écart non nul et dette écart entièrement payée, null si pas d'écart
+        if (caisse.getEcart() != null && Math.abs(caisse.getEcart()) > 1e-6) {
+            dto.setEcartSoldée(caisseIdsEcartSoldée != null && caisseIdsEcartSoldée.contains(caisse.getId()));
+        } else {
+            dto.setEcartSoldée(null);
+        }
         
         String numeroFermeture = genererNumeroFermeture(entrepriseId, caisse.getDateFermeture());
         dto.setNumeroFermeture(numeroFermeture);

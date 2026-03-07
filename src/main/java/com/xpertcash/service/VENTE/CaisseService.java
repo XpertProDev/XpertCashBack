@@ -1,6 +1,7 @@
 package com.xpertcash.service.VENTE;
 
 import com.xpertcash.entity.*;
+import com.xpertcash.entity.Enum.SourceDepense;
 import com.xpertcash.repository.*;
 import com.xpertcash.repository.VENTE.CaisseRepository;
 import com.xpertcash.repository.VENTE.MouvementCaisseRepository;
@@ -57,6 +58,9 @@ public class CaisseService {
     private VersementComptableRepository versementComptableRepository;
     @Autowired
     private VenteRepository venteRepository;
+    @Autowired
+    private EntreeGeneraleRepository entreeGeneraleRepository;
+   
 
         private User getUserFromRequest(HttpServletRequest request) {
         String token = request.getHeader("Authorization");
@@ -167,6 +171,30 @@ public FermerCaisseResponseDTO fermerCaisse(FermerCaisseRequest request, HttpSer
     versement.setStatut(StatutVersement.EN_ATTENTE);
     versement.setCreePar(user);
     versementComptableRepository.save(versement);
+
+    // Si écart non nul : enregistrer comme dette du vendeur (employé = client, on lui met à son compte)
+    if (ecart != null && Math.abs(ecart) > 1e-6) {
+        double montantEcart = Math.abs(ecart);
+        EntreeGenerale entreeEcart = new EntreeGenerale();
+        entreeEcart.setDesignation("Écart caisse - " + caisse.getVendeur().getNomComplet()
+                + " - " + (caisse.getBoutique() != null ? caisse.getBoutique().getNomBoutique() : "")
+                + " - " + (caisse.getDateFermeture() != null ? caisse.getDateFermeture().toLocalDate() : ""));
+        entreeEcart.setPrixUnitaire(montantEcart);
+        entreeEcart.setQuantite(1);
+        entreeEcart.setMontant(montantEcart);
+        entreeEcart.setMontantReste(montantEcart);
+        entreeEcart.setSource(SourceDepense.DETTE);
+        entreeEcart.setEntreprise(caisse.getBoutique().getEntreprise());
+        entreeEcart.setCreePar(user);
+        entreeEcart.setResponsable(caisse.getVendeur());
+        entreeEcart.setDateCreation(LocalDateTime.now());
+        entreeEcart.setDetteId(caisse.getId());
+        entreeEcart.setDetteType("ECART_CAISSE");
+        String numeroEcart = "ECART-" + caisse.getId();
+        entreeEcart.setNumero(numeroEcart);
+        entreeEcart.setDetteNumero(numeroEcart);
+        entreeGeneraleRepository.save(entreeEcart);
+    }
 
     FermerCaisseResponseDTO response = new FermerCaisseResponseDTO();
     response.setId(caisse.getId());
