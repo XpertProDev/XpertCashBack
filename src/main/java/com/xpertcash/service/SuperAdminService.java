@@ -19,6 +19,7 @@ import java.util.stream.Collectors;
 import com.xpertcash.DTOs.SuperAdminDashboardStatsDTO;
 import com.xpertcash.DTOs.SuperAdminEntrepriseListDTO;
 import com.xpertcash.DTOs.SuperAdminEntrepriseStatsDTO;
+import com.xpertcash.DTOs.SuperAdminUserSummaryDTO;
 import com.xpertcash.entity.Entreprise;
 import com.xpertcash.entity.Enum.RoleType;
 import com.xpertcash.entity.VENTE.StatutCaisse;
@@ -456,6 +457,22 @@ public class SuperAdminService {
 
         dto.setNombreCaissesOuvertes(nombreCaissesOuvertes);
         dto.setNombreVentes(nombreVentes);
+
+        List<User> users = usersRepository.findByEntrepriseId(id);
+        List<SuperAdminUserSummaryDTO> utilisateurs = users.stream()
+                .map(u -> {
+                    SuperAdminUserSummaryDTO sum = new SuperAdminUserSummaryDTO();
+                    sum.setId(u.getId());
+                    sum.setUuid(u.getUuid());
+                    sum.setNomComplet(u.getNomComplet());
+                    sum.setRoleName(u.getRole() != null ? u.getRole().getName().name() : null);
+                    sum.setLocked(u.isLocked());
+                    sum.setLockedByQuota(u.isLockedByQuota());
+                    sum.setLastActivity(u.getLastActivity());
+                    return sum;
+                })
+                .collect(Collectors.toList());
+        dto.setUtilisateurs(utilisateurs);
 
         return dto;
     }
