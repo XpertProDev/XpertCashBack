@@ -8,6 +8,13 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 @Entity
+@Table(indexes = {
+        @Index(name = "idx_fournisseur_entreprise_id", columnList = "entreprise_id"),
+        @Index(name = "idx_fournisseur_nom_complet", columnList = "nomComplet"),
+        @Index(name = "idx_fournisseur_nom_societe", columnList = "nomSociete"),
+        @Index(name = "idx_fournisseur_email", columnList = "email"),
+        @Index(name = "idx_fournisseur_telephone", columnList = "telephone")
+})
 @Data 
 @AllArgsConstructor
 @NoArgsConstructor

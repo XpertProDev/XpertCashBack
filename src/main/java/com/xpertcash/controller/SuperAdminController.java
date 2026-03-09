@@ -148,6 +148,60 @@ public class SuperAdminController {
         }
     }
 
+        /**
+         * Migration collective : pour une entreprise donnée,
+         * crée automatiquement des clients pour tous les employés
+         * qui n'existent pas encore dans la table client.
+         */
+        @PostMapping("/entreprises/{entrepriseId}/sync-users-to-clients")
+        public ResponseEntity<?> syncUsersToClientsForEntreprise(
+                @PathVariable Long entrepriseId,
+                HttpServletRequest request) {
+            try {
+                User user = authHelper.getAuthenticatedUserWithFallback(request);
+                int created = superAdminService.syncEmployeesToClientsForEntreprise(user, entrepriseId);
+                return ResponseEntity.ok(Map.of(
+                        "message", "Synchronisation terminée.",
+                        "clientsCrees", created
+                ));
+            } catch (RuntimeException e) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                        .body(Map.of("error", e.getMessage()));
+            } catch (Exception e) {
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                        .body(Map.of("error", "Erreur interne : " + e.getMessage()));
+            }
+        }
+
+        /**
+         * Migration collective globale : pour TOUTES les entreprises (ayant des employés),
+         * crée des clients pour les employés qui n'en ont pas encore.
+         * Réservé au SUPER_ADMIN.
+         */
+        @PostMapping("/superadmin/sync-all-users-to-clients")
+        public ResponseEntity<?> syncAllUsersToClients(HttpServletRequest request) {
+            try {
+                User user = authHelper.getAuthenticatedUserWithFallback(request);
+                var createdByEntreprise = superAdminService.syncEmployeesToClientsForAllEntreprises(user);
+
+                int totalCreated = createdByEntreprise.values().stream()
+                        .mapToInt(Integer::intValue)
+                        .sum();
+
+                return ResponseEntity.ok(Map.of(
+                        "message", "Synchronisation globale terminée.",
+                        "totalClientsCrees", totalCreated,
+                        "detailParEntreprise", createdByEntreprise
+                ));
+            } catch (RuntimeException e) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                        .body(Map.of("error", e.getMessage()));
+            } catch (Exception e) {
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                        .body(Map.of("error", "Erreur interne : " + e.getMessage()));
+            }
+        }
+
     /** Augmenter le quota d'utilisateurs d'une entreprise (réservé au SUPER_ADMIN). Body JSON: { "maxUtilisateurs": 5 } */
     @PatchMapping("/entreprises/{entrepriseId}/max-utilisateurs")
     public ResponseEntity<?> setMaxUtilisateurs(

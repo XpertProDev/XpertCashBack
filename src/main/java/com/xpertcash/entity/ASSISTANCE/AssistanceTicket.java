@@ -59,6 +59,10 @@ public class AssistanceTicket {
     @Column(name = "deleted", nullable = false)
     private boolean deleted = false;
 
+    /** Indique si le client a confirmé que la solution du support règle bien son problème. */
+    @Column(name = "valide_par_client", nullable = false)
+    private boolean valideParClient = false;
+
     @OneToMany(mappedBy = "ticket", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<AssistanceMessage> messages = new ArrayList<>();
 
@@ -136,6 +140,14 @@ public class AssistanceTicket {
 
     public void setDeleted(boolean deleted) {
         this.deleted = deleted;
+    }
+
+    public boolean isValideParClient() {
+        return valideParClient;
+    }
+
+    public void setValideParClient(boolean valideParClient) {
+        this.valideParClient = valideParClient;
     }
 
     public List<AssistanceMessage> getMessages() {

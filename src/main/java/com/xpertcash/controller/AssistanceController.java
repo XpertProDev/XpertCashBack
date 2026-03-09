@@ -21,6 +21,7 @@ import com.xpertcash.DTOs.AssistanceMessageDTO;
 import com.xpertcash.DTOs.AssistanceTicketDTO;
 import com.xpertcash.entity.ASSISTANCE.AssistanceStatus;
 import com.xpertcash.entity.User;
+import com.xpertcash.exceptions.BusinessException;
 import com.xpertcash.service.AssistanceService;
 import com.xpertcash.service.AuthenticationHelper;
 
@@ -38,16 +39,21 @@ public class AssistanceController {
 
     @PostMapping(path = "/tickets", consumes = {"multipart/form-data"})
     public ResponseEntity<?> creerTicket(
+            @RequestParam("objet") String objet,
             @RequestParam("message") String message,
             @RequestParam(name = "pieceJointe", required = false) MultipartFile pieceJointe,
             HttpServletRequest request) {
         try {
             User user = authHelper.getAuthenticatedUserWithFallback(request);
+            if (objet == null || objet.isBlank()) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                        .body(Map.of("error", "Le champ 'objet' est requis."));
+            }
             if (message == null || message.isBlank()) {
                 return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                         .body(Map.of("error", "Le champ 'message' est requis."));
             }
-            AssistanceTicketDTO dto = assistanceService.createTicket(user, message, pieceJointe);
+            AssistanceTicketDTO dto = assistanceService.createTicket(user, objet, message, pieceJointe);
             return ResponseEntity.status(HttpStatus.CREATED).body(dto);
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
@@ -95,6 +101,35 @@ public class AssistanceController {
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(Map.of("error", "Erreur lors de l'ajout du message : " + e.getMessage()));
+        }
+    }
+
+    /** Rapport / statistiques pour le dashboard support (cartes, graphiques). */
+    @GetMapping("/admin/rapport")
+    public ResponseEntity<?> rapportSupport(HttpServletRequest request) {
+        try {
+            User user = authHelper.getAuthenticatedUserWithFallback(request);
+            return ResponseEntity.ok(assistanceService.getSupportRapport(user));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("error", "Accès réservé au support."));
+        }
+    }
+
+    /** Rapport historique pour le dashboard support (jour par jour sur SEMAINE ou MOIS). */
+    @GetMapping("/admin/rapport/historique")
+    public ResponseEntity<?> rapportSupportHistorique(
+            @RequestParam(name = "periode", defaultValue = "SEMAINE") String periode,
+            HttpServletRequest request) {
+        try {
+            User user = authHelper.getAuthenticatedUserWithFallback(request);
+            return ResponseEntity.ok(assistanceService.getSupportRapportHistorique(user, periode));
+        } catch (BusinessException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("error", "Accès réservé au support."));
         }
     }
 
@@ -150,6 +185,32 @@ public class AssistanceController {
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(Map.of("error", "Erreur lors de la suppression du ticket : " + e.getMessage()));
+        }
+    }
+
+    /** Validation finale d'un ticket par le client (confirme que la solution est OK). */
+    @PatchMapping("/tickets/{ticketId}/valider")
+    public ResponseEntity<?> validerTicketParClient(@PathVariable Long ticketId, HttpServletRequest request) {
+        try {
+            User user = authHelper.getAuthenticatedUserWithFallback(request);
+            AssistanceTicketDTO dto = assistanceService.validerResolutionParClient(user, ticketId);
+            return ResponseEntity.ok(dto);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("error", "Erreur lors de la validation du ticket : " + e.getMessage()));
+        }
+    }
+
+    /** Refus explicite d'un ticket résolu par le client (clic sur \"Non\"). */
+    @PatchMapping("/tickets/{ticketId}/refuser")
+    public ResponseEntity<?> refuserTicketParClient(@PathVariable Long ticketId, HttpServletRequest request) {
+        try {
+            User user = authHelper.getAuthenticatedUserWithFallback(request);
+            AssistanceTicketDTO dto = assistanceService.refuserResolutionParClient(user, ticketId);
+            return ResponseEntity.ok(dto);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("error", "Erreur lors du refus du ticket : " + e.getMessage()));
         }
     }
 }

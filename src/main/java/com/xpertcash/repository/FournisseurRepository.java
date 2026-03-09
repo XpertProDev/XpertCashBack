@@ -2,6 +2,8 @@ package com.xpertcash.repository;
 import java.util.List;
 import java.util.Optional;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -15,11 +17,38 @@ public interface FournisseurRepository extends JpaRepository<Fournisseur, Long>{
 
     // Méthodes isolées par entreprise (optimisées avec JOIN FETCH)
     
-    // Récupérer tous les fournisseurs d'une entreprise
+    // Récupérer tous les fournisseurs d'une entreprise (liste complète, sans pagination)
     @Query("SELECT DISTINCT f FROM Fournisseur f " +
            "LEFT JOIN FETCH f.entreprise e " +
            "WHERE e.id = :entrepriseId")
     List<Fournisseur> findByEntrepriseId(@Param("entrepriseId") Long entrepriseId);
+
+    // Pagination simple par entreprise (sans FETCH pour laisser JPA gérer la page)
+    Page<Fournisseur> findByEntreprise_Id(Long entrepriseId, Pageable pageable);
+
+    // Pagination + recherche (nom, société, email, téléphone) pour une entreprise
+    @Query(
+        value = "SELECT f FROM Fournisseur f " +
+                "JOIN f.entreprise e " +
+                "WHERE e.id = :entrepriseId AND (" +
+                "LOWER(COALESCE(f.nomComplet, '')) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
+                "LOWER(COALESCE(f.nomSociete, '')) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
+                "LOWER(COALESCE(f.email, '')) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
+                "COALESCE(f.telephone, '') LIKE CONCAT('%', :search, '%')" +
+                ")",
+        countQuery = "SELECT COUNT(f) FROM Fournisseur f " +
+                     "JOIN f.entreprise e " +
+                     "WHERE e.id = :entrepriseId AND (" +
+                     "LOWER(COALESCE(f.nomComplet, '')) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
+                     "LOWER(COALESCE(f.nomSociete, '')) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
+                     "LOWER(COALESCE(f.email, '')) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
+                     "COALESCE(f.telephone, '') LIKE CONCAT('%', :search, '%')" +
+                     ")"
+    )
+    Page<Fournisseur> findByEntrepriseIdWithSearch(
+            @Param("entrepriseId") Long entrepriseId,
+            @Param("search") String search,
+            Pageable pageable);
 
     // Recherche par ID et entreprise (pour isolation)
     @Query("SELECT DISTINCT f FROM Fournisseur f " +

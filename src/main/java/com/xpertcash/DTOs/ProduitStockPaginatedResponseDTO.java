@@ -23,6 +23,7 @@ public class ProduitStockPaginatedResponseDTO {
     private long totalProduitsActifs;
     private long totalProduitsEnStock;
     private long totalProduitsHorsStock;
+    
 
     public static ProduitStockPaginatedResponseDTO fromPage(Page<ProduitDTO> page, long totalProduitsActifs, long totalProduitsEnStock, long totalProduitsHorsStock) {
         return new ProduitStockPaginatedResponseDTO(

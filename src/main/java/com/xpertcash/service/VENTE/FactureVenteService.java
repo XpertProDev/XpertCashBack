@@ -509,15 +509,20 @@ public StatistiquesVenteGlobalesDTO getStatistiquesGlobales(String periode, Long
     List<Object[]> statsGlobalesList = venteRepository.getStatistiquesGlobalesByEntrepriseIdAndPeriodeAndFilters(
             entrepriseId, dateDebut, dateFin, vendeurId, boutiqueId);
     Long totalVentes = 0L;
-    Double montantTotal = 0.0;
+    Long totalRembourse = 0L;
+    Double montantTotalBrut = 0.0;
+    Double montantTotalNet = 0.0;
     if (statsGlobalesList != null && !statsGlobalesList.isEmpty()) {
         Object[] row = statsGlobalesList.get(0);
         totalVentes = row[0] != null ? ((Number) row[0]).longValue() : 0L;
-        montantTotal = row[1] != null ? ((Number) row[1]).doubleValue() : 0.0;
+        montantTotalBrut = row[1] != null ? ((Number) row[1]).doubleValue() : 0.0;
+        montantTotalNet = row.length > 2 && row[2] != null ? ((Number) row[2]).doubleValue() : 0.0;
+        totalRembourse = row.length > 3 && row[3] != null ? ((Number) row[3]).longValue() : 0L;
     }
     
     Long nombreArticles = venteProduitRepository.countTotalArticlesVendusByEntrepriseIdAndPeriodeAndFilters(
             entrepriseId, dateDebut, dateFin, vendeurId, boutiqueId);
+    long nombreArticlesSafe = Math.max(0L, nombreArticles != null ? nombreArticles : 0L);
 
     List<Object[]> produitsData = venteProduitRepository.findAllProduitsVendusByEntrepriseIdAndPeriodeAndFilters(
             entrepriseId, dateDebut, dateFin, vendeurId, boutiqueId);
@@ -526,8 +531,10 @@ public StatistiquesVenteGlobalesDTO getStatistiquesGlobales(String periode, Long
                 TopProduitVenduDTO dto = new TopProduitVenduDTO();
                 dto.setProduitId(((Number) row[0]).longValue());
                 dto.setNomProduit((String) row[1]);
-                dto.setTotalQuantite(((Number) row[2]).longValue());
-                dto.setTotalMontant(row[3] != null ? ((Number) row[3]).doubleValue() : 0.0);
+                long q = ((Number) row[2]).longValue();
+                double m = row[3] != null ? ((Number) row[3]).doubleValue() : 0.0;
+                dto.setTotalQuantite(Math.max(0L, q));
+                dto.setTotalMontant(Math.max(0.0, m));
                 return dto;
             })
             .collect(Collectors.toList());
@@ -557,8 +564,10 @@ public StatistiquesVenteGlobalesDTO getStatistiquesGlobales(String periode, Long
 
     StatistiquesVenteGlobalesDTO statistiques = new StatistiquesVenteGlobalesDTO();
     statistiques.setTotalVentes(totalVentes);
-    statistiques.setNombreArticles(nombreArticles != null ? nombreArticles : 0L);
-    statistiques.setMontantTotal(Math.round(montantTotal * 100.0) / 100.0);
+    statistiques.setTotalRembourse(totalRembourse);
+    statistiques.setNombreArticles(nombreArticlesSafe);
+    statistiques.setMontantTotalBrut(Math.round(montantTotalBrut * 100.0) / 100.0);
+    statistiques.setMontantTotal(Math.round(montantTotalNet * 100.0) / 100.0);
     statistiques.setMontantCaisseOuverte(montantCaisseOuverte != null ? Math.round(montantCaisseOuverte * 100.0) / 100.0 : 0.0);
     statistiques.setMontantCaisseFermee(montantCaisseFermee != null ? Math.round(montantCaisseFermee * 100.0) / 100.0 : 0.0);
     statistiques.setProduitsVendus(produitsVendus);
@@ -639,17 +648,22 @@ public StatistiquesVenteGlobalesDTO getStatistiquesGlobales(String periode, Long
         LocalDateTime dateFin = periodeDates.dateFin;
         
         Long totalVentes = 0L;
-        Double montantTotal = 0.0;
+        Long totalRembourse = 0L;
+        Double montantTotalBrut = 0.0;
+        Double montantTotalNet = 0.0;
         List<Object[]> statsVendeurList = venteRepository.getStatistiquesVendeurByEntrepriseIdAndPeriode(
                 entrepriseId, vendeurId, dateDebut, dateFin);
         if (statsVendeurList != null && !statsVendeurList.isEmpty()) {
             Object[] row = statsVendeurList.get(0);
             totalVentes = row[0] != null ? ((Number) row[0]).longValue() : 0L;
-            montantTotal = row[1] != null ? ((Number) row[1]).doubleValue() : 0.0;
+            montantTotalBrut = row[1] != null ? ((Number) row[1]).doubleValue() : 0.0;
+            montantTotalNet = row.length > 2 && row[2] != null ? ((Number) row[2]).doubleValue() : 0.0;
+            totalRembourse = row.length > 3 && row[3] != null ? ((Number) row[3]).longValue() : 0L;
         }
         
         Long nombreArticles = venteProduitRepository.countTotalArticlesVendusByVendeurAndPeriode(
                 entrepriseId, vendeurId, dateDebut, dateFin);
+        long nombreArticlesSafe = Math.max(0L, nombreArticles != null ? nombreArticles : 0L);
 
         List<Object[]> montantsCaisse = venteRepository.sumMontantParStatutCaisseByVendeurAndPeriode(
                 entrepriseId, vendeurId, dateDebut, dateFin);
@@ -668,8 +682,10 @@ public StatistiquesVenteGlobalesDTO getStatistiquesGlobales(String periode, Long
                     TopProduitVenduDTO dto = new TopProduitVenduDTO();
                     dto.setProduitId(((Number) row[0]).longValue());
                     dto.setNomProduit((String) row[1]);
-                    dto.setTotalQuantite(((Number) row[2]).longValue());
-                    dto.setTotalMontant(row[3] != null ? ((Number) row[3]).doubleValue() : 0.0);
+                    long q = ((Number) row[2]).longValue();
+                    double m = row[3] != null ? ((Number) row[3]).doubleValue() : 0.0;
+                    dto.setTotalQuantite(Math.max(0L, q));
+                    dto.setTotalMontant(Math.max(0.0, m));
                     return dto;
                 })
                 .collect(Collectors.toList());
@@ -681,8 +697,10 @@ public StatistiquesVenteGlobalesDTO getStatistiquesGlobales(String periode, Long
         statistiques.setEmailVendeur(vendeur.getEmail());
         statistiques.setTelephoneVendeur(vendeur.getPhone());
         statistiques.setTotalVentes(totalVentes);
-        statistiques.setNombreArticles(nombreArticles != null ? nombreArticles : 0L);
-        statistiques.setMontantTotal(Math.round(montantTotal * 100.0) / 100.0);
+        statistiques.setTotalRembourse(totalRembourse);
+        statistiques.setNombreArticles(nombreArticlesSafe);
+        statistiques.setMontantTotalBrut(Math.round(montantTotalBrut * 100.0) / 100.0);
+        statistiques.setMontantTotal(Math.round(montantTotalNet * 100.0) / 100.0);
         statistiques.setMontantCaisseOuverte(montantCaisseOuverte != null ? Math.round(montantCaisseOuverte * 100.0) / 100.0 : 0.0);
         statistiques.setMontantCaisseFermee(montantCaisseFermee != null ? Math.round(montantCaisseFermee * 100.0) / 100.0 : 0.0);
         statistiques.setProduitsVendus(produitsVendus);

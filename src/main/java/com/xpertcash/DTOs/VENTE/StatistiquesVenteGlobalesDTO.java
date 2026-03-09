@@ -9,21 +9,15 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class StatistiquesVenteGlobalesDTO {
-    // Statistiques globales
-    private Long totalVentes;           // Nombre total de ventes
-    private Long nombreArticles;        // Nombre total d'articles vendus
-    private Double montantTotal;        // Montant total des ventes
+    private Long totalVentes;
+    private Long totalRembourse;
+    private Long nombreArticles;
+    private Double montantTotalBrut;
+    private Double montantTotal;
     
-    // Montants par statut de caisse
-    private Double montantCaisseOuverte;   // Montant des ventes dans les caisses ouvertes
-    private Double montantCaisseFermee;    // Montant des ventes dans les caisses fermées
-    
-    // Tous les produits vendus (triés par quantité décroissante - les 3 premiers sont le "top 3")
+    private Double montantCaisseOuverte;
+    private Double montantCaisseFermee;
     private List<TopProduitVenduDTO> produitsVendus;
-    
-    // Tous les vendeurs (triés par montant décroissant - les 3 premiers sont le "top 3")
     private List<TopVendeurDTO> vendeurs;
-    
-    // Période appliquée
     private String periode;
 }

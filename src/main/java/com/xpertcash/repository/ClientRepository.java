@@ -16,6 +16,14 @@ import com.xpertcash.entity.Client;
 public interface ClientRepository extends JpaRepository<Client, Long>{
     List<Client> findByEntrepriseClientId(Long entrepriseClientId);
 
+    /** Client par id uniquement si il appartient à l'entreprise (sécurité multi-tenant). */
+    @Query("SELECT c FROM Client c " +
+           "LEFT JOIN FETCH c.entreprise e " +
+           "LEFT JOIN FETCH c.entrepriseClient ec " +
+           "LEFT JOIN FETCH ec.entreprise ece " +
+           "WHERE c.id = :id AND (e.id = :entrepriseId OR (ec IS NOT NULL AND ece.id = :entrepriseId))")
+    Optional<Client> findByIdAndEntrepriseId(@Param("id") Long id, @Param("entrepriseId") Long entrepriseId);
+
     // Recherche par email avec filtre par entreprise (optimisé avec JOIN)
     @Query("SELECT c FROM Client c " +
            "LEFT JOIN c.entreprise e " +

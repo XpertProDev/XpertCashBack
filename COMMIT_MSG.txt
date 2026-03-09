@@ -1,0 +1,20 @@
+feat(compta,caisse,client,trésorerie): fromUser, écart caisse, dettes et calculs
+
+Client & fromUser
+- Création auto d'un client (fromUser=true) à l'ajout d'un employé
+- Sync employés → clients (SuperAdmin), mise à jour fromUser sur existants
+- Sync client lié (nom, email, téléphone, photo) à la modification employé
+- Suppression: client employé non supprimable côté client; suppression employé → tentative suppression client lié
+- GET /clients/{id}: sécurité entreprise, fromUser, hasEcart, nombreEcarts, montantEcartRestant, liste ecarts (EcartCaisseItemDTO)
+
+Caisse & écart
+- Fermeture avec écart → EntreeGenerale DETTE ECART_CAISSE (dette vendeur)
+- Paiement dette écart: categorieNom + detteTypeOrigine, backfill V1_26
+- Comptabilité: une ligne fermeture (montantEnMain), fermetures 0 F exclues, ecartSoldée sur DTO
+- dette_type_origine sur paiement (V1_25 idempotent), pas de 2e requête en pagination
+
+Trésorerie & statistiques
+- montantCaisse / caisseDetail.entrees = montantEnMain + entrées CAISSE (ENTREE_DETTE ou null), pas de double compte ventes
+- montantCaisseFermee (stats) = somme montant_en_main caisses fermées
+
+Migrations: V1_25 dette_type_origine, V1_26 backfill

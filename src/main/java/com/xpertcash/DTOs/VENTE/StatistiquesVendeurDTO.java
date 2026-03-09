@@ -17,7 +17,11 @@ public class StatistiquesVendeurDTO {
     
     // Statistiques de vente
     private Long totalVentes;
+    private Long totalRembourse;         // Nombre de ventes remboursées (au moins partiellement)
     private Long nombreArticles;
+    /** Montant brut (avant remboursements). */
+    private Double montantTotalBrut;
+    /** Montant net (après remboursements). */
     private Double montantTotal;
     
     // Montants par statut de caisse

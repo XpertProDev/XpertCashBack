@@ -230,6 +230,102 @@ public class SuperAdminService {
         }
     }
 
+    /**
+     * Pour une entreprise donnée, crée un Client pour chaque employé (User)
+     * qui n'est pas encore présent dans la table client de cette entreprise.
+     * Correspond à la mise à jour collective que le SUPER_ADMIN peut lancer.
+     *
+     * @return nombre de clients créés
+     */
+    @Transactional
+    public int syncEmployeesToClientsForEntreprise(User superAdmin, Long entrepriseId) {
+        ensureSuperAdmin(superAdmin);
+
+        Entreprise entreprise = entrepriseService.getEntrepriseById(entrepriseId);
+        if (entreprise == null) {
+            throw new RuntimeException("Entreprise introuvable.");
+        }
+
+        // Tous les utilisateurs de cette entreprise
+        java.util.List<User> users = usersRepository.findByEntrepriseId(entrepriseId);
+        int createdCount = 0;
+
+        for (User u : users) {
+            // Ignorer les SUPER_ADMIN éventuels ou utilisateurs sans email/téléphone
+            if (u.getRole() != null && u.getRole().getName() == RoleType.SUPER_ADMIN) {
+                continue;
+            }
+            if ((u.getEmail() == null || u.getEmail().isBlank()) &&
+                (u.getPhone() == null || u.getPhone().isBlank())) {
+                continue;
+            }
+
+            java.util.Optional<Client> existingOpt = java.util.Optional.empty();
+            if (u.getEmail() != null && !u.getEmail().isBlank()) {
+                existingOpt = clientRepository.findByEmailAndEntrepriseId(u.getEmail(), entrepriseId);
+            }
+            if (existingOpt.isEmpty() && u.getPhone() != null && !u.getPhone().isBlank()) {
+                existingOpt = clientRepository.findByTelephoneAndEntrepriseId(u.getPhone(), entrepriseId);
+            }
+
+            if (existingOpt.isPresent()) {
+                // Client déjà créé (ex. par un ancien sync) : mettre à jour fromUser et les infos
+                Client existingClient = existingOpt.get();
+                existingClient.setFromUser(true);
+                existingClient.setNomComplet(u.getNomComplet());
+                existingClient.setEmail(u.getEmail());
+                existingClient.setTelephone(u.getPhone());
+                existingClient.setPays(u.getPays());
+                clientRepository.save(existingClient);
+                continue;
+            }
+
+            Client client = new Client();
+            client.setNomComplet(u.getNomComplet());
+            client.setEmail(u.getEmail());
+            client.setTelephone(u.getPhone());
+            client.setPays(u.getPays());
+            client.setFromUser(true);
+            client.setEntreprise(entreprise);
+            client.setCreatedAt(LocalDateTime.now());
+
+            clientRepository.save(client);
+            createdCount++;
+        }
+
+        return createdCount;
+    }
+
+    /**
+     * Migration collective sur TOUTES les entreprises (hors entreprise technique SUPER_ADMIN) :
+     * pour chaque entreprise, crée des clients pour les employés qui n'en ont pas encore.
+     *
+     * @return nombre total de clients créés, et le détail par entreprise
+     */
+    @Transactional
+    public Map<Long, Integer> syncEmployeesToClientsForAllEntreprises(User superAdmin) {
+        ensureSuperAdmin(superAdmin);
+
+        List<Entreprise> entreprises = entrepriseRepository.findAllWithRelations();
+        Map<Long, Integer> createdByEntreprise = new HashMap<>();
+
+        for (Entreprise e : entreprises) {
+            // Ignorer l'éventuelle entreprise technique du SUPER_ADMIN
+            if (e.getAdmin() != null &&
+                e.getAdmin().getRole() != null &&
+                e.getAdmin().getRole().getName() == RoleType.SUPER_ADMIN) {
+                continue;
+            }
+
+            int created = syncEmployeesToClientsForEntreprise(superAdmin, e.getId());
+            if (created > 0) {
+                createdByEntreprise.put(e.getId(), created);
+            }
+        }
+
+        return createdByEntreprise;
+    }
+
     
     public Page<SuperAdminEntrepriseListDTO> getAllEntreprisesAsSuperAdmin(User superAdmin, int page, int size) {
         ensureSuperAdmin(superAdmin);

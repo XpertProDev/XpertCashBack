@@ -84,6 +84,10 @@ public class EntreeGenerale {
     @Column(name = "dette_numero")
     private String detteNumero;
 
+    /** Type de la dette payée (ex. ECART_CAISSE, VENTE_CREDIT). Renseigné sur les entrées de paiement pour éviter de recharger la dette en lecture. */
+    @Column(name = "dette_type_origine", length = 50)
+    private String detteTypeOrigine;
+
     @PrePersist
     protected void onCreate() {
         if (dateCreation == null) {

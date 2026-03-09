@@ -28,5 +28,6 @@ public class FermetureCaisseResponseDTO {
     private List<VenteResponse> ventes; // Liste des ventes (lignes de détails)
     private String typeTransaction;
     private String origine; // Nom de la boutique
+    private Boolean ecartSoldée;
 }
 

@@ -166,6 +166,12 @@ public class UsersService {
     private InitialPasswordTokenRepository initialPasswordTokenRepository;
 
     @Autowired
+    private ClientService clientService;
+
+    @Autowired
+    private com.xpertcash.repository.ClientRepository clientRepository;
+
+    @Autowired
     public UsersService(UsersRepository usersRepository, JwtConfig jwtConfig, BCryptPasswordEncoder passwordEncoder) {
         this.usersRepository = usersRepository;
         this.jwtConfig = jwtConfig;
@@ -852,6 +858,19 @@ public class UsersService {
 
                 User savedUser = usersRepository.save(newUser);
 
+                // Créer automatiquement un client correspondant à cet utilisateur dans l'entreprise
+                try {
+                    Client client = new Client();
+                    client.setNomComplet(savedUser.getNomComplet());
+                    client.setEmail(savedUser.getEmail());
+                    client.setTelephone(savedUser.getPhone());
+                    client.setPays(savedUser.getPays());
+                    client.setFromUser(true);
+                    clientService.saveClient(client, request);
+                } catch (RuntimeException e) {
+                    System.err.println("Impossible de créer le client pour l'utilisateur " + savedUser.getEmail() + " : " + e.getMessage());
+                }
+
                 String initialPasswordTokenValue = UUID.randomUUID().toString();
                 InitialPasswordToken initialPasswordToken = 
                     new InitialPasswordToken();
@@ -1234,6 +1253,34 @@ public class UsersService {
 
     initialPasswordTokenRepository.deleteByUser(userToDelete);
 
+    // Supprimer également le client correspondant (même email/téléphone) si possible
+    try {
+        Long entrepriseId = admin.getEntreprise().getId();
+        com.xpertcash.entity.Client linkedClient = null;
+
+        if (userToDelete.getEmail() != null && !userToDelete.getEmail().isBlank()) {
+            linkedClient = clientRepository
+                    .findByEmailAndEntrepriseId(userToDelete.getEmail(), entrepriseId)
+                    .orElse(null);
+        }
+        if (linkedClient == null && userToDelete.getPhone() != null && !userToDelete.getPhone().isBlank()) {
+            linkedClient = clientRepository
+                    .findByTelephoneAndEntrepriseId(userToDelete.getPhone(), entrepriseId)
+                    .orElse(null);
+        }
+
+        if (linkedClient != null) {
+            try {
+                // Utilise la même logique métier que la suppression manuelle d'un client
+                clientService.deleteClientIfNoOrdersOrInvoices(linkedClient.getId(), request);
+            } catch (RuntimeException e) {
+                System.err.println("Impossible de supprimer le client lié à l'utilisateur " + userToDelete.getEmail() + " : " + e.getMessage());
+            }
+        }
+    } catch (Exception e) {
+        System.err.println("Erreur lors de la tentative de suppression du client lié : " + e.getMessage());
+    }
+
     usersRepository.delete(userToDelete);
 }
 
@@ -1243,6 +1290,9 @@ public class UsersService {
     public User updateUser(Long userId, UpdateUserRequest request, MultipartFile imageUserFile, Boolean deletePhoto) {
     User user = usersRepository.findById(userId)
             .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
+
+    String oldEmail = user.getEmail();
+    String oldPhone = user.getPhone();
 
     boolean isSensitiveChange =
             (request.getNewPassword() != null && !request.getNewPassword().isEmpty()) ||
@@ -1325,6 +1375,53 @@ public class UsersService {
         }
     }
     usersRepository.save(user);
+
+    // Synchroniser les informations du client lié (si existe) avec celles de l'utilisateur
+    try {
+        Entreprise entreprise = user.getEntreprise();
+        if (entreprise != null) {
+            Long entrepriseId = entreprise.getId();
+            com.xpertcash.entity.Client linkedClient = null;
+
+            if (oldEmail != null && !oldEmail.isBlank()) {
+                linkedClient = clientRepository
+                        .findByEmailAndEntrepriseId(oldEmail, entrepriseId)
+                        .orElse(null);
+            }
+            if (linkedClient == null && oldPhone != null && !oldPhone.isBlank()) {
+                linkedClient = clientRepository
+                        .findByTelephoneAndEntrepriseId(oldPhone, entrepriseId)
+                        .orElse(null);
+            }
+            // Si aucune entrée avec les anciennes infos, tenter avec les nouvelles
+            if (linkedClient == null) {
+                if (user.getEmail() != null && !user.getEmail().isBlank()) {
+                    linkedClient = clientRepository
+                            .findByEmailAndEntrepriseId(user.getEmail(), entrepriseId)
+                            .orElse(null);
+                }
+            }
+            if (linkedClient == null) {
+                if (user.getPhone() != null && !user.getPhone().isBlank()) {
+                    linkedClient = clientRepository
+                            .findByTelephoneAndEntrepriseId(user.getPhone(), entrepriseId)
+                            .orElse(null);
+                }
+            }
+
+            if (linkedClient != null) {
+                linkedClient.setNomComplet(user.getNomComplet());
+                linkedClient.setEmail(user.getEmail());
+                linkedClient.setTelephone(user.getPhone());
+                linkedClient.setPays(user.getPays());
+                linkedClient.setPhoto(user.getPhoto());
+                clientRepository.save(linkedClient);
+            }
+        }
+    } catch (Exception e) {
+        System.err.println("Erreur lors de la synchronisation du client lié à l'utilisateur " + user.getEmail() + " : " + e.getMessage());
+    }
+
     return user;
 }
 
