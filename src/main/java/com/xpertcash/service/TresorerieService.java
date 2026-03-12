@@ -154,44 +154,88 @@ public class TresorerieService {
             
             double entreesGeneralesCaisse = calculerEntreesGeneralesCaisse(data);
             double entreesPaiementsEspeces = calculerEntreesPaiementsFactures(data, ModePaiement.ESPECES, null);
-            
-            double montantCaisseReel = caisseDetail.getMontantTotal() + entreesGeneralesCaisse + entreesPaiementsEspeces - depensesGeneralesCaisse;
-            tresorerie.setMontantCaisse(Math.max(0.0, montantCaisseReel));
+
+            double montantCaisseReel = caisseDetail.getMontantTotal()
+                    + entreesGeneralesCaisse
+                    + entreesPaiementsEspeces
+                    - depensesGeneralesCaisse;
+            double montantCaisseAffiche = Math.max(0.0, montantCaisseReel);
+            montantCaisseAffiche = Math.round(montantCaisseAffiche);
+            tresorerie.setMontantCaisse(montantCaisseAffiche);
 
             TresorerieDTO.BanqueDetail banqueDetail = calculerBanque(data);
+            // Arrondir les montants banque à l'unité
+            if (banqueDetail != null) {
+                if (banqueDetail.getEntrees() != null) {
+                    banqueDetail.setEntrees((double) Math.round(banqueDetail.getEntrees()));
+                }
+                if (banqueDetail.getSorties() != null) {
+                    banqueDetail.setSorties((double) Math.round(banqueDetail.getSorties()));
+                }
+                if (banqueDetail.getSolde() != null) {
+                    banqueDetail.setSolde((double) Math.round(banqueDetail.getSolde()));
+                }
+            }
             tresorerie.setBanqueDetail(banqueDetail);
-            tresorerie.setMontantBanque(banqueDetail.getSolde());
+            tresorerie.setMontantBanque(banqueDetail != null && banqueDetail.getSolde() != null
+                    ? banqueDetail.getSolde() : 0.0);
 
             TresorerieDTO.MobileMoneyDetail mobileMoneyDetail = calculerMobileMoney(data);
+            // Arrondir les montants mobile money à l'unité
+            if (mobileMoneyDetail != null) {
+                if (mobileMoneyDetail.getEntrees() != null) {
+                    mobileMoneyDetail.setEntrees((double) Math.round(mobileMoneyDetail.getEntrees()));
+                }
+                if (mobileMoneyDetail.getSorties() != null) {
+                    mobileMoneyDetail.setSorties((double) Math.round(mobileMoneyDetail.getSorties()));
+                }
+                if (mobileMoneyDetail.getSolde() != null) {
+                    mobileMoneyDetail.setSolde((double) Math.round(mobileMoneyDetail.getSolde()));
+                }
+            }
             tresorerie.setMobileMoneyDetail(mobileMoneyDetail);
-            tresorerie.setMontantMobileMoney(mobileMoneyDetail.getSolde());
+            tresorerie.setMontantMobileMoney(mobileMoneyDetail != null && mobileMoneyDetail.getSolde() != null
+                    ? mobileMoneyDetail.getSolde() : 0.0);
 
             TresorerieDTO.DetteDetail detteDetail = calculerDette(data, entrepriseId);
+            // Arrondir les montants de dette à l'unité
+            if (detteDetail != null) {
+                if (detteDetail.getFacturesImpayees() != null) {
+                    detteDetail.setFacturesImpayees((double) Math.round(detteDetail.getFacturesImpayees()));
+                }
+                if (detteDetail.getDepensesDette() != null) {
+                    detteDetail.setDepensesDette((double) Math.round(detteDetail.getDepensesDette()));
+                }
+                if (detteDetail.getTotal() != null) {
+                    detteDetail.setTotal((double) Math.round(detteDetail.getTotal()));
+                }
+            }
             tresorerie.setDetteDetail(detteDetail);
-            tresorerie.setMontantDette(detteDetail.getTotal());
+            tresorerie.setMontantDette(detteDetail != null && detteDetail.getTotal() != null
+                    ? detteDetail.getTotal() : 0.0);
 
-            tresorerie.setTotalTresorerie(
-                tresorerie.getMontantCaisse() + 
-                tresorerie.getMontantBanque() + 
-                tresorerie.getMontantMobileMoney()
-            );
+            // Total trésorerie arrondi à l'unité
+            double totalTresorerie = tresorerie.getMontantCaisse()
+                    + tresorerie.getMontantBanque()
+                    + tresorerie.getMontantMobileMoney();
+            tresorerie.setTotalTresorerie((double) Math.round(totalTresorerie));
 
         // Calculer le solde et le CA selon la période
         if (periodeDates != null && periodeDates.filtrerParPeriode) {
             double caPeriode = calculerCAPeriode(data, entrepriseId, periodeDates);
             double sortiesPeriode = calculerSortiesPeriode(data, entrepriseId, periodeDates);
             double soldePeriode = caPeriode - sortiesPeriode;
-            
-            tresorerie.setCaAujourdhui(caPeriode);
-            tresorerie.setSoldeAujourdhui(soldePeriode);
+
+            tresorerie.setCaAujourdhui((double) Math.round(caPeriode));
+            tresorerie.setSoldeAujourdhui((double) Math.round(soldePeriode));
         } else {
             // Par défaut, calculer pour aujourd'hui
             double caAujourdhui = calculerCAAujourdhui(data, entrepriseId);
             double sortiesAujourdhui = calculerSortiesAujourdhui(data, entrepriseId);
             double soldeAujourdhui = caAujourdhui - sortiesAujourdhui;
-            
-            tresorerie.setCaAujourdhui(caAujourdhui);
-            tresorerie.setSoldeAujourdhui(soldeAujourdhui);
+
+            tresorerie.setCaAujourdhui((double) Math.round(caAujourdhui));
+            tresorerie.setSoldeAujourdhui((double) Math.round(soldeAujourdhui));
         }
 
             return tresorerie;
@@ -200,15 +244,22 @@ public class TresorerieService {
      /* Récupère la liste paginée des dettes (factures impayées, ventes à crédit, dépenses en DETTE). Pagination côté base (scalable).
         afficher dans Compta front */
     @Transactional(readOnly = true)
-    public PaginatedResponseDTO<DetteItemDTO> getDettesDetaillees(HttpServletRequest request, int page, int size) {
+    public PaginatedResponseDTO<DetteItemDTO> getDettesDetaillees(HttpServletRequest request, int page, int size, String search) {
         Long entrepriseId = validerEntrepriseEtPermissions(request);
         if (page < 0) page = 0;
         if (size <= 0) size = 20;
         if (size > 100) size = 100;
 
-        long totalElements = tresorerieDettesDetailleesRepository.countDettesDetaillees(entrepriseId);
+        String trimmedSearch = (search != null && !search.trim().isEmpty()) ? search.trim() : null;
+
+        long totalElements = (trimmedSearch == null)
+                ? tresorerieDettesDetailleesRepository.countDettesDetaillees(entrepriseId)
+                : tresorerieDettesDetailleesRepository.countDettesDetailleesWithSearch(entrepriseId, trimmedSearch);
+
         int totalPages = size > 0 ? (int) Math.ceil((double) totalElements / size) : 0;
-        List<Object[]> rows = tresorerieDettesDetailleesRepository.findDettesDetailleesPage(entrepriseId, size, page * size);
+        List<Object[]> rows = (trimmedSearch == null)
+                ? tresorerieDettesDetailleesRepository.findDettesDetailleesPage(entrepriseId, size, page * size)
+                : tresorerieDettesDetailleesRepository.findDettesDetailleesPageWithSearch(entrepriseId, trimmedSearch, size, page * size);
 
         java.util.List<Long> factureIds = new java.util.ArrayList<>();
         java.util.List<Long> depenseIds = new java.util.ArrayList<>();
@@ -332,8 +383,13 @@ public class TresorerieService {
             dto.setDescription(entree.getDesignation());
             dto.setNumero(entree.getNumero());
             if (entree.getResponsable() != null) {
-                dto.setResponsable(entree.getResponsable().getNomComplet());
-                dto.setResponsableContact(entree.getResponsable().getPhone());
+                String nom = entree.getResponsable().getNomComplet();
+                String phone = entree.getResponsable().getPhone();
+                dto.setResponsable(nom);
+                dto.setResponsableContact(phone);
+                // Pour les écarts caisse, le responsable est aussi la "personne à qui on doit"
+                dto.setClient(nom);
+                dto.setContact(phone);
         }
         return dto;
     }
@@ -681,26 +737,19 @@ public class TresorerieService {
                 ));
     }
 
-    /**
-     * Détail caisse : aligné sur la comptabilité.
-     * - montantTotal = somme des montants réellement fermés (montantEnMain), pas le théorique des ventes.
-     * - entrees = montantTotal (fermetures) + entrées générales CAISSE (ex. paiements dettes écart) + paiements factures espèces.
-     * On n'ajoute pas les mouvements VENTE/AJOUT des caisses fermées : l'argent réel est déjà dans montantEnMain
-     * (sinon on double-compterait : vente 2 500 alors qu'on a fermé avec 1 500 + paiements dette 1 000 = 2 500).
-     */
     private TresorerieDTO.CaisseDetail calculerCaisse(TresorerieData data) {
         if (data.boutiqueIds.isEmpty()) {
             return creerCaisseDetailVide();
         }
 
+        // Montant total caisse = somme des montants réellement fermés (montantEnMain)
         double montantTotalCaisse = calculerMontantTotalCaisses(data.caissesFermees);
 
+        // Entrées complémentaires : paiements factures espèces + entrées générales CAISSE (hors transferts, hors paiements facture)
         double entreesPaiementsEspeces = calculerEntreesPaiementsFactures(data, ModePaiement.ESPECES, null);
         double entreesGeneralesCaisse = calculerEntreesGeneralesCaisse(data);
 
-        // Entrées réelles = montant fermé (montantEnMain) + paiements dettes (ex. écart) + paiements factures espèces
         double entrees = montantTotalCaisse + entreesGeneralesCaisse + entreesPaiementsEspeces;
-
         double sorties = calculerSortiesCaisse(data);
 
         TresorerieDTO.CaisseDetail detail = new TresorerieDTO.CaisseDetail();
@@ -711,12 +760,8 @@ public class TresorerieService {
         return detail;
     }
 
-    /**
-     * Montant total caisse = somme des montants réellement fermés (montantEnMain).
-     * Aligné sur la comptabilité : une ligne = une fermeture avec montantEnMain.
-     * Les caisses fermées à 0 F sont exclues (comme en comptabilité).
-     */
     private double calculerMontantTotalCaisses(List<Caisse> caisses) {
+        // Somme des montants réellement fermés (montantEnMain), en excluant les fermetures à 0
         return caisses.stream()
                 .filter(c -> c.getMontantEnMain() != null && c.getMontantEnMain() != 0)
                 .mapToDouble(Caisse::getMontantEnMain)
@@ -1032,16 +1077,11 @@ public class TresorerieService {
         return detail;
     }
 
-    /**
-     * Somme des entrées générales qui font entrer de l'argent en caisse :
-     * - ENTREE_DETTE (paiements dettes, ex. écart caisse) et entrées manuelles (detteType null).
-     * Exclut PAIEMENT_FACTURE (déjà dans paiements factures), transferts et tout autre type pour éviter double compte.
-     */
     private double calculerEntreesGeneralesCaisse(TresorerieData data) {
+
         return data.entreesGenerales.stream()
                 .filter(e -> e.getSource() == SourceDepense.CAISSE)
-                .filter(e -> e.getDetteType() == null || "ENTREE_DETTE".equals(e.getDetteType()))
-                .filter(e -> !estEntreeDeTransfert(e.getDesignation()))
+                .filter(e -> e.getDetteType() == null || !"PAIEMENT_FACTURE".equals(e.getDetteType()))
                 .mapToDouble(e -> getValeurDouble(e.getMontant()))
                 .sum();
     }
@@ -1094,21 +1134,23 @@ public class TresorerieService {
     }
 
     /**
-     * Calcule le CA (entrées) d'aujourd'hui, aligné sur la comptabilité.
-     * Inclut : fermetures de caisse aujourd'hui (montantEnMain) + paiements factures + entrées générales.
-     * Une fermeture = une ligne en compta avec montantEnMain (montant réel déposé).
+     * Calcule le CA (Chiffre d'Affaires) d'aujourd'hui.
+     * Inclut : fermetures de caisse d'aujourd'hui (montantEnMain) + paiements factures d'aujourd'hui + entrées générales CAISSE d'aujourd'hui.
+     * Exclut : transferts de fonds, paiements de factures déjà comptés ailleurs et écarts de caisse (ECART_CAISSE).
      */
     private double calculerCAAujourdhui(TresorerieData data, Long entrepriseId) {
         double ca = 0.0;
 
-        // Fermetures de caisse aujourd'hui : montant réel (montantEnMain), comme en comptabilité
+        // Fermetures de caisse d'aujourd'hui : montant réel (montantEnMain)
         for (Caisse c : data.caissesFermees) {
-            if (estAujourdhui(c.getDateFermeture()) && c.getMontantEnMain() != null && c.getMontantEnMain() != 0) {
+            if (estAujourdhui(c.getDateFermeture())
+                    && c.getMontantEnMain() != null
+                    && c.getMontantEnMain() != 0) {
                 ca += c.getMontantEnMain();
             }
         }
 
-        // Paiements factures d'aujourd'hui
+        // Paiements factures d'aujourd'hui (tous modes)
         List<Paiement> paiementsAujourdhui = paiementRepository.findByEntrepriseId(entrepriseId).stream()
                 .filter(p -> estAujourdhui(p.getDatePaiement()))
                 .collect(Collectors.toList());
@@ -1116,12 +1158,12 @@ public class TresorerieService {
             ca += getValeurDouble(paiement.getMontant());
         }
 
-        // Entrées générales d'aujourd'hui (en excluant les transferts et les paiements de factures)
+        // Entrées générales CAISSE d'aujourd'hui (hors transferts, hors paiements facture, hors écarts caisse)
         for (EntreeGenerale entree : data.entreesGenerales) {
-            if (estAujourdhui(entree.getDateCreation()) 
+            if (estAujourdhui(entree.getDateCreation())
+                    && entree.getSource() == SourceDepense.CAISSE
                     && !estEntreeDeTransfert(entree.getDesignation())
-                    && (entree.getDetteType() == null || !"PAIEMENT_FACTURE".equals(entree.getDetteType()))
-                    && (entree.getDetteType() == null || !"ECART_CAISSE".equals(entree.getDetteType()))) {
+                    && (entree.getDetteType() == null || "ENTREE_DETTE".equals(entree.getDetteType()))) {
                 ca += getValeurDouble(entree.getMontant());
             }
         }
@@ -1243,36 +1285,49 @@ public class TresorerieService {
     }
 
     /**
-     * Calcule le CA (entrées) pour une période, aligné sur la comptabilité.
-     * Inclut : fermetures de caisse dans la période (montantEnMain) + paiements factures + entrées générales.
+     * Calcule le CA (Chiffre d'Affaires) pour une période donnée.
+     * Inclut : fermetures de caisse de la période (montantEnMain) + paiements factures de la période + entrées générales CAISSE de la période.
+     * Exclut : transferts de fonds, paiements de factures déjà comptés ailleurs et écarts de caisse (ECART_CAISSE).
      */
     private double calculerCAPeriode(TresorerieData data, Long entrepriseId, PeriodeDates periodeDates) {
         double ca = 0.0;
 
         // Fermetures de caisse dans la période : montant réel (montantEnMain)
-        if (periodeDates != null && periodeDates.filtrerParPeriode) {
-            for (Caisse c : data.caissesFermees) {
-                if (c.getDateFermeture() != null && c.getMontantEnMain() != null && c.getMontantEnMain() != 0
-                        && !c.getDateFermeture().isBefore(periodeDates.dateDebut)
-                        && c.getDateFermeture().isBefore(periodeDates.dateFin)) {
-                    ca += c.getMontantEnMain();
-                }
+        for (Caisse c : data.caissesFermees) {
+            LocalDateTime df = c.getDateFermeture();
+            if (df != null
+                    && (periodeDates == null || !periodeDates.filtrerParPeriode
+                        || (!df.isBefore(periodeDates.dateDebut) && df.isBefore(periodeDates.dateFin)))
+                    && c.getMontantEnMain() != null
+                    && c.getMontantEnMain() != 0) {
+                ca += c.getMontantEnMain();
             }
         }
 
-        // Paiements factures de la période
+        // Paiements factures de la période (tous modes)
         if (periodeDates != null && periodeDates.filtrerParPeriode) {
             List<Paiement> paiementsPeriode = paiementRepository.findByEntrepriseIdAndDatePaiementBetween(
                     entrepriseId, periodeDates.dateDebut, periodeDates.dateFin);
             for (Paiement paiement : paiementsPeriode) {
                 ca += getValeurDouble(paiement.getMontant());
             }
+        } else {
+            // Si pas de filtre explicite, on considère tous les paiements
+            for (Paiement paiement : paiementRepository.findByEntrepriseId(entrepriseId)) {
+                ca += getValeurDouble(paiement.getMontant());
+            }
         }
 
-        // Entrées générales de la période (en excluant transferts, paiements factures, écarts caisse)
+        // Entrées générales CAISSE de la période (hors transferts, hors paiements facture, hors écarts caisse)
         for (EntreeGenerale entree : data.entreesGenerales) {
-            if (!estEntreeDeTransfert(entree.getDesignation())
-                    && (entree.getDetteType() == null || (!"PAIEMENT_FACTURE".equals(entree.getDetteType()) && !"ECART_CAISSE".equals(entree.getDetteType())))) {
+            LocalDateTime dc = entree.getDateCreation();
+            boolean dansPeriode = (periodeDates == null || !periodeDates.filtrerParPeriode
+                    || (dc != null && !dc.isBefore(periodeDates.dateDebut) && dc.isBefore(periodeDates.dateFin)));
+
+            if (dansPeriode
+                    && entree.getSource() == SourceDepense.CAISSE
+                    && !estEntreeDeTransfert(entree.getDesignation())
+                    && (entree.getDetteType() == null || "ENTREE_DETTE".equals(entree.getDetteType()))) {
                 ca += getValeurDouble(entree.getMontant());
             }
         }

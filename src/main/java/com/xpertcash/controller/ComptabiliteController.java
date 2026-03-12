@@ -106,7 +106,7 @@ public class ComptabiliteController {
         return handleRequest(() -> comptabiliteService.listerEntreesGenerales(request));
     }
 
-    /** Comptabilité complète paginée, avec filtre de période (même paramètres que GET /tresorerie). */
+    /** Comptabilité complète paginée, avec filtre de période (même paramètres que GET /tresorerie) et recherche. */
     @GetMapping("/comptabilite/complete")
     public ResponseEntity<?> getComptabiliteComplete(
             @RequestParam(defaultValue = "0") int page,
@@ -114,8 +114,10 @@ public class ComptabiliteController {
             @RequestParam(required = false, defaultValue = "aujourdhui") String periode,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateDebut,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateFin,
+            @RequestParam(required = false) String search,
             HttpServletRequest request) {
-        return handleRequest(() -> comptabiliteService.getComptabiliteCompletePaginated(request, page, size, periode, dateDebut, dateFin));
+        return handleRequest(() -> comptabiliteService.getComptabiliteCompletePaginated(
+                request, page, size, periode, dateDebut, dateFin, search));
     }
     
 

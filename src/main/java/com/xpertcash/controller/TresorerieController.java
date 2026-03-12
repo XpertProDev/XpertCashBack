@@ -32,8 +32,9 @@ public class TresorerieController {
     public ResponseEntity<?> getDettesDetaillees(
             HttpServletRequest request,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size) {
-        return handleRequest(() -> tresorerieService.getDettesDetaillees(request, page, size));
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false) String search) {
+        return handleRequest(() -> tresorerieService.getDettesDetaillees(request, page, size, search));
     }
 
      // Dettes issues uniquement du POS (ventes à crédit).

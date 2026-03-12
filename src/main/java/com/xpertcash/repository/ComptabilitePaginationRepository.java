@@ -110,4 +110,149 @@ public interface ComptabilitePaginationRepository extends Repository<DepenseGene
             @Param("entrepriseId") Long entrepriseId,
             @Param("dateDebut") LocalDateTime dateDebut,
             @Param("dateFin") LocalDateTime dateFin);
+
+    /**
+     * Page de transactions filtrée par recherche (numero, categorieNom, designation) sur les DEPENSES et ENTREES.
+     */
+    @Query(value = """
+        SELECT * FROM (
+            SELECT d.date_creation AS tx_date, 'DEPENSE' AS tx_type, d.id AS entity_id
+            FROM depense_generale d
+            LEFT JOIN categorie_depense cd ON d.categorie_depense_id = cd.id
+            WHERE d.entreprise_id = :entrepriseId
+            AND (d.designation NOT LIKE 'Transfert vers%%' AND d.designation NOT LIKE 'Transfert depuis%%')
+            AND (
+                LOWER(COALESCE(d.numero, '')) LIKE LOWER(CONCAT('%', :search, '%'))
+                OR LOWER(COALESCE(d.designation, '')) LIKE LOWER(CONCAT('%', :search, '%'))
+                OR LOWER(COALESCE(cd.nom, '')) LIKE LOWER(CONCAT('%', :search, '%'))
+            )
+            UNION ALL
+            SELECT e.date_creation, 'ENTREE', e.id
+            FROM entree_generale e
+            LEFT JOIN categorie c ON e.categorie_id = c.id
+            WHERE e.entreprise_id = :entrepriseId
+            AND (e.dette_type IS NULL OR (e.dette_type != 'PAIEMENT_FACTURE' AND e.dette_type != 'ECART_CAISSE'))
+            AND (e.designation NOT LIKE 'Transfert vers%%' AND e.designation NOT LIKE 'Transfert depuis%%')
+            AND (
+                LOWER(COALESCE(e.numero, '')) LIKE LOWER(CONCAT('%', :search, '%'))
+                OR LOWER(COALESCE(e.designation, '')) LIKE LOWER(CONCAT('%', :search, '%'))
+                OR LOWER(COALESCE(c.nom, '')) LIKE LOWER(CONCAT('%', :search, '%'))
+            )
+        ) AS u ORDER BY u.tx_date DESC LIMIT :lim OFFSET :off
+        """, nativeQuery = true)
+    List<Object[]> findTransactionPageWithSearch(
+            @Param("entrepriseId") Long entrepriseId,
+            @Param("search") String search,
+            @Param("lim") int limit,
+            @Param("off") int offset);
+
+    /**
+     * Nombre total de transactions pour la recherche (même périmètre que findTransactionPageWithSearch).
+     */
+    @Query(value = """
+        SELECT COUNT(*) FROM (
+            SELECT 1
+            FROM depense_generale d
+            LEFT JOIN categorie_depense cd ON d.categorie_depense_id = cd.id
+            WHERE d.entreprise_id = :entrepriseId
+            AND (d.designation NOT LIKE 'Transfert vers%%' AND d.designation NOT LIKE 'Transfert depuis%%')
+            AND (
+                LOWER(COALESCE(d.numero, '')) LIKE LOWER(CONCAT('%', :search, '%'))
+                OR LOWER(COALESCE(d.designation, '')) LIKE LOWER(CONCAT('%', :search, '%'))
+                OR LOWER(COALESCE(cd.nom, '')) LIKE LOWER(CONCAT('%', :search, '%'))
+            )
+            UNION ALL
+            SELECT 1
+            FROM entree_generale e
+            LEFT JOIN categorie c ON e.categorie_id = c.id
+            WHERE e.entreprise_id = :entrepriseId
+            AND (e.dette_type IS NULL OR (e.dette_type != 'PAIEMENT_FACTURE' AND e.dette_type != 'ECART_CAISSE'))
+            AND (e.designation NOT LIKE 'Transfert vers%%' AND e.designation NOT LIKE 'Transfert depuis%%')
+            AND (
+                LOWER(COALESCE(e.numero, '')) LIKE LOWER(CONCAT('%', :search, '%'))
+                OR LOWER(COALESCE(e.designation, '')) LIKE LOWER(CONCAT('%', :search, '%'))
+                OR LOWER(COALESCE(c.nom, '')) LIKE LOWER(CONCAT('%', :search, '%'))
+            )
+        ) AS c
+        """, nativeQuery = true)
+    long countTransactionsWithSearch(
+            @Param("entrepriseId") Long entrepriseId,
+            @Param("search") String search);
+
+    /**
+     * Page de transactions filtrée par période ET recherche (numero, categorieNom, designation) sur les DEPENSES et ENTREES.
+     * dateDebut inclus, dateFin exclu.
+     */
+    @Query(value = """
+        SELECT * FROM (
+            SELECT d.date_creation AS tx_date, 'DEPENSE' AS tx_type, d.id AS entity_id
+            FROM depense_generale d
+            LEFT JOIN categorie_depense cd ON d.categorie_depense_id = cd.id
+            WHERE d.entreprise_id = :entrepriseId
+            AND (d.designation NOT LIKE 'Transfert vers%%' AND d.designation NOT LIKE 'Transfert depuis%%')
+            AND d.date_creation >= :dateDebut AND d.date_creation < :dateFin
+            AND (
+                LOWER(COALESCE(d.numero, '')) LIKE LOWER(CONCAT('%', :search, '%'))
+                OR LOWER(COALESCE(d.designation, '')) LIKE LOWER(CONCAT('%', :search, '%'))
+                OR LOWER(COALESCE(cd.nom, '')) LIKE LOWER(CONCAT('%', :search, '%'))
+            )
+            UNION ALL
+            SELECT e.date_creation, 'ENTREE', e.id
+            FROM entree_generale e
+            LEFT JOIN categorie c ON e.categorie_id = c.id
+            WHERE e.entreprise_id = :entrepriseId
+            AND (e.dette_type IS NULL OR (e.dette_type != 'PAIEMENT_FACTURE' AND e.dette_type != 'ECART_CAISSE'))
+            AND (e.designation NOT LIKE 'Transfert vers%%' AND e.designation NOT LIKE 'Transfert depuis%%')
+            AND e.date_creation >= :dateDebut AND e.date_creation < :dateFin
+            AND (
+                LOWER(COALESCE(e.numero, '')) LIKE LOWER(CONCAT('%', :search, '%'))
+                OR LOWER(COALESCE(e.designation, '')) LIKE LOWER(CONCAT('%', :search, '%'))
+                OR LOWER(COALESCE(c.nom, '')) LIKE LOWER(CONCAT('%', :search, '%'))
+            )
+        ) AS u ORDER BY u.tx_date DESC LIMIT :lim OFFSET :off
+        """, nativeQuery = true)
+    List<Object[]> findTransactionPageWithPeriodAndSearch(
+            @Param("entrepriseId") Long entrepriseId,
+            @Param("dateDebut") LocalDateTime dateDebut,
+            @Param("dateFin") LocalDateTime dateFin,
+            @Param("search") String search,
+            @Param("lim") int limit,
+            @Param("off") int offset);
+
+    /**
+     * Nombre total de transactions pour la période ET la recherche (même périmètre que findTransactionPageWithPeriodAndSearch).
+     */
+    @Query(value = """
+        SELECT COUNT(*) FROM (
+            SELECT 1
+            FROM depense_generale d
+            LEFT JOIN categorie_depense cd ON d.categorie_depense_id = cd.id
+            WHERE d.entreprise_id = :entrepriseId
+            AND (d.designation NOT LIKE 'Transfert vers%%' AND d.designation NOT LIKE 'Transfert depuis%%')
+            AND d.date_creation >= :dateDebut AND d.date_creation < :dateFin
+            AND (
+                LOWER(COALESCE(d.numero, '')) LIKE LOWER(CONCAT('%', :search, '%'))
+                OR LOWER(COALESCE(d.designation, '')) LIKE LOWER(CONCAT('%', :search, '%'))
+                OR LOWER(COALESCE(cd.nom, '')) LIKE LOWER(CONCAT('%', :search, '%'))
+            )
+            UNION ALL
+            SELECT 1
+            FROM entree_generale e
+            LEFT JOIN categorie c ON e.categorie_id = c.id
+            WHERE e.entreprise_id = :entrepriseId
+            AND (e.dette_type IS NULL OR (e.dette_type != 'PAIEMENT_FACTURE' AND e.dette_type != 'ECART_CAISSE'))
+            AND (e.designation NOT LIKE 'Transfert vers%%' AND e.designation NOT LIKE 'Transfert depuis%%')
+            AND e.date_creation >= :dateDebut AND e.date_creation < :dateFin
+            AND (
+                LOWER(COALESCE(e.numero, '')) LIKE LOWER(CONCAT('%', :search, '%'))
+                OR LOWER(COALESCE(e.designation, '')) LIKE LOWER(CONCAT('%', :search, '%'))
+                OR LOWER(COALESCE(c.nom, '')) LIKE LOWER(CONCAT('%', :search, '%'))
+            )
+        ) AS c
+        """, nativeQuery = true)
+    long countTransactionsWithPeriodAndSearch(
+            @Param("entrepriseId") Long entrepriseId,
+            @Param("dateDebut") LocalDateTime dateDebut,
+            @Param("dateFin") LocalDateTime dateFin,
+            @Param("search") String search);
 }
