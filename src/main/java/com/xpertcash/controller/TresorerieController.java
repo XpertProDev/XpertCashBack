@@ -5,7 +5,10 @@ import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
 import java.time.LocalDate;
 import java.util.HashMap;
@@ -35,6 +38,39 @@ public class TresorerieController {
             @RequestParam(defaultValue = "20") int size,
             @RequestParam(required = false) String search) {
         return handleRequest(() -> tresorerieService.getDettesDetaillees(request, page, size, search));
+    }
+
+    @GetMapping("/tresorerie/caisse-detail")
+    public ResponseEntity<?> getCaisseDetailParPeriode(
+            HttpServletRequest request,
+            @RequestParam(required = false, defaultValue = "aujourdhui") String periode,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateDebut,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateFin,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return handleRequest(() -> tresorerieService.getCaisseDetailParPeriode(request, periode, dateDebut, dateFin, page, size));
+    }
+
+    @GetMapping("/tresorerie/banque-detail")
+    public ResponseEntity<?> getBanqueDetailParPeriode(
+            HttpServletRequest request,
+            @RequestParam(required = false, defaultValue = "aujourdhui") String periode,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateDebut,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateFin,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return handleRequest(() -> tresorerieService.getBanqueDetailParPeriode(request, periode, dateDebut, dateFin, page, size));
+    }
+
+    @GetMapping("/tresorerie/mobile-detail")
+    public ResponseEntity<?> getMobileDetailParPeriode(
+            HttpServletRequest request,
+            @RequestParam(required = false, defaultValue = "aujourdhui") String periode,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateDebut,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateFin,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return handleRequest(() -> tresorerieService.getMobileDetailParPeriode(request, periode, dateDebut, dateFin, page, size));
     }
 
      // Dettes issues uniquement du POS (ventes à crédit).
