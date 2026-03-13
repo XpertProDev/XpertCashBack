@@ -1,0 +1,60 @@
+### Sauvegarde des bases XpertCashBack (local & prod)
+
+#### 1. Sauvegarde locale (XAMPP, base `xpertCash_db`)
+
+1. Se placer dans le dossier du projet sur le Mac :
+   ```bash
+   cd /Users/mac/Desktop/Tiak3da/XpertCashBack
+   ```
+2. Utiliser le `mysqldump` de XAMPP (user `root`, sans mot de passe) :
+   ```bash
+   /Applications/XAMPP/xamppfiles/bin/mysqldump -h 127.0.0.1 -P 3306 -u root -p xpertCash_db > backup_xpertCash_db.sql
+   ```
+   - Quand `Enter password:` apparaît, appuyer simplement sur Entrée (mot de passe vide).
+   - Le fichier `backup_xpertCash_db.sql` est créé dans le dossier du projet.
+
+3. (Optionnel) Restaurer la sauvegarde locale dans XAMPP :
+   ```bash
+   /Applications/XAMPP/xamppfiles/bin/mysql -h 127.0.0.1 -P 3306 -u root -p xpertCash_db < backup_xpertCash_db.sql
+   ```
+
+#### 2. Sauvegarde en production (VPS, base `xpertCash_db`, user `xpert_db`)
+
+1. Se connecter en SSH sur le serveur :
+   ```bash
+   ssh xpertprousr@vps112847.serveur-vps.net
+   ```
+
+2. Aller dans le dossier du projet sur le serveur :
+   ```bash
+   cd ~/XpertCashBack
+   ```
+
+3. Lancer le `mysqldump` avec l’utilisateur applicatif `xpert_db` (mot de passe dans `application-prod.properties`) et sans tablespaces :
+   ```bash
+   mysqldump -h localhost -P 3306 -u xpert_db -p --no-tablespaces xpertCash_db > backup_xpertCash_prod.sql
+   ```
+   - Entrer le mot de passe de `xpert_db` quand il est demandé.
+   - Le fichier `backup_xpertCash_prod.sql` est créé dans `~/XpertCashBack` sur le serveur.
+
+4. Vérifier la présence du fichier sur le serveur :
+   ```bash
+   ls -lh ~/XpertCashBack/backup_xpertCash_prod.sql
+   ```
+
+5. Récupérer la sauvegarde prod sur le Mac (depuis le Mac) :
+   ```bash
+   cd /Users/mac/Desktop/Tiak3da/XpertCashBack
+   scp xpertprousr@vps112847.serveur-vps.net:/home/xpertprousr/XpertCashBack/backup_xpertCash_prod.sql .
+   ```
+
+6. (Optionnel) Restaurer la sauvegarde prod dans la base locale XAMPP :
+   ```bash
+   /Applications/XAMPP/xamppfiles/bin/mysql -h 127.0.0.1 -P 3306 -u root -p xpertCash_db < backup_xpertCash_prod.sql
+   ```
+
+Avec ces commandes, tu peux :
+- Sauvegarder la base locale et la base de production.
+- Rapatrier la base de production en local.
+- Restaurer facilement une sauvegarde dans ta base locale XAMPP pour tester avec de vraies données.
+
