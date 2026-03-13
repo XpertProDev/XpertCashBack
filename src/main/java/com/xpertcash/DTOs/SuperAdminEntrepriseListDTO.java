@@ -24,6 +24,8 @@ public class SuperAdminEntrepriseListDTO {
     private String adminNom;
     private String adminPhone;
     private String adminEmail;
+    /** Etat d'activation du compte ADMIN (activatedLien). */
+    private Boolean adminActivatedLien;
     private long nombreUtilisateursEntreprise;
     private LocalDateTime derniereConnexion;
 }

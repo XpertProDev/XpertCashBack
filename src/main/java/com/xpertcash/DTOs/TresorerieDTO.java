@@ -46,6 +46,14 @@ public class TresorerieDTO {
      * CA (Chiffre d'Affaires) d'aujourd'hui (somme de toutes les entrées d'aujourd'hui)
      */
     private Double caAujourdhui;
+
+    // CA / solde par compte (caisse, banque, mobile) sur la période demandée
+    private Double caCaissePeriode;
+    private Double soldeCaissePeriode;
+    private Double caBanquePeriode;
+    private Double soldeBanquePeriode;
+    private Double caMobilePeriode;
+    private Double soldeMobilePeriode;
     
     /**
      * Détails pour la caisse
@@ -160,6 +168,13 @@ public class TresorerieDTO {
          * Total des dettes
          */
         private Double total;
+
+        /**
+         * Montant total payé sur les dettes pendant la période demandée
+         * (paiements de factures + paiements de dettes type écart caisse / dépense à crédit).
+         * Null si aucune période n'est filtrée.
+         */
+        private Double montantPayePeriode;
     }
 }
 

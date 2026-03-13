@@ -142,9 +142,16 @@ public class FactureVenteController {
             @RequestParam(required = false, defaultValue = "aujourdhui") String periode,
             @RequestParam(required = false) Long vendeurId,
             @RequestParam(required = false) Long boutiqueId,
+            @RequestParam(required = false)
+            @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE)
+            java.time.LocalDate dateDebut,
+            @RequestParam(required = false)
+            @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE)
+            java.time.LocalDate dateFin,
             HttpServletRequest request) {
         try {
-            StatistiquesVenteGlobalesDTO statistiques = factureVenteService.getStatistiquesGlobales(periode, vendeurId, boutiqueId, request);
+            StatistiquesVenteGlobalesDTO statistiques = factureVenteService.getStatistiquesGlobales(
+                    periode, vendeurId, boutiqueId, dateDebut, dateFin, request);
             return ResponseEntity.ok(statistiques);
         } catch (RuntimeException e) {
             e.printStackTrace();

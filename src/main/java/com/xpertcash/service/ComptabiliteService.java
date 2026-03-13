@@ -2279,21 +2279,22 @@ public class ComptabiliteService {
     }
 
     /**
-     * Récupère toutes les données comptables paginées de l'entreprise (sans filtre de période).
+     * Récupère toutes les données comptables paginées de l'entreprise (sans filtre de période ni recherche).
      */
     @Transactional(readOnly = true)
     public ComptabiliteCompletePaginatedDTO getComptabiliteCompletePaginated(HttpServletRequest httpRequest, int page, int size) {
-        return getComptabiliteCompletePaginated(httpRequest, page, size, null, null, null);
+        return getComptabiliteCompletePaginated(httpRequest, page, size, null, null, null, null);
     }
 
     /**
-     * Récupère les données comptables paginées avec filtre de période (même sémantique que trésorerie).
+     * Récupère les données comptables paginées avec filtre de période (même sémantique que trésorerie) et recherche.
      * periode: "aujourdhui", "hier", "semaine", "mois", "annee", "personnalise". Si personnalise, dateDebut et dateFin requis.
+     * search: filtre (min 2 caractères) appliqué sur numero, categorieNom, designation.
      */
     @Transactional(readOnly = true)
     public ComptabiliteCompletePaginatedDTO getComptabiliteCompletePaginated(
             HttpServletRequest httpRequest, int page, int size,
-            String periode, LocalDate dateDebut, LocalDate dateFin) {
+            String periode, LocalDate dateDebut, LocalDate dateFin, String search) {
         if (page < 0) page = 0;
         if (size <= 0) size = 20;
         if (size > 100) size = 100;
@@ -2317,12 +2318,27 @@ public class ComptabiliteService {
                 periodEnd = (LocalDateTime) period[1];
             }
         }
+
+        String effectiveSearch = (search != null && search.trim().length() >= 2) ? search.trim() : null;
+
         if (periodStart != null && periodEnd != null) {
-            totalElements = comptabilitePaginationRepository.countTransactionsWithPeriod(entrepriseId, periodStart, periodEnd);
-            rows = comptabilitePaginationRepository.findTransactionPageWithPeriod(entrepriseId, periodStart, periodEnd, size, page * size);
+            if (effectiveSearch != null) {
+                totalElements = comptabilitePaginationRepository.countTransactionsWithPeriodAndSearch(
+                        entrepriseId, periodStart, periodEnd, effectiveSearch);
+                rows = comptabilitePaginationRepository.findTransactionPageWithPeriodAndSearch(
+                        entrepriseId, periodStart, periodEnd, effectiveSearch, size, page * size);
+            } else {
+                totalElements = comptabilitePaginationRepository.countTransactionsWithPeriod(entrepriseId, periodStart, periodEnd);
+                rows = comptabilitePaginationRepository.findTransactionPageWithPeriod(entrepriseId, periodStart, periodEnd, size, page * size);
+            }
         } else {
-            totalElements = comptabilitePaginationRepository.countTransactions(entrepriseId);
-            rows = comptabilitePaginationRepository.findTransactionPage(entrepriseId, size, page * size);
+            if (effectiveSearch != null) {
+                totalElements = comptabilitePaginationRepository.countTransactionsWithSearch(entrepriseId, effectiveSearch);
+                rows = comptabilitePaginationRepository.findTransactionPageWithSearch(entrepriseId, effectiveSearch, size, page * size);
+            } else {
+                totalElements = comptabilitePaginationRepository.countTransactions(entrepriseId);
+                rows = comptabilitePaginationRepository.findTransactionPage(entrepriseId, size, page * size);
+            }
         }
 
         int totalPages = size > 0 ? (int) Math.ceil((double) totalElements / size) : 0;

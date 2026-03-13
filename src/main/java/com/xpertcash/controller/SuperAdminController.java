@@ -149,6 +149,32 @@ public class SuperAdminController {
     }
 
         /**
+         * Activation manuelle du compte ADMIN d'une entreprise par le SUPER_ADMIN.
+         * Utile quand l'admin a supprimé l'email d'activation.
+         */
+        @PatchMapping("/superadmin/admins/{adminId}/activer-compte")
+        public ResponseEntity<?> activerCompteAdmin(
+                @PathVariable Long adminId,
+                HttpServletRequest request) {
+            try {
+                User superAdmin = authHelper.getAuthenticatedUserWithFallback(request);
+                User admin = superAdminService.activateAdminAccountAsSuperAdmin(superAdmin, adminId);
+                return ResponseEntity.ok(Map.of(
+                        "message", "Compte administrateur activé avec succès.",
+                        "adminId", admin.getId(),
+                        "email", admin.getEmail(),
+                        "entrepriseId", admin.getEntreprise() != null ? admin.getEntreprise().getId() : null
+                ));
+            } catch (RuntimeException e) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                        .body(Map.of("error", e.getMessage()));
+            } catch (Exception e) {
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                        .body(Map.of("error", "Erreur interne : " + e.getMessage()));
+            }
+        }
+
+        /**
          * Migration collective : pour une entreprise donnée,
          * crée automatiquement des clients pour tous les employés
          * qui n'existent pas encore dans la table client.
@@ -300,14 +326,27 @@ public class SuperAdminController {
         }
     }
 
-     // Déconnecte tous les utilisateurs du système (réservé au SUPER_ADMIN).
-  
+    // Déconnecte tous les utilisateurs du système (réservé au SUPER_ADMIN).
+    // Body JSON requis : { "confirmPassword": "1598" } (même logique que DELETION_PASSWORD).
     @PostMapping("/deconnecter-tous")
-    public ResponseEntity<?> deconnecterTousLesUtilisateurs(HttpServletRequest request) {
+    public ResponseEntity<?> deconnecterTousLesUtilisateurs(
+            @RequestBody(required = false) Map<String, String> body,
+            HttpServletRequest request) {
         try {
+            String confirmPassword = body != null ? body.get("confirmPassword") : null;
+            if (confirmPassword == null || confirmPassword.isBlank()) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body(Map.of("error", "Mot de passe de confirmation requis (confirmPassword)."));
+            }
+            if (!confirmPassword.equals(SuperAdminInitializer.getDeletionPassword())) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                        .body(Map.of("error", "Mot de passe de confirmation incorrect."));
+            }
+
             User user = authHelper.getAuthenticatedUserWithFallback(request);
             superAdminService.deconnecterTousLesUtilisateurs(user);
-            return ResponseEntity.ok(Map.of("message", "Tous les utilisateurs ont été déconnectés avec succès. Ils devront se reconnecter."));
+            return ResponseEntity.ok(
+                    Map.of("message", "Tous les utilisateurs ont été déconnectés avec succès. Ils devront se reconnecter."));
         } catch (RuntimeException e) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
                     .body(Map.of("error", e.getMessage()));

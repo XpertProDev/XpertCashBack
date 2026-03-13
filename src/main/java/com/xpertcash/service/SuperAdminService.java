@@ -231,6 +231,41 @@ public class SuperAdminService {
     }
 
     /**
+     * Activation manuelle du compte ADMIN d'une entreprise par le SUPER_ADMIN.
+     * - Marque l'admin comme activé (activatedLien = true, enabledLien = true)
+     * - Active également tous les utilisateurs de son entreprise (enabledLien = true)
+     */
+    @Transactional
+    public User activateAdminAccountAsSuperAdmin(User superAdmin, Long adminId) {
+        ensureSuperAdmin(superAdmin);
+
+        User admin = usersRepository.findByIdWithEntrepriseAndRole(adminId)
+                .orElseThrow(() -> new RuntimeException("Admin introuvable avec l'ID : " + adminId));
+
+        if (admin.getRole() == null || admin.getRole().getName() != RoleType.ADMIN) {
+            throw new RuntimeException("L'utilisateur avec l'ID " + adminId + " n'est pas un administrateur d'entreprise.");
+        }
+        if (admin.getEntreprise() == null) {
+            throw new RuntimeException("L'admin n'a pas d'entreprise associée.");
+        }
+
+        // Active explicitement l'admin
+        admin.setActivatedLien(true);
+        admin.setEnabledLien(true);
+        // Optionnel : on peut nettoyer le code d'activation
+        admin.setActivationCode(null);
+        usersRepository.save(admin);
+
+        // Active tous les utilisateurs de l'entreprise (même logique que activateAccount pour un ADMIN)
+        Long entrepriseId = admin.getEntreprise().getId();
+        java.util.List<User> usersToActivate = usersRepository.findByEntrepriseId(entrepriseId);
+        usersToActivate.forEach(u -> u.setEnabledLien(true));
+        usersRepository.saveAll(usersToActivate);
+
+        return admin;
+    }
+
+    /**
      * Pour une entreprise donnée, crée un Client pour chaque employé (User)
      * qui n'est pas encore présent dans la table client de cette entreprise.
      * Correspond à la mise à jour collective que le SUPER_ADMIN peut lancer.
@@ -372,6 +407,7 @@ public class SuperAdminService {
             String adminNom = entreprise.getAdmin() != null ? entreprise.getAdmin().getNomComplet() : "Aucun Admin";
             String adminPhone = entreprise.getAdmin() != null ? entreprise.getAdmin().getPhone() : null;
             String adminEmail = entreprise.getAdmin() != null ? entreprise.getAdmin().getEmail() : null;
+            Boolean adminActivatedLien = entreprise.getAdmin() != null ? entreprise.getAdmin().isActivatedLien() : null;
 
             long nombreUtilisateursEntreprise = countMap.getOrDefault(entreprise.getId(), 0L);
             LocalDateTime lastUsage = lastUsageMap.get(entreprise.getId());
@@ -391,6 +427,7 @@ public class SuperAdminService {
                     adminNom,
                     adminPhone,
                     adminEmail,
+                    adminActivatedLien,
                     nombreUtilisateursEntreprise,
                     derniereConnexion
             );
@@ -1942,23 +1979,31 @@ public class SuperAdminService {
     public void deconnecterTousLesUtilisateurs(User superAdmin) {
         ensureSuperAdmin(superAdmin);
 
-   
+        // Supprimer toutes les sessions sauf celle du SUPER_ADMIN appelant
         List<com.xpertcash.entity.UserSession> allSessions = userSessionRepository.findAll();
         if (!allSessions.isEmpty()) {
-            userSessionRepository.deleteAll(allSessions);
-            entityManager.flush();
+            List<com.xpertcash.entity.UserSession> sessionsToDelete = new java.util.ArrayList<>();
+            for (com.xpertcash.entity.UserSession session : allSessions) {
+                if (session.getUser() == null || !session.getUser().getId().equals(superAdmin.getId())) {
+                    sessionsToDelete.add(session);
+                }
+            }
+            if (!sessionsToDelete.isEmpty()) {
+                userSessionRepository.deleteAll(sessionsToDelete);
+                entityManager.flush();
+            }
         }
 
-
+        // Forcer la reconnexion de tous les utilisateurs sauf le SUPER_ADMIN appelant
         List<User> allUsers = usersRepository.findAll();
         LocalDateTime now = LocalDateTime.now();
         for (User user : allUsers) {
-            user.setLastActivity(now);
-            usersRepository.save(user);
+            if (!user.getId().equals(superAdmin.getId())) {
+                user.setLastActivity(now);
+                usersRepository.save(user);
+            }
         }
         entityManager.flush();
-
-    
     }
 }
 

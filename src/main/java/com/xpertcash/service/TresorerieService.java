@@ -3,10 +3,14 @@ package com.xpertcash.service;
 import com.xpertcash.DTOs.DetteItemDTO;
 import com.xpertcash.DTOs.PaginatedResponseDTO;
 import com.xpertcash.DTOs.TresorerieDTO;
+import com.xpertcash.DTOs.TresorerieCaissePeriodeDTO;
+import com.xpertcash.DTOs.TresorerieBanquePeriodeDTO;
+import com.xpertcash.DTOs.TresorerieMobilePeriodeDTO;
 import com.xpertcash.configuration.CentralAccess;
 import com.xpertcash.entity.*;
 import com.xpertcash.entity.Enum.RoleType;
 import com.xpertcash.entity.Enum.SourceDepense;
+import com.xpertcash.entity.Enum.SourceTresorerie;
 import com.xpertcash.entity.PermissionType;
 import com.xpertcash.entity.VENTE.*;
 import com.xpertcash.exceptions.BusinessException;
@@ -66,6 +70,9 @@ public class TresorerieService {
     @Autowired
     private TresorerieDettesDetailleesRepository tresorerieDettesDetailleesRepository;
 
+    @Autowired
+    private TransfertFondsRepository transfertFondsRepository;
+
      // Calcule la trésorerie complète de l'entreprise de l'utilisateur connecté.
     @Transactional(readOnly = true)
     public TresorerieDTO calculerTresorerie(HttpServletRequest request) {
@@ -86,6 +93,795 @@ public class TresorerieService {
         
         return calculerTresorerieParEntrepriseIdAvecPeriode(entrepriseId, periodeDates);
     }
+
+    /**
+     * Détail de la caisse pour une période donnée (utilisé pour un écran de détail trésorerie caisse).
+     * Ne modifie pas la logique existante : réutilise les mêmes calculs que la trésorerie.
+     */
+    @Transactional(readOnly = true)
+    public TresorerieCaissePeriodeDTO getCaisseDetailParPeriode(HttpServletRequest request, String periode,
+                                                                LocalDate dateDebut, LocalDate dateFin,
+                                                                int page, int size) {
+        Long entrepriseId = validerEntrepriseEtPermissions(request);
+
+        if (page < 0) page = 0;
+        if (size <= 0) size = 20;
+        if (size > 200) size = 200;
+
+        // 1. Solde actuel = montantCaisse global (toutes périodes)
+        TresorerieDTO tresorerieGlobale = calculerTresorerieParEntrepriseId(entrepriseId);
+        double soldeActuel = tresorerieGlobale.getMontantCaisse() != null ? tresorerieGlobale.getMontantCaisse() : 0.0;
+
+        // 2. Période
+        PeriodeDates periodeDates = calculerDatesPeriode(periode, dateDebut, dateFin);
+        TresorerieData dataPeriode = chargerDonneesAvecPeriode(entrepriseId, periodeDates);
+
+        // 3. CA période (même logique que trésorerie)
+        double caPeriode = calculerCAPeriode(dataPeriode, entrepriseId, periodeDates);
+
+        // 4. Transactions de caisse sur la période
+        java.util.List<TresorerieCaissePeriodeDTO.LigneTransaction> lignes = new java.util.ArrayList<>();
+
+        // 4.1 Fermetures de caisse dans la période (entrées de caisse issues des fermetures)
+        for (Caisse c : dataPeriode.caissesFermees) {
+            if (c.getDateFermeture() == null) continue;
+            if (periodeDates != null && periodeDates.filtrerParPeriode) {
+                LocalDateTime df = c.getDateFermeture();
+                if (df.isBefore(periodeDates.dateDebut) || !df.isBefore(periodeDates.dateFin)) {
+                    continue;
+                }
+            }
+            Double montant = c.getMontantEnMain();
+            if (montant == null || montant == 0) continue;
+            String designation = "Fermeture caisse - "
+                    + (c.getBoutique() != null ? c.getBoutique().getNomBoutique() : "")
+                    + " - "
+                    + (c.getVendeur() != null ? c.getVendeur().getNomComplet() : "");
+            TresorerieCaissePeriodeDTO.LigneTransaction lt =
+                    new TresorerieCaissePeriodeDTO.LigneTransaction(
+                            c.getDateFermeture(),
+                            designation,
+                            "ENTREE",
+                            (double) Math.round(montant),
+                            "FERMETURE_CAISSE",
+                            null,
+                            null
+                    );
+            lignes.add(lt);
+        }
+
+        // 4.2 Entrées générales CAISSE (y compris transferts, mais typées différemment)
+        for (EntreeGenerale e : dataPeriode.entreesGenerales) {
+            LocalDateTime dc = e.getDateCreation();
+            if (periodeDates != null && periodeDates.filtrerParPeriode) {
+                if (dc == null || dc.isBefore(periodeDates.dateDebut) || !dc.isBefore(periodeDates.dateFin)) {
+                    continue;
+                }
+            }
+            if (e.getSource() != SourceDepense.CAISSE) continue;
+            // Transferts de fonds : on les affiche comme TRANSFERT, sans les compter dans le CA (déjà exclu ailleurs)
+            if (estEntreeDeTransfert(e.getDesignation())) {
+                Double montant = e.getMontant();
+                if (montant == null || montant == 0) continue;
+                String designation = e.getDesignation();
+                String source = designation != null && designation.trim().startsWith("Transfert vers")
+                        ? "TRANSFERT_VERS"
+                        : "TRANSFERT_DEPUIS";
+                String designationLower = designation != null ? designation.toLowerCase() : "";
+                TresorerieCaissePeriodeDTO.LigneTransaction lt =
+                        new TresorerieCaissePeriodeDTO.LigneTransaction(
+                                e.getDateCreation(),
+                                designation,
+                                "TRANSFERT",
+                                (double) Math.round(montant),
+                                source,
+                                // de / vers : pour une entrée de caisse, l'argent arrive en CAISSE
+                                // et vient soit de BANQUE soit de MOBILE_MONEY selon la désignation
+                                designationLower.contains("banque") ? "BANQUE"
+                                        : designationLower.contains("mobile") ? "MOBILE_MONEY"
+                                        : "INCONNU",
+                                "CAISSE"
+                        );
+                lignes.add(lt);
+                continue;
+            }
+            String dt = e.getDetteType();
+            if (dt != null && !"ENTREE_DETTE".equals(dt)) continue;
+            Double montant = e.getMontant();
+            if (montant == null || montant == 0) continue;
+            TresorerieCaissePeriodeDTO.LigneTransaction lt =
+                    new TresorerieCaissePeriodeDTO.LigneTransaction(
+                            e.getDateCreation(),
+                            e.getDesignation(),
+                            "ENTREE_CAISSE",
+                            (double) Math.round(montant),
+                            "CAISSE",
+                            null,
+                            null
+                    );
+            lignes.add(lt);
+        }
+
+        // 4.3 Paiements factures espèces de la période
+        if (periodeDates != null && periodeDates.filtrerParPeriode) {
+            java.util.List<Paiement> paiementsPeriode = paiementRepository.findByEntrepriseIdAndDatePaiementBetween(
+                    entrepriseId, periodeDates.dateDebut, periodeDates.dateFin);
+            for (Paiement p : paiementsPeriode) {
+                if (p.getModePaiement() == null || !"ESPECES".equalsIgnoreCase(p.getModePaiement())) {
+                    continue;
+                }
+                double montant = getValeurDouble(p.getMontant());
+                if (montant == 0.0) continue;
+                String source = p.getModePaiement() != null ? p.getModePaiement() : "INCONNU";
+                String numeroFacture = null;
+                if (p.getFactureReelle() != null && p.getFactureReelle().getNumeroFacture() != null) {
+                    numeroFacture = p.getFactureReelle().getNumeroFacture();
+                }
+                String designationPaiement = numeroFacture != null
+                        ? "Paiement facture " + numeroFacture
+                        : "Paiement facture";
+                TresorerieCaissePeriodeDTO.LigneTransaction lt =
+                        new TresorerieCaissePeriodeDTO.LigneTransaction(
+                                p.getDatePaiement(),
+                                designationPaiement,
+                                "PAIEMENT_FACTURE",
+                                (double) Math.round(montant),
+                                source,
+                                null,
+                                null
+                        );
+                lignes.add(lt);
+            }
+        }
+
+        // 4.4 Dépenses générales CAISSE (y compris transferts, mais typées différemment)
+        for (DepenseGenerale d : dataPeriode.depensesGenerales) {
+            LocalDateTime dd = d.getDateCreation();
+            if (periodeDates != null && periodeDates.filtrerParPeriode) {
+                if (dd == null || dd.isBefore(periodeDates.dateDebut) || !dd.isBefore(periodeDates.dateFin)) {
+                    continue;
+                }
+            }
+            if (d.getSource() != SourceDepense.CAISSE) continue;
+            // Transferts de fonds : on les affiche comme TRANSFERT, sans les compter deux fois dans les totaux
+            if (estDepenseDeTransfert(d.getDesignation())) {
+                Double montant = d.getMontant();
+                if (montant == null || montant == 0) continue;
+                String designation = d.getDesignation();
+                String source = designation != null && designation.trim().startsWith("Transfert vers")
+                        ? "TRANSFERT_VERS"
+                        : "TRANSFERT_DEPUIS";
+                String designationLower = designation != null ? designation.toLowerCase() : "";
+                TresorerieCaissePeriodeDTO.LigneTransaction lt =
+                        new TresorerieCaissePeriodeDTO.LigneTransaction(
+                                d.getDateCreation(),
+                                designation,
+                                "TRANSFERT",
+                                (double) Math.round(montant),
+                                source,
+                                // de / vers : pour une dépense de caisse, l'argent sort de CAISSE
+                                // et va soit vers BANQUE soit vers MOBILE_MONEY selon la désignation
+                                "CAISSE",
+                                designationLower.contains("banque") ? "BANQUE"
+                                        : designationLower.contains("mobile") ? "MOBILE_MONEY"
+                                        : "INCONNU"
+                        );
+                lignes.add(lt);
+                continue;
+            }
+            Double montant = d.getMontant();
+            if (montant == null || montant == 0) continue;
+            TresorerieCaissePeriodeDTO.LigneTransaction lt =
+                    new TresorerieCaissePeriodeDTO.LigneTransaction(
+                            d.getDateCreation(),
+                            d.getDesignation(),
+                            "DEPENSE_CAISSE",
+                            (double) Math.round(montant),
+                            "CAISSE",
+                            null,
+                            null
+                    );
+            lignes.add(lt);
+        }
+
+        // 4.5 Mouvements caisse DEPENSE et RETRAIT
+        for (MouvementCaisse m : dataPeriode.mouvementsDepense) {
+            LocalDateTime dm = m.getDateMouvement();
+            if (periodeDates != null && periodeDates.filtrerParPeriode) {
+                if (dm == null || dm.isBefore(periodeDates.dateDebut) || !dm.isBefore(periodeDates.dateFin)) {
+                    continue;
+                }
+            }
+            Double montant = m.getMontant();
+            if (montant == null || montant == 0) continue;
+            TresorerieCaissePeriodeDTO.LigneTransaction lt =
+                    new TresorerieCaissePeriodeDTO.LigneTransaction(
+                            m.getDateMouvement(),
+                            m.getDescription(),
+                            "DEPENSE_CAISSE",
+                            (double) Math.round(montant),
+                            m.getModePaiement() != null ? m.getModePaiement().name() : "CAISSE",
+                            null,
+                            null
+                    );
+            lignes.add(lt);
+        }
+        for (MouvementCaisse m : dataPeriode.mouvementsRetrait) {
+            LocalDateTime dm = m.getDateMouvement();
+            if (periodeDates != null && periodeDates.filtrerParPeriode) {
+                if (dm == null || dm.isBefore(periodeDates.dateDebut) || !dm.isBefore(periodeDates.dateFin)) {
+                    continue;
+                }
+            }
+            Double montant = m.getMontant();
+            if (montant == null || montant == 0) continue;
+            TresorerieCaissePeriodeDTO.LigneTransaction lt =
+                    new TresorerieCaissePeriodeDTO.LigneTransaction(
+                            m.getDateMouvement(),
+                            m.getDescription(),
+                            "RETRAIT_CAISSE",
+                            (double) Math.round(montant),
+                            m.getModePaiement() != null ? m.getModePaiement().name() : "CAISSE",
+                            null,
+                            null
+                    );
+            lignes.add(lt);
+        }
+
+        // Trier les transactions par date décroissante
+        lignes.sort((a, b) -> {
+            if (a.getDate() == null && b.getDate() == null) return 0;
+            if (a.getDate() == null) return 1;
+            if (b.getDate() == null) return -1;
+            return b.getDate().compareTo(a.getDate());
+        });
+
+        TresorerieCaissePeriodeDTO dto = new TresorerieCaissePeriodeDTO();
+        dto.setSoldeActuel((double) Math.round(soldeActuel));
+        dto.setCaPeriode((double) Math.round(caPeriode));
+        dto.setNombreTransactions(lignes.size());
+
+        // Pagination en mémoire sur les transactions (les données sont déjà filtrées par période et entreprise).
+        int total = lignes.size();
+        int fromIndex = Math.min(page * size, total);
+        int toIndex = Math.min(fromIndex + size, total);
+        dto.setTransactions(lignes.subList(fromIndex, toIndex));
+
+        // Métadonnées de pagination comme en comptabilité
+        dto.setPageNumber(page);
+        dto.setPageSize(size);
+        dto.setTotalElements(total);
+        int totalPages = size > 0 ? (int) Math.ceil((double) total / size) : 0;
+        dto.setTotalPages(totalPages);
+        dto.setHasNext(page < totalPages - 1);
+        dto.setHasPrevious(page > 0);
+        dto.setFirst(page == 0);
+        dto.setLast(page >= totalPages - 1 || totalPages == 0);
+        return dto;
+    }
+
+    /**
+     * Détail de la banque pour une période donnée (écran de détail trésorerie banque).
+     * Ne modifie pas la logique existante : réutilise les mêmes données que la trésorerie.
+     */
+    @Transactional(readOnly = true)
+    public TresorerieBanquePeriodeDTO getBanqueDetailParPeriode(HttpServletRequest request, String periode,
+                                                                LocalDate dateDebut, LocalDate dateFin,
+                                                                int page, int size) {
+        Long entrepriseId = validerEntrepriseEtPermissions(request);
+
+        if (page < 0) page = 0;
+        if (size <= 0) size = 20;
+        if (size > 200) size = 200;
+
+        // 1. Solde actuel de la banque
+        TresorerieDTO tresorerieGlobale = calculerTresorerieParEntrepriseId(entrepriseId);
+        double soldeActuel = tresorerieGlobale.getMontantBanque() != null ? tresorerieGlobale.getMontantBanque() : 0.0;
+
+        // 2. Période
+        PeriodeDates periodeDates = calculerDatesPeriode(periode, dateDebut, dateFin);
+        TresorerieData dataPeriode = chargerDonneesAvecPeriode(entrepriseId, periodeDates);
+
+        // 3. CA période côté banque (entrées banque uniquement)
+        double caPeriode = calculerCABanquePeriode(dataPeriode, entrepriseId, periodeDates);
+
+        // 4. Transactions banque
+        java.util.List<TresorerieBanquePeriodeDTO.LigneTransaction> lignes = new java.util.ArrayList<>();
+
+        // 4.1 Ventes de la période encaissées par banque (VIREMENT, CHEQUE, CARTE)
+        for (Vente v : dataPeriode.toutesVentes) {
+            if (v.getStatus() == VenteStatus.REMBOURSEE) continue;
+            ModePaiement mp = v.getModePaiement();
+            if (mp == ModePaiement.VIREMENT || mp == ModePaiement.CHEQUE || mp == ModePaiement.CARTE) {
+                double montant = getValeurDouble(v.getMontantTotal());
+                if (montant == 0.0) continue;
+                String designation = v.getDescription() != null ? v.getDescription() : "Vente";
+                lignes.add(new TresorerieBanquePeriodeDTO.LigneTransaction(
+                        v.getDateVente(),
+                        designation,
+                        "ENTREE_BANQUE",
+                        (double) Math.round(montant),
+                        mp.name(),
+                        null,
+                        null
+                ));
+            }
+        }
+
+        // 4.2 Paiements factures de la période (VIREMENT, CHEQUE, CARTE)
+        if (periodeDates != null && periodeDates.filtrerParPeriode) {
+            java.util.List<Paiement> paiementsPeriode = paiementRepository.findByEntrepriseIdAndDatePaiementBetween(
+                    entrepriseId, periodeDates.dateDebut, periodeDates.dateFin);
+            for (Paiement p : paiementsPeriode) {
+                String mp = p.getModePaiement();
+                if (mp == null) continue;
+                String mpUpper = mp.toUpperCase();
+                if (!mpUpper.equals("VIREMENT") && !mpUpper.equals("CHEQUE") && !mpUpper.equals("CARTE")) continue;
+                double montant = getValeurDouble(p.getMontant());
+                if (montant == 0.0) continue;
+                String numeroFacture = null;
+                if (p.getFactureReelle() != null && p.getFactureReelle().getNumeroFacture() != null) {
+                    numeroFacture = p.getFactureReelle().getNumeroFacture();
+                }
+                String designationPaiement = numeroFacture != null
+                        ? "Paiement facture " + numeroFacture
+                        : "Paiement facture";
+                lignes.add(new TresorerieBanquePeriodeDTO.LigneTransaction(
+                        p.getDatePaiement(),
+                        designationPaiement,
+                        "PAIEMENT_FACTURE",
+                        (double) Math.round(montant),
+                        mpUpper,
+                        null,
+                        null
+                ));
+            }
+        }
+
+        // 4.3 Entrées générales BANQUE (hors transferts, hors paiements facture)
+        for (EntreeGenerale e : dataPeriode.entreesGenerales) {
+            LocalDateTime dc = e.getDateCreation();
+            if (periodeDates != null && periodeDates.filtrerParPeriode) {
+                if (dc == null || dc.isBefore(periodeDates.dateDebut) || !dc.isBefore(periodeDates.dateFin)) {
+                    continue;
+                }
+            }
+            if (e.getSource() != SourceDepense.BANQUE) continue;
+            if (estEntreeDeTransfert(e.getDesignation())) continue;
+            String dt = e.getDetteType();
+            if (dt != null && "PAIEMENT_FACTURE".equals(dt)) continue;
+            double montant = getValeurDouble(e.getMontant());
+            if (montant == 0.0) continue;
+            lignes.add(new TresorerieBanquePeriodeDTO.LigneTransaction(
+                    e.getDateCreation(),
+                    e.getDesignation(),
+                    "ENTREE_BANQUE",
+                    (double) Math.round(montant),
+                    "BANQUE",
+                    null,
+                    null
+            ));
+        }
+
+        // 4.4 Dépenses générales BANQUE (hors transferts)
+        for (DepenseGenerale d : dataPeriode.depensesGenerales) {
+            LocalDateTime dd = d.getDateCreation();
+            if (periodeDates != null && periodeDates.filtrerParPeriode) {
+                if (dd == null || dd.isBefore(periodeDates.dateDebut) || !dd.isBefore(periodeDates.dateFin)) {
+                    continue;
+                }
+            }
+            if (d.getSource() != SourceDepense.BANQUE) continue;
+            if (estDepenseDeTransfert(d.getDesignation())) continue;
+            double montant = getValeurDouble(d.getMontant());
+            if (montant == 0.0) continue;
+            lignes.add(new TresorerieBanquePeriodeDTO.LigneTransaction(
+                    d.getDateCreation(),
+                    d.getDesignation(),
+                    "DEPENSE_BANQUE",
+                    (double) Math.round(montant),
+                    "BANQUE",
+                    null,
+                    null
+            ));
+        }
+
+        // 4.5 Mouvements caisse DEPENSE / RETRAIT vers/depuis la banque (VIREMENT, CHEQUE, CARTE)
+        for (MouvementCaisse m : dataPeriode.mouvementsDepense) {
+            LocalDateTime dm = m.getDateMouvement();
+            if (periodeDates != null && periodeDates.filtrerParPeriode) {
+                if (dm == null || dm.isBefore(periodeDates.dateDebut) || !dm.isBefore(periodeDates.dateFin)) {
+                    continue;
+                }
+            }
+            ModePaiement mp = m.getModePaiement();
+            if (mp != ModePaiement.VIREMENT && mp != ModePaiement.CHEQUE && mp != ModePaiement.CARTE) continue;
+            double montant = getValeurDouble(m.getMontant());
+            if (montant == 0.0) continue;
+            lignes.add(new TresorerieBanquePeriodeDTO.LigneTransaction(
+                    m.getDateMouvement(),
+                    m.getDescription(),
+                    "DEPENSE_BANQUE",
+                    (double) Math.round(montant),
+                    mp.name(),
+                    null,
+                    null
+            ));
+        }
+
+        // 4.6 Transferts de fonds impliquant la BANQUE (CAISSE <-> BANQUE, BANQUE <-> MOBILE_MONEY, etc.)
+        java.util.List<TransfertFonds> transferts = transfertFondsRepository.findByEntrepriseIdOrderByDateTransfertDesc(entrepriseId);
+        for (TransfertFonds t : transferts) {
+            LocalDateTime dt = t.getDateTransfert();
+            if (periodeDates != null && periodeDates.filtrerParPeriode) {
+                if (dt == null || dt.isBefore(periodeDates.dateDebut) || !dt.isBefore(periodeDates.dateFin)) {
+                    continue;
+                }
+            }
+            SourceTresorerie src = t.getSource();
+            SourceTresorerie dest = t.getDestination();
+            // On ne garde que les transferts où la banque est source ou destination
+            if (src != SourceTresorerie.BANQUE && dest != SourceTresorerie.BANQUE) continue;
+
+            double montant = getValeurDouble(t.getMontant());
+            if (montant == 0.0) continue;
+
+            String designation = "Transfert de " + src.name() + " vers " + dest.name() + " - " + t.getMotif();
+            // Côté banque : si BANQUE est en destination, on peut considérer que c'est une ENTREE,
+            // si BANQUE est en source, c'est une SORTIE. On garde "TRANSFERT" comme source.
+            String type;
+            if (dest == SourceTresorerie.BANQUE) {
+                type = "ENTREE_BANQUE";
+            } else if (src == SourceTresorerie.BANQUE) {
+                type = "DEPENSE_BANQUE";
+            } else {
+                type = "TRANSFERT";
+            }
+            String source = "TRANSFERT";
+            String de = src != null ? src.name() : null;
+            String vers = dest != null ? dest.name() : null;
+
+            lignes.add(new TresorerieBanquePeriodeDTO.LigneTransaction(
+                    dt,
+                    designation,
+                    type,
+                    (double) Math.round(montant),
+                    source,
+                    de,
+                    vers
+            ));
+        }
+
+        // Tri desc
+        lignes.sort((a, b) -> {
+            if (a.getDate() == null && b.getDate() == null) return 0;
+            if (a.getDate() == null) return 1;
+            if (b.getDate() == null) return -1;
+            return b.getDate().compareTo(a.getDate());
+        });
+
+        // 5. Pagination en mémoire
+        TresorerieBanquePeriodeDTO dto = new TresorerieBanquePeriodeDTO();
+        dto.setSoldeActuel((double) Math.round(soldeActuel));
+        dto.setCaPeriode((double) Math.round(caPeriode));
+        dto.setNombreTransactions(lignes.size());
+
+        int total = lignes.size();
+        int fromIndex = Math.min(page * size, total);
+        int toIndex = Math.min(fromIndex + size, total);
+        dto.setTransactions(lignes.subList(fromIndex, toIndex));
+
+        dto.setPageNumber(page);
+        dto.setPageSize(size);
+        dto.setTotalElements(total);
+        int totalPages = size > 0 ? (int) Math.ceil((double) total / size) : 0;
+        dto.setTotalPages(totalPages);
+        dto.setHasNext(page < totalPages - 1);
+        dto.setHasPrevious(page > 0);
+        dto.setFirst(page == 0);
+        dto.setLast(page >= totalPages - 1 || totalPages == 0);
+        return dto;
+    }
+
+    /**
+     * CA côté banque pour la période : mêmes composantes que calculerBanque mais filtrées sur la période.
+     */
+    private double calculerCABanquePeriode(TresorerieData data, Long entrepriseId, PeriodeDates periodeDates) {
+        double ca = 0.0;
+
+        // Ventes banque
+        for (Vente v : data.toutesVentes) {
+            if (v.getStatus() == VenteStatus.REMBOURSEE) continue;
+            ModePaiement mp = v.getModePaiement();
+            if (mp == ModePaiement.VIREMENT || mp == ModePaiement.CHEQUE || mp == ModePaiement.CARTE) {
+                ca += getValeurDouble(v.getMontantTotal());
+            }
+        }
+
+        // Paiements factures banque
+        if (periodeDates != null && periodeDates.filtrerParPeriode) {
+            java.util.List<Paiement> paiementsPeriode = paiementRepository.findByEntrepriseIdAndDatePaiementBetween(
+                    entrepriseId, periodeDates.dateDebut, periodeDates.dateFin);
+            for (Paiement p : paiementsPeriode) {
+                String mp = p.getModePaiement();
+                if (mp == null) continue;
+                String mpUpper = mp.toUpperCase();
+                if (!mpUpper.equals("VIREMENT") && !mpUpper.equals("CHEQUE") && !mpUpper.equals("CARTE")) continue;
+                ca += getValeurDouble(p.getMontant());
+            }
+        }
+
+        // Entrées générales BANQUE (hors transferts, hors paiements facture)
+        for (EntreeGenerale e : data.entreesGenerales) {
+            if (e.getSource() != SourceDepense.BANQUE) continue;
+            if (estEntreeDeTransfert(e.getDesignation())) continue;
+            String dt = e.getDetteType();
+            if (dt != null && "PAIEMENT_FACTURE".equals(dt)) continue;
+            ca += getValeurDouble(e.getMontant());
+        }
+
+        return ca;
+    }
+
+    /**
+     * Détail du mobile money pour une période donnée (écran de détail trésorerie mobile).
+     * Ne modifie pas la logique existante : réutilise les mêmes données que la trésorerie.
+     */
+    @Transactional(readOnly = true)
+    public TresorerieMobilePeriodeDTO getMobileDetailParPeriode(HttpServletRequest request, String periode,
+                                                                LocalDate dateDebut, LocalDate dateFin,
+                                                                int page, int size) {
+        Long entrepriseId = validerEntrepriseEtPermissions(request);
+
+        if (page < 0) page = 0;
+        if (size <= 0) size = 20;
+        if (size > 200) size = 200;
+
+        // 1. Solde actuel du mobile money
+        TresorerieDTO tresorerieGlobale = calculerTresorerieParEntrepriseId(entrepriseId);
+        double soldeActuel = tresorerieGlobale.getMontantMobileMoney() != null ? tresorerieGlobale.getMontantMobileMoney() : 0.0;
+
+        // 2. Période
+        PeriodeDates periodeDates = calculerDatesPeriode(periode, dateDebut, dateFin);
+        TresorerieData dataPeriode = chargerDonneesAvecPeriode(entrepriseId, periodeDates);
+
+        // 3. CA période côté mobile (entrées mobile uniquement)
+        double caPeriode = calculerCAMobilePeriode(dataPeriode, entrepriseId, periodeDates);
+
+        // 4. Transactions mobile
+        java.util.List<TresorerieMobilePeriodeDTO.LigneTransaction> lignes = new java.util.ArrayList<>();
+
+        // 4.1 Ventes de la période encaissées par mobile money
+        for (Vente v : dataPeriode.toutesVentes) {
+            if (v.getStatus() == VenteStatus.REMBOURSEE) continue;
+            ModePaiement mp = v.getModePaiement();
+            if (mp == ModePaiement.MOBILE_MONEY) {
+                double montant = getValeurDouble(v.getMontantTotal());
+                if (montant == 0.0) continue;
+                String designation = v.getDescription() != null ? v.getDescription() : "Vente";
+                lignes.add(new TresorerieMobilePeriodeDTO.LigneTransaction(
+                        v.getDateVente(),
+                        designation,
+                        "ENTREE_MOBILE",
+                        (double) Math.round(montant),
+                        "MOBILE_MONEY",
+                        null,
+                        null
+                ));
+            }
+        }
+
+        // 4.2 Paiements factures de la période via mobile money
+        if (periodeDates != null && periodeDates.filtrerParPeriode) {
+            java.util.List<Paiement> paiementsPeriode = paiementRepository.findByEntrepriseIdAndDatePaiementBetween(
+                    entrepriseId, periodeDates.dateDebut, periodeDates.dateFin);
+            for (Paiement p : paiementsPeriode) {
+                String mp = p.getModePaiement();
+                if (mp == null) continue;
+                String mpUpper = mp.toUpperCase();
+                if (!mpUpper.equals("MOBILE_MONEY")) continue;
+                double montant = getValeurDouble(p.getMontant());
+                if (montant == 0.0) continue;
+                String numeroFacture = null;
+                if (p.getFactureReelle() != null && p.getFactureReelle().getNumeroFacture() != null) {
+                    numeroFacture = p.getFactureReelle().getNumeroFacture();
+                }
+                String designationPaiement = numeroFacture != null
+                        ? "Paiement facture " + numeroFacture
+                        : "Paiement facture";
+                lignes.add(new TresorerieMobilePeriodeDTO.LigneTransaction(
+                        p.getDatePaiement(),
+                        designationPaiement,
+                        "PAIEMENT_FACTURE",
+                        (double) Math.round(montant),
+                        mpUpper,
+                        null,
+                        null
+                ));
+            }
+        }
+
+        // 4.3 Entrées générales MOBILE_MONEY (hors transferts, hors paiements facture)
+        for (EntreeGenerale e : dataPeriode.entreesGenerales) {
+            LocalDateTime dc = e.getDateCreation();
+            if (periodeDates != null && periodeDates.filtrerParPeriode) {
+                if (dc == null || dc.isBefore(periodeDates.dateDebut) || !dc.isBefore(periodeDates.dateFin)) {
+                    continue;
+                }
+            }
+            if (e.getSource() != SourceDepense.MOBILE_MONEY) continue;
+            if (estEntreeDeTransfert(e.getDesignation())) continue;
+            String dt = e.getDetteType();
+            if (dt != null && "PAIEMENT_FACTURE".equals(dt)) continue;
+            double montant = getValeurDouble(e.getMontant());
+            if (montant == 0.0) continue;
+            lignes.add(new TresorerieMobilePeriodeDTO.LigneTransaction(
+                    e.getDateCreation(),
+                    e.getDesignation(),
+                    "ENTREE_MOBILE",
+                    (double) Math.round(montant),
+                    "MOBILE_MONEY",
+                    null,
+                    null
+            ));
+        }
+
+        // 4.4 Dépenses générales MOBILE_MONEY (hors transferts)
+        for (DepenseGenerale d : dataPeriode.depensesGenerales) {
+            LocalDateTime dd = d.getDateCreation();
+            if (periodeDates != null && periodeDates.filtrerParPeriode) {
+                if (dd == null || dd.isBefore(periodeDates.dateDebut) || !dd.isBefore(periodeDates.dateFin)) {
+                    continue;
+                }
+            }
+            if (d.getSource() != SourceDepense.MOBILE_MONEY) continue;
+            if (estDepenseDeTransfert(d.getDesignation())) continue;
+            double montant = getValeurDouble(d.getMontant());
+            if (montant == 0.0) continue;
+            lignes.add(new TresorerieMobilePeriodeDTO.LigneTransaction(
+                    d.getDateCreation(),
+                    d.getDesignation(),
+                    "DEPENSE_MOBILE",
+                    (double) Math.round(montant),
+                    "MOBILE_MONEY",
+                    null,
+                    null
+            ));
+        }
+
+        // 4.5 Mouvements caisse DEPENSE / RETRAIT vers/depuis le mobile money
+        for (MouvementCaisse m : dataPeriode.mouvementsDepense) {
+            LocalDateTime dm = m.getDateMouvement();
+            if (periodeDates != null && periodeDates.filtrerParPeriode) {
+                if (dm == null || dm.isBefore(periodeDates.dateDebut) || !dm.isBefore(periodeDates.dateFin)) {
+                    continue;
+                }
+            }
+            ModePaiement mp = m.getModePaiement();
+            if (mp != ModePaiement.MOBILE_MONEY) continue;
+            double montant = getValeurDouble(m.getMontant());
+            if (montant == 0.0) continue;
+            lignes.add(new TresorerieMobilePeriodeDTO.LigneTransaction(
+                    m.getDateMouvement(),
+                    m.getDescription(),
+                    "DEPENSE_MOBILE",
+                    (double) Math.round(montant),
+                    mp.name(),
+                    null,
+                    null
+            ));
+        }
+
+        // 4.6 Transferts de fonds impliquant le MOBILE_MONEY
+        java.util.List<TransfertFonds> transferts = transfertFondsRepository.findByEntrepriseIdOrderByDateTransfertDesc(entrepriseId);
+        for (TransfertFonds t : transferts) {
+            LocalDateTime dt = t.getDateTransfert();
+            if (periodeDates != null && periodeDates.filtrerParPeriode) {
+                if (dt == null || dt.isBefore(periodeDates.dateDebut) || !dt.isBefore(periodeDates.dateFin)) {
+                    continue;
+                }
+            }
+            SourceTresorerie src = t.getSource();
+            SourceTresorerie dest = t.getDestination();
+            if (src != SourceTresorerie.MOBILE_MONEY && dest != SourceTresorerie.MOBILE_MONEY) continue;
+
+            double montant = getValeurDouble(t.getMontant());
+            if (montant == 0.0) continue;
+
+            String designation = "Transfert de " + src.name() + " vers " + dest.name() + " - " + t.getMotif();
+            String type;
+            if (dest == SourceTresorerie.MOBILE_MONEY) {
+                type = "ENTREE_MOBILE";
+            } else if (src == SourceTresorerie.MOBILE_MONEY) {
+                type = "DEPENSE_MOBILE";
+            } else {
+                type = "TRANSFERT";
+            }
+            String source = "TRANSFERT";
+            String de = src != null ? src.name() : null;
+            String vers = dest != null ? dest.name() : null;
+
+            lignes.add(new TresorerieMobilePeriodeDTO.LigneTransaction(
+                    dt,
+                    designation,
+                    type,
+                    (double) Math.round(montant),
+                    source,
+                    de,
+                    vers
+            ));
+        }
+
+        // Tri desc
+        lignes.sort((a, b) -> {
+            if (a.getDate() == null && b.getDate() == null) return 0;
+            if (a.getDate() == null) return 1;
+            if (b.getDate() == null) return -1;
+            return b.getDate().compareTo(a.getDate());
+        });
+
+        TresorerieMobilePeriodeDTO dto = new TresorerieMobilePeriodeDTO();
+        dto.setSoldeActuel((double) Math.round(soldeActuel));
+        dto.setCaPeriode((double) Math.round(caPeriode));
+        dto.setNombreTransactions(lignes.size());
+
+        int total = lignes.size();
+        int fromIndex = Math.min(page * size, total);
+        int toIndex = Math.min(fromIndex + size, total);
+        dto.setTransactions(lignes.subList(fromIndex, toIndex));
+
+        dto.setPageNumber(page);
+        dto.setPageSize(size);
+        dto.setTotalElements(total);
+        int totalPages = size > 0 ? (int) Math.ceil((double) total / size) : 0;
+        dto.setTotalPages(totalPages);
+        dto.setHasNext(page < totalPages - 1);
+        dto.setHasPrevious(page > 0);
+        dto.setFirst(page == 0);
+        dto.setLast(page >= totalPages - 1 || totalPages == 0);
+        return dto;
+    }
+
+    /**
+     * CA côté mobile money pour la période.
+     */
+    private double calculerCAMobilePeriode(TresorerieData data, Long entrepriseId, PeriodeDates periodeDates) {
+        double ca = 0.0;
+
+        // Ventes mobile
+        for (Vente v : data.toutesVentes) {
+            if (v.getStatus() == VenteStatus.REMBOURSEE) continue;
+            ModePaiement mp = v.getModePaiement();
+            if (mp == ModePaiement.MOBILE_MONEY) {
+                ca += getValeurDouble(v.getMontantTotal());
+            }
+        }
+
+        // Paiements factures mobile
+        if (periodeDates != null && periodeDates.filtrerParPeriode) {
+            java.util.List<Paiement> paiementsPeriode = paiementRepository.findByEntrepriseIdAndDatePaiementBetween(
+                    entrepriseId, periodeDates.dateDebut, periodeDates.dateFin);
+            for (Paiement p : paiementsPeriode) {
+                String mp = p.getModePaiement();
+                if (mp == null) continue;
+                String mpUpper = mp.toUpperCase();
+                if (!mpUpper.equals("MOBILE_MONEY")) continue;
+                ca += getValeurDouble(p.getMontant());
+            }
+        }
+
+        // Entrées générales MOBILE_MONEY (hors transferts, hors paiements facture)
+        for (EntreeGenerale e : data.entreesGenerales) {
+            if (e.getSource() != SourceDepense.MOBILE_MONEY) continue;
+            if (estEntreeDeTransfert(e.getDesignation())) continue;
+            String dt = e.getDetteType();
+            if (dt != null && "PAIEMENT_FACTURE".equals(dt)) continue;
+            ca += getValeurDouble(e.getMontant());
+        }
+
+        return ca;
+    }
+
 
      // Calcule la trésorerie pour une entreprise donnée.
 
@@ -116,17 +912,43 @@ public class TresorerieService {
             // Calculer les montants globaux avec toutes les données
             TresorerieDTO tresorerie = calculerTresorerieDepuisData(dataGlobale, entrepriseId, null);
             
-            // Si une période est spécifiée, calculer le solde et CA pour cette période uniquement
+            // Si une période est spécifiée, calculer le solde, le CA et le montant payé sur les dettes pour cette période uniquement
             if (periodeDates != null && periodeDates.filtrerParPeriode) {
                 // Charger les données filtrées UNIQUEMENT pour le calcul du solde et CA de la période
                 TresorerieData dataPeriode = chargerDonneesAvecPeriode(entrepriseId, periodeDates);
-                
-                double caPeriode = calculerCAPeriode(dataPeriode, entrepriseId, periodeDates);
-                double sortiesPeriode = calculerSortiesPeriode(dataPeriode, entrepriseId, periodeDates);
-                double soldePeriode = caPeriode - sortiesPeriode;
-                
-                tresorerie.setCaAujourdhui(caPeriode);
-                tresorerie.setSoldeAujourdhui(soldePeriode);
+
+                // CA / solde par compte
+                double caCaisse = calculerCAPeriode(dataPeriode, entrepriseId, periodeDates);
+                double sortiesCaisse = calculerSortiesPeriode(dataPeriode, entrepriseId, periodeDates);
+                double soldeCaisse = caCaisse - sortiesCaisse;
+
+                double caBanque = calculerCABanquePeriode(dataPeriode, entrepriseId, periodeDates);
+                double sortiesBanque = calculerSortiesBanquePeriode(dataPeriode, entrepriseId, periodeDates);
+                double soldeBanque = caBanque - sortiesBanque;
+
+                double caMobile = calculerCAMobilePeriode(dataPeriode, entrepriseId, periodeDates);
+                double sortiesMobile = calculerSortiesMobilePeriode(dataPeriode, entrepriseId, periodeDates);
+                double soldeMobile = caMobile - sortiesMobile;
+
+                // Montant payé sur les dettes pendant la période (paiements factures + paiements dettes)
+                TresorerieDTO.DetteDetail detteDetail = tresorerie.getDetteDetail();
+                if (detteDetail != null) {
+                    double montantPayePeriode = calculerMontantDettesPayePeriode(entrepriseId, periodeDates, dataPeriode);
+                    detteDetail.setMontantPayePeriode((double) Math.round(montantPayePeriode));
+                }
+
+                // Renseigner les champs par compte
+                tresorerie.setCaCaissePeriode(caCaisse);
+                tresorerie.setSoldeCaissePeriode(soldeCaisse);
+                tresorerie.setCaBanquePeriode(caBanque);
+                tresorerie.setSoldeBanquePeriode(soldeBanque);
+                tresorerie.setCaMobilePeriode(caMobile);
+                tresorerie.setSoldeMobilePeriode(soldeMobile);
+
+                // CA / solde globaux = on expose ceux de la CAISSE (compte principal),
+                // les autres comptes ont leurs propres champs (caBanquePeriode, caMobilePeriode, etc.).
+                tresorerie.setCaAujourdhui(caCaisse);
+                tresorerie.setSoldeAujourdhui(soldeCaisse);
             }
             
             return tresorerie;
@@ -154,44 +976,88 @@ public class TresorerieService {
             
             double entreesGeneralesCaisse = calculerEntreesGeneralesCaisse(data);
             double entreesPaiementsEspeces = calculerEntreesPaiementsFactures(data, ModePaiement.ESPECES, null);
-            
-            double montantCaisseReel = caisseDetail.getMontantTotal() + entreesGeneralesCaisse + entreesPaiementsEspeces - depensesGeneralesCaisse;
-            tresorerie.setMontantCaisse(Math.max(0.0, montantCaisseReel));
+
+            double montantCaisseReel = caisseDetail.getMontantTotal()
+                    + entreesGeneralesCaisse
+                    + entreesPaiementsEspeces
+                    - depensesGeneralesCaisse;
+            double montantCaisseAffiche = Math.max(0.0, montantCaisseReel);
+            montantCaisseAffiche = Math.round(montantCaisseAffiche);
+            tresorerie.setMontantCaisse(montantCaisseAffiche);
 
             TresorerieDTO.BanqueDetail banqueDetail = calculerBanque(data);
+            // Arrondir les montants banque à l'unité
+            if (banqueDetail != null) {
+                if (banqueDetail.getEntrees() != null) {
+                    banqueDetail.setEntrees((double) Math.round(banqueDetail.getEntrees()));
+                }
+                if (banqueDetail.getSorties() != null) {
+                    banqueDetail.setSorties((double) Math.round(banqueDetail.getSorties()));
+                }
+                if (banqueDetail.getSolde() != null) {
+                    banqueDetail.setSolde((double) Math.round(banqueDetail.getSolde()));
+                }
+            }
             tresorerie.setBanqueDetail(banqueDetail);
-            tresorerie.setMontantBanque(banqueDetail.getSolde());
+            tresorerie.setMontantBanque(banqueDetail != null && banqueDetail.getSolde() != null
+                    ? banqueDetail.getSolde() : 0.0);
 
             TresorerieDTO.MobileMoneyDetail mobileMoneyDetail = calculerMobileMoney(data);
+            // Arrondir les montants mobile money à l'unité
+            if (mobileMoneyDetail != null) {
+                if (mobileMoneyDetail.getEntrees() != null) {
+                    mobileMoneyDetail.setEntrees((double) Math.round(mobileMoneyDetail.getEntrees()));
+                }
+                if (mobileMoneyDetail.getSorties() != null) {
+                    mobileMoneyDetail.setSorties((double) Math.round(mobileMoneyDetail.getSorties()));
+                }
+                if (mobileMoneyDetail.getSolde() != null) {
+                    mobileMoneyDetail.setSolde((double) Math.round(mobileMoneyDetail.getSolde()));
+                }
+            }
             tresorerie.setMobileMoneyDetail(mobileMoneyDetail);
-            tresorerie.setMontantMobileMoney(mobileMoneyDetail.getSolde());
+            tresorerie.setMontantMobileMoney(mobileMoneyDetail != null && mobileMoneyDetail.getSolde() != null
+                    ? mobileMoneyDetail.getSolde() : 0.0);
 
             TresorerieDTO.DetteDetail detteDetail = calculerDette(data, entrepriseId);
+            // Arrondir les montants de dette à l'unité (données globales)
+            if (detteDetail != null) {
+                if (detteDetail.getFacturesImpayees() != null) {
+                    detteDetail.setFacturesImpayees((double) Math.round(detteDetail.getFacturesImpayees()));
+                }
+                if (detteDetail.getDepensesDette() != null) {
+                    detteDetail.setDepensesDette((double) Math.round(detteDetail.getDepensesDette()));
+                }
+                if (detteDetail.getTotal() != null) {
+                    detteDetail.setTotal((double) Math.round(detteDetail.getTotal()));
+                }
+            }
             tresorerie.setDetteDetail(detteDetail);
-            tresorerie.setMontantDette(detteDetail.getTotal());
+            tresorerie.setMontantDette(detteDetail != null && detteDetail.getTotal() != null
+                    ? detteDetail.getTotal() : 0.0);
 
-            tresorerie.setTotalTresorerie(
-                tresorerie.getMontantCaisse() + 
-                tresorerie.getMontantBanque() + 
-                tresorerie.getMontantMobileMoney()
-            );
+            // Total trésorerie arrondi à l'unité
+            double totalTresorerie = tresorerie.getMontantCaisse()
+                    + tresorerie.getMontantBanque()
+                    + tresorerie.getMontantMobileMoney();
+            tresorerie.setTotalTresorerie((double) Math.round(totalTresorerie));
 
         // Calculer le solde et le CA selon la période
         if (periodeDates != null && periodeDates.filtrerParPeriode) {
             double caPeriode = calculerCAPeriode(data, entrepriseId, periodeDates);
             double sortiesPeriode = calculerSortiesPeriode(data, entrepriseId, periodeDates);
             double soldePeriode = caPeriode - sortiesPeriode;
-            
-            tresorerie.setCaAujourdhui(caPeriode);
-            tresorerie.setSoldeAujourdhui(soldePeriode);
+
+            tresorerie.setCaAujourdhui((double) Math.round(caPeriode));
+            tresorerie.setSoldeAujourdhui((double) Math.round(soldePeriode));
         } else {
             // Par défaut, calculer pour aujourd'hui
             double caAujourdhui = calculerCAAujourdhui(data, entrepriseId);
             double sortiesAujourdhui = calculerSortiesAujourdhui(data, entrepriseId);
             double soldeAujourdhui = caAujourdhui - sortiesAujourdhui;
-            
-            tresorerie.setCaAujourdhui(caAujourdhui);
-            tresorerie.setSoldeAujourdhui(soldeAujourdhui);
+
+            tresorerie.setCaAujourdhui((double) Math.round(caAujourdhui));
+            tresorerie.setSoldeAujourdhui((double) Math.round(soldeAujourdhui));
         }
 
             return tresorerie;
@@ -200,15 +1066,22 @@ public class TresorerieService {
      /* Récupère la liste paginée des dettes (factures impayées, ventes à crédit, dépenses en DETTE). Pagination côté base (scalable).
         afficher dans Compta front */
     @Transactional(readOnly = true)
-    public PaginatedResponseDTO<DetteItemDTO> getDettesDetaillees(HttpServletRequest request, int page, int size) {
+    public PaginatedResponseDTO<DetteItemDTO> getDettesDetaillees(HttpServletRequest request, int page, int size, String search) {
         Long entrepriseId = validerEntrepriseEtPermissions(request);
         if (page < 0) page = 0;
         if (size <= 0) size = 20;
         if (size > 100) size = 100;
 
-        long totalElements = tresorerieDettesDetailleesRepository.countDettesDetaillees(entrepriseId);
+        String trimmedSearch = (search != null && !search.trim().isEmpty()) ? search.trim() : null;
+
+        long totalElements = (trimmedSearch == null)
+                ? tresorerieDettesDetailleesRepository.countDettesDetaillees(entrepriseId)
+                : tresorerieDettesDetailleesRepository.countDettesDetailleesWithSearch(entrepriseId, trimmedSearch);
+
         int totalPages = size > 0 ? (int) Math.ceil((double) totalElements / size) : 0;
-        List<Object[]> rows = tresorerieDettesDetailleesRepository.findDettesDetailleesPage(entrepriseId, size, page * size);
+        List<Object[]> rows = (trimmedSearch == null)
+                ? tresorerieDettesDetailleesRepository.findDettesDetailleesPage(entrepriseId, size, page * size)
+                : tresorerieDettesDetailleesRepository.findDettesDetailleesPageWithSearch(entrepriseId, trimmedSearch, size, page * size);
 
         java.util.List<Long> factureIds = new java.util.ArrayList<>();
         java.util.List<Long> depenseIds = new java.util.ArrayList<>();
@@ -332,8 +1205,13 @@ public class TresorerieService {
             dto.setDescription(entree.getDesignation());
             dto.setNumero(entree.getNumero());
             if (entree.getResponsable() != null) {
-                dto.setResponsable(entree.getResponsable().getNomComplet());
-                dto.setResponsableContact(entree.getResponsable().getPhone());
+                String nom = entree.getResponsable().getNomComplet();
+                String phone = entree.getResponsable().getPhone();
+                dto.setResponsable(nom);
+                dto.setResponsableContact(phone);
+                // Pour les écarts caisse, le responsable est aussi la "personne à qui on doit"
+                dto.setClient(nom);
+                dto.setContact(phone);
         }
         return dto;
     }
@@ -681,26 +1559,19 @@ public class TresorerieService {
                 ));
     }
 
-    /**
-     * Détail caisse : aligné sur la comptabilité.
-     * - montantTotal = somme des montants réellement fermés (montantEnMain), pas le théorique des ventes.
-     * - entrees = montantTotal (fermetures) + entrées générales CAISSE (ex. paiements dettes écart) + paiements factures espèces.
-     * On n'ajoute pas les mouvements VENTE/AJOUT des caisses fermées : l'argent réel est déjà dans montantEnMain
-     * (sinon on double-compterait : vente 2 500 alors qu'on a fermé avec 1 500 + paiements dette 1 000 = 2 500).
-     */
     private TresorerieDTO.CaisseDetail calculerCaisse(TresorerieData data) {
         if (data.boutiqueIds.isEmpty()) {
             return creerCaisseDetailVide();
         }
 
+        // Montant total caisse = somme des montants réellement fermés (montantEnMain)
         double montantTotalCaisse = calculerMontantTotalCaisses(data.caissesFermees);
 
+        // Entrées complémentaires : paiements factures espèces + entrées générales CAISSE (hors transferts, hors paiements facture)
         double entreesPaiementsEspeces = calculerEntreesPaiementsFactures(data, ModePaiement.ESPECES, null);
         double entreesGeneralesCaisse = calculerEntreesGeneralesCaisse(data);
 
-        // Entrées réelles = montant fermé (montantEnMain) + paiements dettes (ex. écart) + paiements factures espèces
         double entrees = montantTotalCaisse + entreesGeneralesCaisse + entreesPaiementsEspeces;
-
         double sorties = calculerSortiesCaisse(data);
 
         TresorerieDTO.CaisseDetail detail = new TresorerieDTO.CaisseDetail();
@@ -711,12 +1582,8 @@ public class TresorerieService {
         return detail;
     }
 
-    /**
-     * Montant total caisse = somme des montants réellement fermés (montantEnMain).
-     * Aligné sur la comptabilité : une ligne = une fermeture avec montantEnMain.
-     * Les caisses fermées à 0 F sont exclues (comme en comptabilité).
-     */
     private double calculerMontantTotalCaisses(List<Caisse> caisses) {
+        // Somme des montants réellement fermés (montantEnMain), en excluant les fermetures à 0
         return caisses.stream()
                 .filter(c -> c.getMontantEnMain() != null && c.getMontantEnMain() != 0)
                 .mapToDouble(Caisse::getMontantEnMain)
@@ -1023,6 +1890,26 @@ public class TresorerieService {
         return detail;
     }
 
+    /**
+     * Calcule le montant total payé sur les dettes pendant la période
+     * (paiements de factures + paiements de dettes type ENTREE_DETTE : écart caisse, dépense à crédit, etc.).
+     */
+    private double calculerMontantDettesPayePeriode(Long entrepriseId, PeriodeDates periodeDates, TresorerieData data) {
+        double total = 0.0;
+        // Paiements de factures dans la période
+        java.util.List<Paiement> paiements = paiementRepository.findByEntrepriseIdAndDatePaiementBetween(
+                entrepriseId, periodeDates.dateDebut, periodeDates.dateFin);
+        for (Paiement p : paiements) {
+            total += getValeurDouble(p.getMontant());
+        }
+        // Paiements de dettes (ENTREE_DETTE : écart caisse, etc.) dans la période — data.entreesGenerales est déjà filtré par période
+        total += data.entreesGenerales.stream()
+                .filter(e -> "ENTREE_DETTE".equals(e.getDetteType()))
+                .mapToDouble(e -> getValeurDouble(e.getMontant()))
+                .sum();
+        return total;
+    }
+
     private TresorerieDTO.CaisseDetail creerCaisseDetailVide() {
         TresorerieDTO.CaisseDetail detail = new TresorerieDTO.CaisseDetail();
         detail.setNombreCaissesOuvertes(0);
@@ -1032,16 +1919,11 @@ public class TresorerieService {
         return detail;
     }
 
-    /**
-     * Somme des entrées générales qui font entrer de l'argent en caisse :
-     * - ENTREE_DETTE (paiements dettes, ex. écart caisse) et entrées manuelles (detteType null).
-     * Exclut PAIEMENT_FACTURE (déjà dans paiements factures), transferts et tout autre type pour éviter double compte.
-     */
     private double calculerEntreesGeneralesCaisse(TresorerieData data) {
+
         return data.entreesGenerales.stream()
                 .filter(e -> e.getSource() == SourceDepense.CAISSE)
-                .filter(e -> e.getDetteType() == null || "ENTREE_DETTE".equals(e.getDetteType()))
-                .filter(e -> !estEntreeDeTransfert(e.getDesignation()))
+                .filter(e -> e.getDetteType() == null || !"PAIEMENT_FACTURE".equals(e.getDetteType()))
                 .mapToDouble(e -> getValeurDouble(e.getMontant()))
                 .sum();
     }
@@ -1094,34 +1976,37 @@ public class TresorerieService {
     }
 
     /**
-     * Calcule le CA (entrées) d'aujourd'hui, aligné sur la comptabilité.
-     * Inclut : fermetures de caisse aujourd'hui (montantEnMain) + paiements factures + entrées générales.
-     * Une fermeture = une ligne en compta avec montantEnMain (montant réel déposé).
+     * Calcule le CA (Chiffre d'Affaires) d'aujourd'hui.
+     * Inclut : fermetures de caisse d'aujourd'hui (montantEnMain) + paiements factures d'aujourd'hui + entrées générales CAISSE d'aujourd'hui.
+     * Exclut : transferts de fonds, paiements de factures déjà comptés ailleurs et écarts de caisse (ECART_CAISSE).
      */
     private double calculerCAAujourdhui(TresorerieData data, Long entrepriseId) {
         double ca = 0.0;
 
-        // Fermetures de caisse aujourd'hui : montant réel (montantEnMain), comme en comptabilité
+        // Fermetures de caisse d'aujourd'hui : montant réel (montantEnMain)
         for (Caisse c : data.caissesFermees) {
-            if (estAujourdhui(c.getDateFermeture()) && c.getMontantEnMain() != null && c.getMontantEnMain() != 0) {
+            if (estAujourdhui(c.getDateFermeture())
+                    && c.getMontantEnMain() != null
+                    && c.getMontantEnMain() != 0) {
                 ca += c.getMontantEnMain();
             }
         }
 
-        // Paiements factures d'aujourd'hui
+        // Paiements factures d'aujourd'hui (CAISSE = ESPECES uniquement)
         List<Paiement> paiementsAujourdhui = paiementRepository.findByEntrepriseId(entrepriseId).stream()
                 .filter(p -> estAujourdhui(p.getDatePaiement()))
+                .filter(p -> p.getModePaiement() != null && "ESPECES".equalsIgnoreCase(p.getModePaiement()))
                 .collect(Collectors.toList());
         for (Paiement paiement : paiementsAujourdhui) {
             ca += getValeurDouble(paiement.getMontant());
         }
 
-        // Entrées générales d'aujourd'hui (en excluant les transferts et les paiements de factures)
+        // Entrées générales CAISSE d'aujourd'hui (hors transferts, hors paiements facture, hors écarts caisse)
         for (EntreeGenerale entree : data.entreesGenerales) {
-            if (estAujourdhui(entree.getDateCreation()) 
+            if (estAujourdhui(entree.getDateCreation())
+                    && entree.getSource() == SourceDepense.CAISSE
                     && !estEntreeDeTransfert(entree.getDesignation())
-                    && (entree.getDetteType() == null || !"PAIEMENT_FACTURE".equals(entree.getDetteType()))
-                    && (entree.getDetteType() == null || !"ECART_CAISSE".equals(entree.getDetteType()))) {
+                    && (entree.getDetteType() == null || "ENTREE_DETTE".equals(entree.getDetteType()))) {
                 ca += getValeurDouble(entree.getMontant());
             }
         }
@@ -1131,15 +2016,18 @@ public class TresorerieService {
 
     /**
      * Calcule les sorties d'aujourd'hui.
-     * Inclut : dépenses générales d'aujourd'hui + mouvements caisse DEPENSE d'aujourd'hui + retraits d'aujourd'hui
-     * Exclut : les transferts de fonds
+     * Version centrée CAISSE : on ne prend en compte que ce qui sort réellement de la caisse,
+     * pas les dépenses payées directement par BANQUE ou MOBILE_MONEY (déjà couvertes par les soldes banque/mobile).
+     * Inclut : dépenses générales source=CAISSE + mouvements caisse DEPENSE + retraits d'aujourd'hui.
+     * Exclut : les transferts de fonds et les dépenses BANQUE / MOBILE_MONEY.
      */
     private double calculerSortiesAujourdhui(TresorerieData data, Long entrepriseId) {
         double sorties = 0.0;
 
-        // Dépenses générales d'aujourd'hui (en excluant les transferts)
+        // Dépenses générales d'aujourd'hui payées PAR LA CAISSE (source = CAISSE), en excluant les transferts
         for (DepenseGenerale depense : data.depensesGenerales) {
             if (estAujourdhui(depense.getDateCreation()) 
+                    && depense.getSource() == SourceDepense.CAISSE
                     && !estDepenseDeTransfert(depense.getDesignation())) {
                 sorties += getValeurDouble(depense.getMontant());
             }
@@ -1243,36 +2131,55 @@ public class TresorerieService {
     }
 
     /**
-     * Calcule le CA (entrées) pour une période, aligné sur la comptabilité.
-     * Inclut : fermetures de caisse dans la période (montantEnMain) + paiements factures + entrées générales.
+     * Calcule le CA (Chiffre d'Affaires) pour une période donnée.
+     * Inclut : fermetures de caisse de la période (montantEnMain) + paiements factures de la période + entrées générales CAISSE de la période.
+     * Exclut : transferts de fonds, paiements de factures déjà comptés ailleurs et écarts de caisse (ECART_CAISSE).
      */
     private double calculerCAPeriode(TresorerieData data, Long entrepriseId, PeriodeDates periodeDates) {
         double ca = 0.0;
 
         // Fermetures de caisse dans la période : montant réel (montantEnMain)
-        if (periodeDates != null && periodeDates.filtrerParPeriode) {
-            for (Caisse c : data.caissesFermees) {
-                if (c.getDateFermeture() != null && c.getMontantEnMain() != null && c.getMontantEnMain() != 0
-                        && !c.getDateFermeture().isBefore(periodeDates.dateDebut)
-                        && c.getDateFermeture().isBefore(periodeDates.dateFin)) {
-                    ca += c.getMontantEnMain();
-                }
+        for (Caisse c : data.caissesFermees) {
+            LocalDateTime df = c.getDateFermeture();
+            if (df != null
+                    && (periodeDates == null || !periodeDates.filtrerParPeriode
+                        || (!df.isBefore(periodeDates.dateDebut) && df.isBefore(periodeDates.dateFin)))
+                    && c.getMontantEnMain() != null
+                    && c.getMontantEnMain() != 0) {
+                ca += c.getMontantEnMain();
             }
         }
 
-        // Paiements factures de la période
+        // Paiements factures de la période (CAISSE = ESPECES uniquement)
         if (periodeDates != null && periodeDates.filtrerParPeriode) {
             List<Paiement> paiementsPeriode = paiementRepository.findByEntrepriseIdAndDatePaiementBetween(
                     entrepriseId, periodeDates.dateDebut, periodeDates.dateFin);
             for (Paiement paiement : paiementsPeriode) {
+                if (paiement.getModePaiement() == null || !"ESPECES".equalsIgnoreCase(paiement.getModePaiement())) {
+                    continue;
+                }
+                ca += getValeurDouble(paiement.getMontant());
+            }
+        } else {
+            // Si pas de filtre explicite, on considère tous les paiements
+            for (Paiement paiement : paiementRepository.findByEntrepriseId(entrepriseId)) {
+                if (paiement.getModePaiement() == null || !"ESPECES".equalsIgnoreCase(paiement.getModePaiement())) {
+                    continue;
+                }
                 ca += getValeurDouble(paiement.getMontant());
             }
         }
 
-        // Entrées générales de la période (en excluant transferts, paiements factures, écarts caisse)
+        // Entrées générales CAISSE de la période (hors transferts, hors paiements facture, hors écarts caisse)
         for (EntreeGenerale entree : data.entreesGenerales) {
-            if (!estEntreeDeTransfert(entree.getDesignation())
-                    && (entree.getDetteType() == null || (!"PAIEMENT_FACTURE".equals(entree.getDetteType()) && !"ECART_CAISSE".equals(entree.getDetteType())))) {
+            LocalDateTime dc = entree.getDateCreation();
+            boolean dansPeriode = (periodeDates == null || !periodeDates.filtrerParPeriode
+                    || (dc != null && !dc.isBefore(periodeDates.dateDebut) && dc.isBefore(periodeDates.dateFin)));
+
+            if (dansPeriode
+                    && entree.getSource() == SourceDepense.CAISSE
+                    && !estEntreeDeTransfert(entree.getDesignation())
+                    && (entree.getDetteType() == null || "ENTREE_DETTE".equals(entree.getDetteType()))) {
                 ca += getValeurDouble(entree.getMontant());
             }
         }
@@ -1282,15 +2189,18 @@ public class TresorerieService {
 
     /**
      * Calcule les sorties pour une période donnée.
-     * Inclut : dépenses générales + mouvements caisse DEPENSE + retraits
-     * Exclut : les transferts de fonds
+     * Version centrée CAISSE pour être cohérente avec soldeAujourdhui :
+     * - on ne prend en compte que ce qui sort réellement de la caisse
+     *   (dépenses générales source = CAISSE, mouvements DEPENSE et RETRAIT),
+     * - on exclut les transferts de fonds et les dépenses payées directement par BANQUE / MOBILE_MONEY.
      */
     private double calculerSortiesPeriode(TresorerieData data, Long entrepriseId, PeriodeDates periodeDates) {
         double sorties = 0.0;
 
-        // Dépenses générales de la période (en excluant les transferts)
+        // Dépenses générales de la période payées PAR LA CAISSE (source = CAISSE), en excluant les transferts
         for (DepenseGenerale depense : data.depensesGenerales) {
-            if (!estDepenseDeTransfert(depense.getDesignation())) {
+            if (depense.getSource() == SourceDepense.CAISSE
+                    && !estDepenseDeTransfert(depense.getDesignation())) {
                 sorties += getValeurDouble(depense.getMontant());
             }
         }
@@ -1303,6 +2213,56 @@ public class TresorerieService {
         // Retraits de la période
         for (MouvementCaisse mouvement : data.mouvementsRetrait) {
             sorties += getValeurDouble(mouvement.getMontant());
+        }
+
+        return sorties;
+    }
+
+    /**
+     * Sorties côté banque pour la période (dépenses BANQUE + mouvements caisse vers/depuis la banque).
+     */
+    private double calculerSortiesBanquePeriode(TresorerieData data, Long entrepriseId, PeriodeDates periodeDates) {
+        double sorties = 0.0;
+
+        // Dépenses générales BANQUE (hors transferts)
+        for (DepenseGenerale depense : data.depensesGenerales) {
+            if (depense.getSource() == SourceDepense.BANQUE
+                    && !estDepenseDeTransfert(depense.getDesignation())) {
+                sorties += getValeurDouble(depense.getMontant());
+            }
+        }
+
+        // Mouvements caisse DEPENSE vers la banque (VIREMENT, CHEQUE, CARTE)
+        for (MouvementCaisse mouvement : data.mouvementsDepense) {
+            ModePaiement mp = mouvement.getModePaiement();
+            if (mp == ModePaiement.VIREMENT || mp == ModePaiement.CHEQUE || mp == ModePaiement.CARTE) {
+                sorties += getValeurDouble(mouvement.getMontant());
+            }
+        }
+
+        return sorties;
+    }
+
+    /**
+     * Sorties côté mobile money pour la période (dépenses MOBILE_MONEY + mouvements caisse vers mobile).
+     */
+    private double calculerSortiesMobilePeriode(TresorerieData data, Long entrepriseId, PeriodeDates periodeDates) {
+        double sorties = 0.0;
+
+        // Dépenses générales MOBILE_MONEY (hors transferts)
+        for (DepenseGenerale depense : data.depensesGenerales) {
+            if (depense.getSource() == SourceDepense.MOBILE_MONEY
+                    && !estDepenseDeTransfert(depense.getDesignation())) {
+                sorties += getValeurDouble(depense.getMontant());
+            }
+        }
+
+        // Mouvements caisse DEPENSE vers le mobile money
+        for (MouvementCaisse mouvement : data.mouvementsDepense) {
+            ModePaiement mp = mouvement.getModePaiement();
+            if (mp == ModePaiement.MOBILE_MONEY) {
+                sorties += getValeurDouble(mouvement.getMontant());
+            }
         }
 
         return sorties;

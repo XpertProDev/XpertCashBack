@@ -478,9 +478,16 @@ public ReceiptEmailRequest getFactureDataForEmail(String venteId, String email, 
 }
 
 /**
- * Récupère les statistiques globales de vente pour l'entreprise (filtres optionnels : période, vendeur, boutique).
+ * Récupère les statistiques globales de vente pour l'entreprise.
+ * Filtres optionnels : période, vendeur, boutique.
+ * Pour une période personnalisée, utiliser periode=custom avec dateDebut et dateFin.
  */
-public StatistiquesVenteGlobalesDTO getStatistiquesGlobales(String periode, Long vendeurId, Long boutiqueId, HttpServletRequest request) {
+public StatistiquesVenteGlobalesDTO getStatistiquesGlobales(String periode,
+                                                            Long vendeurId,
+                                                            Long boutiqueId,
+                                                            java.time.LocalDate dateDebutParam,
+                                                            java.time.LocalDate dateFinParam,
+                                                            HttpServletRequest request) {
     String token = request.getHeader("Authorization");
     if (token == null || !token.startsWith("Bearer ")) {
         throw new RuntimeException("Token JWT manquant ou invalide");
@@ -502,7 +509,7 @@ public StatistiquesVenteGlobalesDTO getStatistiquesGlobales(String periode, Long
         throw new RuntimeException("Boutique invalide ou n'appartient pas à votre entreprise.");
     }
 
-    PeriodeDates periodeDates = calculerDatesPeriodeStatistiques(periode);
+    PeriodeDates periodeDates = calculerDatesPeriodeStatistiques(periode, dateDebutParam, dateFinParam);
     LocalDateTime dateDebut = periodeDates.dateDebut;
     LocalDateTime dateFin = periodeDates.dateFin;
 
@@ -621,6 +628,28 @@ public StatistiquesVenteGlobalesDTO getStatistiquesGlobales(String periode, Long
         }
 
         return new PeriodeDates(dateStart, dateEnd, true, periodeLabel);
+    }
+
+    /**
+     * Variante de calculerDatesPeriodeStatistiques qui gère une période personnalisée (custom)
+     * en utilisant les dates fournies par l'utilisateur.
+     */
+    private PeriodeDates calculerDatesPeriodeStatistiques(String periode,
+                                                          java.time.LocalDate dateDebutParam,
+                                                          java.time.LocalDate dateFinParam) {
+        if (periode != null && periode.equalsIgnoreCase("custom")) {
+            if (dateDebutParam == null || dateFinParam == null) {
+                // Si les dates ne sont pas fournies, on retombe sur le comportement par défaut (aujourd'hui)
+                return calculerDatesPeriodeStatistiques("aujourdhui");
+            }
+            LocalDateTime dateStart = dateDebutParam.atStartOfDay();
+            // on inclut toute la journée de dateFin
+            LocalDateTime dateEnd = dateFinParam.plusDays(1).atStartOfDay();
+            String label = "Du " + dateDebutParam + " au " + dateFinParam;
+            return new PeriodeDates(dateStart, dateEnd, true, label);
+        }
+        // Pour toutes les autres périodes prédéfinies
+        return calculerDatesPeriodeStatistiques(periode);
     }
 
 
