@@ -207,6 +207,9 @@ public class TresorerieService {
             java.util.List<Paiement> paiementsPeriode = paiementRepository.findByEntrepriseIdAndDatePaiementBetween(
                     entrepriseId, periodeDates.dateDebut, periodeDates.dateFin);
             for (Paiement p : paiementsPeriode) {
+                if (p.getModePaiement() == null || !"ESPECES".equalsIgnoreCase(p.getModePaiement())) {
+                    continue;
+                }
                 double montant = getValeurDouble(p.getMontant());
                 if (montant == 0.0) continue;
                 String source = p.getModePaiement() != null ? p.getModePaiement() : "INCONNU";
@@ -1989,9 +1992,10 @@ public class TresorerieService {
             }
         }
 
-        // Paiements factures d'aujourd'hui (tous modes)
+        // Paiements factures d'aujourd'hui (CAISSE = ESPECES uniquement)
         List<Paiement> paiementsAujourdhui = paiementRepository.findByEntrepriseId(entrepriseId).stream()
                 .filter(p -> estAujourdhui(p.getDatePaiement()))
+                .filter(p -> p.getModePaiement() != null && "ESPECES".equalsIgnoreCase(p.getModePaiement()))
                 .collect(Collectors.toList());
         for (Paiement paiement : paiementsAujourdhui) {
             ca += getValeurDouble(paiement.getMontant());
@@ -2146,16 +2150,22 @@ public class TresorerieService {
             }
         }
 
-        // Paiements factures de la période (tous modes)
+        // Paiements factures de la période (CAISSE = ESPECES uniquement)
         if (periodeDates != null && periodeDates.filtrerParPeriode) {
             List<Paiement> paiementsPeriode = paiementRepository.findByEntrepriseIdAndDatePaiementBetween(
                     entrepriseId, periodeDates.dateDebut, periodeDates.dateFin);
             for (Paiement paiement : paiementsPeriode) {
+                if (paiement.getModePaiement() == null || !"ESPECES".equalsIgnoreCase(paiement.getModePaiement())) {
+                    continue;
+                }
                 ca += getValeurDouble(paiement.getMontant());
             }
         } else {
             // Si pas de filtre explicite, on considère tous les paiements
             for (Paiement paiement : paiementRepository.findByEntrepriseId(entrepriseId)) {
+                if (paiement.getModePaiement() == null || !"ESPECES".equalsIgnoreCase(paiement.getModePaiement())) {
+                    continue;
+                }
                 ca += getValeurDouble(paiement.getMontant());
             }
         }
